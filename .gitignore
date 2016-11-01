@@ -1,0 +1,17 @@
+# Folders
+/notes
+/downloads
+/tmp
+/.idea
+
+# File Types
+*.pyc
+*.orig
+*.zip
+*.tern-project
+*.log
+*.log.*
+*~
+
+# specific files
+local_paths.py

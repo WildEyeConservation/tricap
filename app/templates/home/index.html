@@ -1,0 +1,21 @@
+<script src="{{ url_for('static', filename='js/jquery-3.0.0.min.js') }}" type="text/javascript"></script>
+
+<html>
+<header><title>TriCap!</title></header>
+<body>
+
+{% block javascript %}
+    <script type="text/javascript">
+        {% include 'js/home.js' %}
+    </script>
+{% endblock %}
+
+
+TriCap Testing.
+<button type="button" id="btn_start">Start</button>
+<button type="button" id="btn_stop">Stop</button>
+
+<img id="img_cam0">
+
+</body>
+</html>

@@ -1,5 +1,7 @@
 var $SCRIPT_ROOT = {{ request.script_root|tojson|safe }};
 
+var numCams = {{num_cams}};
+
 BUTTON_CODE_START = 0;
 BUTTON_CODE_STOP = 1;
 
@@ -38,18 +40,21 @@ $(function () {
     document.getElementById("btn_stop").onclick = buttonClick
 });
 
-var camImage0CheckFollowUp = function(data){
+
+var camImageCheckFollowUp = function(data){
     if (data.new_image === true){
-        var img = document.getElementById('img_cam0')
-        img.src = '/cam_img0?'+ new Date().getTime();
+        var img = document.getElementById('img_cam'+data.cam_num)
+        img.src = '/cam_img' + data.cam_num + '?'+ new Date().getTime();
     }
 }
 
 $(function () {
-    var checkCamImg0 = function(){
-        console.log("Checking Cam Img 0");
-        $.getJSON($SCRIPT_ROOT + '/_check_cam_image0', {}, camImage0CheckFollowUp)
+    var imgCheckupFunc = function(){
+        for (index = 0; index < numCams; index++){
+            console.log("Checking Cam Img" + index);
+            $.getJSON($SCRIPT_ROOT + '/_check_cam_image'+index, {}, camImageCheckFollowUp)
+        }
         return false;
-    }
-    setInterval(checkCamImg0, 5000);
+    };
+    setInterval(imgCheckupFunc, 5000);
 });

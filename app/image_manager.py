@@ -31,6 +31,9 @@ class QueueImageManager(object):
     def is_cam_image_fresh(self, cam_num):
         self._process_queue()
 
+        if len(self._cam_fps.keys()) == 0:
+            return False
+
         if str(cam_num) not in self._last_provided_cam_fps:
             return True
 
@@ -44,6 +47,7 @@ class QueueImageManager(object):
             print 'Returning queue item : ' + self._cam_fps[str(cam_num)]
 
             subprocess32.check_output(["ufraw-batch", "--silent", "--overwrite", "--rotate=no", "--out-type=jpg",
+                                       "--size=640",
                                        self._cam_fps[str(cam_num)]])
 
             self._last_provided_cam_fps[str(cam_num)] = self._cam_fps[str(cam_num)]

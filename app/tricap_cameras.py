@@ -21,6 +21,8 @@ class TriCapCam(object):
 
         self._setup_camera(port_info)
 
+    #TODO setup from config values
+
     def _setup_camera(self, port_info):
 
         self._gp_camera.set_port_info(port_info)
@@ -107,6 +109,9 @@ class TriCapCamsManager(object):
 
     def get_cam_fp_queue(self):
         return self._cam_fp_queue
+
+    def get_num_cams(self):
+        return len(self._cameras)
 
 
 def _get_cameras(context):

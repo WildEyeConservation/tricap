@@ -20,26 +20,32 @@ def index_slash():
 def index():
     """The home page. Handles the login form and redirects to the verification page after a
     successfull login."""
-    return render_template('/home/index.html')
+    col_size_cam_img = 12/tricap_manager.get_num_cams()
+    if col_size_cam_img < 2:
+        col_size_cam_img = 2
+    return render_template('/home/index.html', num_cams=tricap_manager.get_num_cams(),
+                           col_size_cam_img=col_size_cam_img)
 
 
-@home_bp.route('/_check_cam_image0')
-def is_cam_image0_fresh():
-    print 'Check cam image 0'
-    data = {'new_image': image_manager.is_cam_image_fresh(0)}
+@home_bp.route('/_check_cam_image<cam_num_str>')
+def is_cam_image_fresh(cam_num_str):
+    print 'Check cam image ' + cam_num_str
+    data = {'new_image': image_manager.is_cam_image_fresh(int(cam_num_str)),
+            'cam_num': int(cam_num_str)}
     return jsonify(data)
 
 
-@home_bp.route('/cam_img0')
-def serve_cam_img0():
-    print 'serving cam img 0'
-    cam_img0_fp = image_manager.get_cam_image_fp(0)
+@home_bp.route('/cam_img<cam_num_str>')
+def serve_cam_img(cam_num_str):
+    print 'serving cam img ' + cam_num_str
+    cam_img_fp = image_manager.get_cam_image_fp(int(cam_num_str))
     # cam_img0_fp = '/home/deon/tmp/09_49_04_835.jpg'
 
-    if cam_img0_fp is None:
-        cam_img0_fp = '/home/deon/tmp/deepdream/frame0.jpg'
+    if cam_img_fp is None:
+        cam_img_fp = '/home/deon/tmp/deepdream/frame1.jpg'
 
-    return send_file(cam_img0_fp, attachment_filename='image.bmp', as_attachment=True)
+    return send_file(cam_img_fp, attachment_filename='image.bmp', as_attachment=True)
+
 
 
 @home_bp.route('/_button_click')

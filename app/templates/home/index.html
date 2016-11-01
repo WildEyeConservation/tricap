@@ -1,21 +1,40 @@
-<script src="{{ url_for('static', filename='js/jquery-3.0.0.min.js') }}" type="text/javascript"></script>
+<!DOCTYPE html>
 
-<html>
-<header><title>TriCap!</title></header>
+<script src="{{ url_for('static', filename='js/jquery-3.0.0.min.js') }}" type="text/javascript"></script>
+<script src="{{ url_for('static', filename='js/bootstrap.js') }}" type="text/javascript"></script>
+
+<link rel="stylesheet" href="{{ url_for('static', filename='css/bootstrap.css') }}" type="text/css">
+
+<html lang="en" xmlns="http://www.w3.org/1999.xhtml">
+<header><title>TriCap</title></header>
 <body>
 
-{% block javascript %}
-    <script type="text/javascript">
-        {% include 'js/home.js' %}
-    </script>
-{% endblock %}
+    {% block javascript %}
+        <script type="text/javascript">
+            {% include 'js/home.js' %}
+        </script>
+    {% endblock %}
+
+    <div class="container">
+        <div class="row">
+            {% for cam_num in range(num_cams) %}
+                <div class="col-md-{{col_size_cam_img}}">
+                    <img id="img_cam{{cam_num}}">
+                </div>
+            {% endfor %}
+        </div>
+
+        <div class="row">
+            <div class="col-md-4">
+                <button type="button" class="btn btn-primary btn-block" id="btn_start">Start</button>
+            </div>
+            <div class="col-md-4">
+                <button type="button" class="btn btn-primary btn-block" id="btn_stop">Stop</button>
+            </div>
+        </div>
 
 
-TriCap Testing.
-<button type="button" id="btn_start">Start</button>
-<button type="button" id="btn_stop">Stop</button>
-
-<img id="img_cam0">
+    </div>
 
 </body>
 </html>

@@ -3,6 +3,7 @@
 import local_paths
 
 SERVER_LOG_DIR = local_paths.SERVER_LOG_DIR
+SESSION_ROOT_DIR = local_paths.SESSION_ROOT_DIR
 DISPLAY_DOWNLOAD_DIR = local_paths.DISPLAY_DOWNLOAD_DIR
 
 # gphoto2 canon config vars
@@ -14,13 +15,20 @@ CANON_EOS_6D_SHUTTER_SPEED_1_OVER_640 = 43
 CANON_EOS_6D_SHUTTER_SPEED_1_OVER_4 = 21
 
 
+
 class TRICAP_CAMS_MANAGER_STATES:
     STOPPED, STARTED, ERROR_NO_CAMS = range(3)
-    MAX = 1
+    MAX = 2
     MIN = 0
 
 
+class ALTIMETER_STATE:
+    NOT_CONNECTED, CONNECTED, MEASURING, ERROR = range(4)
+    MAX = 2
+    MAX = 0
+
+
 class BUTTON_CODES:
-    START, STOP = range(2)
-    MAX = 1
+    START, STOP, TEST = range(3)
+    MAX = 2
     MIN = 0

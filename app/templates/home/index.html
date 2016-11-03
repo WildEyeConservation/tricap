@@ -17,9 +17,30 @@
 
     <div class="container">
         <div class="row">
+            <div class="col-md-12">
+                <p>
+                    Number of Cameras: {{num_cams}}
+                </p>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-md-6">
+                <p id='p_alti_state'>
+                    Altimeter state : {{alti_state}}
+                </p>
+            </div>
+            <div class="col-md-6">
+                <p id='p_alti_measurement'>
+                    Altimeter measurement : 0
+                </p>
+            </div>
+        </div>
+
+        <div class="row">
             {% for cam_num in range(num_cams) %}
                 <div class="col-md-{{col_size_cam_img}}">
-                    <img id="img_cam{{cam_num}}">
+                    <img id="img_cam{{cam_num}}" src="{{ url_for('static', filename='img/default.jpg') }}" class='img-rounded img-responsive'>
                 </div>
             {% endfor %}
         </div>
@@ -30,6 +51,9 @@
             </div>
             <div class="col-md-4">
                 <button type="button" class="btn btn-primary btn-block" id="btn_stop">Stop</button>
+            </div>
+            <div class="col-md-4">
+                <button type="button" class="btn btn-primary btn-block" id="btn_test">Test</button>
             </div>
         </div>
 

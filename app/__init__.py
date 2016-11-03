@@ -7,8 +7,10 @@ from logging.handlers import TimedRotatingFileHandler
 
 from flask import Flask
 
-from tricap_cameras import tricap_manager
-from image_manager import QueueImageManager
+# from tricap_cameras import create_tricap_cameras_and_manager
+# from image_manager import QueueImageManager
+from image_manager import DummyImageManager, DummyTricapManager
+from trusense_altimeter import TrusenseAltimeter
 
 from config import SERVER_LOG_DIR
 
@@ -31,7 +33,13 @@ app.logger.addHandler(handler)
 app.logger.setLevel(logging.DEBUG)  # Set this also, so as to get info messages as well
 
 # Custom Setup
-image_manager = QueueImageManager(tricap_manager.get_cam_fp_queue())
+# tricap_cameras, tricap_manager = create_tricap_cameras_and_manager()
+# image_manager = QueueImageManager(tricap_manager.get_cam_fp_queue())
+image_manager = DummyImageManager()
+tricap_manager = DummyTricapManager(2)
+
+# setup altimeter
+altimeter = TrusenseAltimeter()
 
 # Blueprints
 from .views.home import home_bp

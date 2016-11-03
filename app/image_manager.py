@@ -1,18 +1,43 @@
 import subprocess32
 import os
 
+from config import TRICAP_CAMS_MANAGER_STATES
+
 class DummyImageManager(object):
     def __init__(self):
         self.state = 0
 
+    def is_cam_image_fresh(self, cam_num):
+        return True
+
     def get_cam_image_fp(self, cam_num):
-        dd_fp = '/home/deon/tmp/deepdream/frame'+str(self.state) + '.jpg'
+        # dd_fp = '/home/deon/tmp/deepdream/frame'+str(self.state) + '.jpg'
         self.state += 1
 
         if self.state > 9:
             self.state = 0
 
+        dd_fp = 'C:/Users/Public/Pictures/Sample Pictures/Jellyfish.jpg'
+
         return dd_fp
+
+
+class DummyTricapManager(object):
+    def __init__(self, num_cams):
+        self._num_cams = num_cams
+        self.state = TRICAP_CAMS_MANAGER_STATES.STOPPED
+
+    def start_capturing(self):
+        self.state = TRICAP_CAMS_MANAGER_STATES.STARTED
+
+    def stop_capturing(self):
+        self.state = TRICAP_CAMS_MANAGER_STATES.STOPPED
+
+    def get_cam_fp_queue(self):
+        return None
+
+    def get_num_cams(self):
+        return self._num_cams
 
 
 class QueueImageManager(object):
@@ -46,17 +71,15 @@ class QueueImageManager(object):
         if str(cam_num) in self._cam_fps:
             print 'Returning queue item : ' + self._cam_fps[str(cam_num)]
 
-            subprocess32.check_output(["ufraw-batch", "--silent", "--overwrite", "--rotate=no", "--out-type=jpg",
-                                       "--size=640",
-                                       self._cam_fps[str(cam_num)]])
+            dir_with_filename, ext = os.path.splitext(self._cam_fps[str(cam_num)])
+
+            if ext.lower() == '.cr2':
+                subprocess32.check_output(["ufraw-batch", "--silent", "--overwrite", "--rotate=no", "--out-type=jpg",
+                                           "--size=640",
+                                           self._cam_fps[str(cam_num)]])
 
             self._last_provided_cam_fps[str(cam_num)] = self._cam_fps[str(cam_num)]
-
-            dir_with_filename, ext = os.path.splitext(self._cam_fps[str(cam_num)])
 
             return dir_with_filename + '.jpg'
         else:
             return None
-
-
-

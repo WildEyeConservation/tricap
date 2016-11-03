@@ -120,7 +120,7 @@ def _get_cameras(context):
     port_info_list = gp.PortInfoList()
     port_info_list.load()
 
-    for name, addr in gp_context.camera_autodetect():
+    for name, addr in context.camera_autodetect():
 
         if name == "Canon EOS 6D":
             #TODO Replace these print statements with logging
@@ -133,10 +133,8 @@ def _get_cameras(context):
 
     return cameras
 
-gp_context = gp.Context()
-
-tricap_cameras = _get_cameras(gp_context)
-
-tricap_manager = TriCapCamsManager(tricap_cameras)
-
-
+def create_tricap_cameras_and_manager():
+    gp_context = gp.Context()
+    tricap_cameras = _get_cameras(gp_context)
+    tricap_manager = TriCapCamsManager(tricap_cameras)
+    return tricap_cameras, tricap_manager

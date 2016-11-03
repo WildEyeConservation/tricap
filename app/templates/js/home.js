@@ -51,10 +51,25 @@ var camImageCheckFollowUp = function(data){
 $(function () {
     var imgCheckupFunc = function(){
         for (index = 0; index < numCams; index++){
-            console.log("Checking Cam Img" + index);
             $.getJSON($SCRIPT_ROOT + '/_check_cam_image'+index, {}, camImageCheckFollowUp)
         }
         return false;
     };
-    setInterval(imgCheckupFunc, 5000);
+    setInterval(imgCheckupFunc, 2000);
+});
+
+var altiCheckFollowup = function(data){
+    var pAltiState = document.getElementById('p_alti_state');
+    pAltiState.innerHTML = 'Altimeter state : ' + data.alti_state;
+
+    var pAltiMeasurement = document.getElementById('p_alti_measurement');
+    pAltiMeasurement.innerHTML = 'Altimeter measurement : ' + data.alti_measurement;
+}
+
+$(function () {
+    var altiCheckup = function(){
+        $.getJSON($SCRIPT_ROOT + '/_get_alti_data', {}, altiCheckFollowup)
+        return false;
+    };
+    setInterval(altiCheckup, 1000);
 });

@@ -57,11 +57,15 @@ class TriCapCam(object):
                 # Capture an image
                 file_path = gp.check_result(gp.gp_camera_capture(self._gp_camera, gp.GP_CAPTURE_IMAGE, self._context))
 
+                img_name, img_ext = os.path.splitext(file_path.name)
+
                 # Download the image
                 camera_file = gp.check_result(gp.gp_camera_file_get(
-                            self._gp_camera, file_path.folder, file_path.name, gp.GP_FILE_TYPE_NORMAL, self._context))
+                            self._gp_camera, file_path.folder, img_name+'.JPG', gp.GP_FILE_TYPE_NORMAL, self._context))
 
-                download_fp = os.path.join(DISPLAY_DOWNLOAD_DIR, file_path.name)
+                download_fp = os.path.join(DISPLAY_DOWNLOAD_DIR, img_name+'.JPG')
+
+                print img_name+'.JPG'
 
                 gp.check_result(gp.gp_file_save(camera_file, download_fp))
 

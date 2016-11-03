@@ -80,6 +80,6 @@ class QueueImageManager(object):
 
             self._last_provided_cam_fps[str(cam_num)] = self._cam_fps[str(cam_num)]
 
-            return dir_with_filename + '.jpg'
+            return dir_with_filename + '.JPG'
         else:
             return None

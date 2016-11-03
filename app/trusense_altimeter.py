@@ -34,24 +34,27 @@ class TrusenseAltimeter(object):
         if self.state != ALTIMETER_STATE.ERROR:
             self.configure()
 
-    def __del__(self):
-        if self.read_thread is not None:
-            if self.read_thread.is_alive() is True:
-                self._kill_pill.set()
-                self.read_thread.join()
-
-        self.disconnect()
+    # def __del__(self):
+    #     if self.read_thread is not None:
+    #         if self.read_thread.is_alive() is True:
+    #             self._kill_pill.set()
+    #             self.read_thread.join()
+    #
+    #     self.disconnect()
 
     def _get_correct_port_name(self):
         ports = list(serial.tools.list_ports.comports())
         correct_port = None
         for p in ports:
-            if 'Prolific' in p[1]:
+            if 'Prolific' in p[1] or 'USB-Serial Controller' in p[1]:
                 correct_port = p[0]
                 break
 
         if correct_port == None:
             self.state = ALTIMETER_STATE.ERROR
+
+        print correct_port
+        
         return correct_port
 
     def connect(self):

@@ -54,7 +54,7 @@ class TrusenseAltimeter(object):
             self.state = ALTIMETER_STATE.ERROR
 
         print correct_port
-        
+
         return correct_port
 
     def connect(self):
@@ -113,12 +113,12 @@ class TrusenseAltimeter(object):
             return -1
 
         # set continous mode average
-        self._ser.write('$CA,5\r\n')
+        self._ser.write('$CA,2\r\n')
         if self._check_ok('Error setting continous mode frame averaging') != 0:
             return -1
 
         # set fast mode averaging
-        self._ser.write('$FA,5\r\n')
+        self._ser.write('$FA,2\r\n')
         if self._check_ok('Error setting fast mode frame averaging') != 0:
             return -1
 
@@ -166,6 +166,9 @@ class TrusenseAltimeter(object):
         return worker
 
     def start_measuring(self):
+        if self._ser.is_open is False:
+            return -1
+
         self._ser.write('$GO\r\n')
         if self._check_ok('Error starting measuring mode') != 0:
             return -1
@@ -176,6 +179,14 @@ class TrusenseAltimeter(object):
         self.state = ALTIMETER_STATE.MEASURING
 
     def stop_measuring(self):
+        if self._ser.is_open is False:
+            return -1
+
         self._kill_pill.set()
         self.read_thread.join()
+
+        self._ser.write('$ST\r\n')
+        if self._check_ok('Error stopping measuring mode') != 0:
+            return -1
+
         self.state = ALTIMETER_STATE.CONNECTED

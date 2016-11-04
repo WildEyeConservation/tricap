@@ -21,7 +21,11 @@ def index_slash():
 def index():
     """The home page. Handles the login form and redirects to the verification page after a
     successfull login."""
-    col_size_cam_img = 12/tricap_manager.get_num_cams()
+    if tricap_manager.get_num_cams() == 0:
+        col_size_cam_img = 4
+    else:
+        col_size_cam_img = 12/tricap_manager.get_num_cams()
+
     if col_size_cam_img < 2:
         col_size_cam_img = 2
     return render_template('/home/index.html', num_cams=tricap_manager.get_num_cams(),
@@ -49,7 +53,7 @@ def serve_cam_img(cam_num_str):
     # cam_img0_fp = '/home/deon/tmp/09_49_04_835.jpg'
 
     if cam_img_fp is None:
-        cam_img_fp = '/home/deon/tmp/deepdream/frame1.jpg'
+        cam_img_fp = os.path.join(current_app.root_path, 'static', 'img', 'default.jpg')
 
     return send_file(cam_img_fp, attachment_filename='image.bmp', as_attachment=True)
 
@@ -64,8 +68,10 @@ def handle_button_click():
         tricap_manager.start_capturing()
         altimeter.start_measuring()
     elif button_code == BUTTON_CODES.STOP:
+        print 'stopping - view'
         tricap_manager.stop_capturing()
         altimeter.stop_measuring()
+        print 'stopping - view - stopped'
 
     return jsonify()
 

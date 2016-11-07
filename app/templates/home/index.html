@@ -40,6 +40,9 @@
         <div class="row">
             {% for cam_num in range(num_cams) %}
                 <div class="col-md-{{col_size_cam_img}}">
+                    <p>
+                        Camera ID: {{cam_ids[cam_num]}}
+                    </p>
                     <img id="img_cam{{cam_num}}" src="{{ url_for('static', filename='img/default.jpg') }}" class='img-rounded img-responsive'>
                 </div>
             {% endfor %}

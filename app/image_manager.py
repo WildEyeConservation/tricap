@@ -1,7 +1,10 @@
 import subprocess32
 import os
 
+import hashlib
+
 from config import TRICAP_CAMS_MANAGER_STATES
+from config import DISPLAY_DOWNLOAD_DIR, CAM_IMAGE_PREFIX
 
 class DummyImageManager(object):
     def __init__(self):
@@ -83,3 +86,30 @@ class QueueImageManager(object):
             return dir_with_filename + '.JPG'
         else:
             return None
+
+
+class SameFileImageManager(object):
+    # Assumes each camera has a single image it is updating/replacing
+    def __init__(self):
+        self._image_hashes = {}
+
+    def is_cam_image_fresh(self, cam_num):
+        cam_image_fp = os.path.join(DISPLAY_DOWNLOAD_DIR, CAM_IMAGE_PREFIX + str(cam_num) + '.JPG')
+        if os.path.isfile(cam_image_fp) is False:
+            return False
+
+        image_hash = hashlib.sha1(open(cam_image_fp, 'rb').read()).hexdigest()
+
+        if str(cam_num) in self._image_hashes.keys():
+            if self._image_hashes[str(cam_num)] == image_hash:
+                return False
+
+        self._image_hashes[str(cam_num)] = image_hash
+        return True
+
+    def get_cam_image_fp(self, cam_num):
+        cam_image_fp = os.path.join(DISPLAY_DOWNLOAD_DIR, CAM_IMAGE_PREFIX + str(cam_num) + '.JPG')
+        if os.path.isfile(cam_image_fp) is False:
+            return None
+        else:
+            return cam_image_fp

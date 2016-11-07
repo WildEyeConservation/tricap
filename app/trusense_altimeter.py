@@ -14,9 +14,9 @@ class TrusenseAltimeter(object):
         self._ser = serial.Serial()
 
         self._ser.port=self._get_correct_port_name()
-        self._ser.baudrate=115200
-        self._ser.timeout=None
-        self._ser._write_timeout=None
+        self._ser.baudrate = 115200
+        self._ser.timeout = 1.0
+        self._ser.write_timeout = 1.0
 
         self.measurement = 0
 
@@ -60,10 +60,10 @@ class TrusenseAltimeter(object):
     def connect(self):
         self._ser.open()
         if self._ser.is_open == True:
-            print 'Comms with altimeter has been opened'
+            print 'Comms with serial port of the altimeter have been opened'
             self.state = ALTIMETER_STATE.CONNECTED
         else:
-            print 'Commns with altimeter are not open - ERROR.'
+            print 'Comms with serial port of the altimeter are not open - ERROR.'
             self.state = ALTIMETER_STATE.ERROR
             return -1
 
@@ -182,11 +182,12 @@ class TrusenseAltimeter(object):
         if self._ser.is_open is False:
             return -1
 
-        self._kill_pill.set()
-        self.read_thread.join()
+        if self.state == ALTIMETER_STATE.MEASURING:
+            self._kill_pill.set()
+            self.read_thread.join()
 
-        self._ser.write('$ST\r\n')
-        if self._check_ok('Error stopping measuring mode') != 0:
-            return -1
+            self._ser.write('$ST\r\n')
+            if self._check_ok('Error stopping measuring mode') != 0:
+                return -1
 
-        self.state = ALTIMETER_STATE.CONNECTED
+            self.state = ALTIMETER_STATE.CONNECTED

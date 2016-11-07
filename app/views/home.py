@@ -28,9 +28,17 @@ def index():
 
     if col_size_cam_img < 2:
         col_size_cam_img = 2
+
+    cam_ids = tricap_manager.get_cam_ids()
+
+    print 'serial num'
+    print cam_ids[0]
+    print cam_ids
+
     return render_template('/home/index.html', num_cams=tricap_manager.get_num_cams(),
                            col_size_cam_img=col_size_cam_img,
-                           alti_state=altimeter.get_state_as_string())
+                           alti_state=altimeter.get_state_as_string(),
+                           cam_ids=cam_ids)
 
 
 @home_bp.route('/_check_cam_image<cam_num_str>')
@@ -50,7 +58,6 @@ def provide_alti_data():
 def serve_cam_img(cam_num_str):
     print 'serving cam img ' + cam_num_str
     cam_img_fp = image_manager.get_cam_image_fp(int(cam_num_str))
-    # cam_img0_fp = '/home/deon/tmp/09_49_04_835.jpg'
 
     if cam_img_fp is None:
         cam_img_fp = os.path.join(current_app.root_path, 'static', 'img', 'default.jpg')

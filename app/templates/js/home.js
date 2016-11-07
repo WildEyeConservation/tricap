@@ -42,9 +42,13 @@ $(function () {
 
 
 var camImageCheckFollowUp = function(data){
+    var img = document.getElementById('img_cam'+data.cam_num)
     if (data.new_image === true){
-        var img = document.getElementById('img_cam'+data.cam_num)
         img.src = '/cam_img' + data.cam_num + '?'+ new Date().getTime();
+        img.style.border = '5px solid blue'
+    }
+    else {
+        img.style.border = '5px solid grey'
     }
 }
 

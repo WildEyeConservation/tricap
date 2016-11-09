@@ -29,6 +29,8 @@ class TriCapCam(object):
 
         self._setup_camera(port_info)
 
+	print gp.gp_library_version(True)
+
     #TODO setup from config values
 
     def _config_capture_target(self, config):
@@ -82,18 +84,18 @@ class TriCapCam(object):
             img_name, img_ext = os.path.splitext(file_path.name)
             ret_code = -1
             # try to get the jpg, camera might still be converting
-            # ret_code, camera_file = gp.gp_camera_file_get(self._gp_camera,
-            #                                               file_path.folder,
-            #                                               img_name+'.JPG',
-            #                                               gp.GP_FILE_TYPE_NORMAL,
-            #                                               self._context)
-            # if ret_code == 0:
-            #     download_fp = os.path.join(DISPLAY_DOWNLOAD_DIR,
-            #                                CAM_IMAGE_PREFIX+str(cam_num)+'.JPG')
-            #     if os.path.isfile(download_fp) is True:
-            #         os.remove(download_fp)
-            #
-            #     gp.check_result(gp.gp_file_save(camera_file, download_fp))
+            ret_code, camera_file = gp.gp_camera_file_get(self._gp_camera,
+                                                          file_path.folder,
+                                                          img_name+'.JPG',
+                                                          gp.GP_FILE_TYPE_NORMAL,
+                                                          self._context)
+            if ret_code == 0:
+                download_fp = os.path.join(DISPLAY_DOWNLOAD_DIR,
+                                           CAM_IMAGE_PREFIX+str(cam_num)+'.JPG')
+                if os.path.isfile(download_fp) is True:
+                    os.remove(download_fp)
+
+                gp.check_result(gp.gp_file_save(camera_file, download_fp))
 
             self._gp_camera.exit(self._context)
 
@@ -107,28 +109,28 @@ class TriCapCam(object):
                 file_path = gp.check_result(gp.gp_camera_capture(self._gp_camera, gp.GP_CAPTURE_IMAGE, self._context))
 
                 # Download the jpg image
-                img_name, img_ext = os.path.splitext(file_path.name)
-                ret_code = -1
+                #img_name, img_ext = os.path.splitext(file_path.name)
+                #ret_code = -1
                 # try to get the jpg, camera might still be converting
-                attempt_count = 0
-                ret_code, camera_file = gp.gp_camera_file_get(self._gp_camera,
-                                                              file_path.folder,
-                                                              img_name+'.JPG',
-                                                              gp.GP_FILE_TYPE_NORMAL,
-                                                              self._context)
-                if ret_code == 0:
+                #attempt_count = 0
+                #ret_code, camera_file = gp.gp_camera_file_get(self._gp_camera,
+                #                                              file_path.folder,
+                #                                              img_name+'.JPG',
+                #                                              gp.GP_FILE_TYPE_NORMAL,
+                #                                              self._context)
+                #if ret_code == 0:
 
 
-                    download_fp = os.path.join(DISPLAY_DOWNLOAD_DIR,
-                                               CAM_IMAGE_PREFIX+str(cam_num)+'.JPG')
-                    if os.path.isfile(download_fp) is True:
-                        os.remove(download_fp)
+                #    download_fp = os.path.join(DISPLAY_DOWNLOAD_DIR,
+                #                               CAM_IMAGE_PREFIX+str(cam_num)+'.JPG')
+                #    if os.path.isfile(download_fp) is True:
+                #        os.remove(download_fp)
 
-                    gp.check_result(gp.gp_file_save(camera_file, download_fp))
+                #    gp.check_result(gp.gp_file_save(camera_file, download_fp))
 
-                    cam_fp_queue.put((cam_num, download_fp))
+                #    cam_fp_queue.put((cam_num, download_fp))
 
-                self._gp_camera.exit(self._context)
+                #self._gp_camera.exit(self._context)
 
             self._gp_camera.exit(self._context)
 

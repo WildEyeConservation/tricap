@@ -7,10 +7,10 @@ from logging.handlers import TimedRotatingFileHandler
 
 from flask import Flask
 
-from tricap_cameras import create_tricap_cameras_and_manager
-from image_manager import QueueImageManager, SameFileImageManager
+from .tricap_cameras import create_tricap_cameras_and_manager
+from .image_manager import QueueImageManager, SameFileImageManager
 # from image_manager import DummyImageManager, DummyTricapManager
-from trusense_altimeter import TrusenseAltimeter
+from .trusense_altimeter import TrusenseAltimeter
 
 from config import SERVER_LOG_DIR
 

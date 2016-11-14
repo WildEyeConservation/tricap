@@ -22,7 +22,7 @@ CE6D_FORMAT_RAW = 32
 
 
 class TRICAP_CAM_STATES:
-    UNINITIALISED, INITIALISED, CAPTURING, ERROR_CONFIG, ERROR_CAPTURE = range(5)
+    UNINITIALISED, INITIALISED, CAPTURING, ERROR_CONFIG, ERROR_CAPTURE = list(range(5))
     MAX = 5
     MIN = 0
 
@@ -30,23 +30,23 @@ TRICAP_CAM_STATE_STRINGS = ['Uninitialised', 'Ready', 'Capturing',
                             'Configuration Error', 'Capture Error']
 
 class TRICAP_CAMS_MANAGER_STATES:
-    STOPPED, STARTED, ERROR_NO_CAMS = range(3)
+    STOPPED, STARTED, ERROR_NO_CAMS = list(range(3))
     MAX = 2
     MIN = 0
 
 
 class ALTIMETER_STATE:
-    NOT_CONNECTED, CONNECTED, MEASURING, ERROR = range(4)
+    NOT_CONNECTED, CONNECTED, MEASURING, ERROR = list(range(4))
     MAX = 2
     MAX = 0
 
 
 class BUTTON_CODES:
-    START, STOP, TEST, RESET = range(4)
+    START, STOP, TEST, RESET = list(range(4))
     MAX = 3
     MIN = 0
 
 class LOG_CODES:
-    ALL = range(1)
+    ALL = list(range(1))
     MAX = 1
     MIN = 0

@@ -1,4 +1,4 @@
-import subprocess32
+# import subprocess32
 import os
 
 import hashlib
@@ -59,7 +59,7 @@ class QueueImageManager(object):
     def is_cam_image_fresh(self, cam_num):
         self._process_queue()
 
-        if len(self._cam_fps.keys()) == 0:
+        if len(list(self._cam_fps.keys())) == 0:
             return False
 
         if str(cam_num) not in self._last_provided_cam_fps:
@@ -72,14 +72,14 @@ class QueueImageManager(object):
 
     def get_cam_image_fp(self, cam_num):
         if str(cam_num) in self._cam_fps:
-            print 'Returning queue item : ' + self._cam_fps[str(cam_num)]
+            print('Returning queue item : ' + self._cam_fps[str(cam_num)])
 
             dir_with_filename, ext = os.path.splitext(self._cam_fps[str(cam_num)])
 
-            if ext.lower() == '.cr2':
-                subprocess32.check_output(["ufraw-batch", "--silent", "--overwrite", "--rotate=no", "--out-type=jpg",
-                                           "--size=640",
-                                           self._cam_fps[str(cam_num)]])
+            # if ext.lower() == '.cr2':
+            #     subprocess32.check_output(["ufraw-batch", "--silent", "--overwrite", "--rotate=no", "--out-type=jpg",
+            #                                "--size=640",
+            #                                self._cam_fps[str(cam_num)]])
 
             self._last_provided_cam_fps[str(cam_num)] = self._cam_fps[str(cam_num)]
 
@@ -100,7 +100,7 @@ class SameFileImageManager(object):
 
         image_hash = hashlib.sha1(open(cam_image_fp, 'rb').read()).hexdigest()
 
-        if str(cam_num) in self._image_hashes.keys():
+        if str(cam_num) in list(self._image_hashes.keys()):
             if self._image_hashes[str(cam_num)] == image_hash:
                 return False
 

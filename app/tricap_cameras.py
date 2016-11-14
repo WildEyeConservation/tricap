@@ -5,7 +5,7 @@ import pdb
 
 import gphoto2 as gp
 
-from Queue import LifoQueue
+from queue import LifoQueue
 
 from config import CE6D_CAP_TARGET_SD_CARD, CE6D_SHUT_SPEED_1_4
 from config import CE6D_FORMAT_RAW_AND_TINY_JPEG
@@ -191,7 +191,7 @@ class TriCapCamsManager(object):
 
                 self._logger.debug('Capture time: ' + str(current_time_diff))
                 # TODO Remove this printout
-                print 'Capture time: ' + str(current_time_diff)
+                print('Capture time: ' + str(current_time_diff))
                 if current_time_diff < IMAGE_CAPTURE_INTERVAL:
                     time.sleep(IMAGE_CAPTURE_INTERVAL- current_time_diff)
 

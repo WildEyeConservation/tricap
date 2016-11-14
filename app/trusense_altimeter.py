@@ -5,6 +5,8 @@ import serial.tools.list_ports
 
 import threading
 
+import pdb
+
 from config import ALTIMETER_STATE
 
 # TODO How to deal with disconnect?
@@ -53,17 +55,17 @@ class TrusenseAltimeter(object):
         if correct_port == None:
             self.state = ALTIMETER_STATE.ERROR
 
-        print correct_port
+        print(correct_port)
 
         return correct_port
 
     def connect(self):
         self._ser.open()
         if self._ser.is_open == True:
-            print 'Comms with serial port of the altimeter have been opened'
+            print('Comms with serial port of the altimeter have been opened')
             self.state = ALTIMETER_STATE.CONNECTED
         else:
-            print 'Comms with serial port of the altimeter are not open - ERROR.'
+            print('Comms with serial port of the altimeter are not open - ERROR.')
             self.state = ALTIMETER_STATE.ERROR
             return -1
 
@@ -72,10 +74,10 @@ class TrusenseAltimeter(object):
         self._ser.rts = 0
         self._ser.dtr = 0
 
-        # Check for the okay signal
+        # Check for the okay signal        
         temp = self._ser.readline()
-        if temp != '$OK\r\n':
-            print 'Error with opening connection.'
+        if temp != b'$OK\r\n':
+            print('Error with opening connection.')
             self.state = ALTIMETER_STATE.ERROR
             return -1
 
@@ -83,9 +85,9 @@ class TrusenseAltimeter(object):
 
     def _check_ok(self, error_msg):
         reply = self._ser.readline()
-        if reply != '$OK\r\n':
-            print error_msg
-            print reply
+        if reply != b'$OK\r\n':
+            print(error_msg)
+            print(reply)
             self.state = ALTIMETER_STATE.ERROR
             return -1
         else:
@@ -93,32 +95,32 @@ class TrusenseAltimeter(object):
 
     def configure(self):
         # set to fast continuous
-        self._ser.write('$MM,FCO\r\n')
+        self._ser.write('$MM,FCO\r\n'.encode())
         if self._check_ok('Error setting measurment mode') != 0:
             return -1
 
         # set target to farthest
-        self._ser.write('$TM,FA\r\n')
+        self._ser.write('$TM,FA\r\n'.encode())
         if self._check_ok('Error setting target mode') != 0:
             return -1
 
         # set to meters
-        self._ser.write('$DU,M\r\n')
+        self._ser.write('$DU,M\r\n'.encode())
         if self._check_ok('Error setting distance unit') != 0:
             return -1
 
         # set to measurement timeout
-        self._ser.write('$MT,2\r\n')
+        self._ser.write('$MT,2\r\n'.encode())
         if self._check_ok('Error setting measurement timeout') != 0:
             return -1
 
         # set continous mode average
-        self._ser.write('$CA,2\r\n')
+        self._ser.write('$CA,2\r\n'.encode())
         if self._check_ok('Error setting continous mode frame averaging') != 0:
             return -1
 
         # set fast mode averaging
-        self._ser.write('$FA,2\r\n')
+        self._ser.write('$FA,2\r\n'.encode())
         if self._check_ok('Error setting fast mode frame averaging') != 0:
             return -1
 
@@ -142,17 +144,17 @@ class TrusenseAltimeter(object):
 
     def disconnect(self):
         if self._ser.is_open == False:
-            print 'Comms are already closed'
+            print('Comms are already closed')
             self.state = ALTIMETER_STATE.NOT_CONNECTED
             return -1
 
         self._ser.close()
         if self._ser.is_open == False:
-            print 'Comms with altimeter has been closed'
+            print('Comms with altimeter has been closed')
             self.state = ALTIMETER_STATE.NOT_CONNECTED
             return 0
         else:
-            print 'Commns with altimeter are still open - ERROR.'
+            print('Commns with altimeter are still open - ERROR.')
             self.state = ALTIMETER_STATE.ERROR
             return -1
 
@@ -160,7 +162,7 @@ class TrusenseAltimeter(object):
         def worker(stop_event, temp):
             while not stop_event.wait(1):
                 msg = self._ser.readline()
-                dist_str = msg[4:].split(',')[0]
+                dist_str = msg[4:].split(b',')[0]
                 self.measurement = float(dist_str)
 
         return worker
@@ -169,7 +171,7 @@ class TrusenseAltimeter(object):
         if self._ser.is_open is False:
             return -1
 
-        self._ser.write('$GO\r\n')
+        self._ser.write('$GO\r\n'.encode())
         if self._check_ok('Error starting measuring mode') != 0:
             return -1
         self._kill_pill = threading.Event()
@@ -186,7 +188,7 @@ class TrusenseAltimeter(object):
             self._kill_pill.set()
             self.read_thread.join()
 
-            self._ser.write('$ST\r\n')
+            self._ser.write('$ST\r\n'.encode())
             if self._check_ok('Error stopping measuring mode') != 0:
                 return -1
 

@@ -64,7 +64,7 @@ def provide_alti_data():
 
 @home_bp.route('/cam_img<cam_num_str>')
 def serve_cam_img(cam_num_str):
-    print 'serving cam img ' + cam_num_str
+    print('serving cam img ' + cam_num_str)
     cam_img_fp = image_manager.get_cam_image_fp(int(cam_num_str))
 
     if cam_img_fp is None:
@@ -81,10 +81,10 @@ def handle_button_click():
         tricap_manager.start_capturing()
         altimeter.start_measuring()
     elif button_code == BUTTON_CODES.STOP:
-        print 'stopping - view'
+        print('stopping - view')
         tricap_manager.stop_capturing()
         altimeter.stop_measuring()
-        print 'stopping - view - stopped'
+        print('stopping - view - stopped')
     elif button_code == BUTTON_CODES.RESET:
         reset_device_objects()
 

@@ -1,9 +1,9 @@
-var $SCRIPT_ROOT = {{ request.script_root|tojson|safe }};
-
 var numCams = {{num_cams}};
 
 BUTTON_CODE_START = 0;
 BUTTON_CODE_STOP = 1;
+BUTTON_CODE_TEST = 2;
+BUTTON_CODE_RESET = 3;
 
 var buttonClickFollowUp = function () {
     console.log("Button Click Follow Up");
@@ -12,10 +12,12 @@ var buttonClickFollowUp = function () {
 
 var handleButtonClick = function(buttonCode){
 
-    if (buttonCode === BUTTON_CODE_START ){
-        $.getJSON($SCRIPT_ROOT + '/_button_click', {buttonCode: buttonCode }, buttonClickFollowUp)
-    } else if (buttonCode === BUTTON_CODE_STOP){
-        $.getJSON($SCRIPT_ROOT + '/_button_click', {buttonCode: buttonCode }, buttonClickFollowUp)
+    if (buttonCode === BUTTON_CODE_START || buttonCode === BUTTON_CODE_STOP){
+        $.getJSON($SCRIPT_ROOT + '/_button_click', {buttonCode: buttonCode }, buttonClickFollowUp);
+    } else if (buttonCode === BUTTON_CODE_RESET){
+        console.log('Reset Pressed');
+        $.getJSON($SCRIPT_ROOT + '/_button_click', {buttonCode: buttonCode },
+            function(){location.reload(); return false;});
     }
 
     return false;
@@ -40,16 +42,30 @@ $(function () {
     document.getElementById("btn_stop").onclick = buttonClick
 });
 
+$(function () {
+    var buttonClick = function (e) {
+    console.log("Reset Clicked");
+    handleButtonClick(BUTTON_CODE_RESET);
+    return false;
+    };
+    document.getElementById("btn_reset").onclick = buttonClick
+});
+
 
 var camImageCheckFollowUp = function(data){
-    var img = document.getElementById('img_cam'+data.cam_num)
+    var img = document.getElementById('img_cam'+data.cam_num);
     if (data.new_image === true){
         img.src = '/cam_img' + data.cam_num + '?'+ new Date().getTime();
-        img.style.border = '5px solid blue'
+        img.style.border = '5px solid blue';
     }
     else {
-        img.style.border = '5px solid grey'
+        img.style.border = '5px solid grey';
     }
+
+    //TODO: Make the border red on a bad cam state
+
+    var p_cam_state = document.getElementById('p_cam_state_'+data.cam_num);
+    p_cam_state.innerHTML = 'Camera state: ' + data.cam_state;
 }
 
 $(function () {
@@ -59,7 +75,7 @@ $(function () {
         }
         return false;
     };
-    setInterval(imgCheckupFunc, 2000);
+    setInterval(imgCheckupFunc, 1000);
 });
 
 var altiCheckFollowup = function(data){

@@ -33,7 +33,7 @@ app.logger.addHandler(handler)
 app.logger.setLevel(logging.DEBUG)  # Set this also, so as to get info messages as well
 
 # Custom Setup
-tricap_cameras, tricap_manager = create_tricap_cameras_and_manager()
+tricap_cameras, tricap_manager = create_tricap_cameras_and_manager(app.logger)
 # tricap_manager = VolatileCamsManager()
 # image_manager = QueueImageManager(tricap_manager.get_cam_fp_queue())
 image_manager = SameFileImageManager()
@@ -45,4 +45,6 @@ altimeter = TrusenseAltimeter()
 
 # Blueprints
 from .views.home import home_bp
+from .views.showlog import showlog_bp
 app.register_blueprint(home_bp)
+app.register_blueprint(showlog_bp)

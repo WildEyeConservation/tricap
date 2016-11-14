@@ -2,10 +2,14 @@
 
 import os
 
+from app import create_tricap_cameras_and_manager
+from app import SameFileImageManager
+from app import TrusenseAltimeter
+
 from flask import Blueprint, render_template, send_from_directory, current_app, request, jsonify
 from flask import send_file
 
-from app import tricap_manager, image_manager, altimeter
+from app import tricap_manager, tricap_cameras, image_manager, altimeter
 
 from config import BUTTON_CODES
 
@@ -31,21 +35,25 @@ def index():
 
     cam_ids = tricap_manager.get_cam_ids()
 
-    print 'serial num'
-    print cam_ids[0]
-    print cam_ids
+    cam_states = [cam.get_state_as_string() for cam in tricap_cameras]
 
     return render_template('/home/index.html', num_cams=tricap_manager.get_num_cams(),
                            col_size_cam_img=col_size_cam_img,
                            alti_state=altimeter.get_state_as_string(),
-                           cam_ids=cam_ids)
+                           system_state='All Good',
+                           cam_ids=cam_ids, cam_states=cam_states)
 
+def reset_device_objects():
+    pass
 
 @home_bp.route('/_check_cam_image<cam_num_str>')
 def is_cam_image_fresh(cam_num_str):
     data = {'new_image': image_manager.is_cam_image_fresh(int(cam_num_str)),
-            'cam_num': int(cam_num_str)}
+            'cam_num': int(cam_num_str),
+            'cam_state': tricap_cameras[int(cam_num_str)].get_state_as_string()
+            }
     return jsonify(data)
+
 
 @home_bp.route('/_get_alti_data')
 def provide_alti_data():
@@ -64,8 +72,6 @@ def serve_cam_img(cam_num_str):
 
     return send_file(cam_img_fp, attachment_filename='image.bmp', as_attachment=True)
 
-
-
 @home_bp.route('/_button_click')
 def handle_button_click():
 
@@ -79,6 +85,8 @@ def handle_button_click():
         tricap_manager.stop_capturing()
         altimeter.stop_measuring()
         print 'stopping - view - stopped'
+    elif button_code == BUTTON_CODES.RESET:
+        reset_device_objects()
 
     return jsonify()
 

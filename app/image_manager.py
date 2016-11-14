@@ -3,94 +3,48 @@ import os
 
 import hashlib
 
-from config import TRICAP_CAMS_MANAGER_STATES
+from abc import ABCMeta, abstractmethod
+
+from config import TRICAP_CAMS_MANAGER_STATES, DUMMY_IMAGE_PATH
 from config import DISPLAY_DOWNLOAD_DIR, CAM_IMAGE_PREFIX
 
-class DummyImageManager(object):
+
+class ImageManager():
+    """Abstract class all Image Managers should inherit. An ImageManager checks the freshness of
+    images from multiple cameras and gives the full paths to those images."""
+    __metaclass__ = ABCMeta
+
     def __init__(self):
-        self.state = 0
+        pass
+
+    @abstractmethod
+    def is_cam_image_fresh(self, cam_num):
+        pass
+
+    @abstractmethod
+    def get_cam_image_fp(self, cam_num):
+        pass
+
+
+class DummyImageManager(ImageManager):
+    """A dummy image manager, which returns a path to the same default image"""
+
+    def __init__(self):
+        ImageManager.__init__(self)
 
     def is_cam_image_fresh(self, cam_num):
         return True
 
     def get_cam_image_fp(self, cam_num):
-        # dd_fp = '/home/deon/tmp/deepdream/frame'+str(self.state) + '.jpg'
-        self.state += 1
-
-        if self.state > 9:
-            self.state = 0
-
-        dd_fp = 'C:/Users/Public/Pictures/Sample Pictures/Jellyfish.jpg'
-
-        return dd_fp
+        return DUMMY_IMAGE_PATH
 
 
-class DummyTricapManager(object):
-    def __init__(self, num_cams):
-        self._num_cams = num_cams
-        self.state = TRICAP_CAMS_MANAGER_STATES.STOPPED
+class SameFileImageManager(ImageManager):
+    """ An ImageManager which assumes each camera has a single image which it is constantly
+    updating/replacing."""
 
-    def start_capturing(self):
-        self.state = TRICAP_CAMS_MANAGER_STATES.STARTED
-
-    def stop_capturing(self):
-        self.state = TRICAP_CAMS_MANAGER_STATES.STOPPED
-
-    def get_cam_fp_queue(self):
-        return None
-
-    def get_num_cams(self):
-        return self._num_cams
-
-
-class QueueImageManager(object):
-    # The point of the Queue Image Manager is to process the queue and keep track of the latest image for each camera
-    def __init__(self, cam_fp_queue):
-        self._cam_fp_queue = cam_fp_queue
-        self._cam_fps = {}
-        self._last_provided_cam_fps = {}
-
-    def _process_queue(self):
-        while self._cam_fp_queue.empty() is False:
-            cam_num_fp_tuple = self._cam_fp_queue.get()
-            self._cam_fps[str(cam_num_fp_tuple[0])] = cam_num_fp_tuple[1]
-            self._cam_fp_queue.task_done()
-
-    def is_cam_image_fresh(self, cam_num):
-        self._process_queue()
-
-        if len(list(self._cam_fps.keys())) == 0:
-            return False
-
-        if str(cam_num) not in self._last_provided_cam_fps:
-            return True
-
-        if self._last_provided_cam_fps[str(cam_num)] == self._cam_fps[str(cam_num)]:
-            return False
-        else:
-            return True
-
-    def get_cam_image_fp(self, cam_num):
-        if str(cam_num) in self._cam_fps:
-            print('Returning queue item : ' + self._cam_fps[str(cam_num)])
-
-            dir_with_filename, ext = os.path.splitext(self._cam_fps[str(cam_num)])
-
-            # if ext.lower() == '.cr2':
-            #     subprocess32.check_output(["ufraw-batch", "--silent", "--overwrite", "--rotate=no", "--out-type=jpg",
-            #                                "--size=640",
-            #                                self._cam_fps[str(cam_num)]])
-
-            self._last_provided_cam_fps[str(cam_num)] = self._cam_fps[str(cam_num)]
-
-            return dir_with_filename + '.JPG'
-        else:
-            return None
-
-
-class SameFileImageManager(object):
-    # Assumes each camera has a single image it is updating/replacing
     def __init__(self):
+        ImageManager.__init__(self)
         self._image_hashes = {}
 
     def is_cam_image_fresh(self, cam_num):
@@ -113,3 +67,43 @@ class SameFileImageManager(object):
             return None
         else:
             return cam_image_fp
+
+# TODO Recode the queue image manager to use the base ImageManager abstract class
+# class QueueImageManager(object):
+#     # The point of the Queue Image Manager is to process the queue and keep track of the latest image for each camera
+#     def __init__(self, cam_fp_queue):
+#         self._cam_fp_queue = cam_fp_queue
+#         self._cam_fps = {}
+#         self._last_provided_cam_fps = {}
+#
+#     def _process_queue(self):
+#         while self._cam_fp_queue.empty() is False:
+#             cam_num_fp_tuple = self._cam_fp_queue.get()
+#             self._cam_fps[str(cam_num_fp_tuple[0])] = cam_num_fp_tuple[1]
+#             self._cam_fp_queue.task_done()
+#
+#     def is_cam_image_fresh(self, cam_num):
+#         self._process_queue()
+#
+#         if len(list(self._cam_fps.keys())) == 0:
+#             return False
+#
+#         if str(cam_num) not in self._last_provided_cam_fps:
+#             return True
+#
+#         if self._last_provided_cam_fps[str(cam_num)] == self._cam_fps[str(cam_num)]:
+#             return False
+#         else:
+#             return True
+#
+#     def get_cam_image_fp(self, cam_num):
+#         if str(cam_num) in self._cam_fps:
+#             print('Returning queue item : ' + self._cam_fps[str(cam_num)])
+#
+#             dir_with_filename, ext = os.path.splitext(self._cam_fps[str(cam_num)])
+#
+#             self._last_provided_cam_fps[str(cam_num)] = self._cam_fps[str(cam_num)]
+#
+#             return dir_with_filename + '.JPG'
+#         else:
+#             return None

@@ -3,7 +3,17 @@ import time
 import threading
 import pdb
 
-import gphoto2 as gp
+from abc import ABCMeta, abstractmethod
+
+
+# As their is no gphoto2 for windows, we have to switch to using dummmies while working under
+#  windows.
+try:
+    import gphoto2 as gp
+    GPHOTO2_IMPORTED = True
+except ImportError:
+    print("Error import gphoto2, switching over dummy camera handler")
+    GPHOTO2_IMPORTED = False
 
 from queue import LifoQueue
 
@@ -15,9 +25,21 @@ from config import CAM_IMAGE_PREFIX, IMAGE_CAPTURE_INTERVAL, TRICAP_CAM_STATE_ST
 #TODO setup from config file
 #TODO currently, we are coding in a mess of C vs C++ styles. Fix this.
 
-class TriCapCam(object):
+class Cam():
+    """ Abstract base class for all camera handlers."""
+
+    def __init__(self):
+        self.state = -1
+
+    @abstractmethod
+    def get_state_as_string(self):
+        pass
+
+
+class TriCapCam(Cam):
 
     def __init__(self, context, port_info, logger):
+        Cam.__init__(self)
         self._context = context
         self._gp_camera = gp.Camera()
 
@@ -149,10 +171,44 @@ class TriCapCam(object):
     def get_state_as_string(self):
         return TRICAP_CAM_STATE_STRINGS[self.state]
 
+class DummyCam(Cam):
+    def __init__(self):
+        Cam.__init__(self)
+        self.state = TRICAP_CAM_STATES.INITIALISED
 
-class TriCapCamsManager(object):
+    def get_state_as_string(self):
+        return "Dummy cam is stateless."
+
+
+class CamsManager():
+    """Abstract base class for all camera managers. Camera managers handle the starting, stopping
+    and other administration of cameras."""
+    __metaclass__ = ABCMeta
+
+    def __init__(self):
+        self.state = -1
+
+    @abstractmethod
+    def start_capturing(self):
+        pass
+
+    @abstractmethod
+    def stop_capturing(self):
+        pass
+
+    @abstractmethod
+    def get_num_cams(self):
+        pass
+
+    @abstractmethod
+    def get_cam_ids(self):
+        pass
+
+class TriCapCamsManager(CamsManager):
+    """TriCapCamsManager manages TriCap camera objects"""
 
     def __init__(self, cameras, logger):
+        CamsManager.__init__(self)
 
         self.state = TRICAP_CAMS_MANAGER_STATES.STOPPED
 
@@ -225,6 +281,39 @@ class TriCapCamsManager(object):
                 cam_ids.append('Unknown')
 
         return cam_ids
+
+
+class DummyTricapManager(CamsManager):
+    """DummyTricapManager fakes the handling of dummy cameras"""
+
+    def __init__(self, num_cams):
+        CamsManager.__init__(self)
+
+        self._num_cams = num_cams
+        self.state = TRICAP_CAMS_MANAGER_STATES.STOPPED
+        self._cameras = []
+
+        for _ in range(self._num_cams):
+            self._cameras.append(DummyCam())
+
+    def start_capturing(self):
+        self.state = TRICAP_CAMS_MANAGER_STATES.STARTED
+
+    def stop_capturing(self):
+        self.state = TRICAP_CAMS_MANAGER_STATES.STOPPED
+
+    def get_cam_fp_queue(self):
+        return None
+
+    def get_num_cams(self):
+        return self._num_cams
+
+    def get_cam_ids(self):
+        return range(self._num_cams)
+
+    def get_cameras_as_list(self):
+        return self._cameras
+
 
 def _get_cameras(context, logger):
     cameras = []

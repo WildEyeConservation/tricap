@@ -21,20 +21,22 @@
                 {{render_errors(form.shutter_speed)}}
             </div>
         </div>
+
+
+        <div class="row lead">
+            <div class="col-md-6">
+                {{ form.test(class='btn btn-block btn-primary') }}
+            </div>
+            <div class="col-md-6">
+                {{ form.save(class='btn btn-block') }}
+            </div>
+        </div>
+
         <div class='row lead'>
             <div class='col-md-12'>
                 {{form.server_log_dir.label}}
                 {{form.server_log_dir(class='form-control', id='inpurt_server_log_dir')}}
                 {{render_errors(form.server_log_dir)}}
-            </div>
-        </div>
-
-        <div class="row lead">
-            <div class="col-md-6">
-                <input type="submit" name="btn" id='btnSubmitSettings' value="Submit" class="btn btn-primary btn-block"/>
-            </div>
-            <div class="col-md-6">
-                <input type="submit" name="btn" id='btnSubmitSettings' value="Save To Initial Config" class="btn btn-primary btn-block"/>
             </div>
         </div>
 

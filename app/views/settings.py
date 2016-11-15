@@ -1,8 +1,11 @@
 import os
 
+import pdb
+
 from flask import Blueprint, render_template, send_file, request, jsonify, redirect, url_for
 
 from app import forms, tricap_manager
+from app.tricap_cameras import read_init_config, save_config
 
 from config import SERVER_LOG_DIR
 
@@ -25,8 +28,21 @@ def _get_form_with_current_settings():
 def _change_settings(form):
     ss_dict = dict(form.shutter_speed.choices)
     tricap_manager.set_shutterspeed(ss_dict[form.shutter_speed.data])
-
     tricap_manager.set_image_capture_interval(float(form.image_capture_interval.data))
+
+def _save_settings(form):
+    _change_settings(form)
+
+    # TODO Should do an error check here, if there are errors, don't save
+    init_config = read_init_config()
+
+    ss_dict = dict(form.shutter_speed.choices)
+    init_config['shutterspeed'] = ss_dict[form.shutter_speed.data]
+    init_config['image_capture_interval'] = form.image_capture_interval.data
+
+    save_config(init_config)
+
+    # TODO Edit the stuff further here
 
 @settings_bp.route('/settings', methods=['GET', 'POST'])
 def settings():
@@ -38,7 +54,11 @@ def settings():
         form = forms.SettingsForm(request.form)
 
     if form.validate_on_submit():
-        _change_settings(form)
+        if form.test.data is True:
+            _change_settings(form)
+        else:
+            _save_settings(form)
+
         return redirect(url_for('home.index'))
 
     return render_template('/settings/settings.html', form=form)

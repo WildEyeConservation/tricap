@@ -20,9 +20,56 @@ from config import CE6D_CAP_TARGET_SD_CARD, CE6D_SHUT_SPEED_1_4, CE6D_SHUT_SPEED
 from config import CE6D_FORMAT_RAW_AND_TINY_JPEG, CE6D_SHUT_SPEED_1_640
 from config import TRICAP_CAMS_MANAGER_STATES, DISPLAY_DOWNLOAD_DIR, TRICAP_CAM_STATES
 from config import CAM_IMAGE_PREFIX, IMAGE_CAPTURE_INTERVAL, TRICAP_CAM_STATE_STRINGS
+from config import CONFIG_FP
 
 #TODO setup from config file
 #TODO currently, we are coding in a mess of C vs C++ styles. Fix this.
+
+def translate_shutterspeed_str_to_code(val_str):
+    if val_str == '1/2500':
+        config_val = CE6D_SHUT_SPEED_1_2500
+    elif val_str == '1/640':
+        config_val = CE6D_SHUT_SPEED_1_640
+    elif val_str == '1/4':
+        config_val = CE6D_SHUT_SPEED_1_4
+    else:
+        return -1
+
+    return config_val
+
+def save_config(new_config):
+    # TODO Do a check before overwriting the config file
+    with open(CONFIG_FP, 'w') as config_file:
+        for key in new_config.keys():
+            line = key + ' = ' + new_config[key] + '\n'
+            config_file.write(line)
+
+    return 0
+
+def read_init_config():
+    init_configs = {}
+
+    with open(CONFIG_FP, 'r') as config_file:
+        for line in config_file:
+            parts = line.split('=')
+            init_configs[parts[0].strip()] = parts[1].strip()
+
+    config_val = CE6D_SHUT_SPEED_1_2500
+    if 'shutterspeed' in init_configs.keys():
+        val_str = init_configs['shutterspeed']
+        config_val = translate_shutterspeed_str_to_code(val_str)
+
+        if config_val == -1:
+            config_val = CE6D_SHUT_SPEED_1_2500
+
+    init_configs['shutterspeed'] = config_val
+
+    config_val = IMAGE_CAPTURE_INTERVAL
+    if 'image_capture_interval' in init_configs.keys():
+        config_val = float(init_configs['image_capture_interval'] )
+    init_configs['image_capture_interval'] = config_val
+
+    return init_configs
 
 class Cam():
     """ Abstract base class for all camera handlers."""
@@ -110,16 +157,8 @@ class TriCapCam(Cam):
     def set_shutterspeed(self, val_str):
         """ Set the shutterspeed of the camera externally."""
 
-        if val_str == '1/2500':
-            config_val = CE6D_SHUT_SPEED_1_2500
-        elif val_str == '1/640':
-            config_val = CE6D_SHUT_SPEED_1_640
-        elif val_str == '1/4':
-            config_val = CE6D_SHUT_SPEED_1_4
-        else:
-            self._logger.error('Desired shutter speed val str unkown: %s' % val_str)
-            # TODO Should we set the error state here?
-            self.state = TRICAP_CAM_STATES.ERROR_CONFIG
+        config_val = translate_shutterspeed_str_to_code(val_str)
+        if config_val == -1:
             return -1
 
         config = gp.check_result(gp.gp_camera_get_config(self._gp_camera, self._context))
@@ -147,6 +186,8 @@ class TriCapCam(Cam):
         self._gp_camera.set_port_info(port_info)
         self._gp_camera.init(self._context)
 
+        init_configs = read_init_config()
+
         # get configuration tree
         config = gp.check_result(gp.gp_camera_get_config(self._gp_camera, self._context))
 
@@ -154,7 +195,7 @@ class TriCapCam(Cam):
 
         # TODO Read these values from a config file
         ret_val += self._config_cam_value(config, 'capturetarget', CE6D_CAP_TARGET_SD_CARD)
-        ret_val += self._config_cam_value(config, 'shutterspeed', CE6D_SHUT_SPEED_1_4)
+        ret_val += self._config_cam_value(config, 'shutterspeed', init_configs['shutterspeed'])
         ret_val += self._config_cam_value(config, 'imageformat', CE6D_FORMAT_RAW_AND_TINY_JPEG)
         ret_val += self._obtain_serial_num(config)
 
@@ -403,10 +444,10 @@ class DummyTricapManager(CamsManager):
     def get_shutter_speed_as_string(self):
         return CE6D_SHUT_SPEED_1_2500
 
-    def set_shutterspeed(self):
+    def set_shutterspeed(self, val_str):
         pass
 
-    def set_image_capture_interval(self):
+    def set_image_capture_interval(self, val):
         pass
 
     def get_image_capture_interval(self):

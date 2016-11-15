@@ -5,7 +5,6 @@ import pdb
 
 from abc import ABCMeta, abstractmethod
 
-
 # As their is no gphoto2 for windows, we have to switch to using dummmies while working under
 #  windows.
 try:
@@ -17,8 +16,8 @@ except ImportError:
 
 from queue import LifoQueue
 
-from config import CE6D_CAP_TARGET_SD_CARD, CE6D_SHUT_SPEED_1_4
-from config import CE6D_FORMAT_RAW_AND_TINY_JPEG
+from config import CE6D_CAP_TARGET_SD_CARD, CE6D_SHUT_SPEED_1_4, CE6D_SHUT_SPEED_1_2500
+from config import CE6D_FORMAT_RAW_AND_TINY_JPEG, CE6D_SHUT_SPEED_1_640
 from config import TRICAP_CAMS_MANAGER_STATES, DISPLAY_DOWNLOAD_DIR, TRICAP_CAM_STATES
 from config import CAM_IMAGE_PREFIX, IMAGE_CAPTURE_INTERVAL, TRICAP_CAM_STATE_STRINGS
 
@@ -60,6 +59,23 @@ class TriCapCam(Cam):
             self._logger.error(error_message)
 
         return ret_code
+
+    def _get_config_value(self, config_str):
+        # get configuration tree
+        config = gp.check_result(gp.gp_camera_get_config(self._gp_camera, self._context))
+
+        ret_code, config_widget = gp.gp_widget_get_child_by_name(config, config_str)
+        if self._check_for_error(ret_code, 'Error retrieving config widget %s' % config_str):
+            self.state = TRICAP_CAM_STATES.ERROR_CONFIG
+            return ret_code
+
+        # set the actual value
+        ret_code, value = gp.gp_widget_get_value(config_widget)
+        if self._check_for_error(ret_code, 'Error getting widget %s value' % config_str):
+            self.state = TRICAP_CAM_STATES.ERROR_CONFIG
+            return ret_code
+
+        return value
 
     def _config_cam_value(self, config, config_str, config_value):
         # find the capture target config item
@@ -122,6 +138,23 @@ class TriCapCam(Cam):
         ret_val += self._obtain_serial_num(config)
 
         return ret_val
+
+    def get_shutter_speed_as_string(self):
+        shutter_speed_code = self._get_config_value('shutterspeed')
+
+        # CE6D_SHUT_SPEED_1_2500 = 49
+        # CE6D_SHUT_SPEED_1_640 = 43
+        # CE6D_SHUT_SPEED_1_4 = 21
+
+        if shutter_speed_code == CE6D_SHUT_SPEED_1_2500:
+            return '1/2500'
+        elif shutter_speed_code == CE6D_SHUT_SPEED_1_640:
+            return '1/640'
+        elif shutter_speed_code == CE6D_SHUT_SPEED_1_4:
+            return '1/4'
+        else:
+            self._logger.error('Shutter speed code unkown: %s' % shutter_speed_code)
+            return '? %s' % shutter_speed_code
 
     # TODO We are not letting the user know there was an error downloading an image, should we?
 
@@ -204,6 +237,14 @@ class CamsManager():
     def get_cam_ids(self):
         pass
 
+    @abstractmethod
+    def get_shutter_speed_as_string(self):
+        pass
+
+    @abstractmethod
+    def get_image_capture_interval(self):
+        pass
+
 class TriCapCamsManager(CamsManager):
     """TriCapCamsManager manages TriCap camera objects"""
 
@@ -216,6 +257,8 @@ class TriCapCamsManager(CamsManager):
 
         self._cam_threads = []
         self._capture_thread = None
+
+        self._image_capture_interval = IMAGE_CAPTURE_INTERVAL
 
         self._kill_pill = None
 
@@ -246,10 +289,8 @@ class TriCapCamsManager(CamsManager):
                 current_time_diff = time.time() - prev_time
 
                 self._logger.debug('Capture time: ' + str(current_time_diff))
-                # TODO Remove this printout
-                print('Capture time: ' + str(current_time_diff))
-                if current_time_diff < IMAGE_CAPTURE_INTERVAL:
-                    time.sleep(IMAGE_CAPTURE_INTERVAL- current_time_diff)
+                if current_time_diff < self._image_capture_interval:
+                    time.sleep(self._image_capture_interval- current_time_diff)
 
 
         self._capture_thread = threading.Thread(target=worker, args=[self._kill_pill])
@@ -282,6 +323,13 @@ class TriCapCamsManager(CamsManager):
 
         return cam_ids
 
+    def get_shutter_speed_as_string(self):
+        # TODO Should do some error checking here
+        return self._cameras[0].get_shutter_speed_as_string()
+
+    def get_image_capture_interval(self):
+        return self._image_capture_interval
+
 
 class DummyTricapManager(CamsManager):
     """DummyTricapManager fakes the handling of dummy cameras"""
@@ -313,6 +361,12 @@ class DummyTricapManager(CamsManager):
 
     def get_cameras_as_list(self):
         return self._cameras
+
+    def get_shutter_speed_as_string(self):
+        return CE6D_SHUT_SPEED_1_2500
+
+    def get_image_capture_interval(self):
+        return IMAGE_CAPTURE_INTERVAL
 
 
 def _get_cameras(context, logger):

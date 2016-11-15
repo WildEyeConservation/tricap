@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block content %}
+
+{% from "settings/_macros.html" import render_errors, render_field %}
+
+<div class='container'>
+    <form action="" method="post" name="add_im_set" class="form-horizontal" id='form' enctype=multipart/form-data>
+        {{form.hidden_tag()}}
+
+        <div class='row lead'>
+            <div class='col-md-12'>
+                {{form.image_capture_interval.label}}
+                {{form.image_capture_interval(class='form-control', id='input_im_cap_interval')}}
+                {{render_errors(form.image_capture_interval)}}
+            </div>
+        </div>
+        <div class='row lead'>
+            <div class='col-md-12'>
+                {{form.shutter_speed.label}}
+                {{form.shutter_speed(class='form-control', id='input_shutter_speed')}}
+                {{render_errors(form.shutter_speed)}}
+            </div>
+        </div>
+        <div class='row lead'>
+            <div class='col-md-12'>
+                {{form.server_log_dir.label}}
+                {{form.server_log_dir(class='form-control', id='inpurt_server_log_dir')}}
+                {{render_errors(form.server_log_dir)}}
+            </div>
+        </div>
+
+        <div class="row lead">
+            <div class="col-md-6">
+                <input type="submit" name="btn" id='btnSubmitSettings' value="Submit" class="btn btn-primary btn-block"/>
+            </div>
+        </div>
+
+    </form>
+</div>
+
+{% endblock %}

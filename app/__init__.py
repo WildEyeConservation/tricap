@@ -28,7 +28,6 @@ handler.setLevel(logging.DEBUG)
 handler.setFormatter(formatter)
 
 
-
 # Setup the Flask Server, configuring it using the config.py file
 app = Flask(__name__)
 
@@ -44,6 +43,7 @@ if GPHOTO2_IMPORTED is True:
     tricap_cameras, tricap_manager = create_tricap_cameras_and_manager(app.logger)
     image_manager = SameFileImageManager()
 else:
+    app.logger.info('Gphoto2 not found, probably in windows. Loading dummy cam managers')
     tricap_manager = DummyTricapManager(2)
     tricap_cameras = tricap_manager.get_cameras_as_list()
     image_manager = DummyImageManager()
@@ -54,5 +54,7 @@ altimeter = TrusenseAltimeter()
 # Blueprints
 from .views.home import home_bp
 from .views.showlog import showlog_bp
+from .views.settings import settings_bp
 app.register_blueprint(home_bp)
 app.register_blueprint(showlog_bp)
+app.register_blueprint(settings_bp)

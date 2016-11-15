@@ -16,6 +16,7 @@ IMAGE_CAPTURE_INTERVAL = 3.0
 CE6D_CAP_TARGET_MEMORY = 0
 CE6D_CAP_TARGET_SD_CARD = 1
 
+# TODO Going to need to support all possible shutter speeds, because we will want to experiment
 CE6D_SHUT_SPEED_1_2500 = 49
 CE6D_SHUT_SPEED_1_640 = 43
 CE6D_SHUT_SPEED_1_4 = 21

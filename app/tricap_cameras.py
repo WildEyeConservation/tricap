@@ -93,9 +93,17 @@ class TriCapCam(Cam):
 
         self._logger = logger
 
+        self._port_info = port_info
+
         self.state = TRICAP_CAM_STATES.UNINITIALISED
 
-        ret_val = self._setup_camera(port_info)
+        self.reset()
+
+    def reset(self):
+        self.state = TRICAP_CAM_STATES.UNINITIALISED
+
+        # TODO Fix this (unnecessary port info private member)
+        ret_val = self._setup_camera(self._port_info)
 
         if ret_val == 0:
             self.state = TRICAP_CAM_STATES.INITIALISED
@@ -259,6 +267,9 @@ class DummyCam(Cam):
         Cam.__init__(self)
         self.state = TRICAP_CAM_STATES.INITIALISED
 
+    def reset(self):
+        self.state = TRICAP_CAM_STATES.INITIALISED
+
     def get_state_as_string(self):
         return "Dummy cam is stateless."
 
@@ -270,6 +281,10 @@ class CamsManager():
 
     def __init__(self):
         self.state = -1
+
+    @abstractmethod
+    def reset(self):
+        pass
 
     @abstractmethod
     def start_capturing(self):
@@ -307,24 +322,47 @@ class CamsManager():
 class TriCapCamsManager(CamsManager):
     """TriCapCamsManager manages TriCap camera objects"""
 
-    def __init__(self, cameras, logger):
+    def __init__(self, logger, context):
         CamsManager.__init__(self)
 
         self.state = TRICAP_CAMS_MANAGER_STATES.STOPPED
 
-        self._cameras = cameras
+        self._context = context
 
-        self._cam_threads = []
-        self._capture_thread = None
-
-        self._image_capture_interval = IMAGE_CAPTURE_INTERVAL
-
-        self._kill_pill = None
+        self.reset()
 
         self._logger = logger
         self._logger.info('GPHOTO2 version info: ' + str(gp.gp_library_version(True)))
 
-        self._cam_fp_queue = LifoQueue(maxsize=0)
+    def _get_cameras(self):
+        cameras = []
+
+        port_info_list = gp.PortInfoList()
+        port_info_list.load()
+
+        for name, addr in self._context.camera_autodetect():
+
+            if name == "Canon EOS 6D":
+                self._logger.debug('Adding camera %s at port %s ' %(name, addr))
+                idx = port_info_list.lookup_path(addr)
+                tricap_cam = TriCapCam(self._context, port_info_list[idx], self._logger)
+                cameras.append(tricap_cam)
+
+        return cameras
+
+    def reset(self):
+        if self.state == TRICAP_CAMS_MANAGER_STATES.STARTED:
+            self.stop_capturing()
+
+        self._cameras = self._get_cameras()
+
+        self._cam_threads = []
+        self._capture_thread = None
+
+        # TODO This should be read from the init config file
+        self._image_capture_interval = IMAGE_CAPTURE_INTERVAL
+
+        self._kill_pill = None
 
     def _cap_thread_generator(self):
         for index, cam in enumerate(self._cameras):
@@ -423,6 +461,9 @@ class DummyTricapManager(CamsManager):
         for _ in range(self._num_cams):
             self._cameras.append(DummyCam())
 
+    def reset(self):
+        pass
+
     def start_capturing(self):
         self.state = TRICAP_CAMS_MANAGER_STATES.STARTED
 
@@ -452,23 +493,6 @@ class DummyTricapManager(CamsManager):
 
     def get_image_capture_interval(self):
         return IMAGE_CAPTURE_INTERVAL
-
-
-def _get_cameras(context, logger):
-    cameras = []
-
-    port_info_list = gp.PortInfoList()
-    port_info_list.load()
-
-    for name, addr in context.camera_autodetect():
-
-        if name == "Canon EOS 6D":
-            logger.debug('Adding camera %s at port %s ' %(name, addr))
-            idx = port_info_list.lookup_path(addr)
-            tricap_cam = TriCapCam(context, port_info_list[idx], logger)
-            cameras.append(tricap_cam)
-
-    return cameras
 
 def create_tricap_cameras_and_manager(logger):
     gp_context = gp.Context()

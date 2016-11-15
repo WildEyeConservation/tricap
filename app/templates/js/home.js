@@ -1,5 +1,7 @@
 var numCams = {{num_cams}};
 
+// TODO Need to read the state of the cams before displaying, to update the images
+
 BUTTON_CODE_START = 0;
 BUTTON_CODE_STOP = 1;
 BUTTON_CODE_TEST = 2;

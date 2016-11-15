@@ -36,6 +36,12 @@ class TrusenseAltimeter(object):
         if self.state != ALTIMETER_STATE.ERROR:
             self.configure()
 
+    def reset(self):
+        if self.state == ALTIMETER_STATE.MEASURING:
+            self.stop_measuring()
+            
+        self.__init__()
+
     # def __del__(self):
     #     if self.read_thread is not None:
     #         if self.read_thread.is_alive() is True:
@@ -74,7 +80,7 @@ class TrusenseAltimeter(object):
         self._ser.rts = 0
         self._ser.dtr = 0
 
-        # Check for the okay signal        
+        # Check for the okay signal
         temp = self._ser.readline()
         if temp != b'$OK\r\n':
             print('Error with opening connection.')

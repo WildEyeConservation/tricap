@@ -40,7 +40,8 @@ def index():
                            cam_ids=cam_ids, cam_states=cam_states)
 
 def reset_device_objects():
-    pass
+    tricap_manager.reset()
+    altimeter.reset()
 
 @home_bp.route('/_check_cam_image<cam_num_str>')
 def is_cam_image_fresh(cam_num_str):

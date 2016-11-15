@@ -329,10 +329,12 @@ class TriCapCamsManager(CamsManager):
 
         self._context = context
 
-        self.reset()
-
         self._logger = logger
         self._logger.info('GPHOTO2 version info: ' + str(gp.gp_library_version(True)))
+
+        self.reset()
+
+
 
     def _get_cameras(self):
         cameras = []
@@ -349,6 +351,9 @@ class TriCapCamsManager(CamsManager):
                 cameras.append(tricap_cam)
 
         return cameras
+
+    def get_cameras_as_list(self):
+        return self._cameras
 
     def reset(self):
         if self.state == TRICAP_CAMS_MANAGER_STATES.STARTED:
@@ -494,8 +499,8 @@ class DummyTricapManager(CamsManager):
     def get_image_capture_interval(self):
         return IMAGE_CAPTURE_INTERVAL
 
-def create_tricap_cameras_and_manager(logger):
-    gp_context = gp.Context()
-    tricap_cameras = _get_cameras(gp_context, logger)
-    tricap_manager = TriCapCamsManager(tricap_cameras, logger)
-    return tricap_cameras, tricap_manager
+# def create_tricap_cameras_and_manager(logger):
+#     gp_context = gp.Context()
+#     tricap_cameras = _get_cameras(gp_context, logger)
+#     tricap_manager = TriCapCamsManager(tricap_cameras, logger)
+#     return tricap_cameras, tricap_manager

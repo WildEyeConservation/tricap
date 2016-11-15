@@ -1,6 +1,7 @@
 # D Joubert Innoventix Consulting 27 October 2016
 
 import os
+import gphoto2 as gp
 
 import logging
 from logging.handlers import TimedRotatingFileHandler
@@ -10,7 +11,7 @@ from flask import Flask
 from .tricap_cameras import GPHOTO2_IMPORTED
 
 if GPHOTO2_IMPORTED is True:
-    from .tricap_cameras import create_tricap_cameras_and_manager
+    from .tricap_cameras import TriCapCamsManager
     from .image_manager import  SameFileImageManager
 else:
     from .tricap_cameras import DummyTricapManager
@@ -40,7 +41,8 @@ app.logger.info('Initiated logger for new instance of TriCap app.')
 
 # Custom Setup
 if GPHOTO2_IMPORTED is True:
-    tricap_cameras, tricap_manager = create_tricap_cameras_and_manager(app.logger)
+    tricap_manager = TriCapCamsManager(app.logger, gp.Context())
+    tricap_cameras = tricap_manager.get_cameras_as_list()
     image_manager = SameFileImageManager()
 else:
     app.logger.info('Gphoto2 not found, probably in windows. Loading dummy cam managers')

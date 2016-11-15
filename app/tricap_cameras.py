@@ -107,6 +107,26 @@ class TriCapCam(Cam):
 
         return 0
 
+    def set_shutterspeed(self, val_str):
+        """ Set the shutterspeed of the camera externally."""
+
+        if val_str == '1/2500':
+            config_val = CE6D_SHUT_SPEED_1_2500
+        elif val_str == '1/640':
+            config_val = CE6D_SHUT_SPEED_1_640
+        elif val_str == '1/4':
+            config_val = CE6D_SHUT_SPEED_1_4
+        else:
+            self._logger.error('Desired shutter speed val str unkown: %s' % val_str)
+            # TODO Should we set the error state here?
+            self.state = TRICAP_CAM_STATES.ERROR_CONFIG
+            return -1
+
+        config = gp.check_result(gp.gp_camera_get_config(self._gp_camera, self._context))
+        ret_val = self._config_cam_value(config, 'shutterspeed', config_val)
+
+        return ret_val
+
     def _obtain_serial_num(self, config):
         # get serial number
         ret_code, eossernum_config = gp.gp_widget_get_child_by_name(config, 'eosserialnumber')
@@ -132,6 +152,7 @@ class TriCapCam(Cam):
 
         ret_val = 0
 
+        # TODO Read these values from a config file
         ret_val += self._config_cam_value(config, 'capturetarget', CE6D_CAP_TARGET_SD_CARD)
         ret_val += self._config_cam_value(config, 'shutterspeed', CE6D_SHUT_SPEED_1_4)
         ret_val += self._config_cam_value(config, 'imageformat', CE6D_FORMAT_RAW_AND_TINY_JPEG)
@@ -142,19 +163,7 @@ class TriCapCam(Cam):
     def get_shutter_speed_as_string(self):
         shutter_speed_code = self._get_config_value('shutterspeed')
 
-        # CE6D_SHUT_SPEED_1_2500 = 49
-        # CE6D_SHUT_SPEED_1_640 = 43
-        # CE6D_SHUT_SPEED_1_4 = 21
-
-        if shutter_speed_code == CE6D_SHUT_SPEED_1_2500:
-            return '1/2500'
-        elif shutter_speed_code == CE6D_SHUT_SPEED_1_640:
-            return '1/640'
-        elif shutter_speed_code == CE6D_SHUT_SPEED_1_4:
-            return '1/4'
-        else:
-            self._logger.error('Shutter speed code unkown: %s' % shutter_speed_code)
-            return '? %s' % shutter_speed_code
+        return shutter_speed_code
 
     # TODO We are not letting the user know there was an error downloading an image, should we?
 
@@ -238,11 +247,20 @@ class CamsManager():
         pass
 
     @abstractmethod
+    # TODO Fix naming convention on shutter speeds
     def get_shutter_speed_as_string(self):
         pass
 
     @abstractmethod
+    def set_shutterspeed(self, val_str):
+        pass
+
+    @abstractmethod
     def get_image_capture_interval(self):
+        pass
+
+    @abstractmethod
+    def set_image_capture_interval(self, val):
         pass
 
 class TriCapCamsManager(CamsManager):
@@ -324,8 +342,28 @@ class TriCapCamsManager(CamsManager):
         return cam_ids
 
     def get_shutter_speed_as_string(self):
-        # TODO Should do some error checking here
+        # TODO Should do some error checking here, like if there are no cameras!
         return self._cameras[0].get_shutter_speed_as_string()
+
+    def set_shutterspeed(self, val_str):
+        ret_val = 0
+        for cam in self._cameras:
+            ret_val += cam.set_shutterspeed(val_str)
+
+        if ret_val > 0:
+            self._logger.error('Error setting the shutterspeed of the cameras %s' % val_str)
+            return -1
+
+        return 0
+
+    def set_image_capture_interval(self, val):
+        if isinstance(val, float) is False or isinstance(val, int):
+            self._logger.error('Incorrect type of val for setting the image cap int')
+            return -1
+
+        self._image_capture_interval = val
+
+        return 0
 
     def get_image_capture_interval(self):
         return self._image_capture_interval
@@ -364,6 +402,12 @@ class DummyTricapManager(CamsManager):
 
     def get_shutter_speed_as_string(self):
         return CE6D_SHUT_SPEED_1_2500
+
+    def set_shutterspeed(self):
+        pass
+
+    def set_image_capture_interval(self):
+        pass
 
     def get_image_capture_interval(self):
         return IMAGE_CAPTURE_INTERVAL

@@ -12,6 +12,7 @@ def _get_form_with_current_settings():
     form = forms.SettingsForm()
 
     current_shutterspeed_str = tricap_manager.get_shutter_speed_as_string()
+    print(current_shutterspeed_str)
     choice_strings = [choice[1] for choice in form.shutter_speed.choices]
     if current_shutterspeed_str in choice_strings:
         form.shutter_speed.data = str(choice_strings.index(current_shutterspeed_str))
@@ -22,13 +23,17 @@ def _get_form_with_current_settings():
     return form
 
 def _change_settings(form):
-    pass
+    ss_dict = dict(form.shutter_speed.choices)
+    tricap_manager.set_shutterspeed(ss_dict[form.shutter_speed.data])
+
+    tricap_manager.set_image_capture_interval(float(form.image_capture_interval.data))
 
 @settings_bp.route('/settings', methods=['GET', 'POST'])
 def settings():
 
     if request.method == 'GET':
         form = _get_form_with_current_settings()
+        print(form.image_capture_interval.data)
     else:
         form = forms.SettingsForm(request.form)
 

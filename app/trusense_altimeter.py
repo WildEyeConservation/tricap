@@ -1,4 +1,4 @@
-# D Joubert 2 November 2016
+""" D Joubert 2 November 2016 - TruSense S100 Altimeter handler."""
 
 import serial
 import serial.tools.list_ports
@@ -17,7 +17,7 @@ class TrusenseAltimeter(object):
     def __init__(self, logger):
         self._ser = serial.Serial()
 
-        self._ser.port=self._get_correct_port_name()
+        self._ser.port = self._get_correct_port_name()
         self._ser.baudrate = 115200
         self._ser.timeout = 1.0
         self._ser.write_timeout = 1.0
@@ -46,9 +46,9 @@ class TrusenseAltimeter(object):
     def _get_correct_port_name(self):
         ports = list(serial.tools.list_ports.comports())
         correct_port = None
-        for p in ports:
-            if 'Prolific' in p[1] or 'USB-Serial Controller' in p[1]:
-                correct_port = p[0]
+        for port in ports:
+            if 'Prolific' in port[1] or 'USB-Serial Controller' in port[1]:
+                correct_port = port[0]
                 break
 
         if correct_port == None:
@@ -123,7 +123,7 @@ class TrusenseAltimeter(object):
     def _check_ok(self, error_msg):
         reply = self._ser.readline()
         if reply != b'$OK\r\n':
-            self._logger.error(error_msg + ' : ' + reply)
+            self._logger.error(error_msg + ' : ' + reply.decode())
             self._check_for_known_error(reply)
             self.state = ALTIMETER_STATE.ERROR
             return RET_ERROR
@@ -136,10 +136,10 @@ class TrusenseAltimeter(object):
         try:
             self._ser.write(message_bytes)
         except serial.SerialTimeoutException as ex:
-            self._logger.error('Timeout writing %s on altimeter port : %s' % (message, str(ex.args)))
+            self._logger.error('Timeout writing %s on alti port : %s' % (message, str(ex.args)))
             return RET_ERROR
         except serial.SerialException as ex:
-            self._logger.error('Error writing %s on altimeter port : %s' % (message, str(ex.args)))
+            self._logger.error('Error writing %s on alti port : %s' % (message, str(ex.args)))
             return RET_ERROR
 
         if self._check_ok(command_error_str) != 0:
@@ -195,7 +195,7 @@ class TrusenseAltimeter(object):
 
     def disconnect(self):
         if self._ser.is_open == False:
-            self.logger.warning('Trying to close already closed alti serial port')
+            self._logger.warning('Trying to close already closed alti serial port')
             self.state = ALTIMETER_STATE.NOT_CONNECTED
             return RET_ERROR
 
@@ -216,14 +216,17 @@ class TrusenseAltimeter(object):
 
     def _create_read_worker(self):
         def worker(stop_event, temp):
-            while not stop_event.wait(0.01):
+            while not stop_event.wait(1):
                 try:
                     msg = self._ser.readline()
                 except serial.SerialException as ex:
                     self._logger.error('Error reading from altimeter port : %s' % str(ex.args))
                 else:
-                    dist_str = msg[4:].split(b',')[0]
-                    self.measurement = float(dist_str)
+                    if len(msg) > 0:
+                        dist_str = msg[4:].split(b',')[0]
+                        self.measurement = float(dist_str)
+                    else:
+                        self._logger.error('Empty message read from alti port, indicates a timeout')
 
         return worker
 
@@ -236,8 +239,8 @@ class TrusenseAltimeter(object):
 
         # TODO Are there exceptions when starting a thread?
         self._kill_pill = threading.Event()
-        self.read_thread = threading.Thread(target=self._create_read_func(),
-                                  args=(self._kill_pill, 1))
+        self.read_thread = threading.Thread(target=self._create_read_worker(),
+                                            args=(self._kill_pill, 1))
         self.read_thread.start()
         self.state = ALTIMETER_STATE.MEASURING
 

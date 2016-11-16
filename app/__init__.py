@@ -1,7 +1,7 @@
 # D Joubert Innoventix Consulting 27 October 2016
 
 import os
-import gphoto2 as gp
+
 
 import logging
 from logging.handlers import TimedRotatingFileHandler
@@ -11,6 +11,7 @@ from flask import Flask
 from .tricap_cameras import GPHOTO2_IMPORTED
 
 if GPHOTO2_IMPORTED is True:
+    import gphoto2 as gp
     from .tricap_cameras import TriCapCamsManager
     from .image_manager import  SameFileImageManager
 else:
@@ -51,7 +52,7 @@ else:
     image_manager = DummyImageManager()
 
 # setup altimeter
-altimeter = TrusenseAltimeter()
+altimeter = TrusenseAltimeter(app.logger)
 
 # Blueprints
 from .views.home import home_bp

@@ -16,10 +16,10 @@ except ImportError:
 
 from queue import LifoQueue
 
-from config import CE6D_CAP_TARGET_SD_CARD, CE6D_SHUT_SPEED_1_4, CE6D_SHUT_SPEED_1_2500
-from config import CE6D_FORMAT_RAW_AND_TINY_JPEG, CE6D_SHUT_SPEED_1_640
-from config import TRICAP_CAMS_MANAGER_STATES, DISPLAY_DOWNLOAD_DIR, TRICAP_CAM_STATES
-from config import CAM_IMAGE_PREFIX, IMAGE_CAPTURE_INTERVAL, TRICAP_CAM_STATE_STRINGS
+from config import CE6D_CAP_TARGET_SD_CARD, CE6D_SHUTTER_SPEED_1_4, CE6D_SHUTTER_SPEED_1_2500
+from config import CE6D_FORMAT_RAW_AND_TINY_JPEG, CE6D_SHUTTER_SPEED_1_640
+from config import CAM_MANAGER_STATES, DISPLAY_DOWNLOAD_DIR, CAMERA_STATES
+from config import CAM_IMAGE_PREFIX, DEFAULT_IMAGE_CAPTURE_INTERVAL, CAM_STATE_STRINGS
 from config import CONFIG_FP
 
 #TODO setup from config file
@@ -27,11 +27,11 @@ from config import CONFIG_FP
 
 def translate_shutterspeed_str_to_code(val_str):
     if val_str == '1/2500':
-        config_val = CE6D_SHUT_SPEED_1_2500
+        config_val = CE6D_SHUTTER_SPEED_1_2500
     elif val_str == '1/640':
-        config_val = CE6D_SHUT_SPEED_1_640
+        config_val = CE6D_SHUTTER_SPEED_1_640
     elif val_str == '1/4':
-        config_val = CE6D_SHUT_SPEED_1_4
+        config_val = CE6D_SHUTTER_SPEED_1_4
     else:
         return -1
 
@@ -54,17 +54,17 @@ def read_init_config():
             parts = line.split('=')
             init_configs[parts[0].strip()] = parts[1].strip()
 
-    config_val = CE6D_SHUT_SPEED_1_2500
+    config_val = CE6D_SHUTTER_SPEED_1_2500
     if 'shutterspeed' in init_configs.keys():
         val_str = init_configs['shutterspeed']
         config_val = translate_shutterspeed_str_to_code(val_str)
 
         if config_val == -1:
-            config_val = CE6D_SHUT_SPEED_1_2500
+            config_val = CE6D_SHUTTER_SPEED_1_2500
 
     init_configs['shutterspeed'] = config_val
 
-    config_val = IMAGE_CAPTURE_INTERVAL
+    config_val = DEFAULT_IMAGE_CAPTURE_INTERVAL
     if 'image_capture_interval' in init_configs.keys():
         config_val = float(init_configs['image_capture_interval'] )
     init_configs['image_capture_interval'] = config_val
@@ -95,18 +95,18 @@ class TriCapCam(Cam):
 
         self._port_info = port_info
 
-        self.state = TRICAP_CAM_STATES.UNINITIALISED
+        self.state = CAMERA_STATES.UNINITIALISED
 
         self.reset()
 
     def reset(self):
-        self.state = TRICAP_CAM_STATES.UNINITIALISED
+        self.state = CAMERA_STATES.UNINITIALISED
 
         # TODO Fix this (unnecessary port info private member)
         ret_val = self._setup_camera(self._port_info)
 
         if ret_val == 0:
-            self.state = TRICAP_CAM_STATES.INITIALISED
+            self.state = CAMERA_STATES.INITIALISED
 
     def _check_for_error(self, ret_code, error_message):
         if ret_code != 0:
@@ -121,13 +121,13 @@ class TriCapCam(Cam):
 
         ret_code, config_widget = gp.gp_widget_get_child_by_name(config, config_str)
         if self._check_for_error(ret_code, 'Error retrieving config widget %s' % config_str):
-            self.state = TRICAP_CAM_STATES.ERROR_CONFIG
+            self.state = CAMERA_STATES.ERROR_CONFIG
             return ret_code
 
         # set the actual value
         ret_code, value = gp.gp_widget_get_value(config_widget)
         if self._check_for_error(ret_code, 'Error getting widget %s value' % config_str):
-            self.state = TRICAP_CAM_STATES.ERROR_CONFIG
+            self.state = CAMERA_STATES.ERROR_CONFIG
             return ret_code
 
         return value
@@ -136,20 +136,20 @@ class TriCapCam(Cam):
         # find the capture target config item
         ret_code, config_widget = gp.gp_widget_get_child_by_name(config, config_str)
         if self._check_for_error(ret_code, 'Error retrieving config widget %s' % config_str):
-            self.state = TRICAP_CAM_STATES.ERROR_CONFIG
+            self.state = CAMERA_STATES.ERROR_CONFIG
             return ret_code
 
         # get the config choice data structure
         ret_code, value = gp.gp_widget_get_choice(config_widget, config_value)
         if self._check_for_error(ret_code,
                                  'Error retrieving choice %d for %s' % (config_value, config_str)):
-            self.state = TRICAP_CAM_STATES.ERROR_CONFIG
+            self.state = CAMERA_STATES.ERROR_CONFIG
             return ret_code
 
         # set the actual value
         ret_code = gp.gp_widget_set_value(config_widget, value)
         if self._check_for_error(ret_code, 'Error setting widget %s value' % config_str):
-            self.state = TRICAP_CAM_STATES.ERROR_CONFIG
+            self.state = CAMERA_STATES.ERROR_CONFIG
             return ret_code
 
         # set config
@@ -218,8 +218,8 @@ class TriCapCam(Cam):
 
     def create_single_capture_func(self):
         def worker(cam_num):
-            if self.state == TRICAP_CAM_STATES.INITIALISED:
-                self.state = TRICAP_CAM_STATES.CAPTURING
+            if self.state == CAMERA_STATES.INITIALISED:
+                self.state = CAMERA_STATES.CAPTURING
                 # Capture an image
                 ret_code, file_path = gp.gp_camera_capture(self._gp_camera,
                                                            gp.GP_CAPTURE_IMAGE,
@@ -227,7 +227,7 @@ class TriCapCam(Cam):
 
                 if self._check_for_error(ret_code,
                                          'Error capturing cam %d image ' % cam_num):
-                    self.state = TRICAP_CAM_STATES.ERROR_CAPTURE
+                    self.state = CAMERA_STATES.ERROR_CAPTURE
 
                 # Download the jpg image
                 img_name, _ = os.path.splitext(file_path.name)
@@ -246,29 +246,29 @@ class TriCapCam(Cam):
                     ret_code = gp.gp_file_save(camera_file, download_fp)
                     if self._check_for_error(ret_code,
                                              'Error saving cam %d image' %cam_num):
-                        self.state = TRICAP_CAM_STATES.ERROR_CAPTURE
+                        self.state = CAMERA_STATES.ERROR_CAPTURE
                 else:
                     self._logger.error('Failed to download cam %d image : ret_code %d'
                                        % (cam_num, ret_code))
-                    self.state = TRICAP_CAM_STATES.ERROR_CAPTURE
+                    self.state = CAMERA_STATES.ERROR_CAPTURE
 
                 self._gp_camera.exit(self._context)
 
-                if self.state == TRICAP_CAM_STATES.CAPTURING:
-                    self.state = TRICAP_CAM_STATES.INITIALISED
+                if self.state == CAMERA_STATES.CAPTURING:
+                    self.state = CAMERA_STATES.INITIALISED
 
         return worker
 
     def get_state_as_string(self):
-        return TRICAP_CAM_STATE_STRINGS[self.state]
+        return CAM_STATE_STRINGS[self.state]
 
 class DummyCam(Cam):
     def __init__(self):
         Cam.__init__(self)
-        self.state = TRICAP_CAM_STATES.INITIALISED
+        self.state = CAMERA_STATES.INITIALISED
 
     def reset(self):
-        self.state = TRICAP_CAM_STATES.INITIALISED
+        self.state = CAMERA_STATES.INITIALISED
 
     def get_state_as_string(self):
         return "Dummy cam is stateless."
@@ -325,7 +325,7 @@ class TriCapCamsManager(CamsManager):
     def __init__(self, logger, context):
         CamsManager.__init__(self)
 
-        self.state = TRICAP_CAMS_MANAGER_STATES.STOPPED
+        self.state = CAM_MANAGER_STATES.STOPPED
 
         self._context = context
 
@@ -356,7 +356,7 @@ class TriCapCamsManager(CamsManager):
         return self._cameras
 
     def reset(self):
-        if self.state == TRICAP_CAMS_MANAGER_STATES.STARTED:
+        if self.state == CAM_MANAGER_STATES.STARTED:
             self.stop_capturing()
 
         self._cameras = self._get_cameras()
@@ -365,7 +365,7 @@ class TriCapCamsManager(CamsManager):
         self._capture_thread = None
 
         # TODO This should be read from the init config file
-        self._image_capture_interval = IMAGE_CAPTURE_INTERVAL
+        self._image_capture_interval = DEFAULT_IMAGE_CAPTURE_INTERVAL
 
         self._kill_pill = None
 
@@ -400,17 +400,17 @@ class TriCapCamsManager(CamsManager):
 
     def start_capturing(self):
         if len(self._cameras) == 0:
-            self.state = TRICAP_CAMS_MANAGER_STATES.ERROR_NO_CAMS
-        elif self.state == TRICAP_CAMS_MANAGER_STATES.STOPPED:
+            self.state = CAM_MANAGER_STATES.ERROR_NO_CAMS
+        elif self.state == CAM_MANAGER_STATES.STOPPED:
             self._kill_pill = threading.Event()
             self._start_capture_with_wait_thread()
-            self.state = TRICAP_CAMS_MANAGER_STATES.STARTED
+            self.state = CAM_MANAGER_STATES.STARTED
 
     def stop_capturing(self):
-        if self.state == TRICAP_CAMS_MANAGER_STATES.STARTED:
+        if self.state == CAM_MANAGER_STATES.STARTED:
             self._kill_pill.set()
             self._capture_thread.join()
-            self.state = TRICAP_CAMS_MANAGER_STATES.STOPPED
+            self.state = CAM_MANAGER_STATES.STOPPED
 
     def get_num_cams(self):
         return len(self._cameras)
@@ -460,7 +460,7 @@ class DummyTricapManager(CamsManager):
         CamsManager.__init__(self)
 
         self._num_cams = num_cams
-        self.state = TRICAP_CAMS_MANAGER_STATES.STOPPED
+        self.state = CAM_MANAGER_STATES.STOPPED
         self._cameras = []
 
         for _ in range(self._num_cams):
@@ -470,10 +470,10 @@ class DummyTricapManager(CamsManager):
         pass
 
     def start_capturing(self):
-        self.state = TRICAP_CAMS_MANAGER_STATES.STARTED
+        self.state = CAM_MANAGER_STATES.STARTED
 
     def stop_capturing(self):
-        self.state = TRICAP_CAMS_MANAGER_STATES.STOPPED
+        self.state = CAM_MANAGER_STATES.STOPPED
 
     def get_cam_fp_queue(self):
         return None
@@ -488,7 +488,7 @@ class DummyTricapManager(CamsManager):
         return self._cameras
 
     def get_shutter_speed_as_string(self):
-        return CE6D_SHUT_SPEED_1_2500
+        return CE6D_SHUTTER_SPEED_1_2500
 
     def set_shutterspeed(self, val_str):
         pass
@@ -497,7 +497,7 @@ class DummyTricapManager(CamsManager):
         pass
 
     def get_image_capture_interval(self):
-        return IMAGE_CAPTURE_INTERVAL
+        return DEFAULT_IMAGE_CAPTURE_INTERVAL
 
 # def create_tricap_cameras_and_manager(logger):
 #     gp_context = gp.Context()

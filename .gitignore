@@ -3,6 +3,9 @@
 /downloads
 /tmp
 /.idea
+/__pycache__
+/app/__pycache__
+node_modules
 
 # File Types
 *.pyc
@@ -17,3 +20,4 @@
 # specific files
 local_paths.py
 init_config.txt
+pylintrc

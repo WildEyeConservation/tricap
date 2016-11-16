@@ -5,7 +5,7 @@ import hashlib
 
 from abc import ABCMeta, abstractmethod
 
-from config import TRICAP_CAMS_MANAGER_STATES, DUMMY_IMAGE_PATH
+from config import CAM_MANAGER_STATES, DUMMY_IMAGE_PATH
 from config import DISPLAY_DOWNLOAD_DIR, CAM_IMAGE_PREFIX
 
 

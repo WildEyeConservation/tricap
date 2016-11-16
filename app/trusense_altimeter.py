@@ -222,8 +222,11 @@ class TrusenseAltimeter(object):
                 except serial.SerialException as ex:
                     self._logger.error('Error reading from altimeter port : %s' % str(ex.args))
                 else:
-                    dist_str = msg[4:].split(b',')[0]
-                    self.measurement = float(dist_str)
+                    if len(msg) > 0:
+                        dist_str = msg[4:].split(b',')[0]
+                        self.measurement = float(dist_str)
+                    else:
+                        self._logger.error('Empty message read from alti port, indicates a timeout')
 
         return worker
 

@@ -1,0 +1,2 @@
+shutterspeed = 1/4
+image_capture_interval = 3.0

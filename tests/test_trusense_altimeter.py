@@ -46,3 +46,5 @@ class TestDeviceTruSense(unittest.TestCase):
         alti.stop_measuring()
         sleep(2)
         self.assertEqual(alti.state, ALTIMETER_STATE.CONNECTED)
+
+    # TODO Test bad messages, error fallovers

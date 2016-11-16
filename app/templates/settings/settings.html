@@ -24,11 +24,14 @@
 
 
         <div class="row lead">
-            <div class="col-md-6">
+            <div class="col-md-4">
                 {{ form.test(class='btn btn-block btn-primary') }}
             </div>
-            <div class="col-md-6">
+            <div class="col-md-4">
                 {{ form.save(class='btn btn-block') }}
+            </div>
+            <div class="col-md-4">
+                {{ form.revert(class='btn btn-block') }}
             </div>
         </div>
 
@@ -39,8 +42,6 @@
                 {{render_errors(form.server_log_dir)}}
             </div>
         </div>
-
-
 
     </form>
 </div>

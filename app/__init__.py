@@ -12,10 +12,10 @@ from .tricap_cameras import GPHOTO2_IMPORTED
 
 if GPHOTO2_IMPORTED is True:
     import gphoto2 as gp
-    from .tricap_cameras import TriCapCamsManager
+    from .cam_manager import TriCapCamsManager
     from .image_manager import  SameFileImageManager
 else:
-    from .tricap_cameras import DummyTricapManager
+    from .cam_manager import DummyTricapManager
     from .image_manager import DummyImageManager
 from .trusense_altimeter import TrusenseAltimeter
 
@@ -28,7 +28,6 @@ log_fp = os.path.join(SERVER_LOG_DIR, 'tricap_server.log')
 handler = TimedRotatingFileHandler(filename=log_fp, when='midnight', backupCount=10)
 handler.setLevel(logging.DEBUG)
 handler.setFormatter(formatter)
-
 
 # Setup the Flask Server, configuring it using the config.py file
 app = Flask(__name__)

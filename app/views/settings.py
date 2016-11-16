@@ -7,7 +7,7 @@ from flask import Blueprint, render_template, send_file, request, jsonify, redir
 from app import forms, tricap_manager
 from app.tricap_cameras import read_init_config, save_config
 
-from config import SERVER_LOG_DIR
+from config import SERVER_LOG_DIR, DEFAULT_CONFIG_FP
 
 settings_bp = Blueprint('settings', __name__)
 
@@ -42,6 +42,10 @@ def _save_settings(form):
 
     save_config(init_config)
 
+def _revert_to_default_settings():
+    default_config = read_init_config(config_fp = DEFAULT_CONFIG_FP)
+    save_config(default_config)
+
     # TODO Edit the stuff further here
 
 @settings_bp.route('/settings', methods=['GET', 'POST'])
@@ -56,8 +60,10 @@ def settings():
     if form.validate_on_submit():
         if form.test.data is True:
             _change_settings(form)
-        else:
+        elif form.save.data is True:
             _save_settings(form)
+        elif form.revert.data is True:
+            _revert_to_default_settings()
 
         return redirect(url_for('home.index'))
 

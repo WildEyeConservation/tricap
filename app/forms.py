@@ -15,3 +15,4 @@ class SettingsForm(Form):
     server_log_dir = StringField(label='Log directory', default=SERVER_LOG_DIR)
     test = SubmitField(label='Test')
     save = SubmitField(label='Save')
+    revert = SubmitField(label='Revert')

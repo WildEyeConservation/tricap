@@ -15,14 +15,33 @@ def translate_shutterspeed_str_to_code(val_str):
 
     return config_val
 
+def translate_code_to_shutterspeed_str(config_code):
+    if isinstance(config_code, str) is True:
+        config_code = int(config_code)
+
+    if config_code == CE6D_SHUTTER_SPEED_1_2500:
+        val_str = '1/2500'
+    elif config_code == CE6D_SHUTTER_SPEED_1_640:
+        val_str = '1/640'
+    elif config_code == CE6D_SHUTTER_SPEED_1_4:
+        val_str = '1/4'
+    else:
+        return RET_ERROR
+
+    return val_str
+
 def save_config(new_config, save_to_fp=None):
     # TODO Do a check before overwriting the config file
     if save_to_fp is None:
         save_to_fp = CONFIG_FP
-        
+
     with open(save_to_fp, 'w') as config_file:
         for key in new_config.keys():
-            line = key + ' = ' + str(new_config[key]) + '\n'
+            if key == 'shutterspeed':
+                val_str = translate_code_to_shutterspeed_str(new_config[key])
+            else:
+                val_str =  str(new_config[key])
+            line = key + ' = ' + val_str + '\n'
             config_file.write(line)
 
     return RET_OK
@@ -41,6 +60,7 @@ def read_init_config(config_fp=CONFIG_FP):
         config_val = translate_shutterspeed_str_to_code(val_str)
 
         if config_val == RET_ERROR:
+            # TODO There should really be an error here, or some sort of error handling
             config_val = CE6D_SHUTTER_SPEED_1_2500
 
     init_configs['shutterspeed'] = config_val

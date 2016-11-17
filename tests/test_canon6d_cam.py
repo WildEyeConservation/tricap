@@ -72,7 +72,7 @@ class TestDeviceCanon6DCam(TestBaseCanon6DCam):
 
 class TestInteractiveCanon6DCam(TestBaseCanon6DCam):
     def test_cable_remove(self):
-        raw_input('Press enter to conduct cable remove test')
+        input('Press enter to conduct cable remove test')
         cam = Canon6DCam(self.context, self.port_info, self.logger)
         thread_worker = cam.create_single_capture_func()
         self.assertEqual(cam.state, CAMERA_STATES.INITIALISED)

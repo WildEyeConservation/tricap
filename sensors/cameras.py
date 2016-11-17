@@ -72,7 +72,7 @@ class Canon6DCam(Cam):
 
         ret_val = 0
         # TODO Add ISO Speed as a config value
-        ret_val += self._set_config_value(config, 'capturetarget', CE6D_CAP_TARGET_SD_CARD)
+        ret_val += self._set_config_value(config, 'capturetarget', CE6D_CAP_TARGET_SD_CARD)        
         ret_val += self._set_config_value(config, 'shutterspeed', init_configs['shutterspeed'])
         ret_val += self._set_config_value(config, 'imageformat', CE6D_FORMAT_RAW_AND_TINY_JPEG)
         ret_val += self._obtain_serial_num(config)

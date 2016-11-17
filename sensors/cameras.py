@@ -1,5 +1,6 @@
 import os
 import traceback
+import pdb
 
 # No gphoto2 for windows, have to use dummmies while working
 # TODO Implement a Windows Canon6DCam, which uses the Canon EDSDK to communicate with the camera
@@ -44,6 +45,13 @@ class Canon6DCam(Cam):
         self.state = CAMERA_STATES.UNINITIALISED
 
         self._initialise_camera()
+
+        if self.state == CAMERA_STATES.INITIALISED:
+            self._logger.info('Canon EOS 6D Camera %s on port %s succesfully initialised'
+                              %(self.serial_num, self._port_info.get_path() ))
+        else:
+            self._logger.error('Canon EOS 6D Camera not succesfully initialised')
+
 
     def _setup_camera(self):
         self._gp_camera = gp.Camera()
@@ -210,6 +218,12 @@ class Canon6DCam(Cam):
 
                 if self.state == CAMERA_STATES.CAPTURING:
                     self.state = CAMERA_STATES.INITIALISED
+                    return RET_OK
+                else:
+                    return RET_ERROR
+
+            #if the camera had not been initialised (or was in another state)
+            return RET_ERROR
 
         return worker
 

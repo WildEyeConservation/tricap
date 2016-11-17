@@ -21,6 +21,7 @@ class TestDeviceTruSense(unittest.TestCase):
         handler.setLevel(logging.DEBUG)
         handler.setFormatter(formatter)
         self.logger.addHandler(handler)
+        self.logger.setLevel(logging.DEBUG)
 
     def test_initialization(self):
         alti = TrusenseAltimeter(self.logger)

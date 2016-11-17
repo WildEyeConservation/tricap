@@ -104,6 +104,7 @@ class TriCapCamsManager(CamsManager):
                     idx = port_info_list.lookup_path(addr)
                     tricap_cam = Canon6DCam(self._context, port_info_list[idx], self._logger)
                     self._cameras.append(tricap_cam)
+
         except gp.GPhoto2Error as ex:
             self.state = CAM_MANAGER_STATES.ERROR_CONFIG
             self._logger.error('Error finding cameras')
@@ -111,9 +112,6 @@ class TriCapCamsManager(CamsManager):
         except Exception:  # Catches most exceptions, except KeyboardInterrupt and SystemExit
             self._logger.error(traceback.format_exc())
             return RET_ERROR
-
-        # TODO Does this need to be part of the exception handling?
-        self._gp_camera.exit(self._context)
 
         return RET_OK
 

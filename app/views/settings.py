@@ -42,9 +42,9 @@ def _save_settings(form):
 
     save_config(init_config)
 
-def _revert_to_default_settings():
+def _revert_to_default_settings(save_to_fp=None):
     default_config = read_init_config(config_fp = DEFAULT_CONFIG_FP)
-    save_config(default_config)
+    save_config(default_config, save_to_fp=save_to_fp)
 
     # TODO Edit the stuff further here
 

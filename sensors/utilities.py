@@ -15,11 +15,14 @@ def translate_shutterspeed_str_to_code(val_str):
 
     return config_val
 
-def save_config(new_config):
+def save_config(new_config, save_to_fp=None):
     # TODO Do a check before overwriting the config file
-    with open(CONFIG_FP, 'w') as config_file:
+    if save_to_fp is None:
+        save_to_fp = CONFIG_FP
+        
+    with open(save_to_fp, 'w') as config_file:
         for key in new_config.keys():
-            line = key + ' = ' + new_config[key] + '\n'
+            line = key + ' = ' + str(new_config[key]) + '\n'
             config_file.write(line)
 
     return RET_OK

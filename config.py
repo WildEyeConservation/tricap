@@ -46,8 +46,8 @@ CAM_STATE_STRINGS = ['Uninitialised', 'Ready', 'Capturing',
                             'Configuration Error', 'Capture Error']
 
 class CAM_MANAGER_STATES:
-    STOPPED, STARTED, ERROR_NO_CAMS = list(range(3))
-    MAX = 2
+    STOPPED, STARTED, ERROR_NO_CAMS, ERROR_CONFIG = list(range(4))
+    MAX = 3
     MIN = 0
 
 

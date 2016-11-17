@@ -5,7 +5,7 @@ import pdb
 from flask import Blueprint, render_template, send_file, request, jsonify, redirect, url_for
 
 from app import forms, tricap_manager
-from app.tricap_cameras import read_init_config, save_config
+from sensors.utilities import read_init_config, save_config
 
 from config import SERVER_LOG_DIR, DEFAULT_CONFIG_FP
 

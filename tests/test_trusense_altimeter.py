@@ -6,7 +6,7 @@ import os
 
 from time import sleep
 
-from app.trusense_altimeter import TrusenseAltimeter
+from sensors.trusense_altimeter import TrusenseAltimeter
 
 from config import ALTIMETER_STATE, SERVER_LOG_DIR
 

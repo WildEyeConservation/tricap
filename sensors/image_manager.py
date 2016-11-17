@@ -1,3 +1,6 @@
+""" D Joubert - 17 November 2016 - Innoventix Consulting
+    Image Manager, handles images taken from cameras for the webserver"""
+
 # import subprocess32
 import os
 

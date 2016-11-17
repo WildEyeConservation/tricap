@@ -1,14 +1,12 @@
 import os
+import traceback
 
-# from queue import LifoQueue
-
-# As their is no gphoto2 for windows, we have to switch to using dummmies while working under
-#  windows.
+# No gphoto2 for windows, have to use dummmies while working
+# TODO Implement a Windows Canon6DCam, which uses the Canon EDSDK to communicate with the camera
 try:
     import gphoto2 as gp
     GPHOTO2_IMPORTED = True
 except ImportError:
-    print("Error import gphoto2, switching over dummy camera handler")
     GPHOTO2_IMPORTED = False
 
 from .utilities import read_init_config, translate_shutterspeed_str_to_code
@@ -32,6 +30,7 @@ class Cam():
         return "Base Cam has no state."
 
 class Canon6DCam(Cam):
+    """ Hander for the Canon EOS 6D Camera. Uses gphoto2 to handle the actual communication. """
 
     def __init__(self, context, port_info, logger):
         Cam.__init__(self)
@@ -47,11 +46,15 @@ class Canon6DCam(Cam):
         self._initialise_camera()
 
     def _setup_camera(self):
+        self._gp_camera = gp.Camera()
         try:
             self._gp_camera.set_port_info(self._port_info)
             self._gp_camera.init(self._context)
         except gp.GPhoto2Error as ex:
             self._logger.error('GPhoto2 error: %d: %s' %(ex.code, ex.string))
+            return RET_ERROR
+        except Exception:  # Catches most exceptions, except KeyboardInterrupt and SystemExit
+            self._logger.error(traceback.format_exc())
             return RET_ERROR
 
         init_configs = read_init_config()
@@ -61,15 +64,14 @@ class Canon6DCam(Cam):
 
         ret_val = 0
         # TODO Add ISO Speed as a config value
-        ret_val += self._config_cam_value(config, 'capturetarget', CE6D_CAP_TARGET_SD_CARD)
-        ret_val += self._config_cam_value(config, 'shutterspeed', init_configs['shutterspeed'])
-        ret_val += self._config_cam_value(config, 'imageformat', CE6D_FORMAT_RAW_AND_TINY_JPEG)
+        ret_val += self._set_config_value(config, 'capturetarget', CE6D_CAP_TARGET_SD_CARD)
+        ret_val += self._set_config_value(config, 'shutterspeed', init_configs['shutterspeed'])
+        ret_val += self._set_config_value(config, 'imageformat', CE6D_FORMAT_RAW_AND_TINY_JPEG)
         ret_val += self._obtain_serial_num(config)
 
         return ret_val
 
     def _initialise_camera(self):
-        self._gp_camera = gp.Camera()
         ret_val = self._setup_camera()
 
         if ret_val == 0:
@@ -87,10 +89,14 @@ class Canon6DCam(Cam):
             gp.check_result(gp.gp_widget_set_value(config_widget, value))
             # set the widget back to the config tree
             gp.check_result(gp.gp_camera_set_config(self._gp_camera, config, self._context))
+
         except gp.GPhoto2Error as ex:
             self._logger.error('Error setting value %s for config %s' %(config_value, config_str))
             self._logger.error('GPhoto2 Error: %d : %s' %(ex.code, ex.string))
             self.state = CAMERA_STATES.ERROR_CONFIG
+            return RET_ERROR
+        except Exception:
+            self._logger.error(traceback.format_exc())
             return RET_ERROR
 
         self._logger.debug('Succesfully set %s on camera.' % config_str)
@@ -109,6 +115,9 @@ class Canon6DCam(Cam):
             self._logger.error('GPhoto2 Error: %d : %s' %(ex.code, ex.string))
             self.state = CAMERA_STATES.ERROR_CONFIG
             return RET_ERROR
+        except Exception:  # Catches most exceptions, except KeyboardInterrupt and SystemExit
+            self._logger.error(traceback.format_exc())
+            return RET_ERROR
 
         return value
 
@@ -121,6 +130,9 @@ class Canon6DCam(Cam):
         except gp.GPhoto2Error as ex:
             self._logger.error('GPhoto2 Error: %d : %s' %(ex.code, ex.string))
             self.state = CAMERA_STATES.ERROR_CONFIG
+            return RET_ERROR
+        except Exception:  # Catches most exceptions, except KeyboardInterrupt and SystemExit
+            self._logger.error(traceback.format_exc())
             return RET_ERROR
 
         self._logger.info('Succesfully retrieved camera serial number %s' % eossernum)
@@ -137,11 +149,19 @@ class Canon6DCam(Cam):
         """ Set the shutterspeed of the camera externally."""
 
         config_val = translate_shutterspeed_str_to_code(val_str)
-        if config_val == -1:
-            return -1
+        if config_val == RET_ERROR:
+            return RET_ERROR
 
         # TODO Is it better to have the config not be gotten at every setting, or does it not matter
-        config = gp.check_result(gp.gp_camera_get_config(self._gp_camera, self._context))
+        try:
+            config = gp.check_result(gp.gp_camera_get_config(self._gp_camera, self._context))
+        except gp.GPhoto2Error as ex:
+            self._logger.error('GPhoto2 Error: %d : %s' %(ex.code, ex.string))
+            return RET_ERROR
+        except Exception:  # Catches most exceptions, except KeyboardInterrupt and SystemExit
+            self._logger.error(traceback.format_exc())
+            return RET_ERROR
+
         ret_val = self._set_config_value(config, 'shutterspeed', config_val)
 
         return ret_val
@@ -181,7 +201,11 @@ class Canon6DCam(Cam):
                     self.state = CAMERA_STATES.ERROR_CAPTURE
                     self._logger.error('Error capturing image')
                     self._logger.error('GPhoto2 Error: %d : %s' %(ex.code, ex.string))
+                except Exception:  # Catches most exceptions, except KeyboardInterrupt and SystemExit
+                    self._logger.error(traceback.format_exc())
+                    self.state = CAMERA_STATES.ERROR_CAPTURE
 
+                # TODO Not sure if this needs to be exception handled
                 self._gp_camera.exit(self._context)
 
                 if self.state == CAMERA_STATES.CAPTURING:

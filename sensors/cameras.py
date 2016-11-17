@@ -1,5 +1,7 @@
 import os
 
+import pdb
+
 # from queue import LifoQueue
 
 # As their is no gphoto2 for windows, we have to switch to using dummmies while working under
@@ -47,6 +49,8 @@ class Canon6DCam(Cam):
         self._initialise_camera()
 
     def _setup_camera(self):
+        # pdb.set_trace()
+        self._gp_camera = gp.Camera()
         try:
             self._gp_camera.set_port_info(self._port_info)
             self._gp_camera.init(self._context)
@@ -61,15 +65,14 @@ class Canon6DCam(Cam):
 
         ret_val = 0
         # TODO Add ISO Speed as a config value
-        ret_val += self._config_cam_value(config, 'capturetarget', CE6D_CAP_TARGET_SD_CARD)
-        ret_val += self._config_cam_value(config, 'shutterspeed', init_configs['shutterspeed'])
-        ret_val += self._config_cam_value(config, 'imageformat', CE6D_FORMAT_RAW_AND_TINY_JPEG)
+        ret_val += self._set_config_value(config, 'capturetarget', CE6D_CAP_TARGET_SD_CARD)
+        ret_val += self._set_config_value(config, 'shutterspeed', init_configs['shutterspeed'])
+        ret_val += self._set_config_value(config, 'imageformat', CE6D_FORMAT_RAW_AND_TINY_JPEG)
         ret_val += self._obtain_serial_num(config)
 
         return ret_val
 
     def _initialise_camera(self):
-        self._gp_camera = gp.Camera()
         ret_val = self._setup_camera()
 
         if ret_val == 0:

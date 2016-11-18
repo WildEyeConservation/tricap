@@ -4,6 +4,5 @@ import unittest
 
 from tests.test_view_settings import TestViewSettings
 
-
 if __name__ == '__main__':
     unittest.main()

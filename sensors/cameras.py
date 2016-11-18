@@ -10,7 +10,7 @@ try:
 except ImportError:
     GPHOTO2_IMPORTED = False
 
-from .utilities import read_init_config, translate_shutterspeed_str_to_code
+from .configure import TricapConfig
 
 from config import CE6D_CAP_TARGET_SD_CARD, CE6D_FORMAT_RAW_AND_TINY_JPEG, DISPLAY_DOWNLOAD_DIR
 from config import CAM_IMAGE_PREFIX, CAM_STATE_STRINGS, RET_ERROR, RET_OK, CAMERA_STATES
@@ -65,17 +65,18 @@ class Canon6DCam(Cam):
             self._logger.error(traceback.format_exc())
             return RET_ERROR
 
-        init_configs = read_init_config()
+        init_configs = TricapConfig(self._logger)
 
         # get configuration tree
-        config = gp.check_result(gp.gp_camera_get_config(self._gp_camera, self._context))
+        gp_config = gp.check_result(gp.gp_camera_get_config(self._gp_camera, self._context))
 
         ret_val = 0
         # TODO Add ISO Speed as a config value
-        ret_val += self._set_config_value(config, 'capturetarget', CE6D_CAP_TARGET_SD_CARD)        
-        ret_val += self._set_config_value(config, 'shutterspeed', init_configs['shutterspeed'])
-        ret_val += self._set_config_value(config, 'imageformat', CE6D_FORMAT_RAW_AND_TINY_JPEG)
-        ret_val += self._obtain_serial_num(config)
+        ret_val += self._set_config_value(gp_config, 'capturetarget', CE6D_CAP_TARGET_SD_CARD)
+        shutterspeed_code = init_configs.get('shutterspeed', init_configs.TYPE_CODE)
+        ret_val += self._set_config_value(gp_config, 'shutterspeed', shutterspeed_code)
+        ret_val += self._set_config_value(gp_config, 'imageformat', CE6D_FORMAT_RAW_AND_TINY_JPEG)
+        ret_val += self._obtain_serial_num(gp_config)
 
         return ret_val
 

@@ -3,11 +3,12 @@ import os
 import pdb
 
 from flask import Blueprint, render_template, send_file, request, jsonify, redirect, url_for
+from flask import current_app
 
-from app import forms, tricap_manager
-from sensors.utilities import read_init_config, save_config
+from app import forms, tricap_manager, altimeter
+from sensors.configure import TricapConfig
 
-from config import SERVER_LOG_DIR, DEFAULT_CONFIG_FP
+from config import SERVER_LOG_DIR, DEFAULT_CONFIG_FP, CONFIG_FP
 
 settings_bp = Blueprint('settings', __name__)
 
@@ -33,20 +34,23 @@ def _change_settings(form):
 def _save_settings(form):
     _change_settings(form)
 
-    # TODO Should do an error check here, if there are errors, don't save
-    init_config = read_init_config()
+    config = TricapConfig(current_app.logger)
+    config_dict = config.get_dict()
 
     ss_dict = dict(form.shutter_speed.choices)
-    init_config['shutterspeed'] = ss_dict[form.shutter_speed.data]
-    init_config['image_capture_interval'] = form.image_capture_interval.data
+    config_dict['shutterspeed'] = ss_dict[form.shutter_speed.data]
+    config_dict['image_capture_interval'] = form.image_capture_interval.data
 
-    save_config(init_config)
+    config.save_config_dict_to_file(config_dict)
 
-def _revert_to_default_settings(save_to_fp=None):
-    default_config = read_init_config(config_fp = DEFAULT_CONFIG_FP)
-    save_config(default_config, save_to_fp=save_to_fp)
+def _revert_to_default_settings(save_to_fp=CONFIG_FP, logger=None):
+    # arguments are only supposed to be used during unittesting
+    if logger is None:
+        logger = current_app.logger
 
-    # TODO Edit the stuff further here
+    default_config = TricapConfig(logger, config_fp_to_read=DEFAULT_CONFIG_FP)
+    config = TricapConfig(logger, config_fp_to_read=save_to_fp)
+    config.save_config_dict_to_file(default_config.get_dict())
 
 @settings_bp.route('/settings', methods=['GET', 'POST'])
 def settings():
@@ -58,6 +62,9 @@ def settings():
         form = forms.SettingsForm(request.form)
 
     if form.validate_on_submit():
+        tricap_manager.stop_capturing()
+        altimeter.stop_measuring()
+
         if form.test.data is True:
             _change_settings(form)
         elif form.save.data is True:

@@ -21,4 +21,5 @@ node_modules
 # specific files
 local_paths.py
 init_config.txt
+initial.cfg
 pylintrc

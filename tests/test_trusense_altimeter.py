@@ -3,10 +3,13 @@
 import unittest
 import logging
 import os
+import tempfile
+import shutil
 
 from time import sleep
 
 from sensors.trusense_altimeter import TrusenseAltimeter
+from sensors.session_logger import SessionLogger
 
 from config import ALTIMETER_STATE, SERVER_LOG_DIR
 
@@ -23,23 +26,34 @@ class TestDeviceTruSense(unittest.TestCase):
         self.logger.addHandler(handler)
         self.logger.setLevel(logging.DEBUG)
 
+        self.tempdir = tempfile.mkdtemp()
+        self.session_logger = SessionLogger(root_folder = self.tempdir)
+        self.session_logger.create_new_session()
+
+    def tearDown(self):
+        for root, _, filenames in os.walk(self.tempdir):
+            for filename in filenames:
+                os.remove(os.path.join(root, filename))
+
+        shutil.rmtree(self.tempdir)
+
     def test_initialization(self):
-        alti = TrusenseAltimeter(self.logger)
+        alti = TrusenseAltimeter(self.logger, self.session_logger)
         self.assertEqual(alti.state, ALTIMETER_STATE.CONNECTED)
 
     def test_reset(self):
         # TODO Need to elaborate on this test, probably check that some setting is back to default
-        alti = TrusenseAltimeter(self.logger)
+        alti = TrusenseAltimeter(self.logger, self.session_logger)
         alti.reset()
         self.assertEqual(alti.state, ALTIMETER_STATE.CONNECTED)
 
     def test_disconnect(self):
-        alti = TrusenseAltimeter(self.logger)
+        alti = TrusenseAltimeter(self.logger, self.session_logger)
         alti.disconnect()
         self.assertEqual(alti.state, ALTIMETER_STATE.NOT_CONNECTED)
 
     def test_measuring(self):
-        alti = TrusenseAltimeter(self.logger)
+        alti = TrusenseAltimeter(self.logger, self.session_logger)
         alti.start_measuring()
         sleep(2)
         self.assertEqual(alti.state, ALTIMETER_STATE.MEASURING)
@@ -47,5 +61,7 @@ class TestDeviceTruSense(unittest.TestCase):
         alti.stop_measuring()
         sleep(2)
         self.assertEqual(alti.state, ALTIMETER_STATE.CONNECTED)
+
+        # TODO Test session logger, if it takes the input?
 
     # TODO Test bad messages, error fallovers

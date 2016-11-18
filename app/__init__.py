@@ -22,6 +22,7 @@ else:
     from sensors.image_manager import DummyImageManager
 
 from sensors.trusense_altimeter import TrusenseAltimeter
+from sensors.session_logger import SessionLogger
 
 from config import SERVER_LOG_DIR
 
@@ -53,7 +54,8 @@ else:
     tricap_cameras = tricap_manager.get_cameras_as_list()
     image_manager = DummyImageManager()
 
-altimeter = TrusenseAltimeter(app.logger)
+session_logger = SessionLogger()
+altimeter = TrusenseAltimeter(app.logger, session_logger)
 
 # Configure the Flask Blueprints
 from .views.home import home_bp

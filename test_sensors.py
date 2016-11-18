@@ -2,9 +2,10 @@
 
 import unittest
 
-# from tests.test_trusense_altimeter import TestDeviceTruSense
-# from tests.test_canon6d_cam import TestDeviceCanon6DCam
+from tests.test_trusense_altimeter import TestDeviceTruSense
+from tests.test_canon6d_cam import TestDeviceCanon6DCam
 from tests.test_configure import TestConfigure
+from tests.test_session_logger import TestSessionLogger
 
 DO_INTERACTIVE_TESTS = False
 

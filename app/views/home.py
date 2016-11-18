@@ -5,7 +5,7 @@ import os
 from flask import Blueprint, render_template, send_from_directory, current_app, request, jsonify
 from flask import send_file
 
-from app import tricap_manager, tricap_cameras, image_manager, altimeter
+from app import tricap_manager, tricap_cameras, image_manager, altimeter, session_logger
 
 from config import BUTTON_CODES
 
@@ -75,6 +75,8 @@ def handle_button_click():
     button_code = request.args.get('buttonCode', 0, type=int)
 
     if button_code == BUTTON_CODES.START:
+        # TODO Add the session description to the settings page
+        session_logger.create_new_session()
         tricap_manager.start_capturing()
         altimeter.start_measuring()
     elif button_code == BUTTON_CODES.STOP:

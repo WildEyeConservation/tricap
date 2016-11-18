@@ -14,13 +14,15 @@ from config import ALTIMETER_STATE, RET_OK, RET_ERROR, ALTI_STATE_STRINGS
 class TrusenseAltimeter(object):
     """Handles serial communication with the TruSense S100 Laser Altimeter"""
 
-    def __init__(self, logger):
+    def __init__(self, logger, data_logger):
         self._ser = serial.Serial()
 
         self._ser.port = self._get_correct_port_name()
         self._ser.baudrate = 115200
         self._ser.timeout = 1.0
         self._ser.write_timeout = 1.0
+
+        self._data_logger = data_logger
 
         self._logger = logger
 
@@ -225,6 +227,7 @@ class TrusenseAltimeter(object):
                     if len(msg) > 0:
                         dist_str = msg[4:].split(b',')[0]
                         self.measurement = float(dist_str)
+                        self._data_logger.log("Alti measure: %s" %dist_str)
                     else:
                         self._logger.error('Empty message read from alti port, indicates a timeout')
 

@@ -6,14 +6,16 @@ from config import CE6D_SHUTTER_SPEED_1_2500, CE6D_SHUTTER_SPEED_1_640, CE6D_SHU
 from config import CONFIG_FP, DEFAULT_IMAGE_CAPTURE_INTERVAL, RET_OK, RET_ERROR
 from config import DEFAULT_SHUTTER_SPEED
 
-SECTION_HEADER = 'tricap'
+import pdb
 
-class TricapConfig(configparser.ConfigParser):
+SECTION_HEADER = 'Tricap'
+
+class TricapConfig():
     """ Configurator - Object that reads and writes configuration information, handling the
         translation from machine code to human readable format, and back again """
 
-    def __init__(self, logger, config_fp_to_read=CONFIG_FP):
-        configparser.ConfigParser.__init__(self)
+    def __init__(self, logger, config_fp_to_read = CONFIG_FP):
+        self._parser = configparser.ConfigParser()
 
         self._config_fp = config_fp_to_read
         self._logger = logger
@@ -26,7 +28,7 @@ class TricapConfig(configparser.ConfigParser):
         self.TYPE_CODE = 'code'
 
         try:
-            self.read(self._config_fp)
+            self._parser.read(self._config_fp)
             self._ready_flag = True
         except configparser.Error as ex:
             self._logger.error('Error reading from config file %s' % self._config_fp)
@@ -67,9 +69,8 @@ class TricapConfig(configparser.ConfigParser):
     def get_dict(self):
         if self._ready_flag is False:
             return None
-
         try:
-            items = self.items(SECTION_HEADER)
+            items = self._parser.items(SECTION_HEADER)
         except configparser.Error as ex:
             self._logger.error('Error extracting items from config')
             self._logger.error('configparser exception: %s' % ex.args)
@@ -81,9 +82,10 @@ class TricapConfig(configparser.ConfigParser):
     def get(self, id_str, type_str='string'):
         if self._ready_flag is None:
             return None
-
         try:
-            val_str = configparser.ConfigParser.get(self, SECTION_HEADER, id_str)
+            # val_str = configparser.ConfigParser.get(self, SECTION_HEADER, id_str)
+            val_str = self._parser[SECTION_HEADER][id_str]
+
         except configparser.Error as ex:
             self._logger.error('Error reading from config file %s' % self._config_fp)
             self._logger.error('configparser exception: %s' % ex.args)
@@ -133,14 +135,14 @@ class TricapConfig(configparser.ConfigParser):
                         self._logger.error('Bad shutterspeed %s' % str(config_dict[key]))
                         return RET_ERROR
 
-                self.set(SECTION_HEADER, key, str(config_dict[key]))
+                self._parser.set(SECTION_HEADER, key, str(config_dict[key]))
             except configparser.Error as ex:
                 self._logger.error('Error setting %s with value %s' % (key, str(config_dict[key])))
                 self._logger.error('configparser exception: %s' % ex.args)
                 return RET_ERROR
         try:
             config_file = open(config_fp, 'w')
-            self.write(config_file)
+            self._parser.write(config_file)
             config_file.close()
         except configparser.Error as ex:
             self._logger.error('Error writing configs to file %s' % config_fp)

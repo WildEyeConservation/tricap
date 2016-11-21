@@ -57,6 +57,7 @@ class TestDeviceTruSense(unittest.TestCase):
         alti.start_measuring()
         sleep(2)
         self.assertEqual(alti.state, ALTIMETER_STATE.MEASURING)
+	# TODO This test should still provide valid result even if the measure plane is too close.
         self.assertNotEqual(alti.measurement, 0)
         alti.stop_measuring()
         sleep(2)

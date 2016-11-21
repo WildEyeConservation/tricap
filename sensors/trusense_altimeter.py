@@ -187,7 +187,7 @@ class TrusenseAltimeter(object):
         if self.state == ALTIMETER_STATE.MEASURING:
             self.stop_measuring()
 
-        self.__init__(self._logger)
+        self.__init__(self._logger, self._data_logger)
 
     def get_state_as_string(self):
         return ALTI_STATE_STRINGS[self.state]

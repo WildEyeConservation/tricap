@@ -157,7 +157,8 @@ class Canon6DCam(Cam):
     def set_shutterspeed(self, val_str):
         """ Set the shutterspeed of the camera externally."""
 
-        config_val = translate_shutterspeed_str_to_code(val_str)
+        # config_val = translate_shutterspeed_str_to_code(val_str)
+        config_val = TricapConfig.convert_shutterspeed_str_to_code(val_str)
         if config_val == RET_ERROR:
             return RET_ERROR
 

@@ -52,7 +52,6 @@ class Canon6DCam(Cam):
         else:
             self._logger.error('Canon EOS 6D Camera not succesfully initialised')
 
-
     def _setup_camera(self):
         self._gp_camera = gp.Camera()
         try:
@@ -87,6 +86,16 @@ class Canon6DCam(Cam):
             self.state = CAMERA_STATES.INITIALISED
         else:
             self.state = CAMERA_STATES.ERROR_CONFIG
+
+    def list_config_values(self, config_str):
+        config = gp.check_result(gp.gp_camera_get_config(self._gp_camera, self._context))
+        config_widget = gp.check_result(gp.gp_widget_get_child_by_name(config, config_str))
+        choice_count = gp.check_result(gp.gp_widget_count_choices(config_widget))
+        print('choices')
+        for n in range(choice_count):
+            choice = gp.check_result(gp.gp_widget_get_choice(config, n))
+            if choice:
+                print(choice)
 
     def _set_config_value(self, config, config_str, config_value):
         try:

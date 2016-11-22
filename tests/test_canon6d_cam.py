@@ -70,6 +70,11 @@ class TestDeviceCanon6DCam(TestBaseCanon6DCam):
         thread.join()
         self.assertEqual(cam.state, CAMERA_STATES.INITIALISED)
 
+    def test_listing_of_config_values(self):
+        cam = Canon6DCam(self.context, self.port_info, self.logger)
+        cam.list_config_values('iso')
+        self.assertEqual(cam.state, CAMERA_STATES.INITIALISED)
+
 class TestInteractiveCanon6DCam(TestBaseCanon6DCam):
     def test_cable_remove(self):
         input('Press enter to conduct cable remove test')

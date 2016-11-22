@@ -72,8 +72,8 @@ class Canon6DCam(Cam):
         ret_val = 0
         # TODO Add ISO Speed as a config value
         ret_val += self._set_config_value(gp_config, 'capturetarget', CE6D_CAP_TARGET_SD_CARD)
-        shutterspeed_code = init_configs.get('shutterspeed', init_configs.TYPE_CODE)
-        ret_val += self._set_config_value(gp_config, 'shutterspeed', shutterspeed_code)
+        ret_val += self._set_config_value_by_string(gp_config, 'shutterspeed',
+                                                    init_configs.get('shutterspeed'))
         ret_val += self._set_config_value(gp_config, 'imageformat', CE6D_FORMAT_RAW_AND_TINY_JPEG)
         ret_val += self._obtain_serial_num(gp_config)
 
@@ -87,15 +87,32 @@ class Canon6DCam(Cam):
         else:
             self.state = CAMERA_STATES.ERROR_CONFIG
 
-    def list_config_values(self, config_str):
-        config = gp.check_result(gp.gp_camera_get_config(self._gp_camera, self._context))
-        config_widget = gp.check_result(gp.gp_widget_get_child_by_name(config, config_str))
-        choice_count = gp.check_result(gp.gp_widget_count_choices(config_widget))
-        print('choices')
-        for n in range(choice_count):
-            choice = gp.check_result(gp.gp_widget_get_choice(config, n))
-            if choice:
-                print(choice)
+    def _get_list_of_valid_config_choices(self, config, config_str):
+        config_choices = []
+        try:
+            config_widget = gp.check_result(gp.gp_widget_get_child_by_name(config, config_str))
+            choice_count = gp.check_result(gp.gp_widget_count_choices(config_widget))
+            for choice_index in range(choice_count):
+                choice = gp.check_result(gp.gp_widget_get_choice(config_widget, choice_index))
+                if choice:
+                    config_choices.append(choice)
+        except gp.GPhoto2Error as ex:
+            self._logger.error('Error getting list of choices for %s' %(config_str))
+            self._logger.error('GPhoto2 Error: %d : %s' %(ex.code, ex.string))
+            self.state = CAMERA_STATES.ERROR_CONFIG
+            return None
+        except Exception:
+            self._logger.error(traceback.format_exc())
+            return None
+
+        return config_choices
+
+    def _set_config_value_by_string(self, config, config_str, val_string):
+        valid_choices = self._get_list_of_valid_config_choices(config, config_str)
+        if val_string in valid_choices:
+            return self._set_config_value(config, config_str, valid_choices.index(val_string))
+        else:
+            return RET_ERROR
 
     def _set_config_value(self, config, config_str, config_value):
         try:
@@ -163,15 +180,7 @@ class Canon6DCam(Cam):
         self.state = CAMERA_STATES.UNINITIALISED
         self._initialise_camera()
 
-    def set_shutterspeed(self, val_str):
-        """ Set the shutterspeed of the camera externally."""
-
-        # config_val = translate_shutterspeed_str_to_code(val_str)
-        config_val = TricapConfig.convert_shutterspeed_str_to_code(val_str)
-        if config_val == RET_ERROR:
-            return RET_ERROR
-
-        # TODO Is it better to have the config not be gotten at every setting, or does it not matter
+    def set_setting(self, setting_str, val_str):
         try:
             config = gp.check_result(gp.gp_camera_get_config(self._gp_camera, self._context))
         except gp.GPhoto2Error as ex:
@@ -181,13 +190,10 @@ class Canon6DCam(Cam):
             self._logger.error(traceback.format_exc())
             return RET_ERROR
 
-        ret_val = self._set_config_value(config, 'shutterspeed', config_val)
+        return self._set_config_value_by_string(config, setting_str, val_str)
 
-        return ret_val
-
-    def get_shutter_speed_as_string(self):
-        shutter_speed_code = self._get_config_value('shutterspeed')
-        return shutter_speed_code
+    def get_setting(self, setting_str):
+        return self._get_config_value(setting_str)
 
     # TODO We are not letting the user know there was an error downloading an image, should we?
 

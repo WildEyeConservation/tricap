@@ -70,9 +70,3 @@ class TestConfigure(TestBaseConfigure):
 
         self.assertEqual(config.get('shutterspeed'), '1/640')
         self.assertEqual(config.get('image_capture_interval', type_str=config.TYPE_FLOAT), 5.0)
-
-        #bad setting
-        config_dict['shutterspeed'] = '1/Dummy'
-        self.assertEqual(config.save_config_dict_to_file(config_dict), RET_ERROR)
-
-        self.assertEqual(config.get('shutterspeed'), '1/640')

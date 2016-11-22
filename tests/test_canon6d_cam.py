@@ -50,12 +50,11 @@ class TestDeviceCanon6DCam(TestBaseCanon6DCam):
     def test_set_shutterspeed(self):
         cam = Canon6DCam(self.context, self.port_info, self.logger)
 
-        cam.set_shutterspeed('1/640')
-        self.assertEqual(cam.get_shutter_speed_as_string(), '1/640')
+        self.assertEqual(cam.set_setting('shutterspeed', '1/640'), RET_OK)
+        self.assertEqual(cam.get_setting('shutterspeed'), '1/640')
 
-        ret_val = cam.set_shutterspeed('1/5')
-        self.assertEqual(ret_val, RET_ERROR)
-        self.assertEqual(cam.get_shutter_speed_as_string(), '1/640')
+        self.assertEqual(cam.set_setting('shutterspeed', '1/X'), RET_ERROR)
+        self.assertEqual(cam.get_setting('shutterspeed'), '1/640')
 
     def test_capture_func(self):
         cam = Canon6DCam(self.context, self.port_info, self.logger)
@@ -70,10 +69,12 @@ class TestDeviceCanon6DCam(TestBaseCanon6DCam):
         thread.join()
         self.assertEqual(cam.state, CAMERA_STATES.INITIALISED)
 
-    def test_listing_of_config_values(self):
+    def test_setting_iso(self):
         cam = Canon6DCam(self.context, self.port_info, self.logger)
-        cam.list_config_values('iso')
-        self.assertEqual(cam.state, CAMERA_STATES.INITIALISED)
+        cam.set_setting('iso', '100')
+        self.assertEqual(cam.get_setting('iso'), '100')
+        cam.set_setting('iso', '200')
+        self.assertEqual(cam.get_setting('iso'), '200')
 
 class TestInteractiveCanon6DCam(TestBaseCanon6DCam):
     def test_cable_remove(self):

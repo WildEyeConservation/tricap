@@ -25,7 +25,6 @@ class TricapConfig():
         self.TYPE_STRING = 'string'
         self.TYPE_INT = 'int'
         self.TYPE_FLOAT = 'float'
-        self.TYPE_CODE = 'code'
 
         try:
             self._parser.read(self._config_fp)
@@ -34,33 +33,33 @@ class TricapConfig():
             self._logger.error('Error reading from config file %s' % self._config_fp)
             self._logger.error('configparser exception: %s' % ex.args)
 
-    @staticmethod
-    def convert_shutterspeed_str_to_code(val_str):
-        if val_str == '1/2500':
-            config_val = CE6D_SHUTTER_SPEED_1_2500
-        elif val_str == '1/640':
-            config_val = CE6D_SHUTTER_SPEED_1_640
-        elif val_str == '1/4':
-            config_val = CE6D_SHUTTER_SPEED_1_4
-        else:
-            return None
-        return config_val
+    # @staticmethod
+    # def convert_shutterspeed_str_to_code(val_str):
+    #     if val_str == '1/2500':
+    #         config_val = CE6D_SHUTTER_SPEED_1_2500
+    #     elif val_str == '1/640':
+    #         config_val = CE6D_SHUTTER_SPEED_1_640
+    #     elif val_str == '1/4':
+    #         config_val = CE6D_SHUTTER_SPEED_1_4
+    #     else:
+    #         return None
+    #     return config_val
 
-    @staticmethod
-    def convert_shutterspeed_code_to_str(config_code):
-        if isinstance(config_code, str) is True:
-            config_code = int(config_code)
-
-        if config_code == CE6D_SHUTTER_SPEED_1_2500:
-            val_str = '1/2500'
-        elif config_code == CE6D_SHUTTER_SPEED_1_640:
-            val_str = '1/640'
-        elif config_code == CE6D_SHUTTER_SPEED_1_4:
-            val_str = '1/4'
-        else:
-            return None
-
-        return val_str
+    # @staticmethod
+    # def convert_shutterspeed_code_to_str(config_code):
+    #     if isinstance(config_code, str) is True:
+    #         config_code = int(config_code)
+    #
+    #     if config_code == CE6D_SHUTTER_SPEED_1_2500:
+    #         val_str = '1/2500'
+    #     elif config_code == CE6D_SHUTTER_SPEED_1_640:
+    #         val_str = '1/640'
+    #     elif config_code == CE6D_SHUTTER_SPEED_1_4:
+    #         val_str = '1/4'
+    #     else:
+    #         return None
+    #
+    #     return val_str
 
 
     def is_ready(self):
@@ -91,17 +90,7 @@ class TricapConfig():
             self._logger.error('configparser exception: %s' % ex.args)
             return None
 
-        # deal with the specific cases
-        if id_str == 'shutterspeed' and type_str == self.TYPE_CODE:
-            ret_val = self.convert_shutterspeed_str_to_code(val_str)
-            if ret_val == None:
-                self._logger.error('Error converting shutterspeed to code %s' % val_str)
-                # TODO Not sure what to return here, I guess the show must go on?
-                ret_val = DEFAULT_SHUTTER_SPEED
-
-            return ret_val
-
-        if type_str == self.TYPE_STRING or type_str == self.TYPE_CODE:
+        if type_str == self.TYPE_STRING:
             return val_str
 
         if type_str == self.TYPE_INT:
@@ -129,11 +118,11 @@ class TricapConfig():
 
         for key in config_dict.keys():
             try:
-                # check specific, troublesome settings:
-                if key == 'shutterspeed':
-                    if self.convert_shutterspeed_str_to_code(config_dict[key]) is None:
-                        self._logger.error('Bad shutterspeed %s' % str(config_dict[key]))
-                        return RET_ERROR
+                # # check specific, troublesome settings:
+                # if key == 'shutterspeed':
+                #     if self.convert_shutterspeed_str_to_code(config_dict[key]) is None:
+                #         self._logger.error('Bad shutterspeed %s' % str(config_dict[key]))
+                #         return RET_ERROR
 
                 self._parser.set(SECTION_HEADER, key, str(config_dict[key]))
             except configparser.Error as ex:

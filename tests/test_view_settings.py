@@ -75,4 +75,4 @@ class TestViewSettings(TestCase):
 
             new_config = TricapConfig(self.logger, config_fp_to_read = self.temp_config_fp)
 
-            self.assertEqual(new_config.get_dict(), default_config.get_dict())            
+            self.assertEqual(new_config.get_dict(), default_config.get_dict())

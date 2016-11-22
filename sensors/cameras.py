@@ -74,6 +74,7 @@ class Canon6DCam(Cam):
         ret_val += self._set_config_value(gp_config, 'capturetarget', CE6D_CAP_TARGET_SD_CARD)
         ret_val += self._set_config_value_by_string(gp_config, 'shutterspeed',
                                                     init_configs.get('shutterspeed'))
+        ret_val += self._set_config_value_by_string(gp_config, 'iso', init_configs.get('iso'))
         ret_val += self._set_config_value(gp_config, 'imageformat', CE6D_FORMAT_RAW_AND_TINY_JPEG)
         ret_val += self._obtain_serial_num(gp_config)
 

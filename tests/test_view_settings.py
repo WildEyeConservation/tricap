@@ -45,7 +45,7 @@ class TestViewSettings(TestCase):
     def create_a_temp_config(self):
         self.temp_config_fp = os.path.join(self.tempdir, str(self.temp_file_count)+'.temp')
         with open(self.temp_config_fp, 'w') as config_file:
-            config_file.write('[tricap]\n')
+            config_file.write('[Tricap]\n')
             config_file.write('shutterspeed: 1/2500\n')
             config_file.write('image_capture_interval: 3.0\n')
 
@@ -75,4 +75,4 @@ class TestViewSettings(TestCase):
 
             new_config = TricapConfig(self.logger, config_fp_to_read = self.temp_config_fp)
 
-            self.assertEqual(new_config.get_dict(), default_config.get_dict())            
+            self.assertEqual(new_config.get_dict(), default_config.get_dict())

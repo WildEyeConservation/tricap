@@ -93,11 +93,16 @@ class Canon6DCam(Cam):
     def _get_list_of_valid_config_names(self, config):
         config_names = []
         try:
-            config_count = gp.check_result(gp.gp_widget_count_choices(config))
+            config_count = gp.check_result(gp.gp_widget_count_children(config))
             for choice_index in range(config_count):
-                config_name = gp.check_result(gp.gp_widget_get_choice(config, choice_index))
+                child = gp.check_result(gp.gp_widget_get_child(config, choice_index))
+                config_name = gp.check_result(gp.gp_widget_get_name(child))
                 if config_name:
                     config_names.append(config_name)
+
+                grandchildren_names = self._get_list_of_valid_config_names(child)
+                config_names+=grandchildren_names
+
         except gp.GPhoto2Error as ex:
             self._logger.error('Error getting list of camera config names')
             self._logger.error('GPhoto2 Error: %d : %s' %(ex.code, ex.string))

@@ -234,7 +234,7 @@ class TriCapCamsManager(CamsManager):
     def get_choices_for_config(self, config_str):
         choices = None
 
-        if len(self._num_cams > 0):
-            self._cameras[0].get_choices_for_config(config_str)
+        if self.get_num_cams() > 0:
+            choices = self._cameras[0].get_choices_for_config(config_str)
 
         return choices

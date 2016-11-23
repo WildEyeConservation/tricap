@@ -41,17 +41,34 @@ def _get_setting_form(config_fp=CONFIG_FP, config_dict=None):
     for key in config_dict.keys():
         choices = tricap_manager.get_choices_for_config(key)
         if choices is not None and len(choices) != 0:
-            form.select_settings.append_entry()
-            form.select_settings[-1].label = key
             choices_tuples = []
             for index, choice in enumerate(choices):
                 choices_tuples.append((str(index), choice))
-            form.select_settings[-1].choices = choices_tuples
+
+	    sel_field = SelectField(label=key, choices=choices_tuples)
+            form.select_settings.append_entry(sel_field)
+
         else:
-            form.string_settings.append_entry()
-            form.string_settings[-1].label = key
+	    str_field = StringField(label=key)
+            form.string_settings.append_entry(str_field)
 
     return form
+
+def _populated_pushed_form(pushed_form):
+    """ for some reason, the pushed form loses the labels of the added fields, so have to add em"""
+    base_form = _get_setting_form()
+    string_labels, select_labels = _get_setting_labels(base_form)
+
+    pdb.set_trace()
+
+    for index in range(len(string_labels)):
+        base_form.string_settings[index].data = pushed_form.string_settings[index].data
+
+    for index in range(len(select_labels)):
+        base_form.select_labels[index].data = pushed_form.select_labels[index].data
+
+    return base_form
+
 
 def _get_setting_labels(form):
     string_labels = []
@@ -79,7 +96,7 @@ def _get_form_with_current_settings(config_fp = CONFIG_FP):
             elif key in select_labels:
                 choices_tuples = form.select_settings[select_labels.index(key)].choices
                 choices = [ct[1] for ct in choices_tuples]
-                form.select_settings[select_labels.index(key)].data = choices.index(config_val)
+                form.select_settings[select_labels.index(key)].data = str(choices.index(config_val))
         else: # it's not a camera settings
             config_val = altimeter.get_setting(key)
             if config_val is not None:
@@ -166,7 +183,9 @@ def settings():
     else:
         # formClass = _get_blank_setting_form_class()
         # form = formClass(request.form)
-        form = forms.SettingsForm(request.form)
+        form = _populated_pushed_form(forms.SettingsForm(request.form))
+        pdb.set_trace()
+        print(form)
 
     if form.validate_on_submit():
         tricap_manager.stop_capturing()

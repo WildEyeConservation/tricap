@@ -88,6 +88,28 @@ class Canon6DCam(Cam):
         else:
             self.state = CAMERA_STATES.ERROR_CONFIG
 
+    # TODO The naming convention for configs and settings is a mess. Sort it out
+
+    def _get_list_of_valid_config_names(self, config):
+        config_names = []
+        try:
+            config_count = gp.check_result(gp.gp_widget_count_choices(config))
+            for choice_index in range(config_count):
+                config_name = gp.check_result(gp.gp_widget_get_choice(config, choice_index))
+                if config_name:
+                    config_names.append(config_name)
+        except gp.GPhoto2Error as ex:
+            self._logger.error('Error getting list of camera config names')
+            self._logger.error('GPhoto2 Error: %d : %s' %(ex.code, ex.string))
+            self.state = CAMERA_STATES.ERROR_CONFIG
+            return None
+        except Exception:
+            self._logger.error(traceback.format_exc())
+            return None
+
+        return config_names
+
+
     def _get_list_of_valid_config_choices(self, config, config_str):
         config_choices = []
         try:
@@ -195,6 +217,20 @@ class Canon6DCam(Cam):
 
     def get_setting(self, setting_str):
         return self._get_config_value(setting_str)
+
+    def get_choices_for_config(self, config_str):
+        """ External method for getting the choices. If there are any errors (like the config does
+        not exist or there are its not a radio type config) then return None """
+
+        choices = None
+
+        config = gp.check_result(gp.gp_camera_get_config(self._gp_camera, self._context))
+        valid_config_names = self._get_list_of_valid_config_names(config)
+        if valid_config_names is not None and len(valid_config_names) > 0:
+            if config_str in valid_config_names:
+                choices = self._get_list_of_valid_config_choices(config, config_str)
+
+        return choices
 
     # TODO We are not letting the user know there was an error downloading an image, should we?
 

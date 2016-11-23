@@ -86,6 +86,10 @@ class TrusenseAltimeter(object):
 
         return RET_OK
 
+    def get_setting(self,setting_str):
+        # TODO MAKE THIS SOMETHING WORTHWHILE
+        return setting_str
+
     def _check_for_known_error(self, reply):
         if reply[0:2] == b'$ER':
             err_code = str(reply[4:5])

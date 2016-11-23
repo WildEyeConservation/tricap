@@ -20,7 +20,7 @@ SECRET_KEY = 'tricap-secret-key'
 CE6D_CAP_TARGET_MEMORY = 0
 CE6D_CAP_TARGET_SD_CARD = 1
 
-# TODO Going to need to support all possible shutter speeds, because we will want to experiment
+# TODO Delete this if not used (i.e. check where this is used)
 CE6D_SHUTTER_SPEED_1_2500 = 49
 CE6D_SHUTTER_SPEED_1_640 = 43
 CE6D_SHUTTER_SPEED_1_4 = 21

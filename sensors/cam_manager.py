@@ -57,6 +57,27 @@ class CamsManager():
     def get_image_capture_interval(self):
         return DEFAULT_IMAGE_CAPTURE_INTERVAL
 
+    def get_choices_for_config(self, config_str):
+        choices = None
+
+        if config_str == 'shutterspeed':
+            choices = ['1/4', '1/640', '1/2500']
+        elif config_str == 'iso':
+            choices = ['auto', '100', '200']
+
+        return choices
+
+    def get_setting(self, setting_str):
+        ret_val = None
+        if setting_str == 'shutterspeed':
+            ret_val = '1/640'
+        elif setting_str == 'iso':
+            ret_val = '100'
+        else:
+            ret_val = 'setting_str'
+
+        return ret_val
+
 class TriCapCamsManager(CamsManager):
     """TriCapCamsManager manages TriCap camera objects"""
 
@@ -209,3 +230,11 @@ class TriCapCamsManager(CamsManager):
 
     def get_image_capture_interval(self):
         return self._image_capture_interval
+
+    def get_choices_for_config(self, config_str):
+        choices = None
+
+        if len(self._num_cams > 0):
+            self._cameras[0].get_choices_for_config(config_str)
+
+        return choices

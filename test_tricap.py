@@ -2,7 +2,12 @@
 
 import unittest
 
-from tests.test_view_settings import TestViewSettings
+from tests.test_settings import TestSettings
+
+DO_BEHAVIOUR_TESTS = True
+
+if DO_BEHAVIOUR_TESTS is True:
+    from tests.test_settings import TestBehaviourSettings
 
 if __name__ == '__main__':
     unittest.main()

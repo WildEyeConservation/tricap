@@ -1,5 +1,11 @@
 """ D Joubert 16 November 2016 - Camera managers for Tricap app"""
 
+# TODO Wrong place, but the overall logger should be attached to the session logger, so that those
+# error messages get captured to the session folder as well. Or mmaybe separetely, so you can still
+# read the alti messages?
+
+# TODO Settings page should show warnning for all incorrectly formatted settings
+
 import threading
 import time
 import traceback
@@ -52,6 +58,7 @@ class CamsManager():
         return self._cameras[0].get_setting(setting_str)
 
     def set_setting(self, setting_str, setting_value):
+        # TODO Should handle image_capture_interval from this point as well
         return self._cameras[0].set_setting(setting_str, setting_value)
 
 class TriCapCamsManager(CamsManager):
@@ -86,6 +93,17 @@ class TriCapCamsManager(CamsManager):
 
         # TODO This should be read from the init config file
         self._image_capture_interval = DEFAULT_IMAGE_CAPTURE_INTERVAL
+
+    def set_image_capture_interval(self, interval):
+        if isinstance(interval, str):
+            interval = float(interval)
+
+        self._image_capture_interval = interval
+
+        return RET_OK
+
+    def get_image_capture_interval(self):
+        return self._image_capture_interval
 
     def _find_cameras(self):
         self._cameras = []
@@ -181,3 +199,20 @@ class TriCapCamsManager(CamsManager):
             choices = self._cameras[0].get_choices_for_setting(config_str)
 
         return choices
+
+    def get_setting(self, setting_str):
+        # TODO I don't like throwing an exception for every value that is not from the camera
+        if setting_str == 'image_capture_interval':
+            return self._image_capture_interval
+        return self._cameras[0].get_setting(setting_str)
+
+    def set_setting(self, setting_str, val_str):
+        if setting_str == 'image_capture_interval':
+            self._image_capture_interval = float(val_str)
+            return RET_OK
+
+        ret_val = RET_OK
+        for camera in self._cameras:
+            if camera.set_setting(setting_str, val_str) != RET_OK:
+                ret_val = RET_ERROR
+        return ret_val

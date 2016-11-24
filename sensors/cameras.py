@@ -156,6 +156,9 @@ class Canon6DCam(Cam):
 
     def _set_config_value_by_string(self, config, config_str, val_string):
         valid_choices = self._get_list_of_valid_config_choices(config, config_str)
+        if valid_choices is None:
+            return RET_ERROR
+            
         if val_string in valid_choices:
             return self._set_config_value(config, config_str, valid_choices.index(val_string))
         else:
@@ -196,10 +199,10 @@ class Canon6DCam(Cam):
             self._logger.error('Error getting config value for %s' %config_str)
             self._logger.error('GPhoto2 Error: %d : %s' %(ex.code, ex.string))
             self.state = CAMERA_STATES.ERROR_CONFIG
-            return RET_ERROR
+            return None
         except Exception:  # Catches most exceptions, except KeyboardInterrupt and SystemExit
             self._logger.error(traceback.format_exc())
-            return RET_ERROR
+            return None
 
         return value
 
@@ -240,6 +243,9 @@ class Canon6DCam(Cam):
         return self._set_config_value_by_string(config, setting_str, val_str)
 
     def get_setting(self, setting_str):
+        """ This external method is used to get settings from the Cannon EOS 6D using gphoto2. If
+            the setting does not exist, then the method returns None. The underlying
+            self._get_config_value records an error though. """
         return self._get_config_value(setting_str)
 
     def get_choices_for_setting(self, config_str):

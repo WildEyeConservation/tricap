@@ -18,12 +18,14 @@ settings_bp = Blueprint('settings', __name__)
 class MiscSettingHandler():
     """ Handles all the settings which are not applicable to the sensors """
     def __init__(self):
-        self._setting_strings = ['session_description']
+        self._setting_strings = ['session_description', 'image_capture_interval']
 
-    def set_setting(self, setting_str, setting_val):
-        if setting_str in self._settings_strings:
+    def set_setting(self, setting_str, val_str):
+        if setting_str in self._setting_strings:
             if setting_str == 'session_description':
-                return session_logger.set_description(setting_val)
+                return session_logger.set_description(val_str)
+            elif setting_str == 'image_capture_interval':
+                return tricap_manager.set_image_capture_interval(val_str)
         else:
             return RET_ERROR
 
@@ -32,9 +34,11 @@ class MiscSettingHandler():
     def get_setting(self, setting_str):
         ret_val = None
 
-        if setting_str in self._settings_strings:
+        if setting_str in self._setting_strings:
             if setting_str == 'session_description':
                 ret_val = session_logger.get_description()
+            elif setting_str == 'image_capture_interval':
+                ret_val = tricap_manager.get_image_capture_interval()
 
         return ret_val
 

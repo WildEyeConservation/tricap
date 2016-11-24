@@ -133,8 +133,8 @@ class Canon6DCam(Cam):
 
         return config_names
 
-
-    def _get_list_of_valid_config_choices(self, config, config_str):
+    # TODO Correctly handle whether not being able to set/get a config is critical or not
+    def _get_list_of_valid_config_choices(self, config, config_str, critical=True):
         config_choices = []
         try:
             config_widget = gp.check_result(gp.gp_widget_get_child_by_name(config, config_str))
@@ -146,7 +146,8 @@ class Canon6DCam(Cam):
         except gp.GPhoto2Error as ex:
             self._logger.error('Error getting list of choices for %s' %(config_str))
             self._logger.error('GPhoto2 Error: %d : %s' %(ex.code, ex.string))
-            self.state = CAMERA_STATES.ERROR_CONFIG
+            if critical is True:
+                self.state = CAMERA_STATES.ERROR_CONFIG
             return None
         except Exception:
             self._logger.error(traceback.format_exc())
@@ -154,17 +155,18 @@ class Canon6DCam(Cam):
 
         return config_choices
 
-    def _set_config_value_by_string(self, config, config_str, val_string):
+    def _set_config_value_by_string(self, config, config_str, val_string, critical=True):
         valid_choices = self._get_list_of_valid_config_choices(config, config_str)
         if valid_choices is None:
             return RET_ERROR
-            
+
         if val_string in valid_choices:
-            return self._set_config_value(config, config_str, valid_choices.index(val_string))
+            return self._set_config_value(config, config_str, valid_choices.index(val_string),
+                                          critical)
         else:
             return RET_ERROR
 
-    def _set_config_value(self, config, config_str, config_value):
+    def _set_config_value(self, config, config_str, config_value, critical=True):
         try:
             # find the capture target config item
             config_widget = gp.check_result(gp.gp_widget_get_child_by_name(config, config_str))
@@ -178,7 +180,8 @@ class Canon6DCam(Cam):
         except gp.GPhoto2Error as ex:
             self._logger.error('Error setting value %s for config %s' %(config_value, config_str))
             self._logger.error('GPhoto2 Error: %d : %s' %(ex.code, ex.string))
-            self.state = CAMERA_STATES.ERROR_CONFIG
+            if critical is True:
+                self.state = CAMERA_STATES.ERROR_CONFIG
             return RET_ERROR
         except Exception:
             self._logger.error(traceback.format_exc())
@@ -188,7 +191,7 @@ class Canon6DCam(Cam):
 
         return RET_OK
 
-    def _get_config_value(self, config_str):
+    def _get_config_value(self, config_str, critical=True):
         # get configuration tree
         config = gp.check_result(gp.gp_camera_get_config(self._gp_camera, self._context))
 
@@ -198,7 +201,8 @@ class Canon6DCam(Cam):
         except gp.GPhoto2Error as ex:
             self._logger.error('Error getting config value for %s' %config_str)
             self._logger.error('GPhoto2 Error: %d : %s' %(ex.code, ex.string))
-            self.state = CAMERA_STATES.ERROR_CONFIG
+            if critical is True:
+                self.state = CAMERA_STATES.ERROR_CONFIG
             return None
         except Exception:  # Catches most exceptions, except KeyboardInterrupt and SystemExit
             self._logger.error(traceback.format_exc())
@@ -240,13 +244,13 @@ class Canon6DCam(Cam):
             self._logger.error(traceback.format_exc())
             return RET_ERROR
 
-        return self._set_config_value_by_string(config, setting_str, val_str)
+        return self._set_config_value_by_string(config, setting_str, val_str, critical=False)
 
     def get_setting(self, setting_str):
         """ This external method is used to get settings from the Cannon EOS 6D using gphoto2. If
             the setting does not exist, then the method returns None. The underlying
             self._get_config_value records an error though. """
-        return self._get_config_value(setting_str)
+        return self._get_config_value(setting_str, critical=False)
 
     def get_choices_for_setting(self, config_str):
         """ External method for getting the choices. If there are any errors (like the config does
@@ -258,7 +262,7 @@ class Canon6DCam(Cam):
         valid_config_names = self._get_list_of_valid_config_names(config)
         if valid_config_names is not None and len(valid_config_names) > 0:
             if config_str in valid_config_names:
-                choices = self._get_list_of_valid_config_choices(config, config_str)
+                choices = self._get_list_of_valid_config_choices(config, config_str, critical=False)
 
         return choices
 

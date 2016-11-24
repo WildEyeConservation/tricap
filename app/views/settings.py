@@ -6,68 +6,91 @@ from flask import Blueprint, render_template, send_file, request, jsonify, redir
 from flask import current_app
 from wtforms import StringField, IntegerField, SelectField
 
-from app import forms, tricap_manager, altimeter
+from app import forms, tricap_manager, altimeter, session_logger
 from sensors.configure import TricapConfig
 
-from config import SERVER_LOG_DIR, DEFAULT_CONFIG_FP, CONFIG_FP, RET_OK
+from config import SERVER_LOG_DIR, DEFAULT_CONFIG_FP, CONFIG_FP, RET_OK, RET_ERROR
 
 settings_bp = Blueprint('settings', __name__)
 
 """ There should be three sources of settings, the cameras, the altimeter and general settings """
 
-# def _get_blank_setting_form_class(config_fp = CONFIG_FP):
-#     class FormClass(forms.SettingsForm):
-#         pass
-#
-#     config = TricapConfig(current_app.logger, config_fp_to_read=config_fp)
-#     config_dict = config.get_dict()
-#
-#     for key in config_dict.keys():
-#         choices = tricap_manager.get_choices_for_config(key)
-#         if choices is not None and len(choices) != 0:
-#             setattr(FormClass, key, SelectField(label=key, choices=choices))
-#         else:
-#             setattr(FormClass, key, StringField(label=key))
-#
-#     return FormClass
+class MiscSettingHandler():
+    """ Handles all the settings which are not applicable to the sensors """
+    def __init__(self):
+        self._setting_strings = ['session_description']
 
-def _get_setting_form(config_fp=CONFIG_FP, config_dict=None):
-    form = forms.SettingsForm()
+    def set_setting(self, setting_str, setting_val):
+        if setting_str in self._settings_strings:
+            if setting_str == 'session_description':
+                return session_logger.set_description(setting_val)
+        else:
+            return RET_ERROR
+
+        return RET_OK
+
+    def get_setting(self, setting_str):
+        ret_val = None
+
+        if setting_str in self._settings_strings:
+            if setting_str == 'session_description':
+                ret_val = session_logger.get_description()
+
+        return ret_val
+
+
+
+# TODO This got out of hand, should definitely be able to make this simplified
+
+def _get_labels_and_choices_from_config(config_fp = CONFIG_FP, config_dict=None):
+    select_tuples = []
+    string_labels = []
 
     if config_dict is None:
         config = TricapConfig(current_app.logger, config_fp_to_read=config_fp)
         config_dict = config.get_dict()
 
     for key in config_dict.keys():
-        choices = tricap_manager.get_choices_for_config(key)
+        choices = tricap_manager.get_choices_for_setting(key)
         if choices is not None and len(choices) != 0:
             choices_tuples = []
             for index, choice in enumerate(choices):
                 choices_tuples.append((str(index), choice))
 
-	    sel_field = SelectField(label=key, choices=choices_tuples)
-            form.select_settings.append_entry(sel_field)
-
+            select_tuples.append((key, choices_tuples))
         else:
-	    str_field = StringField(label=key)
-            form.string_settings.append_entry(str_field)
+            string_labels.append(key)
+
+    return string_labels, select_tuples
+
+def _get_setting_form(config_fp=CONFIG_FP, config_dict=None):
+    form = forms.SettingsForm()
+
+    string_labels, select_tuples = _get_labels_and_choices_from_config(config_fp=config_fp,
+                                                                       config_dict=config_dict)
+    for sel_tup in select_tuples:
+        form.select_settings.append_entry()
+        form.select_settings[-1].label = sel_tup[0]
+        form.select_settings[-1].choices = sel_tup[1]
+
+    for str_lbl in string_labels:
+        form.string_settings.append_entry()
+        form.string_settings[-1].label = str_lbl
 
     return form
 
-def _populated_pushed_form(pushed_form):
+def _populated_pushed_form(pushed_form, config_fp=CONFIG_FP, config_dict=None):
     """ for some reason, the pushed form loses the labels of the added fields, so have to add em"""
-    base_form = _get_setting_form()
-    string_labels, select_labels = _get_setting_labels(base_form)
-
-    pdb.set_trace()
-
+    string_labels, select_tuples = _get_labels_and_choices_from_config(config_fp=config_fp,
+                                                                       config_dict=config_dict)
     for index in range(len(string_labels)):
-        base_form.string_settings[index].data = pushed_form.string_settings[index].data
+        pushed_form.string_settings[index].label = string_labels[index]
 
-    for index in range(len(select_labels)):
-        base_form.select_labels[index].data = pushed_form.select_labels[index].data
+    for index in range(len(select_tuples)):
+        pushed_form.select_settings[index].label = select_tuples[index][0]
+        pushed_form.select_settings[index].choices = select_tuples[index][1]
 
-    return base_form
+    return pushed_form
 
 
 def _get_setting_labels(form):
@@ -87,6 +110,8 @@ def _get_form_with_current_settings(config_fp = CONFIG_FP):
     form = _get_setting_form(config_dict=config_dict)
     string_labels, select_labels = _get_setting_labels(form)
 
+    misc_setting_handler = MiscSettingHandler()
+
     # populate the form data members
     for key in config_dict.keys():
         config_val = tricap_manager.get_setting(key)
@@ -103,21 +128,17 @@ def _get_form_with_current_settings(config_fp = CONFIG_FP):
                 if key in string_labels:
                     form.string_settings[string_labels.index(key)].data = config_val
             else: # it's not an altimeter setting either
-                pass # here should go specific setting value handling
-
-    # current_shutterspeed_str = tricap_manager.get_shutter_speed_as_string()
-    # print(current_shutterspeed_str)
-    # choice_strings = [choice[1] for choice in form.shutterspeed.choices]
-    # if current_shutterspeed_str in choice_strings:
-    #     form.shutterspeed.data = str(choice_strings.index(current_shutterspeed_str))
-    #
-    # form.image_capture_interval.data = tricap_manager.get_image_capture_interval()
-    # form.server_log_dir.data = SERVER_LOG_DIR
+                config_val = misc_setting_handler.get_setting(key)
+                if config_val is not None:
+                    if key in string_labels:
+                        form.string_settings[string_labels.index(key)].data = config_val
 
     return form
 
 def _change_settings(form):
     string_labels, select_labels = _get_setting_labels(form)
+
+    misc_setting_handler = MiscSettingHandler()
 
     for index, sel_l in enumerate(select_labels):
         choice_index = int(form.select_settings[index].data)
@@ -127,7 +148,8 @@ def _change_settings(form):
             continue
         if altimeter.set_setting(sel_l, choice_val_str) == RET_OK:
             continue
-        # TODO Do something with general settings
+        if misc_setting_handler.set_setting(sel_l, choice_val_str) == RET_OK:
+            continue
 
     for index, str_l in enumerate(string_labels):
         val_str = form.string_settings[index].data
@@ -136,18 +158,23 @@ def _change_settings(form):
             continue
         if altimeter.set_setting(str_l, val_str) == RET_OK:
             continue
-        # TODO Do something with general settings
+        if misc_setting_handler.set_setting(str_l, val_str) == RET_OK:
+            continue
 
-    # ss_dict = dict(form.shutter_speed.choices)
-    # tricap_manager.set_shutterspeed(ss_dict[form.shutter_speed.data])
-    # tricap_manager.set_image_capture_interval(float(form.image_capture_interval.data))
+def _save_settings(form, config_fp=CONFIG_FP, logger=None):
 
-def _save_settings(form):
+    # If no logger is specified, use the apps logger (having it as default
+    #  freaks out the app initialisation)
+    if logger is None:
+        logger = current_app.logger
+
     _change_settings(form)
 
-    config = TricapConfig(current_app.logger)
+    # get the current settings in a dict
+    config = TricapConfig(logger, config_fp_to_read=config_fp)
     config_dict = config.get_dict()
 
+    # modify the settings dict based on settings in the form (i.e. the user selected options)
     string_labels, select_labels = _get_setting_labels(form)
 
     for index, sel_l in enumerate(select_labels):
@@ -159,10 +186,6 @@ def _save_settings(form):
         val_str = form.string_settings[index].data
         config_dict[str_l] = val_str
 
-    # ss_dict = dict(form.shutter_speed.choices)
-    # config_dict['shutterspeed'] = ss_dict[form.shutter_speed.data]
-    # config_dict['image_capture_interval'] = form.image_capture_interval.data
-
     config.save_config_dict_to_file(config_dict)
 
 def _revert_to_default_settings(save_to_fp=CONFIG_FP, logger=None):
@@ -172,6 +195,7 @@ def _revert_to_default_settings(save_to_fp=CONFIG_FP, logger=None):
 
     default_config = TricapConfig(logger, config_fp_to_read=DEFAULT_CONFIG_FP)
     config = TricapConfig(logger, config_fp_to_read=save_to_fp)
+    config.clear_config()
     config.save_config_dict_to_file(default_config.get_dict())
 
 @settings_bp.route('/settings', methods=['GET', 'POST'])
@@ -181,11 +205,9 @@ def settings():
         # When the user initially opens the page, we need the current settings from the sensors
         form = _get_form_with_current_settings()
     else:
-        # formClass = _get_blank_setting_form_class()
-        # form = formClass(request.form)
+        # when the users posts (i.e. clicks one of the submit buttons) we need to base the form
+        #  on the user selected settings
         form = _populated_pushed_form(forms.SettingsForm(request.form))
-        pdb.set_trace()
-        print(form)
 
     if form.validate_on_submit():
         tricap_manager.stop_capturing()

@@ -45,38 +45,14 @@ class CamsManager():
     def get_cameras_as_list(self):
         return self._cameras
 
-    def get_shutter_speed_as_string(self):
-        return "1/Dummy"
-
-    def set_shutterspeed(self, val_str):
-        return RET_OK
-
-    def set_image_capture_interval(self, val):
-        return RET_OK
-
-    def get_image_capture_interval(self):
-        return DEFAULT_IMAGE_CAPTURE_INTERVAL
-
-    def get_choices_for_config(self, config_str):
-        choices = None
-
-        if config_str == 'shutterspeed':
-            choices = ['1/4', '1/640', '1/2500']
-        elif config_str == 'iso':
-            choices = ['auto', '100', '200']
-
-        return choices
+    def get_choices_for_setting(self, setting_str):
+        return self._cameras[0].get_choices_for_setting(setting_str)
 
     def get_setting(self, setting_str):
-        ret_val = None
-        if setting_str == 'shutterspeed':
-            ret_val = '1/640'
-        elif setting_str == 'iso':
-            ret_val = '100'
-        else:
-            ret_val = 'setting_str'
+        return self._cameras[0].get_setting(setting_str)
 
-        return ret_val
+    def set_setting(self, setting_str, setting_value):
+        return self._cameras[0].set_setting(setting_str, setting_value)
 
 class TriCapCamsManager(CamsManager):
     """TriCapCamsManager manages TriCap camera objects"""
@@ -198,43 +174,10 @@ class TriCapCamsManager(CamsManager):
 
         return cam_ids
 
-    def get_shutter_speed_as_string(self):
-        # TODO Should do some error checking here, like if there are no cameras!
-        if len(self._cameras) == 0:
-            self.state = CAM_MANAGER_STATES.ERROR_NO_CAMS
-            return "No Cams Detected"
-        else:
-            # Assuming that all cameras are set to the same shutter speed, should probably do
-            #  an error check here
-            return self._cameras[0].get_shutter_speed_as_string()
-
-    def set_shutterspeed(self, val_str):
-        ret_val = 0
-        for cam in self._cameras:
-            ret_val += cam.set_shutterspeed(val_str)
-
-        if ret_val > 0:
-            self._logger.error('Error setting the shutterspeed of the cameras %s' % val_str)
-            return RET_ERROR
-
-        return RET_OK
-
-    def set_image_capture_interval(self, val):
-        if isinstance(val, float) is False or isinstance(val, int):
-            self._logger.error('Incorrect type of val for setting the image cap int')
-            return RET_ERROR
-
-        self._image_capture_interval = val
-
-        return RET_OK
-
-    def get_image_capture_interval(self):
-        return self._image_capture_interval
-
-    def get_choices_for_config(self, config_str):
+    def get_choices_for_setting(self, config_str):
         choices = None
 
         if self.get_num_cams() > 0:
-            choices = self._cameras[0].get_choices_for_config(config_str)
+            choices = self._cameras[0].get_choices_for_setting(config_str)
 
         return choices

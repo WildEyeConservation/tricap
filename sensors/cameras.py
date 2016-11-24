@@ -23,12 +23,32 @@ class Cam():
     def __init__(self):
         self.state = CAMERA_STATES.INITIALISED
         self.serial_num = None
+        self._settings_dict = {'shutterspeed': '1/4', 'iso': '100', 'image_capture_interval': '3.0'}
 
     def reset(self):
         self.state = CAMERA_STATES.INITIALISED
 
     def get_state_as_string(self):
         return "Base Cam has no state."
+
+    def set_setting(self, setting_str, setting_val):
+        self._settings_dict[setting_str] = setting_val
+        return RET_OK
+
+    def get_setting(self, setting_str):
+        if setting_str in self._settings_dict.keys():
+            return self._settings_dict[setting_str]
+        else:
+            return None
+
+    def get_choices_for_setting(self, setting_str):
+        # just a couple of hard coded ones
+        if setting_str == 'shutterspeed':
+            return ['1/4', '1/640', '1/2500']
+        elif setting_str == 'iso':
+            return ['100', '200', '500']
+        else:
+            return None
 
 class Canon6DCam(Cam):
     """ Hander for the Canon EOS 6D Camera. Uses gphoto2 to handle the actual communication. """
@@ -70,7 +90,6 @@ class Canon6DCam(Cam):
         gp_config = gp.check_result(gp.gp_camera_get_config(self._gp_camera, self._context))
 
         ret_val = 0
-        # TODO Add ISO Speed as a config value
         ret_val += self._set_config_value(gp_config, 'capturetarget', CE6D_CAP_TARGET_SD_CARD)
         ret_val += self._set_config_value_by_string(gp_config, 'shutterspeed',
                                                     init_configs.get('shutterspeed'))
@@ -223,7 +242,7 @@ class Canon6DCam(Cam):
     def get_setting(self, setting_str):
         return self._get_config_value(setting_str)
 
-    def get_choices_for_config(self, config_str):
+    def get_choices_for_setting(self, config_str):
         """ External method for getting the choices. If there are any errors (like the config does
         not exist or there are its not a radio type config) then return None """
 

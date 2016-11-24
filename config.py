@@ -2,6 +2,7 @@
 
    D Joubert Innoventix Consulting 27 October 2016."""
 
+# Get all the machine specific configurations (stuff like file locations)
 import local_paths
 
 SERVER_LOG_DIR = local_paths.SERVER_LOG_DIR
@@ -11,6 +12,7 @@ WORKING_OS = local_paths.WORKING_OS
 DUMMY_IMAGE_PATH = local_paths.DUMMY_IMAGE_PATH
 CONFIG_FP = local_paths.CONFIG_FP
 DEFAULT_CONFIG_FP = local_paths.DEFAULT_CONFIG_FP
+TEST_STATIC_DIR = local_paths.TEST_STATIC_DIR
 
 CAM_IMAGE_PREFIX = 'cam'
 DEFAULT_IMAGE_CAPTURE_INTERVAL = 3.0

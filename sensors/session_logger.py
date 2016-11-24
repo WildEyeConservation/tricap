@@ -30,20 +30,32 @@ class SessionLogger():
         self._log_fp = None
         self._session_folder = None
         self._fh = None
+        self._description = description
 
         self._ready = False
 
         # self.create_new_session(description)
-        # TODO Build in checks so that you don't try to write to an emptry file
+        # TODO Build in checks so that you don't try to write to an empty file
 
     def __del__(self):
-        self._fh.close()
-        self._logger.removeHandler(self._fh)
-
-    def create_new_session(self, description = 'Default Description'):
         if self._fh is not None:
             self._fh.close()
             self._logger.removeHandler(self._fh)
+
+
+    def set_description(self, description):
+        self._description  = description
+
+    def get_description(self):
+        return self._description
+
+    def create_new_session(self, description = None):
+        if self._fh is not None:
+            self._fh.close()
+            self._logger.removeHandler(self._fh)
+
+        if description is not None:
+            self._description = description
 
         self._session_folder = self._create_folder()
         self._prep_folder()

@@ -1,7 +1,6 @@
 """ D Joubert - 17 November 2016 - Innoventix Consulting
     Image Manager, handles images taken from cameras for the webserver"""
 
-# import subprocess32
 import os
 
 import hashlib
@@ -71,7 +70,9 @@ class SameFileImageManager(ImageManager):
         else:
             return cam_image_fp
 
-# TODO Recode the queue image manager to use the base ImageManager abstract class
+# Recode the queue image manager to use the base ImageManager abstract class, if we think it one
+#  day necessary
+
 # class QueueImageManager(object):
 #     # The point of the Queue Image Manager is to process the queue and keep track of the latest image for each camera
 #     def __init__(self, cam_fp_queue):

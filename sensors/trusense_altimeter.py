@@ -22,6 +22,12 @@ class TrusenseAltimeter(object):
         self._ser.timeout = 1.0
         self._ser.write_timeout = 1.0
 
+        # SETTINGS
+        # default values
+        self._measurement_timeout = 2
+        self._num_frames_to_avg = 2
+        self._setting_strings = ['alti_measurement_timeout', 'alti_num_frames_to_avg']
+
         self._data_logger = data_logger
 
         self._logger = logger
@@ -87,8 +93,33 @@ class TrusenseAltimeter(object):
         return RET_OK
 
     def get_setting(self,setting_str):
-        # TODO MAKE THIS SOMETHING WORTHWHILE
-        return setting_str
+        ret_val = None
+        # self._setting_strings = ['alti_measurement_timeout', 'alti_num_frames_to_avg']
+        if setting_str in self._setting_strings:
+            if setting_str == 'alti_measurement_timeout':
+                ret_val = self._measurement_timeout
+            elif setting_str == 'alti_num_frames_to_avg':
+                ret_val = self._num_frames_to_avg
+        return ret_val
+
+    def set_setting(self, setting_str, val_str):
+        try:
+            if setting_str in self._setting_strings:
+                if setting_str == 'alti_measurement_timeout':
+                    self._measurement_timeout = int(val_str)
+                elif setting_str == 'alti_num_frames_to_avg':
+                    self._num_frames_to_avg = int(val_str)
+            else:
+                return RET_ERROR
+        except ValueError:
+            self._logger.error('Cannot convert string to setting value: %s for %s'
+                               %(setting_str, val_str))
+            return RET_ERROR
+
+        # implement the changed settings
+        self._configure()
+
+        return RET_OK
 
     def _check_for_known_error(self, reply):
         if reply[0:2] == b'$ER':
@@ -155,10 +186,6 @@ class TrusenseAltimeter(object):
 
     def _configure(self):
         # set to fast continuous
-        # self._ser.write('$MM,FCO\r\n'.encode())
-        # if self._check_ok('Error setting measurment mode') != 0:
-        #     return -1
-
         if self._write('MM,FCO', 'Error setting measurement mode') != RET_OK:
             return RET_ERROR
 
@@ -173,15 +200,18 @@ class TrusenseAltimeter(object):
         # TODO Set these values from the init config file
 
         # set to measurement timeout
-        if self._write('MT,2', 'Error setting measurement timeout') != RET_OK:
+        if self._write('MT,%d' % self._measurement_timeout,
+                       'Error setting measurement timeout') != RET_OK:
             return RET_ERROR
 
         # set continous mode average
-        if self._write('CA,2', 'Error setting continous mode frame averaging') != RET_OK:
+        if self._write('CA,%d' % self._num_frames_to_avg,
+                       'Error setting continous mode frame averaging') != RET_OK:
             return RET_ERROR
 
         # set fast mode averaging
-        if self._write('FA,2', 'Error setting fast mode frame averaging') != RET_OK:
+        if self._write('FA,%d' % self._num_frames_to_avg,
+                       'Error setting fast mode frame averaging') != RET_OK:
             return RET_ERROR
 
         return 0

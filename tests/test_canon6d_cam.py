@@ -78,7 +78,7 @@ class TestDeviceCanon6DCam(TestBaseCanon6DCam):
 
     def test_get_choices_for_iso(self):
         cam = Canon6DCam(self.context, self.port_info, self.logger)
-        choices = cam.get_choices_for_config('iso')
+        choices = cam.get_choices_for_setting('iso')
         self.assertEqual('100' in choices, True)
         self.assertEqual('200' in choices, True)
 

@@ -5,6 +5,7 @@ import os
 import tempfile
 import logging
 import pdb
+import shutil
 
 from sensors.configure import TricapConfig
 
@@ -28,9 +29,11 @@ class TestBaseConfigure(unittest.TestCase):
         self.temp_config_fp = None
 
     def tearDown(self):
-        for index in range(self.temp_file_count):
-            os.remove(os.path.join(self.tempdir, str(index)+'.temp'))
-        os.rmdir(self.tempdir)
+        for root, _, filenames in os.walk(self.tempdir):
+            for filename in filenames:
+                os.remove(os.path.join(root, filename))
+
+        shutil.rmtree(self.tempdir)
 
     def create_a_temp_config(self):
         self.temp_config_fp = os.path.join(self.tempdir, str(self.temp_file_count)+'.temp')
@@ -68,5 +71,6 @@ class TestConfigure(TestBaseConfigure):
         config_dict['image_capture_interval'] = 5.0
         self.assertEqual(config.save_config_dict_to_file(config_dict), RET_OK)
 
-        self.assertEqual(config.get('shutterspeed'), '1/640')
-        self.assertEqual(config.get('image_capture_interval', type_str=config.TYPE_FLOAT), 5.0)
+        new_config = TricapConfig(self.logger, config_fp_to_read = self.temp_config_fp)
+        self.assertEqual(new_config.get('shutterspeed'), '1/640')
+        self.assertEqual(new_config.get('image_capture_interval', type_str=config.TYPE_FLOAT), 5.0)

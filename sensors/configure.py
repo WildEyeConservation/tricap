@@ -1,6 +1,7 @@
 """ D Joubert 18 November 2016 - Configurator - handles reading and saving the initial config """
 
 import configparser
+import os
 
 from config import CE6D_SHUTTER_SPEED_1_2500, CE6D_SHUTTER_SPEED_1_640, CE6D_SHUTTER_SPEED_1_4
 from config import CONFIG_FP, DEFAULT_IMAGE_CAPTURE_INTERVAL, RET_OK, RET_ERROR
@@ -109,7 +110,14 @@ class TricapConfig():
                 return None
             return ret_val
 
+    def clear_config(self):
+        self._parser.clear()
+        self._parser[SECTION_HEADER] = {}        
+
     def save_config_dict_to_file(self, config_dict, config_fp = None):
+        """ Save the values in a config dict to the config file. Note that settings will only be
+            added and changed. Nothing gets removed """
+
         if self._ready_flag is None:
             return None
 
@@ -118,12 +126,6 @@ class TricapConfig():
 
         for key in config_dict.keys():
             try:
-                # # check specific, troublesome settings:
-                # if key == 'shutterspeed':
-                #     if self.convert_shutterspeed_str_to_code(config_dict[key]) is None:
-                #         self._logger.error('Bad shutterspeed %s' % str(config_dict[key]))
-                #         return RET_ERROR
-
                 self._parser.set(SECTION_HEADER, key, str(config_dict[key]))
             except configparser.Error as ex:
                 self._logger.error('Error setting %s with value %s' % (key, str(config_dict[key])))

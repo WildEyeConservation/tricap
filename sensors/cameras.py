@@ -109,7 +109,7 @@ class Canon6DCam(Cam):
 
     # TODO The naming convention for configs and settings is a mess. Sort it out
 
-    def _get_list_of_valid_config_names(self, config):
+    def _get_list_of_valid_config_names(self, config, critical=True):
         config_names = []
         try:
             config_count = gp.check_result(gp.gp_widget_count_children(config))
@@ -125,7 +125,8 @@ class Canon6DCam(Cam):
         except gp.GPhoto2Error as ex:
             self._logger.error('Error getting list of camera config names')
             self._logger.error('GPhoto2 Error: %d : %s' %(ex.code, ex.string))
-            self.state = CAMERA_STATES.ERROR_CONFIG
+            if critical is True:
+                self.state = CAMERA_STATES.ERROR_CONFIG
             return None
         except Exception:
             self._logger.error(traceback.format_exc())
@@ -156,13 +157,13 @@ class Canon6DCam(Cam):
         return config_choices
 
     def _set_config_value_by_string(self, config, config_str, val_string, critical=True):
-        valid_choices = self._get_list_of_valid_config_choices(config, config_str)
+        valid_choices = self._get_list_of_valid_config_choices(config, config_str, critical=critical)
         if valid_choices is None:
             return RET_ERROR
 
         if val_string in valid_choices:
             return self._set_config_value(config, config_str, valid_choices.index(val_string),
-                                          critical)
+                                          critical=critical)
         else:
             return RET_ERROR
 
@@ -259,7 +260,7 @@ class Canon6DCam(Cam):
         choices = None
 
         config = gp.check_result(gp.gp_camera_get_config(self._gp_camera, self._context))
-        valid_config_names = self._get_list_of_valid_config_names(config)
+        valid_config_names = self._get_list_of_valid_config_names(config, critical=False)
         if valid_config_names is not None and len(valid_config_names) > 0:
             if config_str in valid_config_names:
                 choices = self._get_list_of_valid_config_choices(config, config_str, critical=False)

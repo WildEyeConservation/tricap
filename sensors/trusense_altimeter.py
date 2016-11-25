@@ -16,62 +16,56 @@ class AltiError(Exception):
 class TrusenseAltimeter(object):
     """Handles serial communication with the TruSense S100 Laser Altimeter"""
 
-    def __init__(self, logger, data_logger):
-        self._ser = serial.Serial()
+    errorCodes={'00':'S100 Error 00: Invalid Command',
+                '01':'S100 Error 01: No Target',
+                '10':'S100 Error 10: Bad Data Checksum',
+                '11':'S100 Error 11: Already Measuring',
+                '12':'S100 Error 12: Invalid Parameter',
+                '21':'S100 Error 21: User Settings Checksum',
+                '22':'S100 Error 22: Factory Settings Checksum',
+                '23':'S100 Error 23: BIST Test',
+                '24':'S100 Error 24: PLL Test',
+                '25':'S100 Error 25: Tx Power',
+                '26':'S100 Error 26: Higher Precision',
+                '27':'S100 Error 27: Receiver',
+                '28':'S100 Error 28: Supply Voltage too High',
+                '29':'S100 Error 29: Supply Voltage too Low',
+                '30':'S100 Error 30: Temperature too High',
+                '31':'S100 Error 31: Temperature too Low'}
 
-        self._ser.baudrate = 115200
-        self._ser.timeout = 1.0
-        self._ser.write_timeout = 1.0
-
+    def __init__(self, logger, data_logger,supportedDevices={(1659,8963)}):
         # SETTINGS
         # default values
         self._measurement_timeout = 2
         self._num_frames_to_avg = 2
         self._setting_strings = ['alti_measurement_timeout', 'alti_num_frames_to_avg']
-
         self._data_logger = data_logger
-
         self._logger = logger
-
-        self.measurement = 0
-
-        self.read_thread = None
-        self._kill_pill = threading.Event()
-
         self.state = ALTIMETER_STATE.NOT_CONNECTED
 
         try:
-            self._ser.port = self._get_correct_port_name()
+            self._ser = serial.Serial(port = self._get_correct_port_name(supportedDevices),
+                                           baudrate = 115200,  timeout = 1.0, write_timeout = 1.0)
+            self._logger.info('Altimeter serial port opened.')
+            self.state = ALTIMETER_STATE.CONNECTED
             self._connect()
             self._configure()
         except (AltiError,serial.SerialException) as err:
             self._logger.error(err)
             self.state = ALTIMETER_STATE.ERROR
 
-    def _get_correct_port_name(self):
-        ports = list(serial.tools.list_ports.comports())
+    def _get_correct_port_name(self,supportedDevices):
         correct_port = None
-        for port in ports:
-            if 'Prolific' in port[1] or 'USB-Serial Controller' in port[1]:
-                correct_port = port[0]
-                break
-
-        if correct_port == None:
-            raise AltiError('Could not find supported USB serial port.')
-
-        return correct_port
+        for port in serial.tools.list_ports.comports():
+            if (port.vid,port.pid) in supportedDevices:
+                return port.device
+        raise AltiError('Could not find supported USB serial port.')
 
     def _connect(self):
-        self._ser.open()
-        self._logger.info('Altimeter serial port opened.')
-        self.state = ALTIMETER_STATE.CONNECTED
-
         # toggle dtr line, to get the altimeter in the correct state
         self._ser.dtr = 1
-        self._ser.rts = 0
         sleep(0.001)
         self._ser.dtr = 0
-
         # Check for the okay signal
         self._check_ok('Alti did not send OK on startup')
 
@@ -106,49 +100,18 @@ class TrusenseAltimeter(object):
 
     def _check_for_known_error(self, reply):
         if reply[0:2] == b'$ER':
-            err_code = str(reply[4:5])
-            if err_code == '00':
-                self._logger.error('S100 Error 00: Invalid Command')
-            elif err_code == '01':
-                self._logger.error('S100 Error 01: No Target')
-            elif err_code == '10':
-                self._logger.error('S100 Error 10: Bad Data Checksum')
-            elif err_code == '11':
-                self._logger.error('S100 Error 11: Already Measuring')
-            elif err_code == '12':
-                self._logger.error('S100 Error 12: Invalid Parameter')
-            elif err_code == '21':
-                self._logger.error('S100 Error 21: User Settings Checksum')
-            elif err_code == '22':
-                self._logger.error('S100 Error 22: Factory Settings Checksum')
-            elif err_code == '23':
-                self._logger.error('S100 Error 23: BIST Test')
-            elif err_code == '24':
-                self._logger.error('S100 Error 24: PLL Test')
-            elif err_code == '25':
-                self._logger.error('S100 Error 25: Tx Power')
-            elif err_code == '26':
-                self._logger.error('S100 Error 26: Higher Precision')
-            elif err_code == '27':
-                self._logger.error('S100 Error 27: Receiver')
-            elif err_code == '28':
-                self._logger.error('S100 Error 28: Supply Voltage too High')
-            elif err_code == '29':
-                self._logger.error('S100 Error 29: Supply Voltage too Low')
-            elif err_code == '30':
-                self._logger.error('S100 Error 30: Temperature too High')
-            elif err_code == '31':
-                self._logger.error('S100 Error 31: Temperature too Low')
+            err_code = reply[4:5].decode(encoding=ascii)
+            self._logger.error(TrusenseAltimeter.errorCodes[err_code])
 
     def _check_ok(self, error_msg):
         reply = self._ser.readline()
         if reply != b'$OK\r\n':
             self._check_for_known_error(reply)
-            raise AltiError(error_msg + ' : ' + reply.decode())
+            raise AltiError(error_msg + ' : ' + reply.decode(encoding='ascii'))
 
     def _write(self, command_str, command_error_str):
         message = '$'+command_str+'\r\n'
-        message_bytes = message.encode()
+        message_bytes = message.encode(encoding='ascii')
         self._ser.write(message_bytes)
         self._check_ok(command_error_str)
 

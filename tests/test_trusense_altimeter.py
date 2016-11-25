@@ -15,17 +15,18 @@ from config import ALTIMETER_STATE, SERVER_LOG_DIR
 
 class TestDeviceTruSense(unittest.TestCase):
 
-    def setUp(self):
-        self.logger = logging.getLogger('test_alti_logger')
-        format_str = "%(asctime)s | %(pathname)s:%(lineno)d | %(funcName)s | %(levelname)s | %(message)s "
-        formatter = logging.Formatter(format_str)
-        log_fp = os.path.join(SERVER_LOG_DIR, 'test_alti.log')
-        handler = logging.FileHandler(filename=log_fp)
-        handler.setLevel(logging.DEBUG)
-        handler.setFormatter(formatter)
-        self.logger.addHandler(handler)
-        self.logger.setLevel(logging.DEBUG)
+    logger = logging.getLogger('test_alti_logger')
+    format_str = "%(asctime)s | %(pathname)s:%(lineno)d | %(funcName)s | %(levelname)s | %(message)s "
+    formatter = logging.Formatter(format_str)
+    log_fp = os.path.join(SERVER_LOG_DIR, 'test_alti.log')
+    handler = logging.FileHandler(filename=log_fp)
+    handler.setLevel(logging.DEBUG)
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)
+    logger.setLevel(logging.DEBUG)
 
+    def setUp(self):
+        self.logger=TestDeviceTruSense.logger
         self.tempdir = tempfile.mkdtemp()
         self.session_logger = SessionLogger(root_folder = self.tempdir)
         self.session_logger.create_new_session()
@@ -38,21 +39,28 @@ class TestDeviceTruSense(unittest.TestCase):
         shutil.rmtree(self.tempdir)
 
     def test_initialization(self):
+        self.logger.info("Starting test init")
         alti = TrusenseAltimeter(self.logger, self.session_logger)
         self.assertEqual(alti.state, ALTIMETER_STATE.CONNECTED)
+        self.logger.info("Done with test init")
 
     def test_reset(self):
+        self.logger.info("Starting test reset")
         # TODO Need to elaborate on this test, probably check that some setting is back to default
         alti = TrusenseAltimeter(self.logger, self.session_logger)
         alti.reset()
         self.assertEqual(alti.state, ALTIMETER_STATE.CONNECTED)
+        self.logger.info("Done with test reset")
 
     def test_disconnect(self):
+        self.logger.info("Starting test disc")
         alti = TrusenseAltimeter(self.logger, self.session_logger)
         alti.disconnect()
         self.assertEqual(alti.state, ALTIMETER_STATE.NOT_CONNECTED)
+        self.logger.info("Done with test disc")
 
     def test_measuring(self):
+        self.logger.info("Starting test meas")
         alti = TrusenseAltimeter(self.logger, self.session_logger)
         alti.start_measuring()
         sleep(2)
@@ -62,6 +70,7 @@ class TestDeviceTruSense(unittest.TestCase):
         alti.stop_measuring()
         sleep(2)
         self.assertEqual(alti.state, ALTIMETER_STATE.CONNECTED)
+        self.logger.info("Done with test meas")
 
         # TODO Test session logger, if it takes the input?
 

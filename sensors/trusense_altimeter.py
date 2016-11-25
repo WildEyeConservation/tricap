@@ -6,8 +6,6 @@ from time import sleep
 
 import threading
 
-import pdb
-
 from config import ALTIMETER_STATE, RET_OK, RET_ERROR, ALTI_STATE_STRINGS
 
 # TODO How to deal with disconnect?

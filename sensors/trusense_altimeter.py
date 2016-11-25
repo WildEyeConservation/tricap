@@ -2,6 +2,7 @@
 
 import serial
 import serial.tools.list_ports
+from time import sleep
 
 import threading
 
@@ -78,9 +79,10 @@ class TrusenseAltimeter(object):
             self.state = ALTIMETER_STATE.ERROR
             return RET_ERROR
 
-        # toggle dtr and rts lines, to get the altimeter in the correct state
+        # toggle dtr line, to get the altimeter in the correct state
         self._ser.dtr = 1
         self._ser.rts = 0
+        sleep(0.001)
         self._ser.dtr = 0
 
         # Check for the okay signal

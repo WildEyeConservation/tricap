@@ -1,4 +1,7 @@
-""" D Joubert 16 November 2016 - Unit Tests For TriCap"""
+""" D Joubert 16 November 2016 - Unit Tests for tricap.
+    These tests instantiate a flask instant of the app, i.e. the webserver is started.
+    Typically, these tests are more integration and behaviour tests.
+"""
 
 import unittest
 

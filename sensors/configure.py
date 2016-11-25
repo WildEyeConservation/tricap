@@ -34,35 +34,6 @@ class TricapConfig():
             self._logger.error('Error reading from config file %s' % self._config_fp)
             self._logger.error('configparser exception: %s' % ex.args)
 
-    # @staticmethod
-    # def convert_shutterspeed_str_to_code(val_str):
-    #     if val_str == '1/2500':
-    #         config_val = CE6D_SHUTTER_SPEED_1_2500
-    #     elif val_str == '1/640':
-    #         config_val = CE6D_SHUTTER_SPEED_1_640
-    #     elif val_str == '1/4':
-    #         config_val = CE6D_SHUTTER_SPEED_1_4
-    #     else:
-    #         return None
-    #     return config_val
-
-    # @staticmethod
-    # def convert_shutterspeed_code_to_str(config_code):
-    #     if isinstance(config_code, str) is True:
-    #         config_code = int(config_code)
-    #
-    #     if config_code == CE6D_SHUTTER_SPEED_1_2500:
-    #         val_str = '1/2500'
-    #     elif config_code == CE6D_SHUTTER_SPEED_1_640:
-    #         val_str = '1/640'
-    #     elif config_code == CE6D_SHUTTER_SPEED_1_4:
-    #         val_str = '1/4'
-    #     else:
-    #         return None
-    #
-    #     return val_str
-
-
     def is_ready(self):
         return self._ready_flag
 
@@ -83,7 +54,6 @@ class TricapConfig():
         if self._ready_flag is None:
             return None
         try:
-            # val_str = configparser.ConfigParser.get(self, SECTION_HEADER, id_str)
             val_str = self._parser[SECTION_HEADER][id_str]
 
         except configparser.Error as ex:
@@ -112,7 +82,7 @@ class TricapConfig():
 
     def clear_config(self):
         self._parser.clear()
-        self._parser[SECTION_HEADER] = {}        
+        self._parser[SECTION_HEADER] = {}
 
     def save_config_dict_to_file(self, config_dict, config_fp = None):
         """ Save the values in a config dict to the config file. Note that settings will only be

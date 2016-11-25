@@ -15,8 +15,6 @@ from .configure import TricapConfig
 from config import CE6D_CAP_TARGET_SD_CARD, CE6D_FORMAT_RAW_AND_TINY_JPEG, DISPLAY_DOWNLOAD_DIR
 from config import CAM_IMAGE_PREFIX, CAM_STATE_STRINGS, RET_ERROR, RET_OK, CAMERA_STATES
 
-# TODO currently, we are coding in a mess of C vs C++ styles. Fix this.
-
 class Cam():
     """ Base class for all camera handlers. Serves as a fake class for testing purposes."""
 
@@ -32,6 +30,7 @@ class Cam():
         return "Base Cam has no state."
 
     def set_setting(self, setting_str, setting_val):
+        # TODO Fix the number of allowed settings, to better mimic the real camera
         self._settings_dict[setting_str] = setting_val
         return RET_OK
 
@@ -84,12 +83,14 @@ class Canon6DCam(Cam):
             self._logger.error(traceback.format_exc())
             return RET_ERROR
 
+        # set the settings on the camera
         init_configs = TricapConfig(self._logger)
 
-        # get configuration tree
+        # get configuration tree from the camera
         gp_config = gp.check_result(gp.gp_camera_get_config(self._gp_camera, self._context))
 
         ret_val = 0
+        # TODO Extend the setting of values to include all values in the config file
         ret_val += self._set_config_value(gp_config, 'capturetarget', CE6D_CAP_TARGET_SD_CARD)
         ret_val += self._set_config_value_by_string(gp_config, 'shutterspeed',
                                                     init_configs.get('shutterspeed'))

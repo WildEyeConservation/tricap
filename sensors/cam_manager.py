@@ -1,81 +1,33 @@
+# coding=utf-8
 """ D Joubert 16 November 2016 - Camera managers for Tricap app"""
 
 # TODO Wrong place, but the overall logger should be attached to the session logger, so that those
-# error messages get captured to the session folder as well. Or mmaybe separetely, so you can still
+# error messages get captured to the session folder as well. Or maybe separately, so you can still
 # read the alti messages?
 
-# TODO Settings page should show warnning for all incorrectly formatted settings
+# TODO Settings page should show warning for all incorrectly formatted settings
 
 import threading
 import time
 import traceback
 
-try:
-    import gphoto2 as gp
-    GPHOTO2_IMPORTED = True
-except ImportError:
-    print("Error import gphoto2, switching over dummmy cam managers")
-    GPHOTO2_IMPORTED = False
-
-from .cameras import Canon6DCam, Cam
-
 from config import CAM_MANAGER_STATES, DEFAULT_IMAGE_CAPTURE_INTERVAL
 from config import RET_OK, RET_ERROR
+from .cameras import Camera
 
-class CamsManager():
-    """Abstract base class for all camera managers. Camera managers handle the starting, stopping
-    and other administration of cameras. Also servers as dummy class."""
-    def __init__(self, num_cams):
-        self._num_cams = num_cams
-        self.state = CAM_MANAGER_STATES.STOPPED
-        self._cameras = []
 
-        for _ in range(self._num_cams):
-            self._cameras.append(Cam())
-
-    def reset(self):
-        self.state = CAM_MANAGER_STATES.STOPPED
-
-    def start_capturing(self):
-        self.state = CAM_MANAGER_STATES.STARTED
-
-    def stop_capturing(self):
-        self.state = CAM_MANAGER_STATES.STOPPED
-
-    def get_num_cams(self):
-        return self._num_cams
-
-    def get_cam_ids(self):
-        return range(self._num_cams)
-
-    def get_cameras_as_list(self):
-        return self._cameras
-
-    def get_choices_for_setting(self, setting_str):
-        return self._cameras[0].get_choices_for_setting(setting_str)
-
-    def get_setting(self, setting_str):
-        return self._cameras[0].get_setting(setting_str)
-
-    def set_setting(self, setting_str, setting_value):
-        # TODO Should handle image_capture_interval from this point as well
-        return self._cameras[0].set_setting(setting_str, setting_value)
-
-class TriCapCamsManager(CamsManager):
+class TriCapCamsManager(object):
     """TriCapCamsManager manages TriCap camera objects"""
+    supportedCameras = {"Canon EOS 6D", "Dummy Cam"}
 
-    def __init__(self, logger, context):
+    def __init__(self, logger):
         self.state = CAM_MANAGER_STATES.STOPPED
-
-        self._context = context
 
         self._capture_thread = None
         self._kill_pill = None
         self._image_capture_interval = None
 
         self._logger = logger
-        self._logger.info('GPHOTO2 version info: ' + str(gp.gp_library_version(True)))
-
         self._cameras = None
         self._cam_threads = None
         self._capture_thread = None
@@ -105,25 +57,18 @@ class TriCapCamsManager(CamsManager):
     def get_image_capture_interval(self):
         return self._image_capture_interval
 
+    def get_cameras_as_list(self):
+        return self._cameras
+
     def _find_cameras(self):
         self._cameras = []
 
         try:
-            port_info_list = gp.PortInfoList()
-            port_info_list.load()
-
-            for name, addr in self._context.camera_autodetect():
-
-                if name == "Canon EOS 6D":
-                    self._logger.info('Adding camera %s at port %s ' %(name, addr))
-                    idx = port_info_list.lookup_path(addr)
-                    tricap_cam = Canon6DCam(self._context, port_info_list[idx], self._logger)
+            for name, address in Camera.autodetect():
+                if name in TriCapCamsManager.supportedCameras:
+                    self._logger.info('Adding camera %s at address %s ' % (name, address))
+                    tricap_cam = Camera(address, self._logger)
                     self._cameras.append(tricap_cam)
-
-        except gp.GPhoto2Error as ex:
-            self.state = CAM_MANAGER_STATES.ERROR_CONFIG
-            self._logger.error('Error finding cameras')
-            self._logger.error('GPhoto2 Error: %d : %s' %(ex.code, ex.string))
         except Exception:  # Catches most exceptions, except KeyboardInterrupt and SystemExit
             self._logger.error(traceback.format_exc())
             return RET_ERROR
@@ -141,7 +86,6 @@ class TriCapCamsManager(CamsManager):
             thread = threading.Thread(target=cam.create_single_capture_func(),
                                       args=[index])
             yield thread
-
 
     def _start_capture_with_wait_thread(self):
         # define a worker function to run in a separate thread

@@ -22,8 +22,9 @@ class TestDeviceTruSense(unittest.TestCase):
     handler = logging.FileHandler(filename=log_fp)
     handler.setLevel(logging.DEBUG)
     handler.setFormatter(formatter)
-    logger.addHandler(handler)
-    logger.setLevel(logging.DEBUG)
+    rootlogger = logging.getLogger('')
+    rootlogger.addHandler(handler)
+    rootlogger.setLevel(logging.DEBUG)
 
     def setUp(self):
         self.logger = TestDeviceTruSense.logger
@@ -40,28 +41,28 @@ class TestDeviceTruSense(unittest.TestCase):
 
     def test_initialization(self):
         self.logger.info("Starting test init")
-        alti = TrusenseAltimeter(self.logger, self.session_logger)
+        alti = TrusenseAltimeter(self.session_logger)
         self.assertEqual(alti.state, ALTIMETER_STATE.CONNECTED)
         self.logger.info("Done with test init")
 
     def test_reset(self):
         self.logger.info("Starting test reset")
         # TODO Need to elaborate on this test, probably check that some setting is back to default
-        alti = TrusenseAltimeter(self.logger, self.session_logger)
+        alti = TrusenseAltimeter(self.session_logger)
         alti.reset()
         self.assertEqual(alti.state, ALTIMETER_STATE.CONNECTED)
         self.logger.info("Done with test reset")
 
     def test_disconnect(self):
         self.logger.info("Starting test disc")
-        alti = TrusenseAltimeter(self.logger, self.session_logger)
+        alti = TrusenseAltimeter(self.session_logger)
         alti.disconnect()
         self.assertEqual(alti.state, ALTIMETER_STATE.NOT_CONNECTED)
         self.logger.info("Done with test disc")
 
     def test_measuring(self):
         self.logger.info("Starting test meas")
-        alti = TrusenseAltimeter(self.logger, self.session_logger)
+        alti = TrusenseAltimeter(self.session_logger)
         alti.start_measuring()
         sleep(5)
         self.assertEqual(alti.state, ALTIMETER_STATE.MEASURING)
@@ -72,6 +73,6 @@ class TestDeviceTruSense(unittest.TestCase):
         self.assertEqual(alti.state, ALTIMETER_STATE.CONNECTED)
         self.logger.info("Done with test meas")
 
-    # TODO Test session logger, if it takes the input?
+        # TODO Test session logger, if it takes the input?
 
-    # TODO Test bad messages, error fallovers
+        # TODO Test bad messages, error fallovers

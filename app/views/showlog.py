@@ -18,13 +18,23 @@ class LogFormatter:
             loglines = log_file.readlines()
 
             for line in loglines:
-                linesections = line.split('|')
-                log += linesections[0][5:18]  # reduced date
-                log += ' | ' + '<font color="blue">' + linesections[1].split('/')[-1] + '</font>'  # reduced filename
-                log += ' | ' + linesections[2]  # function name
-                log += ' | ' + '<font color="green">' + linesections[3] + '</font>'  # log message level
-                log += ' | ' + linesections[4]  # messsage
-                log += '<br />'
+                try:
+                    linesections = line.split('|')
+                    # reduced date
+                    log += linesections[0][5:18]
+                    # reduced filename
+                    log += ' | ' + '<font color="blue">' + linesections[1].split('/')[-1] + '</font>'
+                    # function name
+                    log += ' | ' + linesections[2]
+                    # log message level
+                    log += ' | ' + '<font color="green">' + linesections[3] + '</font>'
+                    # messsage
+                    log += ' | ' + linesections[4]
+                    log += '<br />'
+                except IndexError:
+                    # This happens when a log line does not have the expected number of sections. When we drop through
+                    # to here we shoul allready have printed everything we have. so simply ignore and continue
+                    pass
 
         return log
 

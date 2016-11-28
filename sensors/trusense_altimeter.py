@@ -7,6 +7,7 @@ from time import sleep
 import threading
 
 from config import ALTIMETER_STATE, RET_OK, RET_ERROR, ALTI_STATE_STRINGS
+import logging
 
 
 # TODO How to deal with disconnect?
@@ -17,7 +18,7 @@ class AltiError(Exception):
 
 class TrusenseAltimeter(object):
     """Handles serial communication with the TruSense S100 Laser Altimeter"""
-
+    _logger = logging.getLogger(__name__)
     errorCodes = {'00': 'S100 Error 00: Invalid Command',
                   '01': 'S100 Error 01: No Target',
                   '10': 'S100 Error 10: Bad Data Checksum',
@@ -35,14 +36,13 @@ class TrusenseAltimeter(object):
                   '30': 'S100 Error 30: Temperature too High',
                   '31': 'S100 Error 31: Temperature too Low'}
 
-    def __init__(self, logger, data_logger, supported_devices={(1659, 8963)}):
+    def __init__(self, data_logger, supported_devices={(1659, 8963)}):
         # SETTINGS
         # default values
         self._measurement_timeout = 2
         self._num_frames_to_avg = 2
         self._setting_strings = ['alti_measurement_timeout', 'alti_num_frames_to_avg']
         self._data_logger = data_logger
-        self._logger = logger
         self.state = ALTIMETER_STATE.NOT_CONNECTED
         self._kill_pill = None
         self._read_thread = None
@@ -168,7 +168,6 @@ class TrusenseAltimeter(object):
         return worker
 
     def start_measuring(self):
-        assert self._ser.is_open
         try:
             self._write('GO', 'Error starting measuring mode')
             # TODO Are there exceptions when starting a thread?
@@ -183,8 +182,6 @@ class TrusenseAltimeter(object):
             return RET_ERROR
 
     def stop_measuring(self):
-        assert self._ser.is_open
-        assert self.state == ALTIMETER_STATE.MEASURING
         try:
             self._kill_pill.set()
             self._read_thread.join()

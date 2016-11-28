@@ -1,6 +1,6 @@
 # coding=utf-8
 import os
-import traceback
+import logging
 
 from config import CAM_IMAGE_PREFIX, CAM_STATE_STRINGS, RET_ERROR, RET_OK, CAMERA_STATES
 from config import CE6D_CAP_TARGET_SD_CARD, CE6D_FORMAT_RAW_AND_TINY_JPEG, DISPLAY_DOWNLOAD_DIR
@@ -18,12 +18,12 @@ try:
         _port_info_list = gp.PortInfoList()
         _port_info_list.load()
         _context = gp.Context()
+        _logger = logging.getLogger(__name__)
 
-        def __init__(self, address, logger):
+        def __init__(self, address):
 
             self._gp_camera = None
 
-            self._logger = logger
             self.state = CAMERA_STATES.UNINITIALISED
             self._address = address
             self._initialise_camera()
@@ -57,10 +57,10 @@ try:
                 self._logger.error('GPhoto2 error: %d: %s' % (ex.code, ex.string))
                 return RET_ERROR
             except Exception:  # Catches most exceptions, except KeyboardInterrupt and SystemExit
-                self._logger.error(traceback.format_exc())
+                self._logger.error("_setup camera failed.", exc_info=True)
                 return RET_ERROR
 
-            init_configs = TricapConfig(self._logger)
+            init_configs = TricapConfig()
 
             # get configuration tree
             gp_config = gp.check_result(gp.gp_camera_get_config(self._gp_camera, GPhotoCam._context))
@@ -105,7 +105,7 @@ try:
                     self.state = CAMERA_STATES.ERROR_CONFIG
                 return None
             except Exception:
-                self._logger.error(traceback.format_exc())
+                self._logger.error("_get_list_of_valid_config_names failed.", exc_info=True)
                 return None
 
             return config_names
@@ -128,7 +128,7 @@ try:
                 return None
 
             except Exception:
-                self._logger.error(traceback.format_exc())
+                self._logger.error("_get_list_of_valid_config_choices failed.", exc_info=True)
                 return None
 
             return config_choices
@@ -163,7 +163,7 @@ try:
                 return RET_ERROR
 
             except Exception:
-                self._logger.error(traceback.format_exc())
+                self._logger.error("_set_config_value failed.", exc_info=True)
                 return RET_ERROR
 
             self._logger.debug('Successfully set %s on camera.' % config_str)
@@ -185,7 +185,7 @@ try:
                 return None
 
             except Exception:  # Catches most exceptions, except KeyboardInterrupt and SystemExit
-                self._logger.error(traceback.format_exc())
+                self._logger.error("_get_config_value failed.", exc_info=True)
                 return None
 
             return value
@@ -202,7 +202,7 @@ try:
                 return RET_ERROR
 
             except Exception:  # Catches most exceptions, except KeyboardInterrupt and SystemExit
-                self._logger.error(traceback.format_exc())
+                self._logger.error("_obtain_serial_num failed.", exc_info=True)
                 return RET_ERROR
 
             self._logger.info('Successfully retrieved camera serial number %s' % eossernum)
@@ -281,7 +281,7 @@ try:
                     self._logger.error('GPhoto2 Error: %d : %s' % (ex.code, ex.string))
 
                 except Exception:  # Catches most exceptions, except KeyboardInterrupt and SystemExit
-                    self._logger.error(traceback.format_exc())
+                    self._logger.error("capture failed.", exc_info=True)
                     self.state = CAMERA_STATES.ERROR_CAPTURE
 
                 # TODO Not sure if this needs to be exception handled
@@ -315,7 +315,7 @@ except ImportError:
         def autodetect():
             return [("Dummy Cam", i) for i in range(0, NUM_DUMMY_CAMS)]
 
-        def __init__(self, *args):
+        def __init__(self):
             self.state = CAMERA_STATES.INITIALISED
             self.serial_num = None
             self._fresh_capture = False

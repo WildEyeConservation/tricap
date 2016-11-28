@@ -18,8 +18,9 @@ class TestBaseCanon6DCam(unittest.TestCase):
     handler = logging.FileHandler(filename=log_fp)
     handler.setLevel(logging.DEBUG)
     handler.setFormatter(formatter)
-    logger.addHandler(handler)
-    logger.setLevel(logging.DEBUG)
+    rootlogger = logging.getLogger('')
+    rootlogger.addHandler(handler)
+    rootlogger.setLevel(logging.DEBUG)
 
     def setUp(self):
         for name, address in GPhotoCam.autodetect():
@@ -30,12 +31,12 @@ class TestBaseCanon6DCam(unittest.TestCase):
 
 class TestDeviceCanon6DCam(TestBaseCanon6DCam):
     def test_init(self):
-        cam = GPhotoCam(self._address, self.logger)
+        cam = GPhotoCam(self._address)
 
         self.assertEqual(cam.state, CAMERA_STATES.INITIALISED)
 
     def test_set_shutter_speed(self):
-        cam = GPhotoCam(self._address, self.logger)
+        cam = GPhotoCam(self._address)
 
         self.assertEqual(cam.set_setting('shutterspeed', '1/640'), RET_OK)
         self.assertEqual(cam.get_setting('shutterspeed'), '1/640')
@@ -44,18 +45,18 @@ class TestDeviceCanon6DCam(TestBaseCanon6DCam):
         self.assertEqual(cam.get_setting('shutterspeed'), '1/640')
 
     def test_capture_func(self):
-        cam = GPhotoCam(self._address, self.logger)
+        cam = GPhotoCam(self._address)
         self.assertEqual(cam.capture(0), RET_OK)
 
     def test_setting_iso(self):
-        cam = GPhotoCam(self._address, self.logger)
+        cam = GPhotoCam(self._address)
         cam.set_setting('iso', '100')
         self.assertEqual(cam.get_setting('iso'), '100')
         cam.set_setting('iso', '200')
         self.assertEqual(cam.get_setting('iso'), '200')
 
     def test_get_choices_for_iso(self):
-        cam = GPhotoCam(self._address, self.logger)
+        cam = GPhotoCam(self._address)
         choices = cam.get_choices_for_setting('iso')
         self.assertEqual('100' in choices, True)
         self.assertEqual('200' in choices, True)
@@ -64,7 +65,7 @@ class TestDeviceCanon6DCam(TestBaseCanon6DCam):
 class TestInteractiveCanon6DCam(TestBaseCanon6DCam):
     def test_cable_remove(self):
         input('Press enter to conduct cable remove test')
-        cam = GPhotoCam(self._address, self.logger)
+        cam = GPhotoCam(self._address)
         thread_worker = cam.capture
         self.assertEqual(cam.state, CAMERA_STATES.INITIALISED)
 

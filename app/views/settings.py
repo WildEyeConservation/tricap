@@ -1,5 +1,4 @@
 from flask import Blueprint, render_template, request, redirect, url_for
-from flask import current_app
 
 from app import forms, tricap_manager, altimeter, session_logger
 from config import DEFAULT_CONFIG_FP, CONFIG_FP, RET_OK, RET_ERROR
@@ -46,7 +45,7 @@ def _get_labels_and_choices_from_config(config_fp=CONFIG_FP, config_dict=None):
     string_labels = []
 
     if config_dict is None:
-        config = TricapConfig(current_app.logger, config_fp_to_read=config_fp)
+        config = TricapConfig(config_fp_to_read=config_fp)
         config_dict = config.get_dict()
 
     for key in config_dict.keys():
@@ -106,7 +105,7 @@ def _get_setting_labels(form):
 
 
 def _get_form_with_current_settings(config_fp=CONFIG_FP):
-    config = TricapConfig(current_app.logger, config_fp_to_read=config_fp)
+    config = TricapConfig(config_fp_to_read=config_fp)
     config_dict = config.get_dict()
 
     form = _get_setting_form(config_dict=config_dict)
@@ -165,16 +164,11 @@ def _change_settings(form):
             continue
 
 
-def _save_settings(form, config_fp=CONFIG_FP, logger=None):
-    # If no logger is specified, use the apps logger (having it as default
-    #  freaks out the app initialisation)
-    if logger is None:
-        logger = current_app.logger
-
+def _save_settings(form, config_fp=CONFIG_FP):
     _change_settings(form)
 
     # get the current settings in a dict
-    config = TricapConfig(logger, config_fp_to_read=config_fp)
+    config = TricapConfig(config_fp_to_read=config_fp)
     config_dict = config.get_dict()
 
     # modify the settings dict based on settings in the form (i.e. the user selected options)
@@ -192,13 +186,10 @@ def _save_settings(form, config_fp=CONFIG_FP, logger=None):
     config.save_config_dict_to_file(config_dict)
 
 
-def _revert_to_default_settings(save_to_fp=CONFIG_FP, logger=None):
+def _revert_to_default_settings(save_to_fp=CONFIG_FP):
     # arguments are only supposed to be used during unittesting
-    if logger is None:
-        logger = current_app.logger
-
-    default_config = TricapConfig(logger, config_fp_to_read=DEFAULT_CONFIG_FP)
-    config = TricapConfig(logger, config_fp_to_read=save_to_fp)
+    default_config = TricapConfig(config_fp_to_read=DEFAULT_CONFIG_FP)
+    config = TricapConfig(config_fp_to_read=save_to_fp)
     config.clear_config()
     config.save_config_dict_to_file(default_config.get_dict())
 

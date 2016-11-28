@@ -1,6 +1,7 @@
 """ D Joubert 18 November 2016 - Configurator - handles reading and saving the initial config """
 
 import configparser
+import logging
 
 from config import CONFIG_FP, RET_OK, RET_ERROR
 
@@ -10,13 +11,12 @@ SECTION_HEADER = 'Tricap'
 class TricapConfig:
     """ Configurator - Object that reads and writes configuration information, handling the
         translation from machine code to human readable format, and back again """
+    _logger = logging.getLogger(__name__)
 
-    def __init__(self, logger, config_fp_to_read=CONFIG_FP):
+    def __init__(self, config_fp_to_read=CONFIG_FP):
         self._parser = configparser.ConfigParser()
 
         self._config_fp = config_fp_to_read
-        self._logger = logger
-
         self._ready_flag = False
 
         self.TYPE_STRING = 'string'

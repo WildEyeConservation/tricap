@@ -18,8 +18,9 @@ class TestBaseConfigure(unittest.TestCase):
     handler = logging.FileHandler(filename=log_fp)
     handler.setLevel(logging.DEBUG)
     handler.setFormatter(formatter)
-    logger.addHandler(handler)
-    logger.setLevel(logging.DEBUG)
+    rootLogger = logging.getLogger('')
+    rootLogger.addHandler(handler)
+    rootLogger.setLevel(logging.DEBUG)
 
     def setUp(self):
 
@@ -48,12 +49,12 @@ class TestBaseConfigure(unittest.TestCase):
 class TestConfigure(TestBaseConfigure):
     def test_init(self):
         self.create_a_temp_config()
-        config = TricapConfig(self.logger, config_fp_to_read=self.temp_config_fp)
+        config = TricapConfig(config_fp_to_read=self.temp_config_fp)
         self.assertEqual(config.is_ready(), True)
 
     def test_value_getting(self):
         self.create_a_temp_config()
-        config = TricapConfig(self.logger, config_fp_to_read=self.temp_config_fp)
+        config = TricapConfig(config_fp_to_read=self.temp_config_fp)
 
         self.assertEqual(config.get('shutterspeed'), '1/2500')
         self.assertEqual(config.get('image_capture_interval', type_str=config.TYPE_STRING), '3.0')
@@ -65,13 +66,13 @@ class TestConfigure(TestBaseConfigure):
 
     def test_value_setting(self):
         self.create_a_temp_config()
-        config = TricapConfig(self.logger, config_fp_to_read=self.temp_config_fp)
+        config = TricapConfig(config_fp_to_read=self.temp_config_fp)
 
         config_dict = config.get_dict()
         config_dict['shutterspeed'] = '1/640'
         config_dict['image_capture_interval'] = 5.0
         self.assertEqual(config.save_config_dict_to_file(config_dict), RET_OK)
 
-        new_config = TricapConfig(self.logger, config_fp_to_read=self.temp_config_fp)
+        new_config = TricapConfig(config_fp_to_read=self.temp_config_fp)
         self.assertEqual(new_config.get('shutterspeed'), '1/640')
         self.assertEqual(new_config.get('image_capture_interval', type_str=config.TYPE_FLOAT), 5.0)

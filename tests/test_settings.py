@@ -34,8 +34,9 @@ class BaseTestSettings(TestCase):
     handler = logging.FileHandler(filename=log_fp)
     handler.setLevel(logging.DEBUG)
     handler.setFormatter(formatter)
-    logger.addHandler(handler)
-    logger.setLevel(logging.DEBUG)
+    rootlogger = logging.getLogger('')
+    rootlogger.addHandler(handler)
+    rootlogger.setLevel(logging.DEBUG)
 
     def setUp(self):
         self.temp_file_count = 0
@@ -101,7 +102,7 @@ class TestSettings(BaseTestSettings):
     def test_revert(self):
         # create a new config file, change it and save it
         self.create_a_temp_config()
-        new_config = TricapConfig(self.logger, config_fp_to_read=self.temp_config_fp)
+        new_config = TricapConfig(config_fp_to_read=self.temp_config_fp)
         new_config_dict = new_config.get_dict()
         new_config_dict['image_capture_interval'] = -99.99
         new_config.save_config_dict_to_file(new_config_dict)
@@ -110,7 +111,7 @@ class TestSettings(BaseTestSettings):
         # DJOUB This does alter the file itself
 
         # load the default
-        default_config = TricapConfig(self.logger, config_fp_to_read=DEFAULT_CONFIG_FP)
+        default_config = TricapConfig(config_fp_to_read=DEFAULT_CONFIG_FP)
         self.assertNotEqual(new_config.get_dict(), default_config.get_dict())
 
         with self.client:
@@ -120,7 +121,7 @@ class TestSettings(BaseTestSettings):
             settings._revert_to_default_settings(save_to_fp=self.temp_config_fp)
 
             # check that the config file was overwritten with the default values
-            new_config = TricapConfig(self.logger, config_fp_to_read=self.temp_config_fp)
+            new_config = TricapConfig(config_fp_to_read=self.temp_config_fp)
             self.assertEqual(new_config.get_dict(), default_config.get_dict())
 
 
@@ -172,7 +173,7 @@ class TestBehaviourSettings(BaseTestSettings):
 
             # Check that all the config fields have been created
             input_fields = driver.find_elements_by_class_name("form-control")
-            config_dict = TricapConfig(self.logger).get_dict()
+            config_dict = TricapConfig().get_dict()
             self.assertEqual(len(input_fields), len(config_dict.keys()))
 
             driver.quit()
@@ -209,7 +210,7 @@ class TestBehaviourSettings(BaseTestSettings):
             self.client.post(url_for('settings.settings'), data=form_data, follow_redirects=True)
 
             # check that the data has changed
-            new_config = TricapConfig(self.logger)
+            new_config = TricapConfig()
             new_config_dict = new_config.get_dict()
             self.assertEqual(new_config_dict['shutterspeed'], '1/2500')
             self.assertEqual(new_config_dict['iso'], '500')

@@ -12,7 +12,6 @@ from flask import Flask
 # Check if gphoto2 could be imported by the cameras - if not, you are probably in windows
 
 from sensors.cam_manager import TriCapCamsManager
-from sensors.image_manager import SameFileImageManager
 
 from sensors.trusense_altimeter import TrusenseAltimeter
 from sensors.session_logger import SessionLogger
@@ -32,17 +31,18 @@ app = Flask(__name__)
 app.config.from_object('config')
 
 # Add logger to the flask app
-app.logger.addHandler(handler)
-app.logger.setLevel(logging.DEBUG)  # Set this also, so as to get info messages as well
+rootlogger = logging.getLogger('')
+rootlogger.addHandler(handler)
+rootlogger.setLevel(logging.DEBUG)
 app.logger.info('Initiated logger for new instance of TriCap app.')
 
 # Instantiate the sensors
-tricap_manager = TriCapCamsManager(app.logger)
+tricap_manager = TriCapCamsManager()
 tricap_cameras = tricap_manager.get_cameras_as_list()
-image_manager = SameFileImageManager()
+image_manager = tricap_manager
 
 session_logger = SessionLogger()
-altimeter = TrusenseAltimeter(app.logger, session_logger)
+altimeter = TrusenseAltimeter(session_logger)
 
 # Configure the Flask Blueprints
 from .views.home import home_bp

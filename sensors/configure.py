@@ -11,11 +11,12 @@ import pdb
 
 SECTION_HEADER = 'Tricap'
 
-class TricapConfig():
+
+class TricapConfig:
     """ Configurator - Object that reads and writes configuration information, handling the
         translation from machine code to human readable format, and back again """
 
-    def __init__(self, logger, config_fp_to_read = CONFIG_FP):
+    def __init__(self, logger, config_fp_to_read=CONFIG_FP):
         self._parser = configparser.ConfigParser()
 
         self._config_fp = config_fp_to_read
@@ -78,7 +79,6 @@ class TricapConfig():
 
         return dict(items)
 
-
     def get(self, id_str, type_str='string'):
         if self._ready_flag is None:
             return None
@@ -112,9 +112,9 @@ class TricapConfig():
 
     def clear_config(self):
         self._parser.clear()
-        self._parser[SECTION_HEADER] = {}        
+        self._parser[SECTION_HEADER] = {}
 
-    def save_config_dict_to_file(self, config_dict, config_fp = None):
+    def save_config_dict_to_file(self, config_dict, config_fp=None):
         """ Save the values in a config dict to the config file. Note that settings will only be
             added and changed. Nothing gets removed """
 
@@ -145,7 +145,6 @@ class TricapConfig():
             return RET_ERROR
 
         return RET_OK
-
 
 # def save_config(new_config, save_to_fp=None):
 #     # TODO Do a check before overwriting the config file

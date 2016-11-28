@@ -15,8 +15,10 @@ settings_bp = Blueprint('settings', __name__)
 
 """ There should be three sources of settings, the cameras, the altimeter and general settings """
 
-class MiscSettingHandler():
+
+class MiscSettingHandler:
     """ Handles all the settings which are not applicable to the sensors """
+
     def __init__(self):
         self._setting_strings = ['session_description', 'image_capture_interval']
 
@@ -43,10 +45,9 @@ class MiscSettingHandler():
         return ret_val
 
 
-
 # TODO This got out of hand, should definitely be able to make this simplified
 
-def _get_labels_and_choices_from_config(config_fp = CONFIG_FP, config_dict=None):
+def _get_labels_and_choices_from_config(config_fp=CONFIG_FP, config_dict=None):
     select_tuples = []
     string_labels = []
 
@@ -67,6 +68,7 @@ def _get_labels_and_choices_from_config(config_fp = CONFIG_FP, config_dict=None)
 
     return string_labels, select_tuples
 
+
 def _get_setting_form(config_fp=CONFIG_FP, config_dict=None):
     form = forms.SettingsForm()
 
@@ -82,6 +84,7 @@ def _get_setting_form(config_fp=CONFIG_FP, config_dict=None):
         form.string_settings[-1].label = str_lbl
 
     return form
+
 
 def _populated_pushed_form(pushed_form, config_fp=CONFIG_FP, config_dict=None):
     """ for some reason, the pushed form loses the labels of the added fields, so have to add em"""
@@ -107,7 +110,8 @@ def _get_setting_labels(form):
 
     return string_labels, select_labels
 
-def _get_form_with_current_settings(config_fp = CONFIG_FP):
+
+def _get_form_with_current_settings(config_fp=CONFIG_FP):
     config = TricapConfig(current_app.logger, config_fp_to_read=config_fp)
     config_dict = config.get_dict()
 
@@ -126,18 +130,19 @@ def _get_form_with_current_settings(config_fp = CONFIG_FP):
                 choices_tuples = form.select_settings[select_labels.index(key)].choices
                 choices = [ct[1] for ct in choices_tuples]
                 form.select_settings[select_labels.index(key)].data = str(choices.index(config_val))
-        else: # it's not a camera settings
+        else:  # it's not a camera settings
             config_val = altimeter.get_setting(key)
             if config_val is not None:
                 if key in string_labels:
                     form.string_settings[string_labels.index(key)].data = config_val
-            else: # it's not an altimeter setting either
+            else:  # it's not an altimeter setting either
                 config_val = misc_setting_handler.get_setting(key)
                 if config_val is not None:
                     if key in string_labels:
                         form.string_settings[string_labels.index(key)].data = config_val
 
     return form
+
 
 def _change_settings(form):
     string_labels, select_labels = _get_setting_labels(form)
@@ -165,8 +170,8 @@ def _change_settings(form):
         if misc_setting_handler.set_setting(str_l, val_str) == RET_OK:
             continue
 
-def _save_settings(form, config_fp=CONFIG_FP, logger=None):
 
+def _save_settings(form, config_fp=CONFIG_FP, logger=None):
     # If no logger is specified, use the apps logger (having it as default
     #  freaks out the app initialisation)
     if logger is None:
@@ -192,6 +197,7 @@ def _save_settings(form, config_fp=CONFIG_FP, logger=None):
 
     config.save_config_dict_to_file(config_dict)
 
+
 def _revert_to_default_settings(save_to_fp=CONFIG_FP, logger=None):
     # arguments are only supposed to be used during unittesting
     if logger is None:
@@ -202,9 +208,9 @@ def _revert_to_default_settings(save_to_fp=CONFIG_FP, logger=None):
     config.clear_config()
     config.save_config_dict_to_file(default_config.get_dict())
 
+
 @settings_bp.route('/settings', methods=['GET', 'POST'])
 def settings():
-
     if request.method == 'GET':
         # When the user initially opens the page, we need the current settings from the sensors
         form = _get_form_with_current_settings()

@@ -305,6 +305,8 @@ try:
 except ImportError:
     import time
     from config import DUMMY_IMAGE_PATH, NUM_DUMMY_CAMS
+
+
     # No gphoto2 for windows, have to use dummies while working
     # TODO Implement a Windows Canon6DCam, which uses the Canon EDSDK to communicate with the camera
     class DummyCam(object):
@@ -330,7 +332,8 @@ except ImportError:
             self._fresh_capture = False
             return DUMMY_IMAGE_PATH
 
-        def get_state_as_string(self):
+        @staticmethod
+        def get_state_as_string():
             return "Base Cam has no state."
 
         def set_setting(self, setting_str, setting_val):
@@ -343,7 +346,8 @@ except ImportError:
             else:
                 return None
 
-        def get_choices_for_setting(self, setting_str):
+        @staticmethod
+        def get_choices_for_setting(setting_str):
             # just a couple of hard coded ones
             if setting_str == 'shutterspeed':
                 return ['1/4', '1/640', '1/2500']
@@ -352,7 +356,7 @@ except ImportError:
             else:
                 return None
 
-        def capture(cam_num):
+        def capture(self, cam_num):
             if self.state == CAMERA_STATES.INITIALISED:
                 self.state = CAMERA_STATES.CAPTURING
                 # prepare the small jpeg filename
@@ -362,6 +366,7 @@ except ImportError:
                 return RET_OK
             else:
                 return RET_ERROR
+
 
     Camera = DummyCam
     gp = None

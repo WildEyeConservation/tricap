@@ -4,6 +4,7 @@
 from flask_wtf import Form
 from wtforms import StringField, SelectField, SubmitField, FieldList
 
+
 class SettingsForm(Form):
     """The form for the settings page. Contains the three buttons (test, save and revert) and
     then two FieldLists that must be expanded with the settings read from the config file."""

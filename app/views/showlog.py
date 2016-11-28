@@ -7,7 +7,7 @@ from config import SERVER_LOG_DIR, LOG_CODES
 showlog_bp = Blueprint('showlog', __name__)
 
 
-class LogFormatter():
+class LogFormatter:
     def __init__(self, log_fp):
         self._log_fp = log_fp
 
@@ -19,20 +19,22 @@ class LogFormatter():
 
             for line in loglines:
                 linesections = line.split('|')
-                log += linesections[0][5:18] # reduced date
-                log += ' | ' + '<font color="blue">' + linesections[1].split('/')[-1] + '</font>'# reduced filename
-                log += ' | ' + linesections[2] # function name
-                log += ' | ' + '<font color="green">'+ linesections[3] + '</font>'# log message level
-                log += ' | ' + linesections[4] # messsage
+                log += linesections[0][5:18]  # reduced date
+                log += ' | ' + '<font color="blue">' + linesections[1].split('/')[-1] + '</font>'  # reduced filename
+                log += ' | ' + linesections[2]  # function name
+                log += ' | ' + '<font color="green">' + linesections[3] + '</font>'  # log message level
+                log += ' | ' + linesections[4]  # messsage
                 log += '<br />'
 
         return log
+
 
 # TODO Set time correctly on overall logger
 
 @showlog_bp.route('/showlog', methods=['GET'])
 def showlog():
     return render_template('/showlog/showlog.html')
+
 
 @showlog_bp.route('/_get_log', methods=['GET'])
 def provide_log():

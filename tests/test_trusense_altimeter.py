@@ -13,8 +13,8 @@ from sensors.session_logger import SessionLogger
 
 from config import ALTIMETER_STATE, SERVER_LOG_DIR
 
-class TestDeviceTruSense(unittest.TestCase):
 
+class TestDeviceTruSense(unittest.TestCase):
     logger = logging.getLogger('test_alti_logger')
     format_str = "%(asctime)s | %(pathname)s:%(lineno)d | %(funcName)s | %(levelname)s | %(message)s "
     formatter = logging.Formatter(format_str)
@@ -26,9 +26,9 @@ class TestDeviceTruSense(unittest.TestCase):
     logger.setLevel(logging.DEBUG)
 
     def setUp(self):
-        self.logger=TestDeviceTruSense.logger
+        self.logger = TestDeviceTruSense.logger
         self.tempdir = tempfile.mkdtemp()
-        self.session_logger = SessionLogger(root_folder = self.tempdir)
+        self.session_logger = SessionLogger(root_folder=self.tempdir)
         self.session_logger.create_new_session()
 
     def tearDown(self):
@@ -63,15 +63,15 @@ class TestDeviceTruSense(unittest.TestCase):
         self.logger.info("Starting test meas")
         alti = TrusenseAltimeter(self.logger, self.session_logger)
         alti.start_measuring()
-        sleep(2)
+        sleep(5)
         self.assertEqual(alti.state, ALTIMETER_STATE.MEASURING)
-	# TODO This test should still provide valid result even if the measure plane is too close.
+        # TODO This test should still provide valid result even if the measure plane is too close.
         self.assertNotEqual(alti.measurement, 0)
         alti.stop_measuring()
         sleep(2)
         self.assertEqual(alti.state, ALTIMETER_STATE.CONNECTED)
         self.logger.info("Done with test meas")
 
-        # TODO Test session logger, if it takes the input?
+    # TODO Test session logger, if it takes the input?
 
     # TODO Test bad messages, error fallovers

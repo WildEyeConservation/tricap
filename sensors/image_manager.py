@@ -1,17 +1,16 @@
+# coding=utf-8
 """ D Joubert - 17 November 2016 - Innoventix Consulting
-    Image Manager, handles images taken from cameras for the webserver"""
-
-import os
+    Image Manager, handles images taken from cameras for the web server"""
 
 import hashlib
-
+import os
 from abc import ABCMeta, abstractmethod
 
-from config import CAM_MANAGER_STATES, DUMMY_IMAGE_PATH
 from config import DISPLAY_DOWNLOAD_DIR, CAM_IMAGE_PREFIX
+from config import DUMMY_IMAGE_PATH
 
 
-class ImageManager():
+class ImageManager:
     """Abstract class all Image Managers should inherit. An ImageManager checks the freshness of
     images from multiple cameras and gives the full paths to those images."""
     __metaclass__ = ABCMeta

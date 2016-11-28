@@ -159,12 +159,12 @@ class TestBehaviourSettings(BaseTestSettings):
             with open(temp_fp, 'wb') as temp_html_file:
                 temp_html_file.write(response.data.replace(b'/static', TEST_STATIC_DIR))
 
-            display = Display(visible=0, size=(800,600))
-            display.start()
+            # display = Display(visible=0, size=(800,600))
+            # display.start()
 
             # Open the dumped page using chrome (through Selenium) and
             #  wait untill the page has finished loading
-            driver = webdriver.Chrome(executable_path='/usr/lib/chromium-browser/chromedriver')
+            driver = webdriver.Chrome()#executable_path='/usr/lib/chromium-browser/chromedriver')
             driver.get("file:///"+temp_fp)
             wait = WebDriverWait(driver, 10)
             wait.until(EC.visibility_of_element_located((By.ID, "btn_test")))

@@ -42,6 +42,9 @@ class TrusenseAltimeter(object):
         self._data_logger = data_logger
         self._logger = logger
         self.state = ALTIMETER_STATE.NOT_CONNECTED
+        self.measurement = -1
+
+        self._ser = None # set this to None if something goes wrong with getting the Serial object
 
         try:
             self._ser = serial.Serial(port = self._get_correct_port_name(supportedDevices),
@@ -55,7 +58,7 @@ class TrusenseAltimeter(object):
             self.state = ALTIMETER_STATE.ERROR
 
     def _get_correct_port_name(self,supportedDevices):
-        correct_port = None
+        # correct_port = None
         for port in serial.tools.list_ports.comports():
             if (port.vid,port.pid) in supportedDevices:
                 return port.device
@@ -137,7 +140,11 @@ class TrusenseAltimeter(object):
         return str(self.measurement)
 
     def disconnect(self):
-        assert self._ser.is_open, 'Trying to close already closed alti serial port'
+        # Not using the assert, wan't to be able to test the interface even if the alti is not
+        #  connected
+        if self._ser is None or self._ser.is_open is False:
+            return RET_ERROR
+        # assert self._ser.is_open, 'Trying to close already closed alti serial port'
 
         try:
             self._ser.close()
@@ -163,7 +170,8 @@ class TrusenseAltimeter(object):
         return worker
 
     def start_measuring(self):
-        assert self._ser.is_open
+        # assert self._ser.is_open
+
         try:
             self._write('GO', 'Error starting measuring mode')
             # TODO Are there exceptions when starting a thread?
@@ -178,8 +186,15 @@ class TrusenseAltimeter(object):
             return RET_ERROR
 
     def stop_measuring(self):
-        assert self._ser.is_open
-        assert self.state == ALTIMETER_STATE.MEASURING
+        # Not using asserts, need to have this not fall over when testing the GUI
+        if self._ser is None or self._ser.is_open is False:
+            return RET_ERROR
+
+        if self.state != ALTIMETER_STATE.MEASURING:
+            return RET_ERROR
+
+        # assert self._ser.is_open
+        # assert self.state == ALTIMETER_STATE.MEASURING
         try:
             self._kill_pill.set()
             self.read_thread.join()

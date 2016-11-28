@@ -1,5 +1,5 @@
 # coding=utf-8
-"""Configuration variables and classes for tricap.py
+"""Configuration variables and classes for tricap.py"""
 
 # Get all the machine specific configurations (stuff like file locations)
 import local_paths

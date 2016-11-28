@@ -1,3 +1,4 @@
+# coding=utf-8
 """Configuration variables and classes for tricap.py
 
    D Joubert Innoventix Consulting 27 October 2016."""
@@ -38,13 +39,17 @@ ALTI_MEASURE_TIMEOUT = 2
 RET_ERROR = -1
 RET_OK = 0
 
+NUM_DUMMY_CAMS = 3
+
 class CAMERA_STATES:
     UNINITIALISED, INITIALISED, CAPTURING, ERROR_CONFIG, ERROR_CAPTURE = list(range(5))
     MAX = 5
     MIN = 0
 
+
 CAM_STATE_STRINGS = ['Uninitialised', 'Ready', 'Capturing',
-                            'Configuration Error', 'Capture Error']
+                     'Configuration Error', 'Capture Error']
+
 
 class CAM_MANAGER_STATES:
     STOPPED, STARTED, ERROR_NO_CAMS, ERROR_CONFIG = list(range(4))
@@ -55,7 +60,8 @@ class CAM_MANAGER_STATES:
 class ALTIMETER_STATE:
     NOT_CONNECTED, CONNECTED, MEASURING, ERROR = list(range(4))
     MAX = 2
-    MAX = 0
+    MIN = 0
+
 
 ALTI_STATE_STRINGS = ['Not connected', 'Connected', 'Measuring', 'Error']
 

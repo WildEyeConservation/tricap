@@ -17,7 +17,7 @@ try:
 
         _port_info_list = gp.PortInfoList()
         _port_info_list.load()
-        _context = gp.context()
+        _context = gp.Context()
 
         def __init__(self, address, logger):
 
@@ -45,7 +45,7 @@ try:
 
         @staticmethod
         def autodetect():
-            return gp.context.camera_autodetect()
+            return GPhotoCam._context.camera_autodetect()
 
         def _setup_camera(self, address):
             self._gp_camera = gp.Camera()

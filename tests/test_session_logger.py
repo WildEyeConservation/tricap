@@ -39,7 +39,7 @@ class TestSessionLogger(unittest.TestCase):
 
         session_logger.log('TestTestTest')
         with open(session_logger.get_log_fp(), 'r') as log_file:
-            log_file.readline() # Ignore first line
+            log_file.readline()  # Ignore first line
             second_line = log_file.readline()
             parts = second_line.split(' | ')
             self.assertEqual(parts[1], 'TestTestTest\n')

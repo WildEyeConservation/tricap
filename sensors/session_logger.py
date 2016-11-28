@@ -1,9 +1,7 @@
 import logging
-import time
 import os
 import shutil
-
-from random import randint
+import time
 
 from config import SESSION_ROOT_DIR, CONFIG_FP
 

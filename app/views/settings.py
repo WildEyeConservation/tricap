@@ -1,15 +1,9 @@
-import os
-
-import pdb
-
-from flask import Blueprint, render_template, send_file, request, jsonify, redirect, url_for
+from flask import Blueprint, render_template, request, redirect, url_for
 from flask import current_app
-from wtforms import StringField, IntegerField, SelectField
 
 from app import forms, tricap_manager, altimeter, session_logger
+from config import DEFAULT_CONFIG_FP, CONFIG_FP, RET_OK, RET_ERROR
 from sensors.configure import TricapConfig
-
-from config import SERVER_LOG_DIR, DEFAULT_CONFIG_FP, CONFIG_FP, RET_OK, RET_ERROR
 
 settings_bp = Blueprint('settings', __name__)
 

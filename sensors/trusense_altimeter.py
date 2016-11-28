@@ -44,8 +44,9 @@ class TrusenseAltimeter(object):
         self._data_logger = data_logger
         self._logger = logger
         self.state = ALTIMETER_STATE.NOT_CONNECTED
-        self._kill_pill=None
-        self._read_thread= None
+        self._kill_pill = None
+        self._read_thread = None
+        self.measurement = None
 
         try:
             self._ser = serial.Serial(port=self._get_correct_port_name(supported_devices),
@@ -173,7 +174,7 @@ class TrusenseAltimeter(object):
             # TODO Are there exceptions when starting a thread?
             self._kill_pill = threading.Event()
             self._read_thread = threading.Thread(target=self._create_read_worker(),
-                                                 args=(self._kill_pill, ))
+                                                 args=(self._kill_pill,))
             self._read_thread.start()
             self.state = ALTIMETER_STATE.MEASURING
             return RET_OK

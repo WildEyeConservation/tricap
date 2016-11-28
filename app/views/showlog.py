@@ -1,8 +1,8 @@
 import os
 
-from flask import Blueprint, render_template, send_file, request, jsonify
+from flask import Blueprint, render_template, request, jsonify
 
-from config import SERVER_LOG_DIR, LOG_CODES
+from config import SERVER_LOG_DIR
 
 showlog_bp = Blueprint('showlog', __name__)
 

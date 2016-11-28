@@ -1,13 +1,8 @@
 """ D Joubert 18 November 2016 - Configurator - handles reading and saving the initial config """
 
 import configparser
-import os
 
-from config import CE6D_SHUTTER_SPEED_1_2500, CE6D_SHUTTER_SPEED_1_640, CE6D_SHUTTER_SPEED_1_4
-from config import CONFIG_FP, DEFAULT_IMAGE_CAPTURE_INTERVAL, RET_OK, RET_ERROR
-from config import DEFAULT_SHUTTER_SPEED
-
-import pdb
+from config import CONFIG_FP, RET_OK, RET_ERROR
 
 SECTION_HEADER = 'Tricap'
 
@@ -62,7 +57,6 @@ class TricapConfig:
     #         return None
     #
     #     return val_str
-
 
     def is_ready(self):
         return self._ready_flag

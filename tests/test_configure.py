@@ -1,15 +1,13 @@
 """ D Joubert - 18 November 2016 - Unittest for the TriCap configure class """
 
-import unittest
-import os
-import tempfile
 import logging
-import pdb
+import os
 import shutil
+import tempfile
+import unittest
 
+from config import CONFIG_FP, SERVER_LOG_DIR, RET_OK
 from sensors.configure import TricapConfig
-
-from config import CONFIG_FP, SERVER_LOG_DIR, RET_OK, RET_ERROR
 
 
 class TestBaseConfigure(unittest.TestCase):

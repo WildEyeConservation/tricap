@@ -11,7 +11,7 @@ from .configure import TricapConfig
 try:
     import gphoto2 as gp
 
-
+    # noinspection PyUnresolvedReferences
     class GPhotoCam(object):
         """ Handler for the Canon EOS 6D Camera. Uses gphoto2 to handle the actual communication. """
 
@@ -305,10 +305,9 @@ try:
 except ImportError:
     import time
     from config import DUMMY_IMAGE_PATH, NUM_DUMMY_CAMS
-
-
     # No gphoto2 for windows, have to use dummies while working
     # TODO Implement a Windows Canon6DCam, which uses the Canon EDSDK to communicate with the camera
+
     class DummyCam(object):
         """ Serves as a fake camera for testing purposes."""
 

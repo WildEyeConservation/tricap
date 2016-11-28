@@ -64,7 +64,7 @@ class SessionLogger():
         self._logger.addHandler(self._fh)
 
         self._ready = True
-        self.log("Session Description : %s" % description)
+        self.log("Session Description : %s" % self._description)
 
     def get_session_folder(self):
         if self._ready is True:

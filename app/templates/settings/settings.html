@@ -6,7 +6,14 @@
 <div class='container'>
     <form action="" method="post" name="add_im_set" class="form-horizontal" id='form' enctype=multipart/form-data>
         {{form.hidden_tag()}}
-        {% for string_setting in form.string_settings %}
+
+        <div class="row lead">
+            <div class="col-md-12">
+                Camera Settings
+            </div>
+        </div>
+
+        {% for string_setting in form.cam_strings %}
             <div class="row lead">
                 <div class="col-md-12">
                     {{string_setting.label}}
@@ -16,7 +23,61 @@
             </div>
         {% endfor %}
 
-        {% for select_setting in form.select_settings %}
+        {% for select_setting in form.cam_selects %}
+            <div class="row lead">
+                <div class="col-md-12">
+                    {{select_setting.label}}
+                    <!--  TODO The ids for each of these should contain the type of element-->
+                    {{select_setting(class='form-control', id=select_setting.label)}}
+                    {{render_errors(select_setting)}}
+                </div>
+            </div>
+        {% endfor %}
+
+        <div class="row lead">
+            <div class="col-md-12">
+                Altimeter Settings
+            </div>
+        </div>
+
+        {% for string_setting in form.alti_strings %}
+            <div class="row lead">
+                <div class="col-md-12">
+                    {{string_setting.label}}
+                    {{string_setting(class='form-control', id=string_setting.label)}}
+                    {{render_errors(string_setting)}}
+                </div>
+            </div>
+        {% endfor %}
+
+        {% for select_setting in form.alti_selects %}
+            <div class="row lead">
+                <div class="col-md-12">
+                    {{select_setting.label}}
+                    <!--  TODO The ids for each of these should contain the type of element-->
+                    {{select_setting(class='form-control', id=select_setting.label)}}
+                    {{render_errors(select_setting)}}
+                </div>
+            </div>
+        {% endfor %}
+
+        <div class="row lead">
+            <div class="col-md-12">
+                Miscellaneous Settings
+            </div>
+        </div>
+
+        {% for string_setting in form.misc_strings %}
+            <div class="row lead">
+                <div class="col-md-12">
+                    {{string_setting.label}}
+                    {{string_setting(class='form-control', id=string_setting.label)}}
+                    {{render_errors(string_setting)}}
+                </div>
+            </div>
+        {% endfor %}
+
+        {% for select_setting in form.misc_selects %}
             <div class="row lead">
                 <div class="col-md-12">
                     {{select_setting.label}}

@@ -18,6 +18,7 @@ CAM_IMAGE_PREFIX = 'cam'
 SECRET_KEY = 'tricap-secret-key'
 RET_ERROR = -1
 RET_OK = 0
+SERVER_LOG_NAME = 'tricap_server_log'
 
 # gphoto2 canon eos 6d configs
 CE6D_CAP_TARGET_MEMORY = 0

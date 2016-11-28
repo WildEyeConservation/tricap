@@ -6,9 +6,15 @@ from wtforms import StringField, SelectField, SubmitField, FieldList
 
 class SettingsForm(Form):
     """The form for the settings page. Contains the three buttons (test, save and revert) and
-    then two FieldLists that must be expanded with the settings read from the config file."""
-    string_settings = FieldList(StringField(), min_entries=0)
-    select_settings = FieldList(SelectField(), min_entries=0)
+    the FieldLists that must be expanded with the settings read from the config file."""
+    
+    misc_strings = FieldList(StringField(), min_entries=0)
+    misc_selects = FieldList(SelectField(), min_entries=0)
+    cam_strings = FieldList(StringField(), min_entries=0)
+    cam_selects = FieldList(SelectField(), min_entries=0)
+    alti_strings = FieldList(StringField(), min_entries=0)
+    alti_selects = FieldList(SelectField(), min_entries=0)
+
     test = SubmitField(label='Test')
     save = SubmitField(label='Save')
     revert = SubmitField(label='Revert')

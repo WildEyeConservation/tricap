@@ -112,7 +112,7 @@ class TricapConfig():
 
     def clear_config(self):
         self._parser.clear()
-        self._parser[SECTION_HEADER] = {}        
+        self._parser[SECTION_HEADER] = {}
 
     def save_config_dict_to_file(self, config_dict, config_fp = None):
         """ Save the values in a config dict to the config file. Note that settings will only be

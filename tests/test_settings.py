@@ -29,17 +29,17 @@ class BaseTestSettings(TestCase):
         app.config['WTF_CSRF_ENABLED'] = False
         return app
 
-    def setUp(self):
-        self.logger = logging.getLogger('test_configure')
-        format_str = "%(asctime)s | %(pathname)s:%(lineno)d | %(funcName)s | %(levelname)s | %(message)s "
-        formatter = logging.Formatter(format_str)
-        log_fp = os.path.join(SERVER_LOG_DIR, 'test_configure.log')
-        handler = logging.FileHandler(filename=log_fp)
-        handler.setLevel(logging.DEBUG)
-        handler.setFormatter(formatter)
-        self.logger.addHandler(handler)
-        self.logger.setLevel(logging.DEBUG)
+    logger = logging.getLogger('test_configure')
+    format_str = "%(asctime)s | %(pathname)s:%(lineno)d | %(funcName)s | %(levelname)s | %(message)s "
+    formatter = logging.Formatter(format_str)
+    log_fp = os.path.join(SERVER_LOG_DIR, 'test_configure.log')
+    handler = logging.FileHandler(filename=log_fp)
+    handler.setLevel(logging.DEBUG)
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)
+    logger.setLevel(logging.DEBUG)
 
+    def setUp(self):
         self.temp_file_count = 0
         self.tempdir = tempfile.mkdtemp()
         self.real_config_fp = CONFIG_FP
@@ -185,7 +185,7 @@ class TestBehaviourSettings(BaseTestSettings):
             with open(temp_fp, 'wb') as temp_html_file:
                 temp_html_file.write(response.data.replace(b'/static', TEST_STATIC_DIR))
 
-            driver = webdriver.Chrome()
+            driver = webdriver.Chrome(executable_path='/usr/lib/chromium-browser/chromedriver')
             driver.get("file:///"+temp_fp)
             wait = WebDriverWait(driver, 10)
             wait.until(EC.visibility_of_element_located((By.ID, "btn_test")))

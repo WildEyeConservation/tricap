@@ -11,17 +11,17 @@ from sensors.cameras import GPhotoCam
 
 
 class TestBaseCanon6DCam(unittest.TestCase):
-    def setUp(self):
-        self.logger = logging.getLogger('test_canon6d_log')
-        format_str = "%(asctime)s | %(pathname)s:%(lineno)d | %(funcName)s | %(levelname)s | %(message)s "
-        formatter = logging.Formatter(format_str)
-        log_fp = os.path.join(SERVER_LOG_DIR, 'test_canon6d.log')
-        handler = logging.FileHandler(filename=log_fp)
-        handler.setLevel(logging.DEBUG)
-        handler.setFormatter(formatter)
-        self.logger.addHandler(handler)
-        self.logger.setLevel(logging.DEBUG)
+    logger = logging.getLogger('test_canon6d_log')
+    format_str = "%(asctime)s | %(pathname)s:%(lineno)d | %(funcName)s | %(levelname)s | %(message)s "
+    formatter = logging.Formatter(format_str)
+    log_fp = os.path.join(SERVER_LOG_DIR, 'test_canon6d.log')
+    handler = logging.FileHandler(filename=log_fp)
+    handler.setLevel(logging.DEBUG)
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)
+    logger.setLevel(logging.DEBUG)
 
+    def setUp(self):
         for name, address in GPhotoCam.autodetect():
             if name == "Canon EOS 6D":
                 self._address = address

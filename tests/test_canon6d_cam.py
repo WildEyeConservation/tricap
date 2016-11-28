@@ -3,7 +3,6 @@
 
 import logging
 import os
-import threading
 import unittest
 from time import sleep
 
@@ -46,16 +45,7 @@ class TestDeviceCanon6DCam(TestBaseCanon6DCam):
 
     def test_capture_func(self):
         cam = GPhotoCam(self._address, self.logger)
-        thread_worker = cam.create_single_capture_func()
-        self.assertEqual(thread_worker(0), RET_OK)
-
-    def test_cap_func_as_thread(self):
-        cam = GPhotoCam(self._address, self.logger)
-        thread = threading.Thread(target=cam.create_single_capture_func(),
-                                  args=[0])
-        thread.start()
-        thread.join()
-        self.assertEqual(cam.state, CAMERA_STATES.INITIALISED)
+        self.assertEqual(cam.capture(0), RET_OK)
 
     def test_setting_iso(self):
         cam = GPhotoCam(self._address, self.logger)
@@ -75,7 +65,7 @@ class TestInteractiveCanon6DCam(TestBaseCanon6DCam):
     def test_cable_remove(self):
         input('Press enter to conduct cable remove test')
         cam = GPhotoCam(self._address, self.logger)
-        thread_worker = cam.create_single_capture_func()
+        thread_worker = cam.capture
         self.assertEqual(cam.state, CAMERA_STATES.INITIALISED)
 
         print('Remove the cable - you have 2 seconds')

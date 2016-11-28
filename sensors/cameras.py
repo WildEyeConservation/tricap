@@ -7,8 +7,6 @@ from config import CE6D_CAP_TARGET_SD_CARD, CE6D_FORMAT_RAW_AND_TINY_JPEG, DISPL
 from .configure import TricapConfig
 
 # TODO currently, we are coding in a mess of C vs C++ styles. Fix this.
-NUM_DUMMY_CAMS = 3
-# TODO this parameter should get read from config
 
 try:
     import gphoto2 as gp
@@ -29,12 +27,21 @@ try:
             self.state = CAMERA_STATES.UNINITIALISED
             self._address = address
             self._initialise_camera()
+            self._fresh_capture = False
+            self._download_fp = None
 
             if self.state == CAMERA_STATES.INITIALISED:
                 self._logger.info('GPhoto Camera %s at address %s successfully initialised'
                                   % (self.serial_num, address))
             else:
                 self._logger.error('GPhoto Camera not successfully initialised')
+
+        def is_cam_image_fresh(self):
+            return self._fresh_capture
+
+        def get_cam_image_fp(self):
+            self._fresh_capture = False
+            return self._download_fp
 
         @staticmethod
         def autodetect():
@@ -243,53 +250,51 @@ try:
 
         # TODO We are not letting the user know there was an error downloading an image, should we?
 
-        def create_single_capture_func(self):
-            def worker(cam_num):
-                if self.state == CAMERA_STATES.INITIALISED:
-                    self.state = CAMERA_STATES.CAPTURING
-                    try:
-                        # capture an image
-                        file_path = gp.check_result(gp.gp_camera_capture(self._gp_camera,
-                                                                         gp.GP_CAPTURE_IMAGE,
-                                                                         GPhotoCam._context))
-                        # prepare the small jpeg filename
-                        img_name, _ = os.path.splitext(file_path.name)
-                        download_fp = os.path.join(DISPLAY_DOWNLOAD_DIR,
-                                                   CAM_IMAGE_PREFIX + str(cam_num) + '.JPG')
-                        if os.path.isfile(download_fp) is True:
-                            os.remove(download_fp)
+        def capture(self, cam_num):
+            if self.state == CAMERA_STATES.INITIALISED:
+                self.state = CAMERA_STATES.CAPTURING
+                try:
+                    # capture an image
+                    file_path = gp.check_result(gp.gp_camera_capture(self._gp_camera,
+                                                                     gp.GP_CAPTURE_IMAGE,
+                                                                     GPhotoCam._context))
+                    # prepare the small jpeg filename
+                    img_name, _ = os.path.splitext(file_path.name)
+                    self._download_fp = os.path.join(DISPLAY_DOWNLOAD_DIR,
+                                                     CAM_IMAGE_PREFIX + str(cam_num) + '.JPG')
+                    if os.path.isfile(download_fp) is True:
+                        os.remove(download_fp)
 
-                        # get the file object
-                        camera_file = gp.check_result(gp.gp_camera_file_get(self._gp_camera,
-                                                                            file_path.folder,
-                                                                            img_name + '.JPG',
-                                                                            gp.GP_FILE_TYPE_NORMAL,
-                                                                            GPhotoCam._context))
-                        # download the image
-                        gp.check_result(gp.gp_file_save(camera_file, download_fp))
+                    # get the file object
+                    camera_file = gp.check_result(gp.gp_camera_file_get(self._gp_camera,
+                                                                        file_path.folder,
+                                                                        img_name + '.JPG',
+                                                                        gp.GP_FILE_TYPE_NORMAL,
+                                                                        GPhotoCam._context))
+                    # download the image
+                    gp.check_result(gp.gp_file_save(camera_file, self._download_fp))
+                    self._fresh_capture = True
 
-                    except gp.GPhoto2Error as ex:
-                        self.state = CAMERA_STATES.ERROR_CAPTURE
-                        self._logger.error('Error capturing image')
-                        self._logger.error('GPhoto2 Error: %d : %s' % (ex.code, ex.string))
+                except gp.GPhoto2Error as ex:
+                    self.state = CAMERA_STATES.ERROR_CAPTURE
+                    self._logger.error('Error capturing image')
+                    self._logger.error('GPhoto2 Error: %d : %s' % (ex.code, ex.string))
 
-                    except Exception:  # Catches most exceptions, except KeyboardInterrupt and SystemExit
-                        self._logger.error(traceback.format_exc())
-                        self.state = CAMERA_STATES.ERROR_CAPTURE
+                except Exception:  # Catches most exceptions, except KeyboardInterrupt and SystemExit
+                    self._logger.error(traceback.format_exc())
+                    self.state = CAMERA_STATES.ERROR_CAPTURE
 
-                    # TODO Not sure if this needs to be exception handled
-                    self._gp_camera.exit(GPhotoCam._context)
+                # TODO Not sure if this needs to be exception handled
+                self._gp_camera.exit(GPhotoCam._context)
 
-                    if self.state == CAMERA_STATES.CAPTURING:
-                        self.state = CAMERA_STATES.INITIALISED
-                        return RET_OK
-                    else:
-                        return RET_ERROR
+                if self.state == CAMERA_STATES.CAPTURING:
+                    self.state = CAMERA_STATES.INITIALISED
+                    return RET_OK
+                else:
+                    return RET_ERROR
 
-                # if the camera had not been initialised (or was in another state)
-                return RET_ERROR
-
-            return worker
+            # if the camera had not been initialised (or was in another state)
+            return RET_ERROR
 
         def get_state_as_string(self):
             return CAM_STATE_STRINGS[self.state]
@@ -298,10 +303,12 @@ try:
     Camera = GPhotoCam
 
 except ImportError:
+    import time
+    from config import DUMMY_IMAGE_PATH, NUM_DUMMY_CAMS
     # No gphoto2 for windows, have to use dummies while working
     # TODO Implement a Windows Canon6DCam, which uses the Canon EDSDK to communicate with the camera
     class DummyCam(object):
-        """ Base class for all camera handlers. Serves as a fake class for testing purposes."""
+        """ Serves as a fake camera for testing purposes."""
 
         @staticmethod
         def autodetect():
@@ -310,10 +317,18 @@ except ImportError:
         def __init__(self, *args):
             self.state = CAMERA_STATES.INITIALISED
             self.serial_num = None
+            self._fresh_capture = False
             self._settings_dict = {'shutterspeed': '1/4', 'iso': '100', 'image_capture_interval': '3.0'}
 
         def reset(self):
             self.state = CAMERA_STATES.INITIALISED
+
+        def is_cam_image_fresh(self):
+            return self._fresh_capture
+
+        def get_cam_image_fp(self):
+            self._fresh_capture = False
+            return DUMMY_IMAGE_PATH
 
         def get_state_as_string(self):
             return "Base Cam has no state."
@@ -337,6 +352,16 @@ except ImportError:
             else:
                 return None
 
+        def capture(cam_num):
+            if self.state == CAMERA_STATES.INITIALISED:
+                self.state = CAMERA_STATES.CAPTURING
+                # prepare the small jpeg filename
+                time.sleep(1)
+                self._fresh_capture = True
+                self.state = CAMERA_STATES.INITIALISED
+                return RET_OK
+            else:
+                return RET_ERROR
 
     Camera = DummyCam
     gp = None

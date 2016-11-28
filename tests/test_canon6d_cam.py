@@ -37,11 +37,11 @@ class TestDeviceCanon6DCam(TestBaseCanon6DCam):
     def test_set_shutter_speed(self):
         cam = GPhotoCam(self._address, self.logger)
 
-        self.assertEqual(cam.set_setting('shutter speed', '1/640'), RET_OK)
-        self.assertEqual(cam.get_setting('shutter speed'), '1/640')
+        self.assertEqual(cam.set_setting('shutterspeed', '1/640'), RET_OK)
+        self.assertEqual(cam.get_setting('shutterspeed'), '1/640')
 
-        self.assertEqual(cam.set_setting('shutter speed', '1/X'), RET_ERROR)
-        self.assertEqual(cam.get_setting('shutter speed'), '1/640')
+        self.assertEqual(cam.set_setting('shutterspeed', '1/X'), RET_ERROR)
+        self.assertEqual(cam.get_setting('shutterspeed'), '1/640')
 
     def test_capture_func(self):
         cam = GPhotoCam(self._address, self.logger)

@@ -17,7 +17,7 @@ try:
 
         _port_info_list = gp.PortInfoList()
         _port_info_list.load()
-        _context = gp.context()
+        _context = gp.Context()
 
         def __init__(self, address, logger):
 
@@ -45,7 +45,7 @@ try:
 
         @staticmethod
         def autodetect():
-            return gp.context.camera_autodetect()
+            return GPhotoCam._context.camera_autodetect()
 
         def _setup_camera(self, address):
             self._gp_camera = gp.Camera()
@@ -262,8 +262,8 @@ try:
                     img_name, _ = os.path.splitext(file_path.name)
                     self._download_fp = os.path.join(DISPLAY_DOWNLOAD_DIR,
                                                      CAM_IMAGE_PREFIX + str(cam_num) + '.JPG')
-                    if os.path.isfile(download_fp) is True:
-                        os.remove(download_fp)
+                    if os.path.isfile(self._download_fp) is True:
+                        os.remove(self._download_fp)
 
                     # get the file object
                     camera_file = gp.check_result(gp.gp_camera_file_get(self._gp_camera,

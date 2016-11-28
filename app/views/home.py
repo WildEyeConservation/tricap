@@ -8,6 +8,7 @@ from flask import send_file
 from app import tricap_manager, tricap_cameras, image_manager, altimeter, session_logger
 
 from config import BUTTON_CODES
+import io
 
 home_bp = Blueprint('home', __name__)
 
@@ -64,12 +65,14 @@ def provide_alti_data():
 @home_bp.route('/cam_img<cam_num_str>')
 def serve_cam_img(cam_num_str):
     print('serving cam img ' + cam_num_str)
-    cam_img_fp = image_manager.get_cam_image_fp(int(cam_num_str))
+    # cam_img_fp = image_manager.get_cam_image_fp(int(cam_num_str))
+    #
+    # if cam_img_fp is None:
+    #     cam_img_fp = os.path.join(current_app.root_path, 'static', 'img', 'default.jpg')
 
-    if cam_img_fp is None:
-        cam_img_fp = os.path.join(current_app.root_path, 'static', 'img', 'default.jpg')
+    return send_file(io.BytesIO(tricap_manager.get_data(int(cam_num_str))), attachment_filename='image.jpg',
+                     as_attachment=True)
 
-    return send_file(cam_img_fp, attachment_filename='image.bmp', as_attachment=True)
 
 
 @home_bp.route('/_button_click')

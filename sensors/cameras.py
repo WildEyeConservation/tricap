@@ -29,12 +29,14 @@ try:
             self._initialise_camera()
             self._fresh_capture = False
             self._download_fp = None
+            self.data = None
 
             if self.state == CAMERA_STATES.INITIALISED:
                 self._logger.info('GPhoto Camera %s at address %s successfully initialised'
                                   % (self.serial_num, address))
             else:
                 self._logger.error('GPhoto Camera not successfully initialised')
+
 
         def is_cam_image_fresh(self):
             return self._fresh_capture
@@ -247,6 +249,37 @@ try:
                     choices = self._get_list_of_valid_config_choices(config, config_str, critical=False)
 
             return choices
+
+        def capture_to_mem(self):
+            if self.state == CAMERA_STATES.INITIALISED:
+                self.state = CAMERA_STATES.CAPTURING
+                try:
+                    # capture an image
+                    file_path = gp.check_result(gp.gp_camera_capture(self._gp_camera,
+                                                                     gp.GP_CAPTURE_IMAGE,
+                                                                     GPhotoCam._context))
+                    # prepare the small jpeg filename
+                    img_name, _ = os.path.splitext(file_path.name)
+
+                    # get the file object
+                    camera_file = gp.check_result(gp.gp_camera_file_get(self._gp_camera,
+                                                                        file_path.folder,
+                                                                        img_name + '.JPG',
+                                                                        gp.GP_FILE_TYPE_NORMAL,
+                                                                        GPhotoCam._context))
+                    file_data = camera_file.get_data_and_size()
+                    self.data = memoryview(
+                        file_data).tobytes()  # Make a copy, so that we can release the file_data object
+                    self._fresh_capture = True
+                except gp.GPhoto2Error as ex:
+                    self.state = CAMERA_STATES.ERROR_CAPTURE
+                    self._logger.error('Error capturing image')
+                    self._logger.error('GPhoto2 Error: %d : %s' % (ex.code, ex.string))
+                    self._logger.error("capture failed.", exc_info=True)
+                    self.state = CAMERA_STATES.ERROR_CAPTURE
+                    return RET_ERROR
+            self.state = CAMERA_STATES.INITIALISED
+            return RET_OK
 
         # TODO We are not letting the user know there was an error downloading an image, should we?
 

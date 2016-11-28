@@ -57,6 +57,9 @@ class TriCapCamsManager(object):
     def is_cam_image_fresh(self, cam_num):
         return self._cameras[cam_num].is_cam_image_fresh()
 
+    def get_data(self, cam_num):
+        return self._cameras[cam_num].data
+
     def get_cam_image_fp(self, cam_num):
         return self._cameras[cam_num].get_cam_image_fp()
 
@@ -89,8 +92,7 @@ class TriCapCamsManager(object):
 
     def _cap_thread_generator(self):
         for index, cam in enumerate(self._cameras):
-            thread = threading.Thread(target=cam.capture,
-                                      args=[index])
+            thread = threading.Thread(target=cam.capture_to_mem)
             yield thread
 
     def _start_capture_with_wait_thread(self):

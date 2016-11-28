@@ -262,8 +262,8 @@ try:
                     img_name, _ = os.path.splitext(file_path.name)
                     self._download_fp = os.path.join(DISPLAY_DOWNLOAD_DIR,
                                                      CAM_IMAGE_PREFIX + str(cam_num) + '.JPG')
-                    if os.path.isfile(download_fp) is True:
-                        os.remove(download_fp)
+                    if os.path.isfile(self._download_fp) is True:
+                        os.remove(self._download_fp)
 
                     # get the file object
                     camera_file = gp.check_result(gp.gp_camera_file_get(self._gp_camera,
@@ -352,7 +352,7 @@ except ImportError:
             else:
                 return None
 
-        def capture(cam_num):
+        def capture(self, cam_num):
             if self.state == CAMERA_STATES.INITIALISED:
                 self.state = CAMERA_STATES.CAPTURING
                 # prepare the small jpeg filename

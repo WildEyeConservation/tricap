@@ -1,10 +1,9 @@
 # coding=utf-8
-import os
 import logging
 import threading
 
-from config import CAM_IMAGE_PREFIX, CAM_STATE_STRINGS, RET_ERROR, RET_OK, CAMERA_STATES
-from config import CE6D_CAP_TARGET_SD_CARD, CE6D_FORMAT_RAW, CE6D_FORMAT_RAW_AND_TINY_JPEG, DISPLAY_DOWNLOAD_DIR
+from config import CAM_STATE_STRINGS, RET_ERROR, RET_OK, CAMERA_STATES
+from config import CE6D_CAP_TARGET_SD_CARD, CE6D_FORMAT_RAW
 from .configure import TricapConfig
 
 # TODO currently, we are coding in a mess of C vs C++ styles. Fix this.
@@ -27,7 +26,7 @@ try:
 
             self.state = CAMERA_STATES.UNINITIALISED
             self._address = address
-            self._initialise_camera()
+            self._setup_camera()
             self._fresh_capture = False
             self._download_fp = None
             self.data = None
@@ -35,8 +34,6 @@ try:
             if self.state == CAMERA_STATES.INITIALISED:
                 self._logger.info('GPhoto Camera %s at address %s successfully initialised'
                                   % (self.serial_num, address))
-            else:
-                self._logger.error('GPhoto Camera not successfully initialised')
 
         def is_cam_image_fresh(self):
             return self._fresh_capture
@@ -49,9 +46,12 @@ try:
         def autodetect():
             return GPhotoCam._context.camera_autodetect()
 
-        def _setup_camera(self, address):
+        def _setup_camera(self):
+            # In case this is a re-setup. Make sure our previous gp_camera handle gets destroyed.
+            if self._gp_camera:
+                del self._gp_camera
             self._gp_camera = gp.Camera()
-            port_info = GPhotoCam._port_info_list[GPhotoCam._port_info_list.lookup_path(address)]
+            port_info = GPhotoCam._port_info_list[GPhotoCam._port_info_list.lookup_path(self._address)]
             self._gp_camera.set_port_info(port_info)
             self._gp_camera.init(GPhotoCam._context)
             # Do not catch exceptions here. Camera init is mission critical. If camera initialisation fails, we want top
@@ -61,168 +61,68 @@ try:
             # get configuration tree
             gp_config = self._gp_camera.get_config(GPhotoCam._context)
 
-            ret_val = 0
-            ret_val += self._set_config_value(gp_config, 'capturetarget', CE6D_CAP_TARGET_SD_CARD)
-            ret_val += self._set_config_value_by_string(gp_config, 'shutterspeed',
-                                                        init_configs.get('shutterspeed'))
-            ret_val += self._set_config_value_by_string(gp_config, 'iso', init_configs.get('iso'))
-            ret_val += self._set_config_value(gp_config, 'imageformat', CE6D_FORMAT_RAW)
-            ret_val += self._obtain_serial_num(gp_config)
-
-            return ret_val
-
-        def _initialise_camera(self):
-            ret_val = self._setup_camera(self._address)
-
-            if ret_val == 0:
-                self.state = CAMERA_STATES.INITIALISED
-            else:
-                self.state = CAMERA_STATES.ERROR_CONFIG
+            self._set_config_value(gp_config, 'capturetarget', CE6D_CAP_TARGET_SD_CARD)
+            self._set_config_value_by_string(gp_config, 'shutterspeed', init_configs.get('shutterspeed'))
+            self._set_config_value_by_string(gp_config, 'iso', init_configs.get('iso'))
+            self._set_config_value(gp_config, 'imageformat', CE6D_FORMAT_RAW)
+            self._obtain_serial_num(gp_config)
+            self.state = CAMERA_STATES.INITIALISED
 
         # TODO The naming convention for configs and settings is a mess. Sort it out
-
-        def _get_list_of_valid_config_names(self, config, critical=True):
+        def _get_list_of_valid_config_names(self, config):
             config_names = []
-            try:
-                for child in [config.get_child(index) for index in range(config.count_children())]:
-                    config_name = child.get_name()
-                    if config_name:
-                        config_names.append(config_name)
-                    grandchildren_names = self._get_list_of_valid_config_names(child)
-                    config_names += grandchildren_names
-
-            except gp.GPhoto2Error as ex:
-                self._logger.error('Error getting list of camera config names')
-                self._logger.error('GPhoto2 Error: %d : %s' % (ex.code, ex.string))
-                if critical is True:
-                    self.state = CAMERA_STATES.ERROR_CONFIG
-                return None
-            except Exception:
-                self._logger.error("_get_list_of_valid_config_names failed.", exc_info=True)
-                return None
-
+            for child in [config.get_child(index) for index in range(config.count_children())]:
+                config_name = child.get_name()
+                if config_name:
+                    config_names.append(config_name)
+                grandchildren_names = self._get_list_of_valid_config_names(child)
+                config_names += grandchildren_names
             return config_names
 
-        # TODO Correctly handle whether not being able to set/get a config is critical or not
-        def _get_list_of_valid_config_choices(self, config, config_str, critical=True):
+        def _get_list_of_valid_config_choices(self, config, config_str):
             config_choices = []
-            try:
-                config_widget = config.get_child_by_name(config_str)
-                for choice in [config_widget.get_choice(i) for i in range(config_widget.count_choices())]:
-                    if choice:
-                        config_choices.append(choice)
-            except gp.GPhoto2Error as ex:
-                self._logger.error('Error getting list of choices for %s' % config_str)
-                self._logger.error('GPhoto2 Error: %d : %s' % (ex.code, ex.string))
-                if critical is True:
-                    self.state = CAMERA_STATES.ERROR_CONFIG
-                return None
-
-            except Exception:
-                self._logger.error("_get_list_of_valid_config_choices failed.", exc_info=True)
-                return None
-
+            config_widget = config.get_child_by_name(config_str)
+            for choice in [config_widget.get_choice(i) for i in range(config_widget.count_choices())]:
+                if choice:
+                    config_choices.append(choice)
             return config_choices
 
-        def _set_config_value_by_string(self, config, config_str, val_string, critical=True):
-            valid_choices = self._get_list_of_valid_config_choices(config, config_str, critical=critical)
-            if valid_choices is None:
-                return RET_ERROR
+        def _set_config_value_by_string(self, config, config_str, val_str):
+            valid_choices = self._get_list_of_valid_config_choices(config, config_str)
+            self._set_config_value(config, config_str, valid_choices.index(val_str))
 
-            if val_string in valid_choices:
-                return self._set_config_value(config, config_str, valid_choices.index(val_string),
-                                              critical=critical)
-            else:
-                return RET_ERROR
-
-        def _set_config_value(self, config, config_str, config_value, critical=True):
-            try:
-                # find the capture target config item
-                config_widget = config.get_child_by_name(config_str)
-                # get the value bit
-                value = config_widget.get_choice(config_value)
-                # set the value
-                config_widget.set_value(value)
-                # set the widget back to the config tree
-                self._gp_camera.set_config(config, GPhotoCam._context)
-
-            except gp.GPhoto2Error as ex:
-                self._logger.error('Error setting value %s for config %s' % (config_value, config_str))
-                self._logger.error('GPhoto2 Error: %d : %s' % (ex.code, ex.string))
-                if critical is True:
-                    self.state = CAMERA_STATES.ERROR_CONFIG
-                return RET_ERROR
-
-            except Exception:
-                self._logger.error("_set_config_value failed.", exc_info=True)
-                return RET_ERROR
-
+        def _set_config_value(self, config, config_str, config_value):
+            # find the capture target config item
+            config_widget = config.get_child_by_name(config_str)
+            # get the value bit
+            value = config_widget.get_choice(config_value)
+            # set the value
+            config_widget.set_value(value)
+            # set the widget back to the config tree
+            self._gp_camera.set_config(config, GPhotoCam._context)
             self._logger.debug('Successfully set %s on camera.' % config_str)
 
-            return RET_OK
+        def _get_config_value(self, config_str):
+            return self._gp_camera.get_config(GPhotoCam._context).get_child_by_name(config_str).get_value()
 
-        def _get_config_value(self, config_str, critical=True):
-            # get configuration tree
-            config = self._gp_camera.get_config(GPhotoCam._context)
-
-            try:
-                config_widget = config.get_child_by_name(config_str)
-                value = config_widget.get_value()
-            except gp.GPhoto2Error as ex:
-                self._logger.error('Error getting config value for %s' % config_str)
-                self._logger.error('GPhoto2 Error: %d : %s' % (ex.code, ex.string))
-                if critical is True:
-                    self.state = CAMERA_STATES.ERROR_CONFIG
-                return None
-
-            except Exception:  # Catches most exceptions, except KeyboardInterrupt and SystemExit
-                self._logger.error("_get_config_value failed.", exc_info=True)
-                return None
-
-            return value
-
+        # TODO : make serial number a read-only property
         def _obtain_serial_num(self, config):
-            # get serial number
-            try:
-                eossernum_config = config.get_child_by_name('eosserialnumber')
-                eossernum = eossernum_config.get_value()
-            except gp.GPhoto2Error as ex:
-                self._logger.error('GPhoto2 Error: %d : %s' % (ex.code, ex.string))
-                self.state = CAMERA_STATES.ERROR_CONFIG
-                return RET_ERROR
-
-            except Exception:  # Catches most exceptions, except KeyboardInterrupt and SystemExit
-                self._logger.error("_obtain_serial_num failed.", exc_info=True)
-                return RET_ERROR
-
-            self._logger.info('Successfully retrieved camera serial number %s' % eossernum)
-
-            self.serial_num = eossernum
-
-            return RET_OK
+            self.serial_num = config.get_child_by_name('eosserialnumber').get_value()
+            self._logger.info('Successfully retrieved camera serial number %s' % self.serial_num)
 
         def reset(self):
             self.state = CAMERA_STATES.UNINITIALISED
-            self._initialise_camera()
+            self._setup_camera()
 
         def set_setting(self, setting_str, val_str):
-            try:
-                config = self._gp_camera.get_config(GPhotoCam._context)
-            except gp.GPhoto2Error as ex:
-                self._logger.error('GPhoto2 Error: %d : %s' % (ex.code, ex.string))
-                return RET_ERROR
-
-            except Exception:  # Catches most exceptions, except KeyboardInterrupt and SystemExit
-                self._logger.error(traceback.format_exc())
-                return RET_ERROR
-
-            return self._set_config_value_by_string(config, setting_str, val_str, critical=False)
+            config = self._gp_camera.get_config(GPhotoCam._context)
+            self._set_config_value_by_string(config, setting_str, val_str)
 
         def get_setting(self, setting_str):
             """ This external method is used to get settings from the Cannon EOS 6D using gphoto2. If
                 the setting does not exist, then the method returns None. The underlying
                 self._get_config_value records an error though. """
-            return self._get_config_value(setting_str, critical=False)
+            return self._get_config_value(setting_str)
 
         def get_choices_for_setting(self, config_str):
             """ External method for getting the choices. If there are any errors (like the config does
@@ -231,93 +131,32 @@ try:
             choices = None
 
             config = self._gp_camera.get_config(GPhotoCam._context)
-            valid_config_names = self._get_list_of_valid_config_names(config, critical=False)
+            valid_config_names = self._get_list_of_valid_config_names(config)
             if valid_config_names is not None and len(valid_config_names) > 0:
                 if config_str in valid_config_names:
-                    choices = self._get_list_of_valid_config_choices(config, config_str, critical=False)
+                    choices = self._get_list_of_valid_config_choices(config, config_str)
 
             return choices
 
-        def capture_to_mem(self, barrier: threading.Barrier = None):
-            if self.state == CAMERA_STATES.INITIALISED:
+        def capture(self, singleShot=True, barrier: threading.Barrier = None):
+            while True:
                 self.state = CAMERA_STATES.CAPTURING
-                try:
-                    # capture an image
-                    if barrier:
-                        barrier.wait()
-                    file_path = self._gp_camera.capture(gp.GP_CAPTURE_IMAGE, GPhotoCam._context)
-                    # prepare the small jpeg filename
-                    # img_name, _ = os.path.splitext(file_path.name)
-                    # # get the file object
-                    camera_file = self._gp_camera.file_get(file_path.folder, file_path.name, gp.GP_FILE_TYPE_PREVIEW,
-                                                           GPhotoCam._context)
-
-                    # camera_file = self._gp_camera.file_get(file_path.folder, img_name + '.JPG', gp.GP_FILE_TYPE_NORMAL,
-                    #                                        GPhotoCam._context)
-                    file_data = camera_file.get_data_and_size()
-                    # # Make a copy, so that we can release the file_data object
-                    self.data = memoryview(file_data).tobytes()
-                    self._fresh_capture = True
-                    del camera_file
-                except gp.GPhoto2Error as ex:
-                    self._logger.error('Error capturing image')
-                    self._logger.error('GPhoto2 Error: %d : %s' % (ex.code, ex.string))
-                    self._logger.error("capture failed.", exc_info=True)
-                    self.state = CAMERA_STATES.ERROR_CAPTURE
-                    return RET_ERROR
-
-            # gp.gp_filesystem_reset()
-            # self._gp_camera.exit(GPhotoCam._context)
-            self.state = CAMERA_STATES.INITIALISED
-            return RET_OK
-
-        # TODO We are not letting the user know there was an error downloading an image, should we?
-
-        def capture(self, cam_num):
-            if self.state == CAMERA_STATES.INITIALISED:
-                self.state = CAMERA_STATES.CAPTURING
-                try:
-                    # capture an image
-                    file_path = self._gp_camera.capture(gp.GP_CAPTURE_IMAGE, GPhotoCam._context)
-                    # prepare the small jpeg filename
-
-                    img_name, _ = os.path.splitext(file_path.name)
-                    self._download_fp = os.path.join(DISPLAY_DOWNLOAD_DIR,
-                                                     CAM_IMAGE_PREFIX + str(cam_num) + '.JPG')
-                    if os.path.isfile(self._download_fp) is True:
-                        os.remove(self._download_fp)
-
-                    # get the file object
-                    camera_file = self._gp_camera.file_get(file_path.folder, file_path.name, gp.GP_FILE_TYPE_NORMAL,
-                                                           GPhotoCam._context)
-                    # download the image
-                    camera_file.save(self._download_fp)
-                    self._fresh_capture = True
-
-                except gp.GPhoto2Error as ex:
-                    self.state = CAMERA_STATES.ERROR_CAPTURE
-                    self._logger.error('Error capturing image')
-                    self._logger.error('GPhoto2 Error: %d : %s' % (ex.code, ex.string))
-
-                except Exception:  # Catches most exceptions, except KeyboardInterrupt and SystemExit
-                    self._logger.error("capture failed.", exc_info=True)
-                    self.state = CAMERA_STATES.ERROR_CAPTURE
-
-                # TODO Not sure if this needs to be exception handled
-                self._gp_camera.exit(GPhotoCam._context)
-
-                if self.state == CAMERA_STATES.CAPTURING:
-                    self.state = CAMERA_STATES.INITIALISED
-                    return RET_OK
-                else:
-                    return RET_ERROR
-
-            # if the camera had not been initialised (or was in another state)
-            return RET_ERROR
+                if barrier:
+                    barrier.wait()
+                file_path = self._gp_camera.capture(gp.GP_CAPTURE_IMAGE, GPhotoCam._context)
+                camera_file = self._gp_camera.file_get(file_path.folder, file_path.name, gp.GP_FILE_TYPE_PREVIEW,
+                                                       GPhotoCam._context)
+                file_data = camera_file.get_data_and_size()
+                # # Make a copy, so that we can release the file_data object
+                self.data = memoryview(file_data).tobytes()
+                self._fresh_capture = True
+                del camera_file
+                self.state = CAMERA_STATES.INITIALISED
+                if singleShot:
+                    return self.data
 
         def get_state_as_string(self):
             return CAM_STATE_STRINGS[self.state]
-
 
     Camera = GPhotoCam
 
@@ -374,7 +213,7 @@ except ImportError:
             else:
                 return None
 
-        def capture(self, cam_num):
+        def capture(self):
             if self.state == CAMERA_STATES.INITIALISED:
                 self.state = CAMERA_STATES.CAPTURING
                 # prepare the small jpeg filename
@@ -384,7 +223,6 @@ except ImportError:
                 return RET_OK
             else:
                 return RET_ERROR
-
 
     Camera = DummyCam
     gp = None

@@ -6,6 +6,8 @@ from time import sleep
 
 import threading
 
+from .configure import TricapConfig
+
 from config import ALTIMETER_STATE, RET_OK, RET_ERROR, ALTI_STATE_STRINGS
 import logging
 
@@ -39,9 +41,16 @@ class TrusenseAltimeter(object):
     def __init__(self, data_logger, supported_devices={(1659, 8963)}):
         # SETTINGS
         # default values
-        self._measurement_timeout = 2
-        self._num_frames_to_avg = 2
+        self._measurement_timeout = -1
+        self._num_frames_to_avg = -1
         self._setting_strings = ['measurement_timeout', 'num_frames_to_avg']
+
+        # Read the alti values from the initial.cfg file
+        init_configs = TricapConfig()
+        section_dict = init_configs.get_section_dict(TricapConfig.ALTI_SECTION_HEADER)
+        for key in section_dict:
+            self.set_setting(key, section_dict[key], reconfigure=False)
+
         self._data_logger = data_logger
         self.state = ALTIMETER_STATE.NOT_CONNECTED
         self._kill_pill = None
@@ -89,7 +98,7 @@ class TrusenseAltimeter(object):
                 ret_val = self._num_frames_to_avg
         return ret_val
 
-    def set_setting(self, setting_str, val_str):
+    def set_setting(self, setting_str, val_str, reconfigure=True):
         try:
             if setting_str in self._setting_strings:
                 if setting_str == 'measurement_timeout':
@@ -106,7 +115,7 @@ class TrusenseAltimeter(object):
         # implement the changed settings
         # TODO Need to decide how the altimeter should distinguish between test mode and an actual
         #  error
-        if self._ser is not None:
+        if reconfigure and self._ser is not None:
             self._configure()
 
         return RET_OK
@@ -141,7 +150,7 @@ class TrusenseAltimeter(object):
         if self.state == ALTIMETER_STATE.MEASURING:
             self.stop_measuring()
 
-        self.__init__(self._logger, self._data_logger)
+        self.__init__(self._data_logger)
 
     def get_state_as_string(self):
         return ALTI_STATE_STRINGS[self.state]

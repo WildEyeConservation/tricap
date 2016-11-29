@@ -65,16 +65,17 @@ try:
             # get configuration tree
             gp_config = gp.check_result(gp.gp_camera_get_config(self._gp_camera, GPhotoCam._context))
 
-            # TODO Read all the TricapConfig values from the initial.cfg file, not just these
-
             ret_val = 0
+
+            # Set the Hard Coded Values
             ret_val += self._set_config_value(gp_config, 'capturetarget', CE6D_CAP_TARGET_SD_CARD)
-            ret_val += self._set_config_value_by_string(gp_config, 'shutterspeed',
-                                                        init_configs.get('shutterspeed',
-                                                        TricapConfig.CAMERA_SECTION_HEADER))
-            ret_val += self._set_config_value_by_string(gp_config, 'iso',
-                                    init_configs.get('iso', TricapConfig.CAMERA_SECTION_HEADER))
             ret_val += self._set_config_value(gp_config, 'imageformat', CE6D_FORMAT_RAW_AND_TINY_JPEG)
+
+            # Read the camera values from the initial.cfg file
+            section_dict = init_configs.get_section_dict(TricapConfig.CAMERA_SECTION_HEADER)
+            for key in section_dict:
+                ret_val += self._set_config_value_by_string(gp_config, key, section_dict[key])
+
             ret_val += self._obtain_serial_num(gp_config)
 
             return ret_val

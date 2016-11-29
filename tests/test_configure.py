@@ -5,6 +5,8 @@ import os
 import shutil
 import tempfile
 import unittest
+import pdb
+import configparser
 
 from config import CONFIG_FP, SERVER_LOG_DIR, RET_OK
 from sensors.configure import TricapConfig
@@ -45,13 +47,19 @@ class TestConfigure(TestBaseConfigure):
         config = TricapConfig()
         self.assertEqual(config.is_ready(), True)
 
+    def test_bad_config_fp(self):
+        """ Tests whether the correct error behaviour is obtained when something goes wrong with
+            reading the config file. Which in this case, is to throw an exception."""
+        with self.assertRaises(Exception):
+            TricapConfig(config_fp_to_read='/I/Dont/Exist.cfg')
+
     def test_value_getting(self):
         config = TricapConfig()
 
         # get the values manually
         with open(CONFIG_FP) as config_file:
             for line in config_file:
-                if ':' in line:
+                if ':' in line or '=' in line:
                     parts = line.split(':')
                     if parts[0].strip() == 'shutterspeed':
                         ss_string = parts[1].strip()

@@ -2,6 +2,7 @@
 
 import configparser
 import logging
+import pdb
 
 from config import CONFIG_FP, RET_OK, RET_ERROR
 
@@ -32,9 +33,9 @@ class TricapConfig:
         self._ready_flag = False
 
         try:
-            self._parser.read(self._config_fp)
+            self._parser.read_file(open(self._config_fp))
             self._ready_flag = True
-        except configparser.Error as ex:
+        except (configparser.Error, IOError, OSError) as ex:
             self._logger.error('Error reading from config file %s', self._config_fp)
             self._logger.error('configparser exception: %s', ex.args)
             # If there is an error reading from the config file, the system should fall over

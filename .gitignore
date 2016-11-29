@@ -27,3 +27,4 @@ local_paths.py
 init_config.txt
 initial.cfg
 pylintrc
+test_local.py

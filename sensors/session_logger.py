@@ -3,7 +3,7 @@ import os
 import shutil
 import time
 
-from config import SESSION_ROOT_DIR, CONFIG_FP
+from config import SESSION_ROOT_DIR, CONFIG_FP, RET_OK
 
 """ D Joubert - Innoventix Consulting - 18 November 2016 - session_logger.py
     Logger for data, to be used for importing the data into the larger system """
@@ -43,6 +43,7 @@ class SessionLogger:
 
     def set_description(self, description):
         self._description = description
+        return RET_OK
 
     def get_description(self):
         return self._description

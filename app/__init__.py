@@ -18,7 +18,7 @@ from sensors.session_logger import SessionLogger
 
 from config import SERVER_LOG_DIR
 
-# Set up logger
+# Set up rotating log file
 format_str = "%(asctime)s | %(pathname)s:%(lineno)d | %(funcName)s | %(levelname)s | %(message)s "
 formatter = logging.Formatter(format_str)
 log_fp = os.path.join(SERVER_LOG_DIR, 'tricap_server.log')

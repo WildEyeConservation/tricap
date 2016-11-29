@@ -14,6 +14,7 @@ import logging
 from config import CAM_MANAGER_STATES, DEFAULT_IMAGE_CAPTURE_INTERVAL
 from config import RET_OK, RET_ERROR
 from .cameras import Camera
+from .configure import TricapConfig
 
 
 class TriCapCamsManager(object):
@@ -43,8 +44,9 @@ class TriCapCamsManager(object):
         self._cam_threads = []
         self._capture_thread = None
 
-        # TODO This should be read from the init config file
-        self._image_capture_interval = DEFAULT_IMAGE_CAPTURE_INTERVAL
+        init_config = TricapConfig()
+        self._image_capture_interval = init_config.get('image_capture_interval',
+                                                       TricapConfig.MISC_SECTION_HEADER)
 
     def set_image_capture_interval(self, interval):
         if isinstance(interval, str):
@@ -153,9 +155,9 @@ class TriCapCamsManager(object):
         return choices
 
     def get_setting(self, setting_str):
-        # TODO I don't like throwing an exception for every value that is not from the camera
+        # TODO Document: All gets and sets should operate on strings
         if setting_str == 'image_capture_interval':
-            return self._image_capture_interval
+            return str(self._image_capture_interval)
         return self._cameras[0].get_setting(setting_str)
 
     def set_setting(self, setting_str, val_str):

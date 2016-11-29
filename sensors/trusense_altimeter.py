@@ -6,6 +6,8 @@ from time import sleep
 
 import threading
 
+from .configure import TricapConfig
+
 from config import ALTIMETER_STATE, RET_OK, RET_ERROR, ALTI_STATE_STRINGS
 import logging
 
@@ -39,14 +41,23 @@ class TrusenseAltimeter(object):
     def __init__(self, data_logger, supported_devices={(1659, 8963)}):
         # SETTINGS
         # default values
-        self._measurement_timeout = 2
-        self._num_frames_to_avg = 2
-        self._setting_strings = ['alti_measurement_timeout', 'alti_num_frames_to_avg']
+        self._measurement_timeout = -1
+        self._num_frames_to_avg = -1
+        self._setting_strings = ['measurement_timeout', 'num_frames_to_avg']
+
+        # Read the alti values from the initial.cfg file
+        init_configs = TricapConfig()
+        section_dict = init_configs.get_section_dict(TricapConfig.ALTI_SECTION_HEADER)
+        for key in section_dict:
+            self.set_setting(key, section_dict[key], reconfigure=False)
+
         self._data_logger = data_logger
         self.state = ALTIMETER_STATE.NOT_CONNECTED
         self._kill_pill = None
         self._read_thread = None
-        self.measurement = None
+        self.measurement = -1
+
+        self._ser = None # set this to None if something goes wrong with getting the Serial object
 
         try:
             self._ser = serial.Serial(port=self._get_correct_port_name(supported_devices),
@@ -74,22 +85,25 @@ class TrusenseAltimeter(object):
         # Check for the okay signal
         self._check_ok('Alti did not send OK on startup')
 
-    def get_setting(self, setting_str):
+    def get_choices_for_setting(self, setting_str):
+        return None
+
+    def get_setting(self,setting_str):
         ret_val = None
         # self._setting_strings = ['alti_measurement_timeout', 'alti_num_frames_to_avg']
         if setting_str in self._setting_strings:
-            if setting_str == 'alti_measurement_timeout':
+            if setting_str == 'measurement_timeout':
                 ret_val = self._measurement_timeout
-            elif setting_str == 'alti_num_frames_to_avg':
+            elif setting_str == 'num_frames_to_avg':
                 ret_val = self._num_frames_to_avg
         return ret_val
 
-    def set_setting(self, setting_str, val_str):
+    def set_setting(self, setting_str, val_str, reconfigure=True):
         try:
             if setting_str in self._setting_strings:
-                if setting_str == 'alti_measurement_timeout':
+                if setting_str == 'measurement_timeout':
                     self._measurement_timeout = int(val_str)
-                elif setting_str == 'alti_num_frames_to_avg':
+                elif setting_str == 'num_frames_to_avg':
                     self._num_frames_to_avg = int(val_str)
             else:
                 return RET_ERROR
@@ -99,7 +113,10 @@ class TrusenseAltimeter(object):
             return RET_ERROR
 
         # implement the changed settings
-        self._configure()
+        # TODO Need to decide how the altimeter should distinguish between test mode and an actual
+        #  error
+        if reconfigure and self._ser is not None:
+            self._configure()
 
         return RET_OK
 
@@ -133,7 +150,7 @@ class TrusenseAltimeter(object):
         if self.state == ALTIMETER_STATE.MEASURING:
             self.stop_measuring()
 
-        self.__init__(self._logger, self._data_logger)
+        self.__init__(self._data_logger)
 
     def get_state_as_string(self):
         return ALTI_STATE_STRINGS[self.state]
@@ -142,7 +159,11 @@ class TrusenseAltimeter(object):
         return str(self.measurement)
 
     def disconnect(self):
-        assert self._ser.is_open, 'Trying to close already closed alti serial port'
+        # Not using the assert, wan't to be able to test the interface even if the alti is not
+        #  connected
+        if self._ser is None or self._ser.is_open is False:
+            return RET_ERROR
+        # assert self._ser.is_open, 'Trying to close already closed alti serial port'
 
         try:
             self._ser.close()
@@ -182,6 +203,15 @@ class TrusenseAltimeter(object):
             return RET_ERROR
 
     def stop_measuring(self):
+        # Not using asserts, need to have this not fall over when testing the GUI
+        if self._ser is None or self._ser.is_open is False:
+            return RET_ERROR
+
+        if self.state != ALTIMETER_STATE.MEASURING:
+            return RET_ERROR
+
+        # assert self._ser.is_open
+        # assert self.state == ALTIMETER_STATE.MEASURING
         try:
             self._kill_pill.set()
             self._read_thread.join()

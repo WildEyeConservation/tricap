@@ -1,4 +1,7 @@
-""" D Joubert 16 November 2016 - Unit Tests For TriCap"""
+""" D Joubert 16 November 2016 - Unit Tests For TriCap
+    These unit tests do not instantiate a Flask WebServer, tests the sensors (and other components)
+    separately from the webserver.
+"""
 
 import unittest
 

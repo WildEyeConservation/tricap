@@ -61,12 +61,27 @@ try:
             # get configuration tree
             gp_config = self._gp_camera.get_config(GPhotoCam._context)
 
+            # Set the Hard Coded Values
             self._set_config_value(gp_config, 'capturetarget', CE6D_CAP_TARGET_SD_CARD)
-            self._set_config_value_by_string(gp_config, 'shutterspeed', init_configs.get('shutterspeed'))
-            self._set_config_value_by_string(gp_config, 'iso', init_configs.get('iso'))
-            self._set_config_value(gp_config, 'imageformat', CE6D_FORMAT_RAW)
-            self._obtain_serial_num(gp_config)
+            self._set_config_value(gp_config, 'imageformat', CE6D_FORMAT_RAW_AND_TINY_JPEG)
+
+            # Read the camera values from the initial.cfg file
+            section_dict = init_configs.get_section_dict(TricapConfig.CAMERA_SECTION_HEADER)
+            for key in section_dict:
+                self._set_config_value_by_string(gp_config, key, section_dict[key])
+
             self.state = CAMERA_STATES.INITIALISED
+            self._obtain_serial_num(gp_config)
+
+            return ret_val
+
+        def _initialise_camera(self):
+            ret_val = self._setup_camera(self._address)
+
+            if ret_val == 0:
+                self.state = CAMERA_STATES.INITIALISED
+            else:
+                self.state = CAMERA_STATES.ERROR_CONFIG
 
         # TODO The naming convention for configs and settings is a mess. Sort it out
         def _get_list_of_valid_config_names(self, config):
@@ -165,7 +180,7 @@ except ImportError:
     from config import DUMMY_IMAGE_PATH, NUM_DUMMY_CAMS
     # No gphoto2 for windows, have to use dummies while working
     # TODO Implement a Windows Canon6DCam, which uses the Canon EDSDK to communicate with the camera
-
+    # TODO Have the DummyCam load variables from the config file, like the normal camera would
     class DummyCam(object):
         """ Serves as a fake camera for testing purposes."""
 
@@ -173,11 +188,13 @@ except ImportError:
         def autodetect():
             return [("Dummy Cam", i) for i in range(0, NUM_DUMMY_CAMS)]
 
-        def __init__(self):
+        def __init__(self, address):
             self.state = CAMERA_STATES.INITIALISED
             self.serial_num = None
             self._fresh_capture = False
-            self._settings_dict = {'shutterspeed': '1/4', 'iso': '100', 'image_capture_interval': '3.0'}
+            self._address = address  # if we ever want to do anything with this later
+            init_config = TricapConfig()
+            self._settings_dict = init_config.get_section_dict(TricapConfig.CAMERA_SECTION_HEADER)
 
         def reset(self):
             self.state = CAMERA_STATES.INITIALISED

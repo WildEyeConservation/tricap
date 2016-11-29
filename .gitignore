@@ -3,9 +3,13 @@
 /downloads
 /tmp
 /.idea
+/.coverage
+/htmlcov
 /__pycache__
 /app/__pycache__
 /*/__pycache__
+/.coverage
+/htmlcov
 node_modules
 
 # File Types

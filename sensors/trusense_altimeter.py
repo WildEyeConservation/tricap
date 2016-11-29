@@ -173,7 +173,7 @@ class TrusenseAltimeter(object):
             # TODO Are there exceptions when starting a thread?
             self._kill_pill = threading.Event()
             self._read_thread = threading.Thread(target=self._create_read_worker(),
-                                                 args=(self._kill_pill,))
+                                                 args=(self._kill_pill,), daemon=True)
             self._read_thread.start()
             self.state = ALTIMETER_STATE.MEASURING
             return RET_OK

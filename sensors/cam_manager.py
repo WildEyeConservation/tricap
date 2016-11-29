@@ -92,7 +92,7 @@ class TriCapCamsManager(object):
 
     def _cap_thread_generator(self):
         for index, cam in enumerate(self._cameras):
-            thread = threading.Thread(target=cam.capture_to_mem)
+            thread = threading.Thread(target=cam.capture_to_mem, daemon=True)
             yield thread
 
     def _start_capture_with_wait_thread(self):
@@ -114,7 +114,7 @@ class TriCapCamsManager(object):
                 if current_time_diff < self._image_capture_interval:
                     time.sleep(self._image_capture_interval - current_time_diff)
 
-        self._capture_thread = threading.Thread(target=worker, args=[self._kill_pill])
+        self._capture_thread = threading.Thread(target=worker, args=[self._kill_pill], daemon=True)
         self._capture_thread.start()
 
     def start_capturing(self):

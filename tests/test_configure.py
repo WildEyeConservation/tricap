@@ -23,56 +23,65 @@ class TestBaseConfigure(unittest.TestCase):
     rootLogger.setLevel(logging.DEBUG)
 
     def setUp(self):
-
-        self.temp_file_count = 0
+        # backup the actual initial.cfg
         self.tempdir = tempfile.mkdtemp()
-        self.real_config_fp = CONFIG_FP
-        self.temp_config_fp = None
+        self.bk_config_fp = os.path.join(self.tempdir, 'initial.cfg_bk')
+        shutil.copyfile(CONFIG_FP, self.bk_config_fp)
 
     def tearDown(self):
+        # copy back the initial.cfg
+        shutil.copyfile(self.bk_config_fp, CONFIG_FP)
+
         for root, _, filenames in os.walk(self.tempdir):
             for filename in filenames:
                 os.remove(os.path.join(root, filename))
 
         shutil.rmtree(self.tempdir)
 
-    def create_a_temp_config(self):
-        self.temp_config_fp = os.path.join(self.tempdir, str(self.temp_file_count) + '.temp')
-        with open(self.temp_config_fp, 'w') as config_file:
-            config_file.write('[Tricap]\n')
-            config_file.write('shutterspeed: 1/2500\n')
-            config_file.write('image_capture_interval: 3.0\n')
-
-        self.temp_file_count += 1
 
 
 class TestConfigure(TestBaseConfigure):
     def test_init(self):
-        self.create_a_temp_config()
-        config = TricapConfig(config_fp_to_read=self.temp_config_fp)
+        config = TricapConfig()
         self.assertEqual(config.is_ready(), True)
 
     def test_value_getting(self):
-        self.create_a_temp_config()
-        config = TricapConfig(config_fp_to_read=self.temp_config_fp)
+        config = TricapConfig()
 
-        self.assertEqual(config.get('shutterspeed'), '1/2500')
-        self.assertEqual(config.get('image_capture_interval', type_str=config.TYPE_STRING), '3.0')
-        self.assertEqual(config.get('image_capture_interval', type_str=config.TYPE_FLOAT), 3.0)
+        # get the values manually
+        with open(CONFIG_FP) as config_file:
+            for line in config_file:
+                if ':' in line:
+                    parts = line.split(':')
+                    if parts[0].strip() == 'shutterspeed':
+                        ss_string = parts[1].strip()
+                    elif parts[0].strip() == 'image_capture_interval':
+                        ici_string = parts[1].strip()
+
+        self.assertEqual(config.get('shutterspeed', TricapConfig.CAMERA_SECTION_HEADER), ss_string)
+        self.assertEqual(config.get('image_capture_interval', TricapConfig.MISC_SECTION_HEADER,
+                                    type_str=config.TYPE_STRING), ici_string)
+        self.assertEqual(config.get('image_capture_interval', TricapConfig.MISC_SECTION_HEADER,
+                                    type_str=config.TYPE_FLOAT), float(ici_string))
 
         # bad requests
-        self.assertEqual(config.get('image_capture_interval', type_str=config.TYPE_INT), None)
-        self.assertEqual(config.get('shutterspeed', type_str=config.TYPE_FLOAT), None)
+        self.assertEqual(config.get('shutterspeed', TricapConfig.CAMERA_SECTION_HEADER,
+                         type_str=config.TYPE_FLOAT), None)
 
     def test_value_setting(self):
-        self.create_a_temp_config()
-        config = TricapConfig(config_fp_to_read=self.temp_config_fp)
+        config = TricapConfig()
 
-        config_dict = config.get_dict()
-        config_dict['shutterspeed'] = '1/640'
-        config_dict['image_capture_interval'] = 5.0
-        self.assertEqual(config.save_config_dict_to_file(config_dict), RET_OK)
+        section_dict = config.get_section_dict(TricapConfig.CAMERA_SECTION_HEADER)
+        section_dict['shutterspeed'] = '1/640'
+        section_dict['iso'] = '200'
 
-        new_config = TricapConfig(config_fp_to_read=self.temp_config_fp)
-        self.assertEqual(new_config.get('shutterspeed'), '1/640')
-        self.assertEqual(new_config.get('image_capture_interval', type_str=config.TYPE_FLOAT), 5.0)
+        self.assertEqual(config.set_section(section_dict, TricapConfig.CAMERA_SECTION_HEADER),
+                                            RET_OK)
+        self.assertEqual(config.save_to_file(), RET_OK)
+
+        new_config = TricapConfig()
+        self.assertEqual(new_config.get('shutterspeed', TricapConfig.CAMERA_SECTION_HEADER),
+                         '1/640')
+        self.assertEqual(new_config.get('iso',
+                                        TricapConfig.CAMERA_SECTION_HEADER,
+                                        type_str=config.TYPE_FLOAT), 200.0)

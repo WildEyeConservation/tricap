@@ -65,11 +65,15 @@ try:
             # get configuration tree
             gp_config = gp.check_result(gp.gp_camera_get_config(self._gp_camera, GPhotoCam._context))
 
+            # TODO Read all the TricapConfig values from the initial.cfg file, not just these
+
             ret_val = 0
             ret_val += self._set_config_value(gp_config, 'capturetarget', CE6D_CAP_TARGET_SD_CARD)
             ret_val += self._set_config_value_by_string(gp_config, 'shutterspeed',
-                                                        init_configs.get('shutterspeed'))
-            ret_val += self._set_config_value_by_string(gp_config, 'iso', init_configs.get('iso'))
+                                                        init_configs.get('shutterspeed',
+                                                        TricapConfig.CAMERA_SECTION_HEADER))
+            ret_val += self._set_config_value_by_string(gp_config, 'iso',
+                                    init_configs.get('iso', TricapConfig.CAMERA_SECTION_HEADER))
             ret_val += self._set_config_value(gp_config, 'imageformat', CE6D_FORMAT_RAW_AND_TINY_JPEG)
             ret_val += self._obtain_serial_num(gp_config)
 
@@ -307,7 +311,7 @@ except ImportError:
     from config import DUMMY_IMAGE_PATH, NUM_DUMMY_CAMS
     # No gphoto2 for windows, have to use dummies while working
     # TODO Implement a Windows Canon6DCam, which uses the Canon EDSDK to communicate with the camera
-
+    # TODO Have the DummyCam load variables from the config file, like the normal camera would
     class DummyCam(object):
         """ Serves as a fake camera for testing purposes."""
 
@@ -315,10 +319,11 @@ except ImportError:
         def autodetect():
             return [("Dummy Cam", i) for i in range(0, NUM_DUMMY_CAMS)]
 
-        def __init__(self):
+        def __init__(self, address):
             self.state = CAMERA_STATES.INITIALISED
             self.serial_num = None
             self._fresh_capture = False
+            self._address = address  # if we ever want to do anything with this later
             self._settings_dict = {'shutterspeed': '1/4', 'iso': '100', 'image_capture_interval': '3.0'}
 
         def reset(self):

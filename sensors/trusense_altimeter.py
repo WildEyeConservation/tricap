@@ -41,7 +41,7 @@ class TrusenseAltimeter(object):
         # default values
         self._measurement_timeout = 2
         self._num_frames_to_avg = 2
-        self._setting_strings = ['alti_measurement_timeout', 'alti_num_frames_to_avg']
+        self._setting_strings = ['measurement_timeout', 'num_frames_to_avg']
         self._data_logger = data_logger
         self.state = ALTIMETER_STATE.NOT_CONNECTED
         self._kill_pill = None
@@ -76,22 +76,25 @@ class TrusenseAltimeter(object):
         # Check for the okay signal
         self._check_ok('Alti did not send OK on startup')
 
-    def get_setting(self, setting_str):
+    def get_choices_for_setting(self, setting_str):
+        return None
+
+    def get_setting(self,setting_str):
         ret_val = None
         # self._setting_strings = ['alti_measurement_timeout', 'alti_num_frames_to_avg']
         if setting_str in self._setting_strings:
-            if setting_str == 'alti_measurement_timeout':
+            if setting_str == 'measurement_timeout':
                 ret_val = self._measurement_timeout
-            elif setting_str == 'alti_num_frames_to_avg':
+            elif setting_str == 'num_frames_to_avg':
                 ret_val = self._num_frames_to_avg
         return ret_val
 
     def set_setting(self, setting_str, val_str):
         try:
             if setting_str in self._setting_strings:
-                if setting_str == 'alti_measurement_timeout':
+                if setting_str == 'measurement_timeout':
                     self._measurement_timeout = int(val_str)
-                elif setting_str == 'alti_num_frames_to_avg':
+                elif setting_str == 'num_frames_to_avg':
                     self._num_frames_to_avg = int(val_str)
             else:
                 return RET_ERROR
@@ -101,7 +104,10 @@ class TrusenseAltimeter(object):
             return RET_ERROR
 
         # implement the changed settings
-        self._configure()
+        # TODO Need to decide how the altimeter should distinguish between test mode and an actual
+        #  error
+        if self._ser is not None:
+            self._configure()
 
         return RET_OK
 

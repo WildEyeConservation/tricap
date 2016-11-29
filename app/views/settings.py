@@ -1,12 +1,15 @@
-from flask import Blueprint, render_template, request, redirect, url_for
+""" The settings page is built on the following assumptions:
+    - The are only three types of settings: camera, alti, miscellaneous.
+    - If a setting is not in the initial.cfg file, it is not displayed or made modifiable
+"""
+
+from flask import Blueprint, current_app, redirect, url_for, render_template, request
 
 from app import forms, tricap_manager, altimeter, session_logger
 from config import DEFAULT_CONFIG_FP, CONFIG_FP, RET_OK, RET_ERROR
 from sensors.configure import TricapConfig
 
 settings_bp = Blueprint('settings', __name__)
-
-""" There should be three sources of settings, the cameras, the altimeter and general settings """
 
 
 class MiscSettingHandler:
@@ -20,7 +23,7 @@ class MiscSettingHandler:
             if setting_str == 'session_description':
                 return session_logger.set_description(val_str)
             elif setting_str == 'image_capture_interval':
-                return tricap_manager.set_image_capture_interval(val_str)
+                return tricap_manager.set_setting('image_capture_interval', val_str)
         else:
             return RET_ERROR
 
@@ -37,183 +40,173 @@ class MiscSettingHandler:
 
         return ret_val
 
+    def get_choices_for_setting(self, setting_str):
+        return None
 
-# TODO This got out of hand, should definitely be able to make this simplified
-
-def _get_labels_and_choices_from_config(config_fp=CONFIG_FP, config_dict=None):
-    select_tuples = []
-    string_labels = []
-
-    if config_dict is None:
-        config = TricapConfig(config_fp_to_read=config_fp)
-        config_dict = config.get_dict()
-
-    for key in config_dict.keys():
-        choices = tricap_manager.get_choices_for_setting(key)
+def populate_form_section(sdict, handler, form_selects, form_strings, set_data=True):
+    for key in sdict.keys():
+        # check if its a select
+        choices = handler.get_choices_for_setting(key)
         if choices is not None and len(choices) != 0:
             choices_tuples = []
             for index, choice in enumerate(choices):
                 choices_tuples.append((str(index), choice))
 
-            select_tuples.append((key, choices_tuples))
+            form_selects.append_entry()
+            form_selects[-1].label = key
+            form_selects[-1].choices = choices_tuples
+
+            if set_data is True:
+                config_val = tricap_manager.get_setting(key)
+                if config_val is not None:
+                    form_selects[-1].data = str(choices.index(config_val))
         else:
-            string_labels.append(key)
+            form_strings.append_entry()
+            form_strings[-1].label = key
+            if set_data is True:
+                config_val = handler.get_setting(key)
+                if config_val is not None:
+                    form_strings[-1].data = config_val
 
-    return string_labels, select_tuples
+def get_form_for_display(config_fp = CONFIG_FP, set_data=True):
+    """ Returns a SettingsForm populated with values from the setting sources as per the config
+    file. Current settings need to be checked, so that if something was not set during the overall
+    init, we could pick it up here (or if we are just testing a new setting something)"""
 
+    config = TricapConfig(config_fp_to_read=config_fp)
+    # Specify the form data as None to prevent automatic population with the request.Form data.
+    # The request form data does not contain the label and choice information.
+    form = forms.SettingsForm(formdata=None)
 
-def _get_setting_form(config_fp=CONFIG_FP, config_dict=None):
-    form = forms.SettingsForm()
+    # Populate the form
+    cam_dict = config.get_section_dict(TricapConfig.CAMERA_SECTION_HEADER)
+    populate_form_section(cam_dict, tricap_manager, form.cam_selects, form.cam_strings, set_data)
 
-    string_labels, select_tuples = _get_labels_and_choices_from_config(config_fp=config_fp,
-                                                                       config_dict=config_dict)
-    for sel_tup in select_tuples:
-        form.select_settings.append_entry()
-        form.select_settings[-1].label = sel_tup[0]
-        form.select_settings[-1].choices = sel_tup[1]
+    alti_dict = config.get_section_dict(TricapConfig.ALTI_SECTION_HEADER)
+    populate_form_section(alti_dict, altimeter, form.alti_selects, form.alti_strings, set_data)
 
-    for str_lbl in string_labels:
-        form.string_settings.append_entry()
-        form.string_settings[-1].label = str_lbl
+    misc_setting_handler = MiscSettingHandler()
+    misc_dict = config.get_section_dict(TricapConfig.MISC_SECTION_HEADER)
+    populate_form_section(misc_dict, misc_setting_handler, form.misc_selects, form.misc_strings,
+                             set_data)
 
     return form
 
+def populate_pushed_form_section(pf_strings, pf_selects, df_strings, df_selects):
+    for index in range(len(df_strings)):
+        pf_strings[index].label = df_strings[index].label
 
-def _populated_pushed_form(pushed_form, config_fp=CONFIG_FP, config_dict=None):
+    for index in range(len(df_selects)):
+        pf_selects[index].label = df_selects[index].label
+        pf_selects[index].choices = df_selects[index].choices
+
+def populate_pushed_form(pushed_form):
     """ for some reason, the pushed form loses the labels of the added fields, so have to add em"""
-    string_labels, select_tuples = _get_labels_and_choices_from_config(config_fp=config_fp,
-                                                                       config_dict=config_dict)
-    for index in range(len(string_labels)):
-        pushed_form.string_settings[index].label = string_labels[index]
+    display_form = get_form_for_display(set_data=False)
 
-    for index in range(len(select_tuples)):
-        pushed_form.select_settings[index].label = select_tuples[index][0]
-        pushed_form.select_settings[index].choices = select_tuples[index][1]
+    populate_pushed_form_section(pushed_form.cam_strings, pushed_form.cam_selects,
+                                 display_form.cam_strings, display_form.cam_selects)
+
+    populate_pushed_form_section(pushed_form.alti_strings, pushed_form.alti_selects,
+                                 display_form.alti_strings, display_form.alti_selects)
+
+    populate_pushed_form_section(pushed_form.misc_strings, pushed_form.misc_selects,
+                                 display_form.misc_strings, display_form.misc_selects)
 
     return pushed_form
 
+def extract_dict_info_from_form_section(section_dict, form_strings, form_selects):
+    for index in range(len(form_strings)):
+        section_dict[form_strings[index].label] = form_strings[index].data.replace('%20', ' ')
 
-def _get_setting_labels(form):
-    string_labels = []
-    select_labels = []
-    for string_setting in form.string_settings:
-        string_labels.append(string_setting.label)
-    for select_setting in form.select_settings:
-        select_labels.append(select_setting.label)
+    for index in range(len(form_selects)):
+        choices = [ct[1] for ct in form_selects[index].choices]
+        section_dict[form_selects[index].label] = choices[int(form_selects[index].data)]
 
-    return string_labels, select_labels
+def convert_populated_form_to_dict(form):
+    form_dict = {}
 
+    form_dict[TricapConfig.CAMERA_SECTION_HEADER] = {}
+    extract_dict_info_from_form_section(form_dict[TricapConfig.CAMERA_SECTION_HEADER],
+                                        form.cam_strings, form.cam_selects)
 
-def _get_form_with_current_settings(config_fp=CONFIG_FP):
-    config = TricapConfig(config_fp_to_read=config_fp)
-    config_dict = config.get_dict()
+    form_dict[TricapConfig.ALTI_SECTION_HEADER] = {}
+    extract_dict_info_from_form_section(form_dict[TricapConfig.ALTI_SECTION_HEADER],
+                                        form.alti_strings, form.alti_selects)
 
-    form = _get_setting_form(config_dict=config_dict)
-    string_labels, select_labels = _get_setting_labels(form)
+    form_dict[TricapConfig.MISC_SECTION_HEADER] = {}
+    extract_dict_info_from_form_section(form_dict[TricapConfig.MISC_SECTION_HEADER],
+                                        form.misc_strings, form.misc_selects)
 
-    misc_setting_handler = MiscSettingHandler()
+    return form_dict
 
-    # populate the form data members
-    for key in config_dict.keys():
-        config_val = tricap_manager.get_setting(key)
-        if config_val is not None:
-            if key in string_labels:
-                form.string_settings[string_labels.index(key)].data = config_val
-            elif key in select_labels:
-                choices_tuples = form.select_settings[select_labels.index(key)].choices
-                choices = [ct[1] for ct in choices_tuples]
-                form.select_settings[select_labels.index(key)].data = str(choices.index(config_val))
-        else:  # it's not a camera settings
-            config_val = altimeter.get_setting(key)
-            if config_val is not None:
-                if key in string_labels:
-                    form.string_settings[string_labels.index(key)].data = config_val
-            else:  # it's not an altimeter setting either
-                config_val = misc_setting_handler.get_setting(key)
-                if config_val is not None:
-                    if key in string_labels:
-                        form.string_settings[string_labels.index(key)].data = config_val
+def set_setting_handler_with_dict(handler, sdict):
+    # TODO Should we do this here, how should we handle the returns? Figure it out on merging
+    ret_val = 0
+    for key in sdict.keys():
+        ret_val += handler.set_setting(key, sdict[key])
 
-    return form
+    return ret_val
 
+def change_settings(form):
+    form_dict = convert_populated_form_to_dict(form)
 
-def _change_settings(form):
-    string_labels, select_labels = _get_setting_labels(form)
+    set_setting_handler_with_dict(tricap_manager, form_dict[TricapConfig.CAMERA_SECTION_HEADER])
+    set_setting_handler_with_dict(altimeter, form_dict[TricapConfig.ALTI_SECTION_HEADER])
 
     misc_setting_handler = MiscSettingHandler()
+    set_setting_handler_with_dict(misc_setting_handler, form_dict[TricapConfig.MISC_SECTION_HEADER])
 
-    for index, sel_l in enumerate(select_labels):
-        choice_index = int(form.select_settings[index].data)
-        choice_val_str = form.select_settings[index].choices[choice_index][1]
-        # check the three config sources/sinks
-        if tricap_manager.set_setting(sel_l, choice_val_str) == RET_OK:
-            continue
-        if altimeter.set_setting(sel_l, choice_val_str) == RET_OK:
-            continue
-        if misc_setting_handler.set_setting(sel_l, choice_val_str) == RET_OK:
-            continue
-
-    for index, str_l in enumerate(string_labels):
-        val_str = form.string_settings[index].data
-        # check the three config sources/sinks
-        if tricap_manager.set_setting(str_l, val_str) == RET_OK:
-            continue
-        if altimeter.set_setting(str_l, val_str) == RET_OK:
-            continue
-        if misc_setting_handler.set_setting(str_l, val_str) == RET_OK:
-            continue
-
-
-def _save_settings(form, config_fp=CONFIG_FP):
-    _change_settings(form)
-
+def save_settings(form, config_fp=CONFIG_FP):
     # get the current settings in a dict
     config = TricapConfig(config_fp_to_read=config_fp)
-    config_dict = config.get_dict()
 
     # modify the settings dict based on settings in the form (i.e. the user selected options)
-    string_labels, select_labels = _get_setting_labels(form)
+    form_dict = convert_populated_form_to_dict(form)
 
-    for index, sel_l in enumerate(select_labels):
-        choice_index = int(form.select_settings[index].data)
-        choice_val_str = form.select_settings[index].choices[choice_index][1]
-        config_dict[sel_l] = choice_val_str
+    for section_header in TricapConfig.SECTION_HEADERS:
+        config.set_section(form_dict[section_header], section_header)
 
-    for index, str_l in enumerate(string_labels):
-        val_str = form.string_settings[index].data
-        config_dict[str_l] = val_str
+    config.save_to_file()
 
-    config.save_config_dict_to_file(config_dict)
-
-
-def _revert_to_default_settings(save_to_fp=CONFIG_FP):
+def revert_to_default_settings(save_to_fp=CONFIG_FP, logger=None):
     # arguments are only supposed to be used during unittesting
+    if logger is None:
+        logger = current_app.logger
+
     default_config = TricapConfig(config_fp_to_read=DEFAULT_CONFIG_FP)
     config = TricapConfig(config_fp_to_read=save_to_fp)
-    config.clear_config()
-    config.save_config_dict_to_file(default_config.get_dict())
 
+    for section_header in TricapConfig.SECTION_HEADERS:
+        config.set_section(default_config.get_section_dict(section_header), section_header)
+
+    config.save_to_file()
 
 @settings_bp.route('/settings', methods=['GET', 'POST'])
 def settings():
     if request.method == 'GET':
-        # When the user initially opens the page, we need the current settings from the sensors
-        form = _get_form_with_current_settings()
+        # When the user initially opens the page, we need to setup the choices and labels for the
+        #  forms
+        form = get_form_for_display()
     else:
-        # when the users posts (i.e. clicks one of the submit buttons) we need to base the form
-        #  on the user selected settings
-        form = _populated_pushed_form(forms.SettingsForm(request.form))
+        # When the users posts (i.e. clicks one of the submit buttons), any SettingsForm will be
+        #  populated with the data from the request.form (i.e. from the browser). However, this form
+        #  does not contain the labels and choices of the FieldLists, so we need to populate those
+        #  attributes.
+        # TODO Find out why the lables and choices are missing from the FieldLists
+        form = populate_pushed_form(forms.SettingsForm())
 
     if form.validate_on_submit():
         tricap_manager.stop_capturing()
         altimeter.stop_measuring()
 
         if form.test.data is True:
-            _change_settings(form)
+            change_settings(form)
         elif form.save.data is True:
-            _save_settings(form)
+            change_settings(form)
+            save_settings(form)
         elif form.revert.data is True:
-            _revert_to_default_settings()
+            revert_to_default_settings()
 
         return redirect(url_for('home.index'))
 

@@ -151,9 +151,9 @@ class TriCapCamsManager(object):
         return choices
 
     def get_setting(self, setting_str):
-        # TODO I don't like throwing an exception for every value that is not from the camera
+        # TODO Document: All gets and sets should operate on strings
         if setting_str == 'image_capture_interval':
-            return self._image_capture_interval
+            return str(self._image_capture_interval)
         return self._cameras[0].get_setting(setting_str)
 
     def set_setting(self, setting_str, val_str):

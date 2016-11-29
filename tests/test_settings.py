@@ -16,6 +16,8 @@ from selenium.webdriver.common.by import By
 
 from app.views import settings
 
+from app import tricap_manager
+
 from sensors.configure import TricapConfig
 
 from config import DEFAULT_CONFIG_FP, SERVER_LOG_DIR, CONFIG_FP, TEST_STATIC_DIR, SERVER_LOG_NAME
@@ -167,6 +169,45 @@ class TestBehaviourSettings(BaseTestSettings):
 
             driver.quit()
 
+    def test_test(self):
+        with self.client:  # access the web page through a 'client', as if a browser
+            response = self.client.get(url_for('settings.settings'))
+
+            temp_fp = self.create_temp_file()
+            with open(temp_fp, 'wb') as temp_html_file:
+                temp_html_file.write(response.data.replace(b'/static', TEST_STATIC_DIR))
+
+            driver = webdriver.Chrome()
+            driver.get("file:///"+temp_fp)
+            wait = WebDriverWait(driver, 10)
+            wait.until(EC.visibility_of_element_located((By.ID, "btn_test")))
+
+            # Change settings on the form
+            ss_select = Select(driver.find_element_by_id('shutterspeed'))
+            ss_select.select_by_visible_text("1/2500")
+
+            iso_select = Select(driver.find_element_by_id('iso'))
+            iso_select.select_by_visible_text("500")
+
+            ici_string = driver.find_element_by_id('image_capture_interval')
+            ici_string.clear()
+            ici_string.send_keys('9.0')
+
+            # simulate posting the data through the test button
+            form_data = self._get_form_data_as_dict(driver)
+            form_data['test'] = 'Test'
+            response = self.client.post(url_for('settings.settings'),
+                                        data=form_data,
+                                        follow_redirects=True)
+
+            self.assertEqual(tricap_manager.get_setting('shutterspeed'),  '1/2500')
+            self.assertEqual(tricap_manager.get_setting('iso'), '500')
+            self.assertEqual(tricap_manager.get_setting('image_capture_interval'), '9.0')
+
+
+
+            driver.quit()
+
     def test_save(self):
         with self.client:  # access the web page through a 'client', as if a browser
             response = self.client.get(url_for('settings.settings'))
@@ -193,33 +234,18 @@ class TestBehaviourSettings(BaseTestSettings):
 
             # simulate posting the data through the save button
             form_data = self._get_form_data_as_dict(driver)
-            print(form_data)
 
             form_data['save'] = 'Save'
+
             response = self.client.post(url_for('settings.settings'),
                                         data=form_data,
                                         follow_redirects=True)
 
-            # check that the data has changed
-            # get the values manually
-            with open(CONFIG_FP) as config_file:
-                for line in config_file:
-                    if ':' in line:
-                        parts = line.split(':')
-                        key = parts[0].strip()
-                        value = parts[1].strip()
-                        if key == 'shutterspeed':
-                            ss_string = value
-                        elif key == 'image_capture_interval':
-                            ici_string = value
-                        elif key == 'iso':
-                            iso_string = value
-
             new_config = TricapConfig()
             section_dict = new_config.get_section_dict(TricapConfig.CAMERA_SECTION_HEADER)
-            self.assertEqual(section_dict['shutterspeed'], ss_string)
-            self.assertEqual(section_dict['iso'], iso_string)
+            self.assertEqual(section_dict['shutterspeed'], "1/2500")
+            self.assertEqual(section_dict['iso'], "500")
             section_dict = new_config.get_section_dict(TricapConfig.MISC_SECTION_HEADER)
-            self.assertEqual(section_dict['image_capture_interval'], ici_string)
+            self.assertEqual(section_dict['image_capture_interval'], '9.0')
 
             driver.quit()

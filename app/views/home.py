@@ -24,7 +24,7 @@ def index():
     if tricap_manager.get_num_cams() == 0:
         col_size_cam_img = 4
     else:
-        col_size_cam_img = 12/tricap_manager.get_num_cams()
+        col_size_cam_img = 12 / tricap_manager.get_num_cams()
 
     if col_size_cam_img < 2:
         col_size_cam_img = 2
@@ -39,9 +39,11 @@ def index():
                            system_state='All Good',
                            cam_ids=cam_ids, cam_states=cam_states)
 
+
 def reset_device_objects():
     tricap_manager.reset()
     altimeter.reset()
+
 
 @home_bp.route('/_check_cam_image<cam_num_str>')
 def is_cam_image_fresh(cam_num_str):
@@ -69,9 +71,9 @@ def serve_cam_img(cam_num_str):
 
     return send_file(cam_img_fp, attachment_filename='image.bmp', as_attachment=True)
 
+
 @home_bp.route('/_button_click')
 def handle_button_click():
-
     button_code = request.args.get('buttonCode', 0, type=int)
 
     if button_code == BUTTON_CODES.START:

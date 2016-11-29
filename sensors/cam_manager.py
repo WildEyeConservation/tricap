@@ -9,7 +9,7 @@
 
 import threading
 import time
-import traceback
+import logging
 
 from config import CAM_MANAGER_STATES, DEFAULT_IMAGE_CAPTURE_INTERVAL
 from config import RET_OK, RET_ERROR
@@ -19,15 +19,15 @@ from .cameras import Camera
 class TriCapCamsManager(object):
     """TriCapCamsManager manages TriCap camera objects"""
     supportedCameras = {"Canon EOS 6D", "Dummy Cam"}
+    _logger = logging.getLogger(__name__)
 
-    def __init__(self, logger):
+    def __init__(self):
         self.state = CAM_MANAGER_STATES.STOPPED
 
         self._capture_thread = None
         self._kill_pill = None
         self._image_capture_interval = None
 
-        self._logger = logger
         self._cameras = None
         self._cam_threads = None
         self._capture_thread = None
@@ -73,10 +73,10 @@ class TriCapCamsManager(object):
             for name, address in Camera.autodetect():
                 if name in TriCapCamsManager.supportedCameras:
                     self._logger.info('Adding camera %s at address %s ' % (name, address))
-                    tricap_cam = Camera(address, self._logger)
+                    tricap_cam = Camera(address)
                     self._cameras.append(tricap_cam)
         except Exception:  # Catches most exceptions, except KeyboardInterrupt and SystemExit
-            self._logger.error(traceback.format_exc())
+            self._logger.error("_find_cameras failed.", exc_info=True)
             return RET_ERROR
 
         return RET_OK

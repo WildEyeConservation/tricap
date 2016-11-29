@@ -1,22 +1,21 @@
 import logging
-import time
 import os
 import shutil
-
-from random import randint
+import time
 
 from config import SESSION_ROOT_DIR, CONFIG_FP
 
 """ D Joubert - Innoventix Consulting - 18 November 2016 - session_logger.py
     Logger for data, to be used for importing the data into the larger system """
 
-class SessionLogger():
+
+class SessionLogger:
     """ The session logger is responsible for creating a session folder, a session data file
         (which will most likely only contain the data from the altimeter), copying the config file
         and creating any additional data structures. The log file is converted in the end to XML
         format, so that whatever program in whatever language can use it. """
 
-    def __init__(self, description = 'Default Description', root_folder = SESSION_ROOT_DIR):
+    def __init__(self, description='Default Description', root_folder=SESSION_ROOT_DIR):
 
         self._root_folder = root_folder
 
@@ -42,14 +41,13 @@ class SessionLogger():
             self._fh.close()
             self._logger.removeHandler(self._fh)
 
-
     def set_description(self, description):
-        self._description  = description
+        self._description = description
 
     def get_description(self):
         return self._description
 
-    def create_new_session(self, description = None):
+    def create_new_session(self, description=None):
         if self._fh is not None:
             self._fh.close()
             self._logger.removeHandler(self._fh)
@@ -64,7 +62,7 @@ class SessionLogger():
         self._logger.addHandler(self._fh)
 
         self._ready = True
-        self.log("Session Description : %s" % description)
+        self.log("Session Description : %s" % self._description)
 
     def get_session_folder(self):
         if self._ready is True:
@@ -79,7 +77,7 @@ class SessionLogger():
             return None
 
     def _create_file_handler(self):
-        session_filename = "%s_session%.2d.log" %(time.strftime("%Y_%m_%d"), self._session_count)
+        session_filename = "%s_session%.2d.log" % (time.strftime("%Y_%m_%d"), self._session_count)
         self._log_fp = os.path.join(self._session_folder, session_filename)
         fh = logging.FileHandler(self._log_fp)
         fh.setFormatter(logging.Formatter("%(asctime)s | %(message)s", datefmt='%I:%M:%S %p'))
@@ -96,10 +94,10 @@ class SessionLogger():
             os.mkdir(date_folder)
 
         session_count = 0
-        session_folder = os.path.join(date_folder, '%s_session%.2d' %(date_str, session_count))
+        session_folder = os.path.join(date_folder, '%s_session%.2d' % (date_str, session_count))
         while os.path.isdir(session_folder) is True:
             session_count += 1
-            session_folder = os.path.join(date_folder, '%s_session%.2d' %(date_str, session_count))
+            session_folder = os.path.join(date_folder, '%s_session%.2d' % (date_str, session_count))
 
         os.mkdir(session_folder)
         self._session_count = session_count

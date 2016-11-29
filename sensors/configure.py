@@ -1,26 +1,22 @@
 """ D Joubert 18 November 2016 - Configurator - handles reading and saving the initial config """
 
 import configparser
-import os
+import logging
 
-from config import CE6D_SHUTTER_SPEED_1_2500, CE6D_SHUTTER_SPEED_1_640, CE6D_SHUTTER_SPEED_1_4
-from config import CONFIG_FP, DEFAULT_IMAGE_CAPTURE_INTERVAL, RET_OK, RET_ERROR
-from config import DEFAULT_SHUTTER_SPEED
-
-import pdb
+from config import CONFIG_FP, RET_OK, RET_ERROR
 
 SECTION_HEADER = 'Tricap'
 
-class TricapConfig():
+
+class TricapConfig:
     """ Configurator - Object that reads and writes configuration information, handling the
         translation from machine code to human readable format, and back again """
+    _logger = logging.getLogger(__name__)
 
-    def __init__(self, logger, config_fp_to_read = CONFIG_FP):
+    def __init__(self, config_fp_to_read=CONFIG_FP):
         self._parser = configparser.ConfigParser()
 
         self._config_fp = config_fp_to_read
-        self._logger = logger
-
         self._ready_flag = False
 
         self.TYPE_STRING = 'string'
@@ -48,7 +44,6 @@ class TricapConfig():
             return None
 
         return dict(items)
-
 
     def get(self, id_str, type_str='string'):
         if self._ready_flag is None:
@@ -84,7 +79,7 @@ class TricapConfig():
         self._parser.clear()
         self._parser[SECTION_HEADER] = {}
 
-    def save_config_dict_to_file(self, config_dict, config_fp = None):
+    def save_config_dict_to_file(self, config_dict, config_fp=None):
         """ Save the values in a config dict to the config file. Note that settings will only be
             added and changed. Nothing gets removed """
 

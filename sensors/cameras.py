@@ -2,8 +2,8 @@
 import logging
 import threading
 
-from config import CAM_STATE_STRINGS, RET_ERROR, RET_OK, CAMERA_STATES
 from config import CE6D_CAP_TARGET_SD_CARD, CE6D_FORMAT_RAW
+from config import RET_ERROR, RET_OK, CAMERA_STATES
 from .configure import TricapConfig
 
 # TODO currently, we are coding in a mess of C vs C++ styles. Fix this.
@@ -63,7 +63,7 @@ try:
 
             # Set the Hard Coded Values
             self._set_config_value(gp_config, 'capturetarget', CE6D_CAP_TARGET_SD_CARD)
-            self._set_config_value(gp_config, 'imageformat', CE6D_FORMAT_RAW_AND_TINY_JPEG)
+            self._set_config_value(gp_config, 'imageformat', CE6D_FORMAT_RAW)
 
             # Read the camera values from the initial.cfg file
             section_dict = init_configs.get_section_dict(TricapConfig.CAMERA_SECTION_HEADER)
@@ -74,14 +74,6 @@ try:
             self._obtain_serial_num(gp_config)
 
             return ret_val
-
-        def _initialise_camera(self):
-            ret_val = self._setup_camera(self._address)
-
-            if ret_val == 0:
-                self.state = CAMERA_STATES.INITIALISED
-            else:
-                self.state = CAMERA_STATES.ERROR_CONFIG
 
         # TODO The naming convention for configs and settings is a mess. Sort it out
         def _get_list_of_valid_config_names(self, config):
@@ -153,7 +145,7 @@ try:
 
             return choices
 
-        def capture(self, singleShot=True, barrier: threading.Barrier = None):
+        def capture(self, continuous=False, barrier: threading.Barrier = None):
             while True:
                 self.state = CAMERA_STATES.CAPTURING
                 if barrier:
@@ -167,17 +159,20 @@ try:
                 self._fresh_capture = True
                 del camera_file
                 self.state = CAMERA_STATES.INITIALISED
-                if singleShot:
+                if not continuous:
                     return self.data
 
         def get_state_as_string(self):
-            return CAM_STATE_STRINGS[self.state]
+            return self.state.name
+
 
     Camera = GPhotoCam
 
 except ImportError:
     import time
     from config import DUMMY_IMAGE_PATH, NUM_DUMMY_CAMS
+
+
     # No gphoto2 for windows, have to use dummies while working
     # TODO Implement a Windows Canon6DCam, which uses the Canon EDSDK to communicate with the camera
     # TODO Have the DummyCam load variables from the config file, like the normal camera would
@@ -240,6 +235,7 @@ except ImportError:
                 return RET_OK
             else:
                 return RET_ERROR
+
 
     Camera = DummyCam
     gp = None

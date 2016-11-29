@@ -1,19 +1,18 @@
+# coding=utf-8
 """ D Joubert 2 November 2016 - TruSense S100 Altimeter handler."""
+
+import logging
+import threading
+from time import sleep
 
 import serial
 import serial.tools.list_ports
-from time import sleep
 
-import threading
-
+from config import ALTIMETER_STATE, RET_OK, RET_ERROR
 from .configure import TricapConfig
-
-from config import ALTIMETER_STATE, RET_OK, RET_ERROR, ALTI_STATE_STRINGS
-import logging
 
 
 # TODO How to deal with disconnect?
-
 class AltiError(Exception):
     pass
 
@@ -57,7 +56,7 @@ class TrusenseAltimeter(object):
         self._read_thread = None
         self.measurement = -1
 
-        self._ser = None # set this to None if something goes wrong with getting the Serial object
+        self._ser = None  # set this to None if something goes wrong with getting the Serial object
 
         try:
             self._ser = serial.Serial(port=self._get_correct_port_name(supported_devices),
@@ -88,7 +87,7 @@ class TrusenseAltimeter(object):
     def get_choices_for_setting(self, setting_str):
         return None
 
-    def get_setting(self,setting_str):
+    def get_setting(self, setting_str):
         ret_val = None
         # self._setting_strings = ['alti_measurement_timeout', 'alti_num_frames_to_avg']
         if setting_str in self._setting_strings:
@@ -153,7 +152,7 @@ class TrusenseAltimeter(object):
         self.__init__(self._data_logger)
 
     def get_state_as_string(self):
-        return ALTI_STATE_STRINGS[self.state]
+        return self.state.name
 
     def get_measurement_as_string(self):
         return str(self.measurement)

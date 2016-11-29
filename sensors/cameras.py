@@ -325,7 +325,8 @@ except ImportError:
             self.serial_num = None
             self._fresh_capture = False
             self._address = address  # if we ever want to do anything with this later
-            self._settings_dict = {'shutterspeed': '1/4', 'iso': '100', 'image_capture_interval': '3.0'}
+            init_config = TricapConfig()
+            self._settings_dict = init_config.get_section_dict(TricapConfig.CAMERA_SECTION_HEADER)
 
         def reset(self):
             self.state = CAMERA_STATES.INITIALISED

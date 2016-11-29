@@ -5,8 +5,6 @@ import logging
 
 from config import CONFIG_FP, RET_OK, RET_ERROR, SERVER_LOG_NAME
 
-import pdb
-
 # TODO Do better than a bunch of RET_OK, RET_ERRORS
 
 class TricapConfig():
@@ -19,6 +17,7 @@ class TricapConfig():
     CAMERA_SECTION_HEADER = 'Camera'
     ALTI_SECTION_HEADER = 'Altimeter'
     MISC_SECTION_HEADER = 'Misc'
+    SECTION_HEADERS = [CAMERA_SECTION_HEADER, ALTI_SECTION_HEADER, MISC_SECTION_HEADER]
 
     TYPE_STRING = 'string'
     TYPE_INT = 'int'
@@ -38,11 +37,14 @@ class TricapConfig():
         except configparser.Error as ex:
             self._logger.error('Error reading from config file %s', self._config_fp)
             self._logger.error('configparser exception: %s', ex.args)
+            # If there is an error reading from the config file, the system should fall over
+            raise
 
     def is_ready(self):
         return self._ready_flag
 
     def get_section_dict(self, section_header):
+        """ Get all the parameters for a particular section """
         if self._ready_flag is False:
             return None
         try:
@@ -80,19 +82,11 @@ class TricapConfig():
 
         return ret_val
 
-    # def clear_config(self):
-    #     # TODO There should be a cleaner way to do this
-    #     self._parser.clear()
-    #     self._parser[TricapConfig.ALTI_SECTION_HEADER] = {}
-    #     self._parser[TricapConfig.MISC_SECTION_HEADER] = {}
-    #     self._parser[TricapConfig.CAMERA_SECTION_HEADER] = {}
-
     def set_section(self, section_dict, section_header):
         """ Change the values stored in the internal configparser.
             Note that settings will only be changed. Nothing gets added or removed """
-        # TODO Replace with an assert?
-        if self._ready_flag is None:
-            return None
+        # Using an assert, because this should really not happen
+        assert self._ready_flag
 
         for key in section_dict.keys():
             if key not in self._parser[section_header]:

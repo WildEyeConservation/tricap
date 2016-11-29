@@ -15,8 +15,6 @@ from config import DEFAULT_CONFIG_FP, CONFIG_FP, RET_OK, RET_ERROR
 
 settings_bp = Blueprint('settings', __name__)
 
-
-
 class MiscSettingHandler():
     """ Handles all the settings which are not applicable to the sensors """
     def __init__(self):
@@ -44,7 +42,33 @@ class MiscSettingHandler():
 
         return ret_val
 
-# TODO This got out of hand, should definitely be able to make this simplified
+    def get_choices_for_setting(self, setting_str):
+        return None
+
+def populate_form_section(sdict, handler, form_selects, form_strings, set_data=True):
+    for key in sdict.keys():
+        # check if its a select
+        choices = handler.get_choices_for_setting(key)
+        if choices is not None and len(choices) != 0:
+            choices_tuples = []
+            for index, choice in enumerate(choices):
+                choices_tuples.append((str(index), choice))
+
+            form_selects.append_entry()
+            form_selects[-1].label = key
+            form_selects[-1].choices = choices_tuples
+
+            if set_data is True:
+                config_val = tricap_manager.get_setting(key)
+                if config_val is not None:
+                    form_selects[-1].data = str(choices.index(config_val))
+        else:
+            form_strings.append_entry()
+            form_strings[-1].label = key
+            if set_data is True:
+                config_val = handler.get_setting(key)
+                if config_val is not None:
+                    form_strings[-1].data = config_val
 
 def get_form_for_display(config_fp = CONFIG_FP, set_data=True):
     """ Returns a SettingsForm populated with values from the setting sources as per the config
@@ -56,135 +80,84 @@ def get_form_for_display(config_fp = CONFIG_FP, set_data=True):
     # The request form data does not contain the label and choice information.
     form = forms.SettingsForm(formdata=None)
 
-    # TODO Clean this up by having the tricap_manager, altimeter and misc_handler inherit from a
-    #   setting source abstract base class (can you do multiple inheritance?)
-
     # Populate the form
     cam_dict = config.get_section_dict(TricapConfig.CAMERA_SECTION_HEADER)
-    for key in cam_dict.keys():
-        # check if its a select
-        choices = tricap_manager.get_choices_for_setting(key)
-        if choices is not None and len(choices) != 0:
-            choices_tuples = []
-            for index, choice in enumerate(choices):
-                choices_tuples.append((str(index), choice))
+    populate_form_section(cam_dict, tricap_manager, form.cam_selects, form.cam_strings, set_data)
 
-            form.cam_selects.append_entry()
-            form.cam_selects[-1].label = key
-            form.cam_selects[-1].choices = choices_tuples
-
-            if set_data is True:
-                config_val = tricap_manager.get_setting(key)
-                if config_val is not None:
-                    form.cam_selects[-1].data = str(choices.index(config_val))
-        else:
-            form.cam_strings.append_entry()
-            form.cam_strings[-1].label = key
-            if set_data is True:
-                config_val = tricap_manager.get_setting(key)
-                if config_val is not None:
-                    form.cam_strings[-1].data = config_val
-
-    # Get those settings pertaining to the altimeter
-    # TODO I'm cheating here, knowing that the alti only has string settings
     alti_dict = config.get_section_dict(TricapConfig.ALTI_SECTION_HEADER)
-    for key in alti_dict:
-        form.alti_strings.append_entry()
-        form.alti_strings[-1].label = key
-        if set_data is True:
-            config_val = altimeter.get_setting(key)
-            if config_val is not None:
-                form.alti_strings[-1].data = config_val
+    populate_form_section(alti_dict, altimeter, form.alti_selects, form.alti_strings, set_data)
 
-    # Get those settings pertaining to the misc
-    # TODO Again, I cheat, knowing that misc only has string settings
     misc_setting_handler = MiscSettingHandler()
     misc_dict = config.get_section_dict(TricapConfig.MISC_SECTION_HEADER)
-    for key in misc_dict:
-        form.misc_strings.append_entry()
-        form.misc_strings[-1].label = key
-        if set_data is True:
-            config_val = misc_setting_handler.get_setting(key)
-            if config_val is not None:
-                form.misc_strings[-1].data = config_val
+    populate_form_section(misc_dict, misc_setting_handler, form.misc_selects, form.misc_strings,
+                             set_data)
 
     return form
+
+def populate_pushed_form_section(pf_strings, pf_selects, df_strings, df_selects):
+    for index in range(len(df_strings)):
+        pf_strings[index].label = df_strings[index].label
+
+    for index in range(len(df_selects)):
+        pf_selects[index].label = df_selects[index].label
+        pf_selects[index].choices = df_selects[index].choices
 
 def populate_pushed_form(pushed_form):
     """ for some reason, the pushed form loses the labels of the added fields, so have to add em"""
     display_form = get_form_for_display(set_data=False)
 
-    for index in range(len(display_form.cam_strings)):
-        pushed_form.cam_strings[index].label = display_form.cam_strings[index].label
+    populate_pushed_form_section(pushed_form.cam_strings, pushed_form.cam_selects,
+                                 display_form.cam_strings, display_form.cam_selects)
 
-    for index in range(len(display_form.cam_selects)):
-        pushed_form.cam_selects[index].label = display_form.cam_selects[index].label
-        pushed_form.cam_selects[index].choices = display_form.cam_selects[index].choices
+    populate_pushed_form_section(pushed_form.alti_strings, pushed_form.alti_selects,
+                                 display_form.alti_strings, display_form.alti_selects)
 
-    for index in range(len(display_form.alti_strings)):
-        pushed_form.alti_strings[index].label = display_form.alti_strings[index].label
-
-    for index in range(len(display_form.alti_selects)):
-        pushed_form.alti_selects[index].label = display_form.alti_selects[index].label
-        pushed_form.alti_selects[index].choices = display_form.alti_selects[index].choices
-
-    for index in range(len(display_form.misc_strings)):
-        pushed_form.misc_strings[index].label = display_form.misc_strings[index].label
-
-    for index in range(len(display_form.misc_selects)):
-        pushed_form.misc_selects[index].label = display_form.misc_selects[index].label
-        pushed_form.misc_selects[index].choices = display_form.misc_selects[index].choices
+    populate_pushed_form_section(pushed_form.misc_strings, pushed_form.misc_selects,
+                                 display_form.misc_strings, display_form.misc_selects)
 
     return pushed_form
+
+def extract_dict_info_from_form_section(section_dict, form_strings, form_selects):
+    for index in range(len(form_strings)):
+        section_dict[form_strings[index].label] = form_strings[index].data.replace('%20', ' ')
+
+    for index in range(len(form_selects)):
+        choices = [ct[1] for ct in form_selects[index].choices]
+        section_dict[form_selects[index].label] = choices[int(form_selects[index].data)]
 
 def convert_populated_form_to_dict(form):
     form_dict = {}
 
-    sh = TricapConfig.CAMERA_SECTION_HEADER
-    form_dict[sh] = {}
-    for index in range(len(form.cam_strings)):
-        form_dict[sh][form.cam_strings[index].label] = form.cam_strings[index].data.replace('%20', ' ')
+    form_dict[TricapConfig.CAMERA_SECTION_HEADER] = {}
+    extract_dict_info_from_form_section(form_dict[TricapConfig.CAMERA_SECTION_HEADER],
+                                        form.cam_strings, form.cam_selects)
 
-    for index in range(len(form.cam_selects)):
-        choices = [ct[1] for ct in form.cam_selects[index].choices]
-        form_dict[sh][form.cam_selects[index].label] = choices[int(form.cam_selects[index].data)]
+    form_dict[TricapConfig.ALTI_SECTION_HEADER] = {}
+    extract_dict_info_from_form_section(form_dict[TricapConfig.ALTI_SECTION_HEADER],
+                                        form.alti_strings, form.alti_selects)
 
-    sh = TricapConfig.ALTI_SECTION_HEADER
-    form_dict[sh] = {}
-    for index in range(len(form.alti_strings)):
-        form_dict[sh][form.alti_strings[index].label] = form.alti_strings[index].data.replace('%20', ' ')
-
-    for index in range(len(form.alti_selects)):
-        choices = [ct[1] for ct in form.alti_selects[index].choices]
-        form_dict[sh][form.alti_selects[index].label] = choices[int(form.alti_selects[index].data)]
-
-    sh = TricapConfig.MISC_SECTION_HEADER
-    form_dict[sh] = {}
-    for index in range(len(form.misc_strings)):
-        form_dict[sh][form.misc_strings[index].label] = form.misc_strings[index].data.replace('%20', ' ')
-
-    for index in range(len(form.misc_selects)):
-        choices = [ct[1] for ct in form.misc_selects[index].choices]
-        form_dict[sh][form.misc_selects[index].label] = choices[int(form.misc_selects[index].data)]
+    form_dict[TricapConfig.MISC_SECTION_HEADER] = {}
+    extract_dict_info_from_form_section(form_dict[TricapConfig.MISC_SECTION_HEADER],
+                                        form.misc_strings, form.misc_selects)
 
     return form_dict
 
-def set_setting_sink_with_dict(sink, sdict):
+def set_setting_handler_with_dict(handler, sdict):
     # TODO Should we do this here, how should we handle the returns? Figure it out on merging
     ret_val = 0
     for key in sdict.keys():
-        ret_val += sink.set_setting(key, sdict[key])
+        ret_val += handler.set_setting(key, sdict[key])
 
     return ret_val
 
 def change_settings(form):
     form_dict = convert_populated_form_to_dict(form)
 
-    set_setting_sink_with_dict(tricap_manager, form_dict[TricapConfig.CAMERA_SECTION_HEADER])
-    set_setting_sink_with_dict(altimeter, form_dict[TricapConfig.ALTI_SECTION_HEADER])
+    set_setting_handler_with_dict(tricap_manager, form_dict[TricapConfig.CAMERA_SECTION_HEADER])
+    set_setting_handler_with_dict(altimeter, form_dict[TricapConfig.ALTI_SECTION_HEADER])
 
     misc_setting_handler = MiscSettingHandler()
-    set_setting_sink_with_dict(misc_setting_handler, form_dict[TricapConfig.MISC_SECTION_HEADER])
+    set_setting_handler_with_dict(misc_setting_handler, form_dict[TricapConfig.MISC_SECTION_HEADER])
 
 def save_settings(form, config_fp=CONFIG_FP, logger=None):
 
@@ -199,12 +172,8 @@ def save_settings(form, config_fp=CONFIG_FP, logger=None):
     # modify the settings dict based on settings in the form (i.e. the user selected options)
     form_dict = convert_populated_form_to_dict(form)
 
-    config.set_section(form_dict[TricapConfig.CAMERA_SECTION_HEADER],
-                                 TricapConfig.CAMERA_SECTION_HEADER)
-    config.set_section(form_dict[TricapConfig.ALTI_SECTION_HEADER],
-                                 TricapConfig.ALTI_SECTION_HEADER)
-    config.set_section(form_dict[TricapConfig.MISC_SECTION_HEADER],
-                                 TricapConfig.MISC_SECTION_HEADER)
+    for section_header in TricapConfig.SECTION_HEADERS:
+        config.set_section(form_dict[section_header], section_header)
 
     config.save_to_file()
 
@@ -215,13 +184,10 @@ def revert_to_default_settings(save_to_fp=CONFIG_FP, logger=None):
 
     default_config = TricapConfig(config_fp_to_read=DEFAULT_CONFIG_FP)
     config = TricapConfig(config_fp_to_read=save_to_fp)
-    # config.clear_config()
-    config.set_section(default_config.get_section_dict(TricapConfig.CAMERA_SECTION_HEADER),
-                       TricapConfig.CAMERA_SECTION_HEADER)
-    config.set_section(default_config.get_section_dict(TricapConfig.ALTI_SECTION_HEADER),
-                       TricapConfig.ALTI_SECTION_HEADER)
-    config.set_section(default_config.get_section_dict(TricapConfig.MISC_SECTION_HEADER),
-                       TricapConfig.MISC_SECTION_HEADER)
+
+    for section_header in TricapConfig.SECTION_HEADERS:
+        config.set_section(default_config.get_section_dict(section_header), section_header)
+
     config.save_to_file()
 
 @settings_bp.route('/settings', methods=['GET', 'POST'])

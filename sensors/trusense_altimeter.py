@@ -72,6 +72,9 @@ class TrusenseAltimeter(object):
         # Check for the okay signal
         self._check_ok('Alti did not send OK on startup')
 
+    def get_choices_for_setting(self, setting_str):
+        return None
+
     def get_setting(self,setting_str):
         ret_val = None
         # self._setting_strings = ['alti_measurement_timeout', 'alti_num_frames_to_avg']

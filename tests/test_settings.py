@@ -15,6 +15,8 @@ from app.views import settings
 
 from app import tricap_manager
 
+from app import simfdf
+
 from sensors.configure import TricapConfig
 
 from config import DEFAULT_CONFIG_FP, SERVER_LOG_DIR, CONFIG_FP, TEST_STATIC_DIR, SERVER_LOG_NAME
@@ -41,6 +43,7 @@ class BaseTestSettings(TestCase):
         app.config['WTF_CSRF_ENABLED'] = False
         # So that the error catching does not prevent us from seeing exceptions
         app.config['TESTING'] = True
+
         return app
 
     def setUp(self):

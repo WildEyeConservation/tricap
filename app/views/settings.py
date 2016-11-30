@@ -117,6 +117,8 @@ def populate_pushed_form(pushed_form):
 
 def extract_dict_info_from_form_section(section_dict, form_strings, form_selects):
     for index in range(len(form_strings)):
+        # Replacing the %20 introducted by the HTML Form when there is a space in a string, because
+        #  the configparser uses % to indicate values which should be interpolated.
         section_dict[form_strings[index].label] = form_strings[index].data.replace('%20', ' ')
 
     for index in range(len(form_selects)):

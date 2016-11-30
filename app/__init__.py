@@ -15,6 +15,7 @@ from sensors.cam_manager import TriCapCamsManager
 
 from sensors.trusense_altimeter import TrusenseAltimeter
 from sensors.session_logger import SessionLogger
+from sensors.configure import TricapConfig
 
 from config import SERVER_LOG_DIR
 
@@ -35,6 +36,10 @@ rootlogger = logging.getLogger('')
 rootlogger.addHandler(handler)
 rootlogger.setLevel(logging.DEBUG)
 app.logger.info('Initiated logger for new instance of TriCap app.')
+
+# Instantiate a config object, and delete again, as a startup test to validate the config file
+temp = TricapConfig()
+temp = None
 
 # Instantiate the sensors
 tricap_manager = TriCapCamsManager()

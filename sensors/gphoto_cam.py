@@ -7,7 +7,11 @@ import gphoto2 as gp
 from config import CAMERA_STATES
 from config import CE6D_CAP_TARGET_SD_CARD, CE6D_FORMAT_RAW
 from .configure import TricapConfig
+from enum import IntEnum
 
+CamConfigType = IntEnum("CamConfigType",
+                        {"Window": 0, "Section": 1, "Text": 2, "Range": 3, "Toggle": 4, "Radio": 5, "Menu": 6,
+                         "Button": 7, "Date": 8})
 
 # noinspection PyUnresolvedReferences
 class GPhotoCam(object):
@@ -70,6 +74,24 @@ class GPhotoCam(object):
 
         self.state = CAMERA_STATES.INITIALISED
         self._obtain_serial_num(gp_config)
+
+    def get_config_tree(self):
+        return GPhotoCam._get_config(self._gp_camera.get_config(GPhotoCam._context))
+
+    @staticmethod
+    def _get_config(node):
+        children = [node.get_child(i) for i in range(node.count_children())]
+        if len(children):
+            return {child.get_name(): GPhotoCam._get_config(child) for child in children}
+        else:
+            if (node.get_type() == 5):
+                choices = [node.get_choice(i) for i in range(node.count_choices())]
+            else:
+                choices = None
+            return {'label': node.get_label(),
+                    'type': node.get_type(),
+                    'value': node.get_value(),
+                    'choices': choices}
 
     # TODO The naming convention for configs and settings is a mess. Sort it out
     def _get_list_of_valid_config_names(self, config):

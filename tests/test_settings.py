@@ -25,7 +25,7 @@ from config import DEFAULT_CONFIG_FP, SERVER_LOG_DIR, CONFIG_FP, TEST_STATIC_DIR
 
 class BaseTestSettings(TestCase):
 
-    logger = logging.getLogger(SERVER_LOG_NAME)
+    # logger = logging.getLogger('test_configure')
     format_str = "%(asctime)s | %(pathname)s:%(lineno)d | %(funcName)s | %(levelname)s | %(message)s "
     formatter = logging.Formatter(format_str)
     log_fp = os.path.join(SERVER_LOG_DIR, 'test_settings.log')
@@ -39,17 +39,6 @@ class BaseTestSettings(TestCase):
     def create_app(self):
         app.config['WTF_CSRF_ENABLED'] = False
         return app
-
-    logger = logging.getLogger('test_configure')
-    format_str = "%(asctime)s | %(pathname)s:%(lineno)d | %(funcName)s | %(levelname)s | %(message)s "
-    formatter = logging.Formatter(format_str)
-    log_fp = os.path.join(SERVER_LOG_DIR, 'test_configure.log')
-    handler = logging.FileHandler(filename=log_fp)
-    handler.setLevel(logging.DEBUG)
-    handler.setFormatter(formatter)
-    rootlogger = logging.getLogger('')
-    rootlogger.addHandler(handler)
-    rootlogger.setLevel(logging.DEBUG)
 
     def setUp(self):
         # backup the actual initial.cfg

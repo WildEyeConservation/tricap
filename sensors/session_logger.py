@@ -1,13 +1,12 @@
+""" D Joubert - Innoventix Consulting - 18 November 2016 - session_logger.py
+    Logger for data, to be used for importing the data into the larger system """
+
 import logging
 import os
 import shutil
 import time
 
 from config import SESSION_ROOT_DIR, CONFIG_FP, RET_OK
-
-""" D Joubert - Innoventix Consulting - 18 November 2016 - session_logger.py
-    Logger for data, to be used for importing the data into the larger system """
-
 
 class SessionLogger:
     """ The session logger is responsible for creating a session folder, a session data file
@@ -24,6 +23,10 @@ class SessionLogger:
         session_name = 'session_logger'
         self._logger = logging.getLogger(session_name)
         self._logger.setLevel(logging.DEBUG)
+         # The session_logger is not an error logger, messages logged to it should not be pushed to
+         #  the rootlogger
+        self._logger.propagate = False
+
 
         self._session_count = None
         self._log_fp = None

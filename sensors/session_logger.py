@@ -6,22 +6,28 @@ import os
 import shutil
 import time
 
-from config import SESSION_ROOT_DIR, CONFIG_FP, RET_OK, SERVER_LOG_DIR
+from config import SESSION_ROOT_DIR, CONFIG_FP, SERVER_LOG_DIR
 
 class SessionLogger:
     """ The session logger is responsible for creating a session folder, a session data file
         (which will most likely only contain the data from the altimeter), copying the config file
-        and creating any additional data structures. """
+        and creating any additional data structures.
+        If something goes wrong with using the SessionLogger, it is seen as not critical enough to
+        halt operation by default. So exceptions should be caught and logged. That said, the
+        list of exceptions to catch will be quite restricted, so if something weird happens, it
+        is better to break the system (fail early)."""
+
+    _root_logger = logging.getLogger(__name__)
 
     def __init__(self, description='Default Description', root_folder=SESSION_ROOT_DIR):
 
         self._root_folder = root_folder
 
-        self._logger = logging.getLogger('session_logger')
-        self._logger.setLevel(logging.DEBUG)
+        self._data_logger = logging.getLogger('session_logger')
+        self._data_logger.setLevel(logging.DEBUG)
          # The session_logger is not an error logger, messages logged to it should not be pushed to
          #  the rootlogger
-        self._logger.propagate = False
+        self._data_logger.propagate = False
 
         self._session_count = None
         self._log_fp = None
@@ -33,51 +39,47 @@ class SessionLogger:
         self._ready = False
 
     def __del__(self):
+        self._remove_handlers()
+
+    def _remove_handlers(self):
         if self._fh is not None:
             self._fh.close()
-            self._logger.removeHandler(self._fh)
+            self._data_logger.removeHandler(self._fh)
 
         if self._server_fh is not None:
             self._server_fh.close()
             logging.getLogger('').removeHandler(self._server_fh)
 
+    def is_ready(self):
+        return self._ready
+
     def set_description(self, description):
         self._description = description
-        return RET_OK
 
     def get_description(self):
         return self._description
 
     def create_new_session(self, description=None):
-        if self._fh is not None:
-            self._fh.close()
-            self._logger.removeHandler(self._fh)
+        self._ready = False
+
+        self._remove_handlers()
 
         if description is not None:
             self._description = description
 
-        self._session_folder = self._create_folder()
-        self._prep_folder()
+        try:
+            self._session_folder = self._create_folder()
+            self._prep_folder()
 
-        self._fh = self._create_file_handler()
-        self._logger.addHandler(self._fh)
+            self._fh = self._create_file_handler()
+            self._data_logger.addHandler(self._fh)
 
-        self._copy_and_link_to_root_logger()
-
-        self._ready = True
-        self.log("Session Description : %s" % self._description)
-
-    def get_session_folder(self):
-        if self._ready is True:
-            return self._session_folder
-        else:
-            return None
-
-    def get_log_fp(self):
-        if self._ready is True:
-            return self._log_fp
-        else:
-            return None
+            # need to set ready to true otherwise the log function won't work.
+            self._ready = True
+            self.log("Session Description : %s" % self._description)
+        except (FileNotFoundError) as ex:
+            self._root_logger.error(ex)
+            self._ready = False
 
     def _create_file_handler(self):
         session_filename = "%s_session%.2d.log" % (time.strftime("%Y_%m_%d"), self._session_count)
@@ -113,7 +115,7 @@ class SessionLogger:
 
         shutil.copyfile(CONFIG_FP, os.path.join(self._session_folder, 'initial.cfg'))
 
-    def _copy_and_link_to_root_logger(self):
+        # copy the root logger file, and create a new session_server.log
         root_log = os.path.join(SERVER_LOG_DIR, 'tricap_server.log')
         if os.path.isfile(root_log):
             # Don't care if it overwrites any existing pre-session_server log, it will contain same
@@ -130,9 +132,5 @@ class SessionLogger:
         rootlogger.addHandler(self._server_fh)
 
     def log(self, msg):
-        if self._ready is True:
-            self._logger.info(msg)
-
-    def convert_file_to_xml(self):
-        """ Not implemented yet, might be usefull"""
-        pass
+        if self._ready:
+            self._data_logger.info(msg)

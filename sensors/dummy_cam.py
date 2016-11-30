@@ -28,8 +28,8 @@ class DummyCam(object):
         self._fresh_capture = False
         self._address = address  # if we ever want to do anything with this later
         self._settings_dict = settings
-        for setting_name, setting_value in settings:
-            self._set_config_value_by_string(setting_name, setting_value)
+        for setting_name, setting_value in settings.items():
+            self.set_setting(setting_name, setting_value)
 
     def reset(self):
         self.state = CAMERA_STATES.INITIALISED

@@ -1,13 +1,14 @@
-""" D Joubert 18 November 2016 - Configurator - handles reading and saving the initial config """
+"""D Joubert 18 November 2016 - Configurator - handles reading and saving the initial config."""
 
 import configparser
 import logging
 import pdb
-
 from config import CONFIG_FP
+
 
 class TricapConfigError(Exception):
     pass
+
 
 class TricapConfig:
     """ TricapConfig: Object that reads and writes settings from/to a config file, handling the
@@ -32,7 +33,7 @@ class TricapConfig:
     TYPE_INT = 'int'
     TYPE_FLOAT = 'float'
 
-    def __init__(self, config_fp_to_read = CONFIG_FP):
+    def __init__(self, config_fp_to_read=CONFIG_FP):
         self._parser = configparser.ConfigParser()
 
         self._config_fp = config_fp_to_read
@@ -90,9 +91,11 @@ class TricapConfig:
 
         return ret_val
 
-    def set_section(self, section_dict, section_header):
-        """ Change the values stored in the internal configparser.
-            Note that settings will only be changed. Nothing gets added or removed """
+    def set_section(self, section_dict: dict, section_header):
+        """Change the values stored in the internal configparser.
+
+        Note that settings will only be changed. Nothing gets added or removed.
+        """
         # Using an assert, because this should really not happen
         assert self._ready_flag
 
@@ -109,7 +112,7 @@ class TricapConfig:
             self._logger.error('configparser exception: %s', ex.args)
             raise
 
-    def save_to_file(self, config_fp = None):
+    def save_to_file(self, config_fp=None):
         """ Save the values of the configparser to file. """
 
         assert self._ready_flag

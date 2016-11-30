@@ -1,22 +1,23 @@
 # coding=utf-8
 """ D Joubert 16 November 2016 - Camera managers for Tricap app"""
 
-# TODO Wrong place, but the overall logger should be attached to the session logger, so that those
-# error messages get captured to the session folder as well. Or maybe separately, so you can still
-# read the alti messages?
-
 # TODO Settings page should show warning for all incorrectly formatted settings
 
 import logging
 import threading
 import time
+import pdb
 
 from config import CAM_MANAGER_STATES
 from config import RET_OK, RET_ERROR
 
 # TODO : Create a camera factory that will import cameras according to its config and make them available via its own
 # autodetect function
-from .gphoto_cam import GPhotoCam as Camera
+try:
+    from .gphoto_cam import GPhotoCam as Camera
+except ImportError:
+    from .dummy_cam import DummyCam as Camera
+
 from .configure import TricapConfig
 
 
@@ -25,7 +26,7 @@ class TriCapCamsManager(object):
     supportedCameras = {"Canon EOS 6D", "Dummy Cam"}
     _logger = logging.getLogger(__name__)
 
-    def __init__(self):
+    def __init__(self, cam_settings):
         self.state = CAM_MANAGER_STATES.STOPPED
 
         self._capture_thread = None
@@ -36,6 +37,7 @@ class TriCapCamsManager(object):
         self._capture_thread = None
         self._image_capture_interval = None
         self._kill_pill = None
+        self._cam_settings = cam_settings
 
         self._initialise()
 
@@ -79,8 +81,8 @@ class TriCapCamsManager(object):
         try:
             for name, address in Camera.autodetect():
                 if name in TriCapCamsManager.supportedCameras:
-                    self._logger.info('Adding camera %s at address %s ' % (name, address))
-                    tricap_cam = Camera(address)
+                    self._logger.info('Adding camera %s at address %s ' % (name, address))                
+                    tricap_cam = Camera(address, self._cam_settings)
                     self._cameras.append(tricap_cam)
         except Exception:  # Catches most exceptions, except KeyboardInterrupt and SystemExit
             self._logger.error("_find_cameras failed.", exc_info=True)

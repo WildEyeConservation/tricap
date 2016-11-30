@@ -28,3 +28,4 @@ init_config.txt
 initial.cfg
 pylintrc
 test_local.py
+delete_log_files.py

@@ -71,8 +71,6 @@ class GPhotoCam(object):
         self.state = CAMERA_STATES.INITIALISED
         self._obtain_serial_num(gp_config)
 
-        return ret_val
-
     # TODO The naming convention for configs and settings is a mess. Sort it out
     def _get_list_of_valid_config_names(self, config):
         config_names = []

@@ -7,7 +7,7 @@ from flask import send_file
 
 from app import tricap_manager, tricap_cameras, image_manager, altimeter, session_logger
 
-from config import BUTTON_CODES
+from config import BUTTON_CODE
 import io
 
 home_bp = Blueprint('home', __name__)
@@ -79,17 +79,17 @@ def serve_cam_img(cam_num_str):
 def handle_button_click():
     button_code = request.args.get('buttonCode', 0, type=int)
 
-    if button_code == BUTTON_CODES.START:
+    if button_code == BUTTON_CODE.START:
         # TODO Add the session description to the settings page
         session_logger.create_new_session()
         tricap_manager.start_capturing()
         altimeter.start_measuring()
-    elif button_code == BUTTON_CODES.STOP:
+    elif button_code == BUTTON_CODE.STOP:
         print('stopping - view')
         tricap_manager.stop_capturing()
         altimeter.stop_measuring()
         print('stopping - view - stopped')
-    elif button_code == BUTTON_CODES.RESET:
+    elif button_code == BUTTON_CODE.RESET:
         reset_device_objects()
 
     return jsonify()

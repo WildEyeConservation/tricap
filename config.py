@@ -2,7 +2,7 @@
 """Configuration variables and classes for tricap.py"""
 
 # Get all the machine specific configurations (stuff like file locations)
-from enum import Enum
+from enum import Enum, IntEnum
 
 import local_paths
 
@@ -37,5 +37,5 @@ NUM_DUMMY_CAMS = 3
 CAMERA_STATES = Enum("CamState", ["UNINITIALISED", "INITIALISED", "CAPTURING", "ERROR_CONFIG", "ERROR_CAPTURE"])
 CAM_MANAGER_STATES = Enum("CamManagerState", ["STOPPED", "STARTED", "ERROR_NO_CAMS", "ERROR_CONFIG"])
 ALTIMETER_STATE = Enum("AltiState", ["NOT_CONNECTED", "CONNECTED", "MEASURING", "ERROR"])
-BUTTON_CODES = Enum("ButtonCode", ["START", "STOP", "TEST", "RESET"])
+BUTTON_CODE = IntEnum("ButtonCode", {"START": 0, "STOP": 1, "TEST": 2, "RESET": 3})
 LOG_CODES = Enum("LogCode", "ALL")

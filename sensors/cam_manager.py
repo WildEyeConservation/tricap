@@ -30,7 +30,6 @@ class TriCapCamsManager(object):
 
         self._capture_thread = None
         self._kill_pill = None
-        self._image_capture_interval = None
 
         self._cameras = None
         self._cam_threads = None
@@ -48,8 +47,8 @@ class TriCapCamsManager(object):
         self._capture_thread = None
 
         init_config = TricapConfig()
-        self._image_capture_interval = init_config.get('image_capture_interval',
-                                                       TricapConfig.MISC_SECTION_HEADER)
+        self._image_capture_interval = float(init_config.get('image_capture_interval',
+                                                             TricapConfig.MISC_SECTION_HEADER))
 
     def set_image_capture_interval(self, interval):
         if isinstance(interval, str):
@@ -97,7 +96,7 @@ class TriCapCamsManager(object):
 
     def _cap_thread_generator(self):
         for index, cam in enumerate(self._cameras):
-            thread = threading.Thread(target=cam.capture_to_mem, daemon=True)
+            thread = threading.Thread(target=cam.capture, daemon=True)
             yield thread
 
     def _start_capture_with_wait_thread(self):

@@ -8,7 +8,7 @@ import unittest
 import pdb
 import configparser
 
-from config import CONFIG_FP, SERVER_LOG_DIR, RET_OK
+from config import CONFIG_FP, SERVER_LOG_DIR
 from sensors.configure import TricapConfig, TricapConfigError
 
 class TestBaseConfigure(unittest.TestCase):

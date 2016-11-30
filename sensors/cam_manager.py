@@ -7,13 +7,16 @@
 
 # TODO Settings page should show warning for all incorrectly formatted settings
 
+import logging
 import threading
 import time
-import logging
 
-from config import CAM_MANAGER_STATES, DEFAULT_IMAGE_CAPTURE_INTERVAL
+from config import CAM_MANAGER_STATES
 from config import RET_OK, RET_ERROR
-from .cameras import Camera
+
+# TODO : Create a camera factory that will import cameras according to its config and make them available via its own
+# autodetect function
+from .gphoto_cam import GPhotoCam as Camera
 from .configure import TricapConfig
 
 

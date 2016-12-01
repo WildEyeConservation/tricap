@@ -5,16 +5,18 @@ from collections import namedtuple
 from config import RET_ERROR, RET_OK, CAMERA_STATES, DUMMY_IMAGE_PATH
 import pickle
 from anytree import Node, PreOrderIter
-from .abstract_cam import CamConfigType
+from .abstract_cam import CamConfigType, AbstractCamera, CameraException
 import os
 from copy import deepcopy
+import threading
+from glob import glob
 
 # TODO Implement a Windows Canon6DCam, which uses the Canon EDSDK to communicate with the camera
 # TODO Have the DummyCam load variables from the config file, like the normal camera would
 CameraSpec = namedtuple("cam", ["name", "model"])
 
 
-class DummyCam:
+class DummyCam(AbstractCamera):
     """ Serves as a fake camera for testing purposes."""
 
     cameras = [CameraSpec(name="Dummy Cam", model=None) for i in range(3)]
@@ -95,61 +97,78 @@ class DummyCam:
     def autodetect():
         return [(cam.name, index) for index, cam in enumerate(DummyCam.cameras)]
 
-    def __init__(self, address, settings):
+    def __init__(self, address, settings=dict()):
         self.state = CAMERA_STATES.INITIALISED
-        # TODO : Check if this camera has allready been claimed and throw an exception.
+        # TODO : Check if this camera has allready been claimed and raise an exception.
         self._camera = DummyCam.cameras[address]
+        camFile = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                               '../camModels/Canon 6D - 023052000180.pkl')
+        with open(camFile, 'rb') as f:
+            self._model = pickle.load(f)
         self._fresh_capture = False
         self._address = address  # if we ever want to do anything with this later
-        self._settings_dict = settings
+        fnames = glob(os.path.join(os.path.dirname(__file__), '..', 'camModels', 'captureSequence', '*.jpg'))
+        # TODO : raise an exception if this list does not contain at least 2 images
+        self._imgs = []
+        self._counter = 0
+        self.serial_num = 0
+        for filename in fnames:
+            with open(filename, 'rb') as f:
+                self._imgs.append(f.read())
+
         for setting_name, setting_value in settings.items():
-            self._set_config_value_by_string(setting_name, setting_value)
+            self.set_setting(setting_name, setting_value)
 
     def reset(self):
         self.state = CAMERA_STATES.INITIALISED
 
     def is_cam_image_fresh(self):
-        return self._fresh_capture
+        cache = self._fresh_capture
+        self._fresh_capture = False
+        return cache
 
     def get_cam_image_fp(self):
-        self._fresh_capture = False
-        return DUMMY_IMAGE_PATH
+        return self.data
 
-    @staticmethod
-    def get_state_as_string():
-        return "Base Cam has no state."
+    def get_state_as_string(self):
+        return self.state.name
 
-    def _find_nodes(self, name):
-        return [node for node in PreOrderIter(self._camera.model) if node.name == name]
+    def _find_node(self, name):
+        nodes = [node for node in PreOrderIter(self._model) if node.name == name]
+        if len(nodes) != 1:
+            raise CameraException("%s does not uniquely identify a single setting" % name)
+        return nodes[0]
 
-    def _set_config_value_by_string(self, setting_str, setting_val):
-        nodes = self._find_nodes(setting_str)
-        assert len(nodes) == 1, "%s does not uniquely identify a single setting" % setting_str
-        assert nodes[0].type == CamConfigType.Radio, "Only radio button configs can be set for now"
-        nodes[0].value = setting_val
+    def get_config_tree(self):
+        return self._model
 
-    def _get_config_value_by_string(self, setting_str):
-        nodes = _find_nodes(self, name)
-        assert len(nodes) == 1, "%s does not uniquely identify a single setting" % setting_str
-        return nodes[0].value
-
-    @staticmethod
-    def get_choices_for_setting(setting_str):
-        # just a couple of hard coded ones
-        if setting_str == 'shutterspeed':
-            return ['1/4', '1/640', '1/2500']
-        elif setting_str == 'iso':
-            return ['100', '200', '500']
+    def set_setting(self, setting_str, setting_val):
+        node = self._find_node(setting_str)
+        if setting_val in node.choices:
+            node.value = setting_val
         else:
-            return None
+            raise CameraException("%s does not appear to be a valid option for %s. Valid choices are %s" % (
+            setting_val, setting_str, node.choices))
 
-    def capture(self):
-        if self.state == CAMERA_STATES.INITIALISED:
+    def get_choices_for_setting(self, setting_str):
+        node = self._find_nodes(setting_str)
+        if node.type != CamConfigType.Radio:
+            raise CameraException("Only radio button configs can be queried for valid choices.")
+        return node.choices
+
+    def get_setting(self, setting_str):
+        node = self._find_nodes(setting_str)
+        return node.value
+
+    def capture(self, continuous=False, barrier: threading.Barrier = None):
+        while True:
             self.state = CAMERA_STATES.CAPTURING
-            # prepare the small jpeg filename
             time.sleep(1)
+            if barrier:
+                barrier.wait()
+            self._counter += 1
+            self.data = self._imgs[self._counter % len(self._imgs)]
             self._fresh_capture = True
             self.state = CAMERA_STATES.INITIALISED
-            return RET_OK
-        else:
-            return RET_ERROR
+            if not continuous:
+                return

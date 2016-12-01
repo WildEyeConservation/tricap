@@ -4,6 +4,7 @@
 import logging
 import os
 import unittest
+from sensors.abstract_cam import CameraException
 
 from config import CAMERA_STATES, SERVER_LOG_DIR, RET_OK, RET_ERROR
 from sensors.configure import TricapConfig
@@ -37,11 +38,12 @@ class TestDummyCam(TestBaseDummyCam):
         DummyCam.configure(camSpecs)
 
         allNames = []
-        for ((name, address), spec) in zip(DummyCam.autodetect(), camSpecs):
-            allNames.append(name)
-            cam = DummyCam(address, settings)
-
-        self.assertEqual(allNames, camNames)
+        settings = {'shutterspeed': '1/2500', 'iso': '100'}
+        cam = DummyCam(0, settings)
+        settings = {'shotterspeed': '1/2500', 'iso': '100'}
+        self.assertRaises(CameraException, DummyCam, 0, settings)
+        settings = {'shutterspeed': '1/2501', 'iso': '100'}
+        self.assertRaises(Exception, DummyCam, 0, settings)
 
         # def test_init(self):
         #     cam = DummyCam(self._address)

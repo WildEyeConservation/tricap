@@ -17,10 +17,11 @@ from config import RET_OK, RET_ERROR
 # TODO : Create a camera factory that will import cameras according to its config and make them available via its own
 # autodetect function
 from .gphoto_cam import GPhotoCam as Camera
+# from .dummy_cam import DummyCam as Camera
 from .configure import TricapConfig
 
 
-class TriCapCamsManager(object):
+class TriCapCamsManager:
     """TriCapCamsManager manages TriCap camera objects"""
     supportedCameras = {"Canon EOS 6D", "Dummy Cam"}
     _logger = logging.getLogger(__name__)

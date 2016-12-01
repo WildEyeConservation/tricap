@@ -24,10 +24,11 @@ class GPhotoCam(object):
 
         self.state = CAMERA_STATES.UNINITIALISED
         self._address = address
+        self._settings = settings
         self._setup_camera()
         self._fresh_capture = False
         self._download_fp = None
-        self._settings = settings
+
         self.data = None
 
         if self.state == CAMERA_STATES.INITIALISED:

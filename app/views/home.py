@@ -64,7 +64,6 @@ def provide_alti_data():
 
 @home_bp.route('/cam_img<cam_num_str>')
 def serve_cam_img(cam_num_str):
-    print('serving cam img ' + cam_num_str)
     # cam_img_fp = image_manager.get_cam_image_fp(int(cam_num_str))
     #
     # if cam_img_fp is None:

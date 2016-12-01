@@ -62,18 +62,13 @@ class TriCapCamsManager:
 
     def _find_cameras(self):
         self._cameras = []
-
-        try:
-            for name, address in Camera.autodetect():
-                if name in TriCapCamsManager.supportedCameras:
-                    self._logger.info('Adding camera %s at address %s ' % (name, address))
-                    tricap_cam = Camera(address, self._cam_settings)
-                    self._cameras.append(tricap_cam)
-        except Exception:  # Catches most exceptions, except KeyboardInterrupt and SystemExit
-            self._logger.error("_find_cameras failed.", exc_info=True)
-            return RET_ERROR
-
-        return RET_OK
+        # Do not catch exceptions here. If any detected camera fails to instantiate, it is a critical error and we want
+        # to halt and catch fire.
+        for name, address in Camera.autodetect():
+            if name in TriCapCamsManager.supportedCameras:
+                self._logger.info('Adding camera %s at address %s ' % (name, address))
+                tricap_cam = Camera(address, self._cam_settings)
+                self._cameras.append(tricap_cam)
 
     def reset(self, man_settings: dict, cam_settings: dict):
         self._man_settings = man_settings

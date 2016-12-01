@@ -151,13 +151,13 @@ class DummyCam(AbstractCamera):
             setting_val, setting_str, node.choices))
 
     def get_choices_for_setting(self, setting_str):
-        node = self._find_nodes(setting_str)
+        node = self._find_node(setting_str)
         if node.type != CamConfigType.Radio:
             raise CameraException("Only radio button configs can be queried for valid choices.")
         return node.choices
 
     def get_setting(self, setting_str):
-        node = self._find_nodes(setting_str)
+        node = self._find_node(setting_str)
         return node.value
 
     def capture(self, continuous=False, barrier: threading.Barrier = None):

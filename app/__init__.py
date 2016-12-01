@@ -41,7 +41,9 @@ app.logger.info('Initiated logger for new instance of TriCap app.')
 init_config = TricapConfig()
 
 # Instantiate the sensors
-tricap_manager = TriCapCamsManager(init_config.get_section_dict(TricapConfig.CAMERA_SECTION_HEADER))
+misc_settings = init_config.get_section_dict(TricapConfig.MISC_SECTION_HEADER)
+cam_settings = init_config.get_section_dict(TricapConfig.CAMERA_SECTION_HEADER)
+tricap_manager = TriCapCamsManager()
 tricap_cameras = tricap_manager.get_cameras_as_list()
 image_manager = tricap_manager
 

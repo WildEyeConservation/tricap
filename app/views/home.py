@@ -80,7 +80,6 @@ def handle_button_click():
     button_code = request.args.get('buttonCode', 0, type=int)
 
     if button_code == BUTTON_CODE.START:
-        # TODO Add the session description to the settings page
         session_logger.create_new_session()
         tricap_manager.start_capturing()
         altimeter.start_measuring()

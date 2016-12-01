@@ -19,15 +19,17 @@ class GPhotoCam(object):
     _context = gp.Context()
     _logger = logging.getLogger(__name__)
 
-    def __init__(self, address):
+    def __init__(self, address, settings: dict):
 
         self._gp_camera = None
 
         self.state = CAMERA_STATES.UNINITIALISED
         self._address = address
+        self._settings = settings
         self._setup_camera()
         self._fresh_capture = False
         self._download_fp = None
+
         self.data = None
 
         if self.state == CAMERA_STATES.INITIALISED:
@@ -55,7 +57,6 @@ class GPhotoCam(object):
         self._gp_camera.init(GPhotoCam._context)
         # Do not catch exceptions here. Camera init is mission critical. If camera initialisation fails, we want top
         # level code to know about it.
-        init_configs = TricapConfig()
 
         # get configuration tree
         gp_config = self._gp_camera.get_config(GPhotoCam._context)
@@ -64,9 +65,8 @@ class GPhotoCam(object):
         self._set_config_value(gp_config, 'imageformat', CE6D_FORMAT_RAW)
 
         # Read the camera values from the initial.cfg file
-        section_dict = init_configs.get_section_dict(TricapConfig.CAMERA_SECTION_HEADER)
-        for key in section_dict:
-            self._set_config_value_by_string(gp_config, key, section_dict[key])
+        for key in self._settings:
+            self._set_config_value_by_string(gp_config, key, self._settings[key])
 
         self.state = CAMERA_STATES.INITIALISED
         self._obtain_serial_num(gp_config)
@@ -132,8 +132,9 @@ class GPhotoCam(object):
         self.serial_num = config.get_child_by_name('eosserialnumber').get_value()
         self._logger.info('Successfully retrieved camera serial number %s' % self.serial_num)
 
-    def reset(self):
+    def reset(self, settings: dict):
         self.state = CAMERA_STATES.UNINITIALISED
+        self._settings = settings
         self._setup_camera()
 
     def set_setting(self, setting_str, val_str):

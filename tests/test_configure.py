@@ -8,17 +8,16 @@ import unittest
 import pdb
 import configparser
 
-from config import CONFIG_FP, SERVER_LOG_DIR, RET_OK
+from config import CONFIG_FP, SERVER_LOG_DIR
 from sensors.configure import TricapConfig, TricapConfigError
 
 class TestBaseConfigure(unittest.TestCase):
-    logger = logging.getLogger('test_configure')
+
     format_str = "%(asctime)s | %(pathname)s:%(lineno)d | %(funcName)s | %(levelname)s | %(message)s "
-    formatter = logging.Formatter(format_str)
-    log_fp = os.path.join(SERVER_LOG_DIR, 'test_configure.log')
-    handler = logging.FileHandler(filename=log_fp)
+    handler = logging.FileHandler(filename=os.path.join(SERVER_LOG_DIR, 'test_configure.log'))
     handler.setLevel(logging.DEBUG)
-    handler.setFormatter(formatter)
+    handler.setFormatter(logging.Formatter(format_str))
+    handler.addFilter(logging.Filter(name='sensors.configure'))
     rootLogger = logging.getLogger('')
     rootLogger.addHandler(handler)
     rootLogger.setLevel(logging.DEBUG)
@@ -38,8 +37,6 @@ class TestBaseConfigure(unittest.TestCase):
                 os.remove(os.path.join(root, filename))
 
         shutil.rmtree(self.tempdir)
-
-
 
 class TestConfigure(TestBaseConfigure):
     def test_init(self):

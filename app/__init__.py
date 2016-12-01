@@ -38,10 +38,11 @@ rootlogger.setLevel(logging.DEBUG)
 app.logger.info('Initiated logger for new instance of TriCap app.')
 
 # Instantiate a config object, and delete again, as a startup test to validate the config file
-temp = TricapConfig()
-temp = None
+init_config = TricapConfig()
 
 # Instantiate the sensors
+misc_settings = init_config.get_section_dict(TricapConfig.MISC_SECTION_HEADER)
+cam_settings = init_config.get_section_dict(TricapConfig.CAMERA_SECTION_HEADER)
 tricap_manager = TriCapCamsManager()
 tricap_cameras = tricap_manager.get_cameras_as_list()
 image_manager = tricap_manager

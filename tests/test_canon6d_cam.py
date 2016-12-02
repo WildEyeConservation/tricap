@@ -28,7 +28,6 @@ class TestBaseCanon6DCam(unittest.TestCase):
             if name == "Canon EOS 6D":
                 self._address = address
                 break
-
         self.cam_settings = TricapConfig().get_section_dict(TricapConfig.CAMERA_SECTION_HEADER)
 
 
@@ -41,8 +40,8 @@ class TestDeviceCanon6DCam(TestBaseCanon6DCam):
     def test_set_shutter_speed(self):
         cam = GPhotoCam(self._address, self.cam_settings)
 
-        cam.set_setting('shutterspeed', '1/640')
-        self.assertEqual(cam.get_setting('shutterspeed'), '1/640')
+        cam.shutterspeed = '1/640'
+        self.assertEqual(cam.shutterspeed, '1/640')
 
         with self.assertRaises(ValueError):
             cam.set_setting('shutterspeed', '1/X')
@@ -55,10 +54,32 @@ class TestDeviceCanon6DCam(TestBaseCanon6DCam):
 
     def test_setting_iso(self):
         cam = GPhotoCam(self._address, self.cam_settings)
-        cam.set_setting('iso', '100')
-        self.assertEqual(cam.get_setting('iso'), '100')
-        cam.set_setting('iso', '200')
-        self.assertEqual(cam.get_setting('iso'), '200')
+        cam.hw.iso = '100'
+        self.assertEqual(cam.hw.iso, '100')
+        cam.hw.iso = '200'
+        self.assertEqual(cam.hw.iso, '200')
+
+        def setInvalidField():
+            cam.hw.isoo = '100'
+
+        def setInvalidIso():
+            cam.hw.iso = '101'
+
+        self.assertEqual(cam.hw.iso.label, 'ISO Speed')
+        self.assertEqual(cam.hw.iso.choices,
+                         ['Auto', '100', '125', '160', '200', '250', '320', '400', '500', '640', '800', '1000', '1250',
+                          '1600',
+                          '2000', '2500', '3200', '4000', '5000', '6400', '8000', '10000', '12800',
+                          'Unknown value 0083',
+                          'Unknown value 0085', '25600'])
+        self.assertRaises(Exception, setInvalidField)
+        self.assertRaises(Exception, setInvalidIso)
+        print(cam.hw.datetime)
+        # self.assertEqual(dir(cam.hw),['aeb', 'autoexposuremode', 'capturetarget', 'colorspace', 'drivemode',
+        #                               'eosremoterelease', 'evfmode', 'exposurecompensation', 'focusmode', 'imageformat',
+        #                               'imageformatcf', 'imageformatsd', 'iso', 'manualfocusdrive', 'meteringmode',
+        #                               'movierecord', 'output', 'picturestyle', 'reviewtime', 'shutterspeed',
+        #                               'whitebalance', 'whitebalanceadjusta', 'whitebalanceadjustb'])
 
     def test_get_choices_for_iso(self):
         cam = GPhotoCam(self._address, self.cam_settings)

@@ -119,6 +119,12 @@ class DummyCam(AbstractCamera):
         for setting_name, setting_value in settings.items():
             self.set_setting(setting_name, setting_value)
 
+    def __getattr__(self, item):
+        self.get_setting(item)
+
+    def __setattr__(self, key, value):
+        self.set_setting(key, value)
+
     def reset(self):
         self.state = CAMERA_STATES.INITIALISED
 
@@ -142,7 +148,7 @@ class DummyCam(AbstractCamera):
     def get_config_tree(self):
         return self._model
 
-    def set_setting(self, setting_str, setting_val):
+    def __set_attr__(self, setting_str, setting_val):
         node = self._find_node(setting_str)
         if setting_val in node.choices:
             node.value = setting_val
@@ -156,7 +162,7 @@ class DummyCam(AbstractCamera):
             raise CameraException("Only radio button configs can be queried for valid choices.")
         return node.choices
 
-    def get_setting(self, setting_str):
+    def __get_attr__(self, setting_str):
         node = self._find_node(setting_str)
         return node.value
 

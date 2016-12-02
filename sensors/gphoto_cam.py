@@ -7,8 +7,103 @@ import gphoto2 as gp
 from config import CAMERA_STATES
 from config import CE6D_CAP_TARGET_SD_CARD, CE6D_FORMAT_RAW
 from .configure import TricapConfig
-from anytree import Node
-from .abstract_cam import CamConfigType
+from anytree import Node, PreOrderIter, RenderTree
+from .abstract_cam import CamConfigType, CameraException
+
+
+class GPhotoConfigWidget:
+    def __init__(self, widget):
+        self._widget = widget
+
+    def _set(self, value):
+        #        if self._widget.get_type()!=CamConfigType.Radio or value in self.choices:
+        self._widget.set_value(str(value))
+
+    #        else:
+    #            raise CameraException("%s is not a valid value for %s. Valid choices are : %s" % (value,self._widget.get_name(),self.choices))
+
+    def __eq__(self, other):
+        return self._widget.get_value().__ne__(str(other))
+
+    def __eq__(self, other):
+        return self._widget.get_value().__eq__(str(other))
+
+    def __lt__(self, other):
+        return self._widget.get_value().__lt__(str(other))
+
+    def __gt__(self, other):
+        return self._widget.get_value().__gt__(str(other))
+
+    def __lt__(self, other):
+        return self._widget.get_value().__le__(str(other))
+
+    def __gt__(self, other):
+        return self._widget.get_value().__ge__(str(other))
+
+    @property
+    def choices(self):
+        try:
+            return [self._widget.get_choice(i) for i in range(self._widget.count_choices())]
+        except gp.GPhoto2Error:
+            return []
+
+    def __repr__(self):
+        return str(self._widget.get_value())
+
+    @property
+    def label(self):
+        return self._widget.get_label()
+
+
+class GPhotoConfig:
+    dictkeys = ["_camera", "_context"]
+
+    def __init__(self, camera, context):
+        self._camera = camera
+        self._context = context
+
+    def __repr__(self):
+        return str(RenderTree(self.get_tree()))
+
+    def __dir__(self):
+        return [node.name for node in PreOrderIter(self.get_tree()) if node.is_leaf]
+
+    def __setattr__(self, key, value):
+        if key in GPhotoConfig.dictkeys:
+            self.__dict__[key] = value
+        else:
+            config = self._camera.get_config(self._context)
+            config_widget = GPhotoConfigWidget(config.get_child_by_name(key))
+            config_widget._set(value)
+            self._camera.set_config(config, self._context)
+
+    def __getattr__(self, key):
+        if key in GPhotoConfig.dictkeys:
+            return self.__dict__[key]
+        else:
+            config = self._camera.get_config(self._context)
+            return GPhotoConfigWidget(config.get_child_by_name(key))
+
+    @staticmethod
+    def _get_config(node, parent=None):
+        children = [node.get_child(i) for i in range(node.count_children())]
+        if len(children):
+            thisnode = Node(node.get_name(), parent=parent, label=node.get_label(),
+                            type=CamConfigType(node.get_type()))
+            for child in children:
+                GPhotoConfig._get_config(child, thisnode)
+            return thisnode
+        else:
+            if (node.get_type() == CamConfigType.Radio):
+                choices = [node.get_choice(i) for i in range(node.count_choices())]
+            else:
+                choices = None
+            return Node(node.get_name(), parent=parent, label=node.get_label(), type=CamConfigType(node.get_type()),
+                        value=node.get_value(), choices=choices)
+
+    def get_tree(self):
+        config = self._camera.get_config(self._context)
+        return GPhotoConfig._get_config(config)
 
 # noinspection PyUnresolvedReferences
 class GPhotoCam(object):
@@ -20,28 +115,20 @@ class GPhotoCam(object):
     _logger = logging.getLogger(__name__)
 
     def __init__(self, address, settings: dict):
+        self.__dict__ = {'_gp_camera': None,
+                         'state': CAMERA_STATES.UNINITIALISED,
+                         '_address': address,
+                         '_settings': settings,
+                         '_fresh_capture': False,
+                         'data': None}
 
-        self._gp_camera = None
-
-        self.state = CAMERA_STATES.UNINITIALISED
-        self._address = address
-        self._settings = settings
         self._setup_camera()
-        self._fresh_capture = False
-        self._download_fp = None
-
-        self.data = None
-
         if self.state == CAMERA_STATES.INITIALISED:
             self._logger.info('GPhoto Camera %s at address %s successfully initialised'
                               % (self.serial_num, address))
 
     def is_cam_image_fresh(self):
         return self._fresh_capture
-
-    def get_cam_image_fp(self):
-        self._fresh_capture = False
-        return self._download_fp
 
     @staticmethod
     def autodetect():
@@ -60,9 +147,10 @@ class GPhotoCam(object):
 
         # get configuration tree
         gp_config = self._gp_camera.get_config(GPhotoCam._context)
+        self.hw = GPhotoConfig(self._gp_camera, self._context)
         # Set the Hard Coded Values
-        self._set_config_value(gp_config, 'capturetarget', CE6D_CAP_TARGET_SD_CARD)
-        self._set_config_value(gp_config, 'imageformat', CE6D_FORMAT_RAW)
+        self.hw.capturetarget = CE6D_CAP_TARGET_SD_CARD
+        self.hw.imageformat = CE6D_FORMAT_RAW
 
         # Read the camera values from the initial.cfg file
         for key in self._settings:
@@ -136,16 +224,6 @@ class GPhotoCam(object):
         self.state = CAMERA_STATES.UNINITIALISED
         self._settings = settings
         self._setup_camera()
-
-    def set_setting(self, setting_str, val_str):
-        config = self._gp_camera.get_config(GPhotoCam._context)
-        self._set_config_value_by_string(config, setting_str, val_str)
-
-    def get_setting(self, setting_str):
-        """ This external method is used to get settings from the Cannon EOS 6D using gphoto2. If
-            the setting does not exist, then the method returns None. The underlying
-            self._get_config_value records an error though. """
-        return self._get_config_value(setting_str)
 
     def get_choices_for_setting(self, config_str):
         """ External method for getting the choices. If there are any errors (like the config does

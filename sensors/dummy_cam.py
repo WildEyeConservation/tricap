@@ -1,20 +1,104 @@
 # coding=utf-8
+import os
+import pickle
+import threading
 import time
 from collections import namedtuple
-
-from config import RET_ERROR, RET_OK, CAMERA_STATES, DUMMY_IMAGE_PATH
-import pickle
-from anytree import Node, PreOrderIter
-from .abstract_cam import CamConfigType, AbstractCamera, CameraException
-import os
-from copy import deepcopy
-import threading
 from glob import glob
+
+from anytree import PreOrderIter, RenderTree
+
+from config import CAMERA_STATES
+from .abstract_cam import CamConfigType, AbstractCamera, CameraException
 
 # TODO Implement a Windows Canon6DCam, which uses the Canon EDSDK to communicate with the camera
 # TODO Have the DummyCam load variables from the config file, like the normal camera would
 CameraSpec = namedtuple("cam", ["name", "model"])
 
+
+class DummyWidget:
+    def __init__(self, node):
+        self._widget = node
+
+    def _set(self, value):
+        if self._widget.type == CamConfigType.Radio:
+            choices = self.choices
+            if value not in choices:
+                raise CameraException(
+                    "%s is not a valid value for %s. Valid choices are : %s" % (value, self._widget.name, self.choices))
+        self._widget.value = value
+
+    def __eq__(self, other):
+        return self._widget.value.__ne__(str(other))
+
+    def __eq__(self, other):
+        return self._widget.value.__eq__(str(other))
+
+    def __lt__(self, other):
+        return self._widget.value.__lt__(str(other))
+
+    def __gt__(self, other):
+        return self._widget.value.__gt__(str(other))
+
+    def __lt__(self, other):
+        return _widget.value.__le__(str(other))
+
+    def __gt__(self, other):
+        return _widget.value.__ge__(str(other))
+
+    @property
+    def choices(self):
+        try:
+            return self._widget.choices
+        except gp.GPhoto2Error:
+            return []
+
+    def __repr__(self):
+        return str(self._widget.value)
+
+    @property
+    def label(self):
+        return self._widget.label
+
+
+class DummyConfig:
+    dictkeys = ["_tree"]
+
+    def __init__(self, tree):
+        self._tree = tree
+
+
+    def __repr__(self):
+        return str(RenderTree(self._tree))
+
+    def __dir__(self):
+        return [node.name for node in PreOrderIter(self.get_tree()) if node.is_leaf]
+
+    def _get_child_by_name(self, key):
+        config_widget = [DummyWidget(widget) for widget in PreOrderIter(self._tree)
+                         if widget.name == key and widget.is_leaf]
+        if len(config_widget) != 1:
+            raise CameraException("%s does not uniquely identify a single item" % key)
+        return config_widget[0]
+
+    def __setattr__(self, key, value):
+        if key in DummyConfig.dictkeys:
+            self.__dict__[key] = value
+        else:
+            config_widget = self._get_child_by_name(key)
+            config_widget._set(str(value))
+
+    def __getattr__(self, key):
+        if key in self.__class__.dictkeys:
+            return self.__dict__[key]
+        else:
+            return self._get_child_by_name(key)
+
+    __setitem__ = __setattr__
+    __getitem__ = __getattr__
+
+    def get_tree(self):
+        return self._tree
 
 class DummyCam(AbstractCamera):
     """ Serves as a fake camera for testing purposes."""
@@ -105,6 +189,7 @@ class DummyCam(AbstractCamera):
                                '../camModels/Canon 6D - 023052000180.pkl')
         with open(camFile, 'rb') as f:
             self._model = pickle.load(f)
+        self._config = DummyConfig(self._model)
         self._fresh_capture = False
         self._address = address  # if we ever want to do anything with this later
         fnames = glob(os.path.join(os.path.dirname(__file__), '..', 'camModels', 'captureSequence', '*.jpg'))
@@ -119,11 +204,9 @@ class DummyCam(AbstractCamera):
         for setting_name, setting_value in settings.items():
             self.set_setting(setting_name, setting_value)
 
-    def __getattr__(self, item):
-        self.get_setting(item)
-
-    def __setattr__(self, key, value):
-        self.set_setting(key, value)
+    @property
+    def config(self):
+        return self._config
 
     def reset(self):
         self.state = CAMERA_STATES.INITIALISED

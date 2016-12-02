@@ -3,12 +3,11 @@ import logging
 import threading
 
 import gphoto2 as gp
+from anytree import Node, PreOrderIter, RenderTree
 
 from config import CAMERA_STATES
 from config import CE6D_CAP_TARGET_SD_CARD, CE6D_FORMAT_RAW
-from .configure import TricapConfig
-from anytree import Node, PreOrderIter, RenderTree
-from .abstract_cam import CamConfigType, CameraException
+from .abstract_cam import CamConfigType
 
 
 class GPhotoConfigWidget:
@@ -83,6 +82,9 @@ class GPhotoConfig:
         else:
             config = self._camera.get_config(self._context)
             return GPhotoConfigWidget(config.get_child_by_name(key))
+
+    __setitem__ = __setattr__
+    __getitem__ = __getattr__
 
     @staticmethod
     def _get_config(node, parent=None):

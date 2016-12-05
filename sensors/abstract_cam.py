@@ -29,15 +29,7 @@ class AbstractCamera(ABC):
         pass
 
     @abstractmethod
-    def get_config_tree(self):
-        pass
-
-    @abstractmethod
     def reset(self):
-        pass
-
-    @abstractmethod
-    def get_choices_for_setting(self, config_str):
         pass
 
     @abstractmethod

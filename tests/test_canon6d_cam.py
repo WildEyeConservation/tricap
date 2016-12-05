@@ -37,15 +37,6 @@ class TestDeviceCanon6DCam(TestBaseCanon6DCam):
 
         self.assertEqual(cam.state, CAMERA_STATES.INITIALISED)
 
-    def test_set_shutter_speed(self):
-        cam = GPhotoCam(self._address, self.cam_settings)
-
-        cam.shutterspeed = '1/640'
-        self.assertEqual(cam.shutterspeed, '1/640')
-
-        with self.assertRaises(ValueError):
-            cam.set_setting('shutterspeed', '1/X')
-
     def test_capture_func(self):
         cam = GPhotoCam(self._address, self.cam_settings)
         self.assertEqual(cam.is_cam_image_fresh(), False)
@@ -54,38 +45,48 @@ class TestDeviceCanon6DCam(TestBaseCanon6DCam):
 
     def test_setting_iso(self):
         cam = GPhotoCam(self._address, self.cam_settings)
-        cam.hw.iso = '100'
-        self.assertEqual(cam.hw.iso, '100')
-        cam.hw.iso = '200'
-        self.assertEqual(cam.hw.iso, '200')
+        cam.config.iso = '100'
+        self.assertEqual(cam.config.iso, '100')
+        cam.config.iso = 200
+        self.assertEqual(cam.config.iso, '200')
+        cam.config['iso'] = 100
+        self.assertEqual(cam.config.iso, 100)
+        self.assertEqual(cam.config.iso.label, 'ISO Speed')
 
         def setInvalidField():
-            cam.hw.isoo = '100'
+            cam.config.isoo = '100'
 
         def setInvalidIso():
-            cam.hw.iso = '101'
+            cam.config.iso = '101'
 
-        self.assertEqual(cam.hw.iso.label, 'ISO Speed')
-        self.assertEqual(cam.hw.iso.choices,
+        self.assertEqual(cam.config.iso.choices,
                          ['Auto', '100', '125', '160', '200', '250', '320', '400', '500', '640', '800', '1000', '1250',
                           '1600',
                           '2000', '2500', '3200', '4000', '5000', '6400', '8000', '10000', '12800',
                           'Unknown value 0083',
                           'Unknown value 0085', '25600'])
+
+        self.assertEqual(cam.config['iso'].choices,
+                         ['Auto', '100', '125', '160', '200', '250', '320', '400', '500', '640', '800', '1000', '1250',
+                          '1600',
+                          '2000', '2500', '3200', '4000', '5000', '6400', '8000', '10000', '12800',
+                          'Unknown value 0083',
+                          'Unknown value 0085', '25600'])
+
+        def setInvalidField():
+            cam.config.isoo = 100
+
+        def setInvalidIso():
+            cam.config.iso = 101
+
         self.assertRaises(Exception, setInvalidField)
         self.assertRaises(Exception, setInvalidIso)
-        print(cam.hw.datetime)
-        # self.assertEqual(dir(cam.hw),['aeb', 'autoexposuremode', 'capturetarget', 'colorspace', 'drivemode',
+        # self.assertEqual(dir(cam.config),['aeb', 'autoexposuremode', 'capturetarget', 'colorspace', 'drivemode',
         #                               'eosremoterelease', 'evfmode', 'exposurecompensation', 'focusmode', 'imageformat',
         #                               'imageformatcf', 'imageformatsd', 'iso', 'manualfocusdrive', 'meteringmode',
         #                               'movierecord', 'output', 'picturestyle', 'reviewtime', 'shutterspeed',
         #                               'whitebalance', 'whitebalanceadjusta', 'whitebalanceadjustb'])
 
-    def test_get_choices_for_iso(self):
-        cam = GPhotoCam(self._address, self.cam_settings)
-        choices = cam.get_choices_for_setting('iso')
-        self.assertEqual('100' in choices, True)
-        self.assertEqual('200' in choices, True)
 
 
 class TestInteractiveCanon6DCam(TestBaseCanon6DCam):

@@ -202,7 +202,7 @@ class DummyCam(AbstractCamera):
                 self._imgs.append(f.read())
 
         for setting_name, setting_value in settings.items():
-            self.set_setting(setting_name, setting_value)
+            self.config[setting_name] = setting_value
 
     @property
     def config(self):
@@ -216,9 +216,6 @@ class DummyCam(AbstractCamera):
         self._fresh_capture = False
         return cache
 
-    def get_cam_image_fp(self):
-        return self.data
-
     def get_state_as_string(self):
         return self.state.name
 
@@ -228,9 +225,6 @@ class DummyCam(AbstractCamera):
             raise CameraException("%s does not uniquely identify a single setting" % name)
         return nodes[0]
 
-    def get_config_tree(self):
-        return self._model
-
     def __set_attr__(self, setting_str, setting_val):
         node = self._find_node(setting_str)
         if setting_val in node.choices:
@@ -238,12 +232,6 @@ class DummyCam(AbstractCamera):
         else:
             raise CameraException("%s does not appear to be a valid option for %s. Valid choices are %s" % (
             setting_val, setting_str, node.choices))
-
-    def get_choices_for_setting(self, setting_str):
-        node = self._find_node(setting_str)
-        if node.type != CamConfigType.Radio:
-            raise CameraException("Only radio button configs can be queried for valid choices.")
-        return node.choices
 
     def __get_attr__(self, setting_str):
         node = self._find_node(setting_str)

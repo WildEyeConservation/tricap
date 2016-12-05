@@ -14,10 +14,37 @@ from config import RET_OK, RET_ERROR
 # TODO : Create a camera factory that will import cameras according to its config and make them available via its own
 # autodetect function
 try:
-    from .gphoto_cam import GPhotoCam as Camera
+    from .gphoto_cam import GPhotoConfig, GPhotoCam as Camera
 except ImportError:
     from .dummy_cam import DummyCam as Camera
 
+
+class MultiConfig(GPhotoConfig):
+    dictkeys = ["_cameras", "_context"]
+
+    def __init__(self, cameras, context):
+        self._cameras = cameras
+        self._context = context
+
+    def __setattr__(self, key, value):
+        if key in self.dictkeys:
+            self.__dict__[key] = value
+        else:
+            for camera in self._cameras:
+                camera.config[key] = value
+
+    def __getattr__(self, key):
+        if key in self.dictkeys:
+            return self.__dict__[key]
+        else:
+            return self._cameras[0].config[key]
+
+    __setitem__ = __setattr__
+    __getitem__ = __getattr__
+
+    def get_tree(self):
+        config = self._cameras[0].get_config(self._context)
+        return GPhotoConfig._get_config(config)
 
 class TriCapCamsManager:
     """TriCapCamsManager manages TriCap camera objects"""
@@ -123,6 +150,11 @@ class TriCapCamsManager:
             self._capture_thread.join()
             self.state = CAM_MANAGER_STATES.STOPPED
 
+    def get_image_capture_interval(self):
+        return self._man_settings['image_capture_interval']
+
+    def set_image_capture_interval(self, value):
+        self._man_settings['image_capture_interval'] = value
     def get_num_cams(self):
         return len(self._cameras)
 
@@ -136,27 +168,6 @@ class TriCapCamsManager:
 
         return cam_ids
 
-    def get_choices_for_setting(self, config_str):
-        choices = None
-
-        if self.get_num_cams() > 0:
-            choices = self._cameras[0].get_choices_for_setting(config_str)
-
-        return choices
-
-    def get_setting(self, setting_str):
-        # TODO Document: All gets and sets should operate on strings
-        if setting_str == 'image_capture_interval':
-            return self._man_settings['image_capture_interval']
-        return self._cameras[0].get_setting(setting_str)
-
-    def set_setting(self, setting_str, val_str):
-        if setting_str == 'image_capture_interval':
-            self._man_settings['image_capture_interval'] = val_str
-            return RET_OK
-
-        ret_val = RET_OK
-        for camera in self._cameras:
-            if camera.set_setting(setting_str, val_str) != RET_OK:
-                ret_val = RET_ERROR
-        return ret_val
+    @property
+    def config(self):
+        return MultiConfig(self._cameras, self._cameras[0]._context)

@@ -13,13 +13,39 @@ from config import RET_OK, RET_ERROR
 
 # TODO : Create a camera factory that will import cameras according to its config and make them available via its own
 # autodetect function
+from .canon_6D import Canon6DCam
 try:
     from .gphoto_cam import GPhotoCam as Camera
 except ImportError:
     from .dummy_cam import DummyCam as Camera
 
 
-class TriCapCamsManager(object):
+class MultiConfig():
+    dictkeys = ["_cameras", "_context"]
+
+    def __init__(self, cameras):
+        self._cameras = cameras
+
+    def __setattr__(self, key, value):
+        if key in self.dictkeys:
+            self.__dict__[key] = value
+        else:
+            for camera in self._cameras:
+                camera.config[key] = value
+
+    def __getattr__(self, key):
+        if key in self.dictkeys:
+            return self.__dict__[key]
+        else:
+            return self._cameras[0].config[key]
+
+    __setitem__ = __setattr__
+    __getitem__ = __getattr__
+
+    def get_tree(self):
+        return self._cameras[0].config.get_tree()
+
+class TriCapCamsManager:
     """TriCapCamsManager manages TriCap camera objects"""
     supportedCameras = {"Canon EOS 6D", "Dummy Cam"}
     _logger = logging.getLogger(__name__)
@@ -62,18 +88,13 @@ class TriCapCamsManager(object):
 
     def _find_cameras(self):
         self._cameras = []
-
-        # try:
+        # Do not catch exceptions here. If any detected camera fails to instantiate, it is a critical error and we want
+        # to halt and catch fire.
         for name, address in Camera.autodetect():
             if name in TriCapCamsManager.supportedCameras:
                 self._logger.info('Adding camera %s at address %s ' % (name, address))
-                tricap_cam = Camera(address, self._cam_settings)
+                tricap_cam = Canon6DCam(Camera(address, self._cam_settings))
                 self._cameras.append(tricap_cam)
-        # except Exception:  # Catches most exceptions, except KeyboardInterrupt and SystemExit
-        #     self._logger.error("_find_cameras failed.", exc_info=True)
-        #     return RET_ERROR
-
-        return RET_OK
 
     def reset(self, man_settings: dict, cam_settings: dict):
         self._man_settings = man_settings
@@ -84,50 +105,29 @@ class TriCapCamsManager(object):
 
         self._initialise()
 
-    def _cap_thread_generator(self):
-        for index, cam in enumerate(self._cameras):
-            thread = threading.Thread(target=cam.capture, daemon=True)
-            yield thread
-
-    def _start_capture_with_wait_thread(self):
-        # define a worker function to run in a separate thread
-
-        ici = float(self._man_settings['image_capture_interval'])
-
-        def worker(stop_event):
-            # TODO How long do we need to wait for a stop event? Is there another way to do this?
-            while not stop_event.wait(0.01):
-                prev_time = time.time()
-
-                cam_threads = list(self._cap_thread_generator())
-                for t in cam_threads:
-                    t.start()
-                for t in cam_threads:
-                    t.join()
-
-                current_time_diff = time.time() - prev_time
-
-                self._logger.debug('Capture time: ' + str(current_time_diff))
-                if current_time_diff < ici:
-                    time.sleep(ici - current_time_diff)
-
-        self._capture_thread = threading.Thread(target=worker, args=[self._kill_pill], daemon=True)
-        self._capture_thread.start()
-
     def start_capturing(self):
         if len(self._cameras) == 0:
             self.state = CAM_MANAGER_STATES.ERROR_NO_CAMS
         elif self.state == CAM_MANAGER_STATES.STOPPED:
+            barrier = threading.Barrier(len(self._cameras))
             self._kill_pill = threading.Event()
-            self._start_capture_with_wait_thread()
+            for cam in self._cameras:
+                thread = threading.Thread(target=cam.capture, daemon=True,
+                                          kwargs={"continuous": True, "barrier": barrier,
+                                                  "stop_event": self._kill_pill})
+                thread.start()
             self.state = CAM_MANAGER_STATES.STARTED
 
     def stop_capturing(self):
         if self.state == CAM_MANAGER_STATES.STARTED:
             self._kill_pill.set()
-            self._capture_thread.join()
             self.state = CAM_MANAGER_STATES.STOPPED
 
+    def get_image_capture_interval(self):
+        return self._man_settings['image_capture_interval']
+
+    def set_image_capture_interval(self, value):
+        self._man_settings['image_capture_interval'] = value
     def get_num_cams(self):
         return len(self._cameras)
 
@@ -141,27 +141,6 @@ class TriCapCamsManager(object):
 
         return cam_ids
 
-    def get_choices_for_setting(self, config_str):
-        choices = None
-
-        if self.get_num_cams() > 0:
-            choices = self._cameras[0].get_choices_for_setting(config_str)
-
-        return choices
-
-    def get_setting(self, setting_str):
-        # TODO Document: All gets and sets should operate on strings
-        if setting_str == 'image_capture_interval':
-            return self._man_settings['image_capture_interval']
-        return self._cameras[0].get_setting(setting_str)
-
-    def set_setting(self, setting_str, val_str):
-        if setting_str == 'image_capture_interval':
-            self._man_settings['image_capture_interval'] = val_str
-            return RET_OK
-
-        ret_val = RET_OK
-        for camera in self._cameras:
-            if camera.set_setting(setting_str, val_str) != RET_OK:
-                ret_val = RET_ERROR
-        return ret_val
+    @property
+    def config(self):
+        return MultiConfig(self._cameras)

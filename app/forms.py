@@ -1,11 +1,11 @@
 # D Joubert Innoventix Consulting 14 November 2016
 # Forms for the GUI
 
-from flask_wtf import Form
+from flask_wtf import FlaskForm
 from wtforms import StringField, SelectField, SubmitField, FieldList
 
 
-class SettingsForm(Form):
+class SettingsForm(FlaskForm):
     """The form for the settings page. Contains the three buttons (test, save and revert) and
     the FieldLists that must be expanded with the settings read from the config file."""
     

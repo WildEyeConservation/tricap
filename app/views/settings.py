@@ -8,8 +8,33 @@ from flask import Blueprint, current_app, redirect, url_for, render_template, re
 from app import forms, tricap_manager, altimeter, session_logger
 from config import DEFAULT_CONFIG_FP, CONFIG_FP, RET_OK, RET_ERROR
 from sensors.configure import TricapConfig
+from collections import namedtuple
 
 settings_bp = Blueprint('settings', __name__)
+
+
+class MiscSettingConfig:
+    Accessors = namedtuple('Accessors', 'getter setter')
+
+    _settings = {'session_description': Accessors(getter=session_logger.get_description,
+                                                  setter=session_logger.set_description),
+                 'image_capture_interval': Accessors(getter=tricap_manager.get_image_capture_interval,
+                                                     setter=tricap_manager.set_image_capture_interval)}
+
+    def __repr__(self):
+        return str(self._settings.keys())
+
+    def __dir__(self):
+        return self._settings.keys()
+
+    def __setattr__(self, key, value):
+        setter = self._settings[key].setter(value)
+
+    def __getattr__(self, key):
+        return self._settings[key].getter()
+
+    __setitem__ = __setattr__
+    __getitem__ = __getattr__
 
 
 class MiscSettingHandler:
@@ -19,36 +44,18 @@ class MiscSettingHandler:
     def __init__(self):
         self._setting_strings = ['session_description', 'image_capture_interval']
 
-    def set_setting(self, setting_str, val_str):
-        ret_val = RET_OK
-        if setting_str in self._setting_strings:
-            if setting_str == 'session_description':
-                session_logger.set_description(val_str)
-            elif setting_str == 'image_capture_interval':
-                ret_val = tricap_manager.set_setting('image_capture_interval', val_str)
-        else:
-            return RET_ERROR
+    @property
+    def config(self):
+        return MiscSettingConfig()
 
-        return ret_val
-
-    def get_setting(self, setting_str):
-        ret_val = None
-
-        if setting_str in self._setting_strings:
-            if setting_str == 'session_description':
-                ret_val = session_logger.get_description()
-            elif setting_str == 'image_capture_interval':
-                ret_val = str(tricap_manager.get_setting(setting_str))
-
-        return ret_val
-
-    def get_choices_for_setting(self, setting_str):
-        return None
 
 def populate_form_section(sdict, handler, form_selects, form_strings, set_data=True):
     for key in sdict.keys():
         # check if its a select
-        choices = handler.get_choices_for_setting(key)
+        try:
+            choices = handler.config[key].choices
+        except AttributeError:
+            choices = None
         if choices is not None and len(choices) != 0:
             choices_tuples = []
             for index, choice in enumerate(choices):
@@ -59,14 +66,14 @@ def populate_form_section(sdict, handler, form_selects, form_strings, set_data=T
             form_selects[-1].choices = choices_tuples
 
             if set_data is True:
-                config_val = tricap_manager.get_setting(key)
+                config_val = tricap_manager.config[key]
                 if config_val is not None:
                     form_selects[-1].data = str(choices.index(config_val))
         else:
             form_strings.append_entry()
             form_strings[-1].label = key
             if set_data is True:
-                config_val = handler.get_setting(key)
+                config_val = handler.config[key]
                 if config_val is not None:
                     form_strings[-1].data = config_val
 
@@ -84,8 +91,8 @@ def get_form_for_display(config_fp = CONFIG_FP, set_data=True):
     cam_dict = config.get_section_dict(TricapConfig.CAMERA_SECTION_HEADER)
     populate_form_section(cam_dict, tricap_manager, form.cam_selects, form.cam_strings, set_data)
 
-    alti_dict = config.get_section_dict(TricapConfig.ALTI_SECTION_HEADER)
-    populate_form_section(alti_dict, altimeter, form.alti_selects, form.alti_strings, set_data)
+    # alti_dict = config.get_section_dict(TricapConfig.ALTI_SECTION_HEADER)
+    # populate_form_section(alti_dict, altimeter, form.alti_selects, form.alti_strings, set_data)
 
     misc_setting_handler = MiscSettingHandler()
     misc_dict = config.get_section_dict(TricapConfig.MISC_SECTION_HEADER)
@@ -147,10 +154,8 @@ def convert_populated_form_to_dict(form):
 def set_setting_handler_with_dict(handler, sdict):
     # TODO Should we do this here, how should we handle the returns? Figure it out on merging
     ret_val = 0
-    for key in sdict.keys():
-        ret_val += handler.set_setting(key, sdict[key])
-
-    return ret_val
+    for key, value in sdict.items():
+        handler.config[key] = value
 
 def change_settings(form):
     form_dict = convert_populated_form_to_dict(form)

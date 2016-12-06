@@ -22,11 +22,10 @@ RET_OK = 0
 SERVER_LOG_NAME = 'tricap_server_log'
 
 # gphoto2 canon eos 6d configs
-CE6D_CAP_TARGET_MEMORY = 0
-CE6D_CAP_TARGET_SD_CARD = 1
+CE6D_CAP_TARGET_MEMORY = 'Internal RAM'
+CE6D_CAP_TARGET_SD_CARD = 'Memory card'
 
-CE6D_FORMAT_RAW_AND_TINY_JPEG = 15
-CE6D_FORMAT_RAW = 32
+CE6D_FORMAT_RAW = 'RAW'
 
 # Altimeter default configs
 ALTI_NUM_AVG_FRAMES = 2

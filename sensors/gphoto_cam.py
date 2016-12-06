@@ -1,3 +1,4 @@
+"""Handler for the Canon EOS 6D Camera. Uses gphoto2 to handle the actual communication."""
 # coding=utf-8
 import logging
 import threading
@@ -6,12 +7,11 @@ import gphoto2 as gp
 
 from config import CAMERA_STATES
 from config import CE6D_CAP_TARGET_SD_CARD, CE6D_FORMAT_RAW
-from .configure import TricapConfig
 
 
 # noinspection PyUnresolvedReferences
 class GPhotoCam(object):
-    """ Handler for the Canon EOS 6D Camera. Uses gphoto2 to handle the actual communication. """
+    """Handler for the Canon EOS 6D Camera. Uses gphoto2 to handle the actual communication."""
 
     _port_info_list = gp.PortInfoList()
     _port_info_list.load()

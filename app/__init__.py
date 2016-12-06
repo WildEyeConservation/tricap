@@ -6,6 +6,7 @@
 
 import logging
 import os
+
 from logging.handlers import TimedRotatingFileHandler
 
 from flask import Flask
@@ -43,7 +44,7 @@ init_config = TricapConfig()
 # Instantiate the sensors
 misc_settings = init_config.get_section_dict(TricapConfig.MISC_SECTION_HEADER)
 cam_settings = init_config.get_section_dict(TricapConfig.CAMERA_SECTION_HEADER)
-tricap_manager = TriCapCamsManager()
+tricap_manager = TriCapCamsManager(misc_settings, cam_settings)
 tricap_cameras = tricap_manager.get_cameras_as_list()
 image_manager = tricap_manager
 

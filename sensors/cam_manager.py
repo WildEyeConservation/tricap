@@ -63,15 +63,15 @@ class TriCapCamsManager(object):
     def _find_cameras(self):
         self._cameras = []
 
-        try:
-            for name, address in Camera.autodetect():
-                if name in TriCapCamsManager.supportedCameras:
-                    self._logger.info('Adding camera %s at address %s ' % (name, address))
-                    tricap_cam = Camera(address, self._cam_settings)
-                    self._cameras.append(tricap_cam)
-        except Exception:  # Catches most exceptions, except KeyboardInterrupt and SystemExit
-            self._logger.error("_find_cameras failed.", exc_info=True)
-            return RET_ERROR
+        # try:
+        for name, address in Camera.autodetect():
+            if name in TriCapCamsManager.supportedCameras:
+                self._logger.info('Adding camera %s at address %s ' % (name, address))
+                tricap_cam = Camera(address, self._cam_settings)
+                self._cameras.append(tricap_cam)
+        # except Exception:  # Catches most exceptions, except KeyboardInterrupt and SystemExit
+        #     self._logger.error("_find_cameras failed.", exc_info=True)
+        #     return RET_ERROR
 
         return RET_OK
 

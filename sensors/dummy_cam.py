@@ -2,6 +2,8 @@
 import time
 from collections import namedtuple
 
+from PIL import Image
+
 from config import RET_ERROR, RET_OK, CAMERA_STATES, DUMMY_IMAGE_PATH
 
 # TODO Implement a Windows Canon6DCam, which uses the Canon EDSDK to communicate with the camera
@@ -28,6 +30,7 @@ class DummyCam(object):
         self._fresh_capture = False
         self._address = address  # if we ever want to do anything with this later
         self._settings_dict = settings
+        self.data = Image.open(DUMMY_IMAGE_PATH)
         for setting_name, setting_value in settings.items():
             self.set_setting(setting_name, setting_value)
 

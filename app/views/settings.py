@@ -38,7 +38,7 @@ class MiscSettingHandler:
             if setting_str == 'session_description':
                 ret_val = session_logger.get_description()
             elif setting_str == 'image_capture_interval':
-                ret_val = str(tricap_manager.get_image_capture_interval())
+                ret_val = str(tricap_manager.get_setting(setting_str))
 
         return ret_val
 

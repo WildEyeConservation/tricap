@@ -1,53 +1,48 @@
-# D Joubert 27 October 2016 Innoventix Consulting
+"""The 'controller' code for the landing page, which is currently seen as the default Pilot view."""
 
 import os
+import io
+import pdb
 
 from flask import Blueprint, render_template, send_from_directory, current_app, request, jsonify
 from flask import send_file
 
 from app import tricap_manager, tricap_cameras, image_manager, altimeter, session_logger
 
+from sensors.configure import TricapConfig
+
 from config import BUTTON_CODE
-import io
 
 home_bp = Blueprint('home', __name__)
 
 
 @home_bp.route('/', methods=['GET'])
 def index_slash():
+    """Redirect request to the proper index page."""
     return index()
 
 
 @home_bp.route('/index', methods=['GET'])
 def index():
-    """The home page. Handles the login form and redirects to the verification page after a
-    successfull login."""
-    if tricap_manager.get_num_cams() == 0:
-        col_size_cam_img = 4
-    else:
-        col_size_cam_img = 12 / tricap_manager.get_num_cams()
-
-    if col_size_cam_img < 2:
-        col_size_cam_img = 2
-
-    cam_ids = tricap_manager.get_cam_ids()
-
-    cam_states = [cam.get_state_as_string() for cam in tricap_cameras]
-
+    """The Main GUI interface page."""
+    # TODO Get the params from the config
     return render_template('/home/index.html', num_cams=tricap_manager.get_num_cams(),
-                           col_size_cam_img=col_size_cam_img,
-                           alti_state=altimeter.get_state_as_string(),
-                           system_state='All Good',
-                           cam_ids=cam_ids, cam_states=cam_states)
+                           refresh_rate=1000, img_too_old_count=5)
 
 
 def reset_device_objects():
-    tricap_manager.reset()
-    altimeter.reset()
+    """Reset all the handlers that can be reset."""
+    config = TricapConfig()
+    misc_settings = config.get_section_dict(TricapConfig.MISC_SECTION_HEADER)
+    cam_settings = config.get_section_dict(TricapConfig.CAMERA_SECTION_HEADER)
+    tricap_manager.reset(misc_settings, cam_settings)
+    altimeter.reset(config.get_section_dict(TricapConfig.ALTI_SECTION_HEADER))
 
 
-@home_bp.route('/_check_cam_image<cam_num_str>')
-def is_cam_image_fresh(cam_num_str):
+@home_bp.route('/_get_cam_data<img_str>')
+def provide_cam_data(img_str):
+
+
     data = {'new_image': image_manager.is_cam_image_fresh(int(cam_num_str)),
             'cam_num': int(cam_num_str),
             'cam_state': tricap_cameras[int(cam_num_str)].get_state_as_string()
@@ -62,17 +57,14 @@ def provide_alti_data():
     return jsonify(data)
 
 
-@home_bp.route('/cam_img<cam_num_str>')
-def serve_cam_img(cam_num_str):
-    print('serving cam img ' + cam_num_str)
-    # cam_img_fp = image_manager.get_cam_image_fp(int(cam_num_str))
-    #
-    # if cam_img_fp is None:
-    #     cam_img_fp = os.path.join(current_app.root_path, 'static', 'img', 'default.jpg')
+@home_bp.route('/cam_img<img_str>')
+def serve_cam_img(img_str):
+    """Serve the image as described by the img_str = camera id + image id."""
+    cam_num = int(img_str[0])
+    img_num = int(img_str[1:])
 
-    return send_file(io.BytesIO(tricap_manager.get_data(int(cam_num_str))), attachment_filename='image.jpg',
+    return send_file(io.BytesIO(tricap_manager.get_data(cam_num)), attachment_filename='image.jpg',
                      as_attachment=True)
-
 
 
 @home_bp.route('/_button_click')

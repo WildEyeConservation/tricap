@@ -39,6 +39,8 @@ class TricapConfig:
         self._config_fp = config_fp_to_read
         self._ready_flag = False
 
+
+
         try:
             # Switched from using read to read_file to make the parser raise an exception if there
             # is a problem with the file

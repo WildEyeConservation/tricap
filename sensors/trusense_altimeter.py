@@ -197,8 +197,9 @@ class TrusenseAltimeter(object):
             self._read_thread.start()
             self.state = ALTIMETER_STATE.MEASURING
             return RET_OK
-        except Exception as err:
-            self._logger.error(err)
+        except (serial.SerialException, serial.SerialTimeoutException,
+                threading.ThreadError) as ex:
+            self._logger.error(ex)
             return RET_ERROR
 
     def stop_measuring(self):
@@ -217,6 +218,7 @@ class TrusenseAltimeter(object):
             self._write('ST', 'Error stopping measuring mode')
             self.state = ALTIMETER_STATE.CONNECTED
             return RET_OK
-        except Exception as e:
-            self._logger.error(e)
+        except (serial.SerialException, serial.SerialTimeoutException,
+                threading.ThreadError) as ex:
+            self._logger.error(ex)
             return RET_ERROR

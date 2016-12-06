@@ -1,8 +1,9 @@
 # coding=utf-8
 import time
 from collections import namedtuple
+from glob import glob
+import os
 
-from PIL import Image
 
 from config import RET_ERROR, RET_OK, CAMERA_STATES, DUMMY_IMAGE_PATH
 
@@ -30,9 +31,20 @@ class DummyCam(object):
         self._fresh_capture = False
         self._address = address  # if we ever want to do anything with this later
         self._settings_dict = settings
-        self.data = Image.open(DUMMY_IMAGE_PATH)
+        self._imgs = []
+        self._count = 0
+        fnames = glob(os.path.join('C:/Users/Public/Pictures/Sample Pictures', '*.jpg'))
+        for filename in fnames:
+            with open(filename, 'rb') as f:
+                self._imgs.append(f.read())
+
+        self.data = self._imgs[0]
+
         for setting_name, setting_value in settings.items():
             self.set_setting(setting_name, setting_value)
+
+    def get_count(self):
+        return self._count
 
     def reset(self):
         self.state = CAMERA_STATES.INITIALISED
@@ -73,6 +85,8 @@ class DummyCam(object):
             self.state = CAMERA_STATES.CAPTURING
             # prepare the small jpeg filename
             time.sleep(1)
+            self._counter += 1
+            self.data = self._imgs[self._counter % len(self._imgs)]
             self._fresh_capture = True
             self.state = CAMERA_STATES.INITIALISED
             return RET_OK

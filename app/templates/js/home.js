@@ -10,12 +10,20 @@ var numCams = {{num_cams}};
 var imgTooOldCount = {{img_too_old_count}};
 var camRefreshRate = {{refresh_rate}}
 var stateRefreshRate = {{refresh_rate}}
+var timeOutPeriod = {{timeout_period}}
 // Code here will be ignored by JSHint.
 /* jshint ignore:end */
 
 // TODO Need to read the state of the cams before displaying, to update the images
 
 // Constants go first (declared without a var}
+
+tricap.GLOBAL_STATES = Object.freeze({
+    INITIALISED: 0,
+    CAPTURING: 1,
+    ERROR: 2
+});
+
 tricap.BUTTON_CODES = Object.freeze({
     START: 0,
     STOP: 1,
@@ -29,16 +37,77 @@ tricap.CAPTURE_STATES = Object.freeze({
     STOPPED: 1
 });
 
+//ALTIMETER_STATE = Enum("AltiState", ["NOT_CONNECTED", "CONNECTED", "MEASURING", "ERROR"])
+tricap.ALTI_STATES = Object.freeze({
+    NOT_CONNECTED: 0,
+    CONNECTED: 1,
+    MEASURING: 2,
+    ERROR: 3
+});
+
+//Object Constructors
+
 function camImgController() {
     this.imgId = 0;
     this.lastRequestId = -1;
     this.oldImgCount = 0;
 }
 
-camImgControllers = [];
+//Globals
+
+var camImgControllers = [];
+var globalState = tricap.GLOBAL_STATES.INITIALISED;
+var timeoutFunc;
 
 // Then function declarations (i.e. function addTwoNumbers(a, b){ return a+b;};) so that hoisting
 // is obvious
+function changeStateColour(elem_id, target_colour){
+
+    //Check if its an alert (i.e. a div) or a button (i.e. an a)
+    var elem = $('#'+elem_id);
+
+    var pre;
+    if (elem.is('div') === true){
+        pre='alert-';
+    } else if (elem.is('a') === true){
+        pre='btn-';
+    }
+
+    if (target_colour === 'red'){
+        elem.removeClass(pre+'tricap-green '+pre+'tricap-orange');
+        elem.addClass(pre+'tricap-red');
+    } else if (target_colour === 'green'){
+        elem.removeClass(pre+'tricap-red '+pre+'tricap-orange');
+        elem.addClass(pre+'tricap-green');
+    } else if (target_colour === 'orange'){
+        elem.removeClass(pre+'tricap-green '+pre+'tricap-red');
+        elem.addClass(pre+'tricap-orange');
+    }
+}
+
+function changeTimeColour(elem_id, target_colour){
+
+    //Check if its an alert (i.e. a div) or a button (i.e. an a)
+    var elem = $('#'+elem_id);
+
+    var pre;
+    if (elem.is('div') === true){
+        pre='alert-';
+    } else if (elem.is('a') === true){
+        pre='btn-';
+    }
+
+    if (target_colour === 'grey'){
+        elem.removeClass(pre+'tricap-blue '+pre+'tricap-red');
+        elem.addClass(pre+'tricap-grey');
+    } else if (target_colour === 'blue'){
+        elem.removeClass(pre+'tricap-grey '+pre+'tricap-red');
+        elem.addClass(pre+'tricap-blue');
+    } else if (target_colour === 'red'){
+        elem.removeClass(pre+'tricap-blue '+pre+'tricap-grey');
+        elem.addClass(pre+'tricap-red');
+    }
+}
 
 // Then function expressions (i.e. var a = function(a,b){return a+b;};). Note that the var a is
 // hoisted as var a = undefined. So watch out.
@@ -71,24 +140,57 @@ var refreshCamImages = function(){
         if (camImgControllers[index].imgId !== camImgControllers[index].lastRequestId){
             var cam_img_url = $SCRIPT_ROOT + '/cam_img'+index+camImgControllers[index].imgId;
             $('#img_cam'+index).attr('src', cam_img_url);
-            $('#alt_cam'+index).removeClass('alert-tricap-grey alert-tricap-red');
-            $('#alt_cam'+index).addClass('alert-tricap-blue');
+            changeTimeColour('alt_cam', 'blue');
         } else {
             camImgControllers[index].oldImgCount = camImgControllers[index].oldImgCount + 1;
             if (camImgControllers[index].oldImgCount < imgTooOldCount){
-                $('#alt_cam'+index).removeClass('alert-tricap-blue alert-tricap-red');
-                $('#alt_cam'+index).addClass('alert-tricap-grey');
+                changeTimeColour('alt_cam', 'grey');
             } else {
-                $('#alt_cam'+index).removeClass('alert-tricap-blue alert-tricap-grey');
-                $('#alt_cam'+index).addClass('alert-tricap-red');
+                changeTimeColour('alt_cam', 'red');
             }
         }
     }
     return false;
 };
 
-var requestStateData = function(data){
+var updateAlti = function(data){
+    $('#h_alti').html('Altitude: ' + data.measurement + ' m');
+
+    if (data.state === tricap.ALTI_STATES.CONNECTED) {
+        changeStateColour('alt_alti', 'orange');
+        changeStateColour('btn_alti', 'orange');
+    } else if (data.state === tricap.ALTI_STATES.MEASURING) {
+        changeStateColour('alt_alti', 'green');
+        changeStateColour('btn_alti', 'green');
+    } else {
+        changeStateColour('alt_alti', 'red');
+        changeStateColour('btn_alti', 'red');
+    }
+
     return false;
+};
+
+var requestStateData = function(data){
+    $.getJSON($SCRIPT_ROOT + '/_get_state_data', {},
+              function(data){
+                  updateAlti(data.alti);
+
+                  //Reset the timeout period
+                  clearTimeout(timeoutFunc);
+                  timeoutFunc = setTimeout(showNoResponseMessage, timeOutPeriod);
+                  return false;
+              });
+    return false;
+};
+
+var showNoResponseMessage = function(){
+    // TODO Implement an observer pattern for the globalState
+
+    $('#h_main_status').html('No Response From Server');
+
+    globalState = tricap.GLOBAL_STATES.ERROR;
+    changeStateColour('alt_main_status', 'red');
+    changeStateColour('alt_msgs', 'red');
 };
 
 // All of the following code will only run when the page is ready
@@ -108,4 +210,5 @@ $(function(){
     // Set the interval functions
     setInterval(refreshCamImages, camRefreshRate);
     setInterval(requestStateData, stateRefreshRate);
+    timeoutFunc = setTimeout(showNoResponseMessage, timeOutPeriod);
 });

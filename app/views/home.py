@@ -7,7 +7,7 @@ import pdb
 from flask import Blueprint, render_template, send_from_directory, current_app, request, jsonify
 from flask import send_file
 
-from app import tricap_manager, tricap_cameras, image_manager, altimeter, session_logger
+from app import tricap_manager, altimeter, session_logger
 
 from sensors.configure import TricapConfig
 
@@ -27,7 +27,7 @@ def index():
     """The Main GUI interface page."""
     # TODO Get the params from the config
     return render_template('/home/index.html', num_cams=tricap_manager.get_num_cams(),
-                           refresh_rate=1000, img_too_old_count=5)
+                           refresh_rate=1000, img_too_old_count=5, timeout_period=5000)
 
 
 def reset_device_objects():
@@ -37,23 +37,28 @@ def reset_device_objects():
     cam_settings = config.get_section_dict(TricapConfig.CAMERA_SECTION_HEADER)
     tricap_manager.reset(misc_settings, cam_settings)
     altimeter.reset(config.get_section_dict(TricapConfig.ALTI_SECTION_HEADER))
+# @home_bp.route('/_get_cam_data<img_str>')
+# def provide_cam_data(img_str):
+#
+#         data = {'new_image': image_manager.is_cam_image_fresh(int(cam_num_str)),
+#             'cam_num': int(cam_num_str),
+#             'cam_state': tricap_cameras[int(cam_num_str)].get_state_as_string()
+#             }
+#     return jsonify(data)
+# @home_bp.route('/_get_alti_data')
+# def provide_alti_data():
+#     data = {'alti_state': altimeter.get_state_as_string(),
+#             'alti_measurement': altimeter.get_measurement_as_string()}
+#     return jsonify(data)
 
 
-@home_bp.route('/_get_cam_data<img_str>')
-def provide_cam_data(img_str):
+@home_bp.route('/_get_state_data')
+def provide_state_data():
+    """Jsonify all the data pertaining to the state of the system."""
+    alti_data = {'state': altimeter.state.value,
+                 'measurement': altimeter.get_measurement_as_string()}
 
-
-    data = {'new_image': image_manager.is_cam_image_fresh(int(cam_num_str)),
-            'cam_num': int(cam_num_str),
-            'cam_state': tricap_cameras[int(cam_num_str)].get_state_as_string()
-            }
-    return jsonify(data)
-
-
-@home_bp.route('/_get_alti_data')
-def provide_alti_data():
-    data = {'alti_state': altimeter.get_state_as_string(),
-            'alti_measurement': altimeter.get_measurement_as_string()}
+    data = {'alti': alti_data}
     return jsonify(data)
 
 

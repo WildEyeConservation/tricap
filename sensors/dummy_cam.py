@@ -216,6 +216,9 @@ class DummyCam(AbstractCamera):
         self._fresh_capture = False
         return cache
 
+    def get_cam_image_fp(self):
+        return self.data
+
     def get_state_as_string(self):
         return self.state.name
 
@@ -237,8 +240,11 @@ class DummyCam(AbstractCamera):
         node = self._find_node(setting_str)
         return node.value
 
-    def capture(self, continuous=False, barrier: threading.Barrier = None):
+    def capture(self, continuous=False, barrier: threading.Barrier = None, stop_event=None):
         while True:
+            if stop_event:
+                if stop_event.wait(0.01):
+                    return
             self.state = CAMERA_STATES.CAPTURING
             time.sleep(1)
             if barrier:

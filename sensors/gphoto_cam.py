@@ -154,17 +154,21 @@ class GPhotoCam(object):
     def config(self):
         return GPhotoConfig(self._gp_camera, self._context)
 
-
-    def reset(self, settings: dict):
-        self.state = CAMERA_STATES.UNINITIALISED
-        self._setup_camera(settings)
-
-    def capture(self, continuous=False, barrier: threading.Barrier = None):
+    def capture(self, continuous=False, barrier: threading.Barrier = None, stop_event=None):
         while True:
+            if stop_event:
+                if stop_event.wait(0.01):
+                    return
             self.state = CAMERA_STATES.CAPTURING
             if barrier:
                 barrier.wait()
-            file_path = self._gp_camera.capture(gp.GP_CAPTURE_IMAGE, GPhotoCam._context)
+            success = False
+            while not (success):
+                try:
+                    file_path = self._gp_camera.capture(gp.GP_CAPTURE_IMAGE, GPhotoCam._context)
+                    success = True
+                except gp.GPhoto2Error:
+                    pass
             camera_file = self._gp_camera.file_get(file_path.folder, file_path.name, gp.GP_FILE_TYPE_PREVIEW,
                                                    GPhotoCam._context)
             file_data = camera_file.get_data_and_size()
@@ -175,6 +179,11 @@ class GPhotoCam(object):
             self.state = CAMERA_STATES.INITIALISED
             if not continuous:
                 return self.data
+
+
+    def reset(self, settings: dict):
+        self.state = CAMERA_STATES.UNINITIALISED
+        self._setup_camera(settings)
 
     def get_state_as_string(self):
         return self.state.name

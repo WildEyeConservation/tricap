@@ -20,11 +20,11 @@ from sensors.configure import TricapConfig
 from config import DEFAULT_CONFIG_FP, SERVER_LOG_DIR, CONFIG_FP, TEST_STATIC_DIR, SERVER_LOG_NAME
 from config import RET_ERROR
 
+
 # TODO Create a temp file test base class, from which all tests can inherit that uses temp files
 # TODO Remove all old style tearDowns (i.e. with file counting), temp_file_counts
 
 class BaseTestSettings(TestCase):
-
     # TODO Check how we can setup base classes for the testing
     format_str = "%(asctime)s | %(pathname)s:%(lineno)d | %(funcName)s | %(levelname)s | %(message)s "
     formatter = logging.Formatter(format_str)
@@ -105,10 +105,10 @@ class TestSettings(BaseTestSettings):
         new_config.set_section(section_dict, TricapConfig.MISC_SECTION_HEADER)
         new_config.save_to_file()
         self.assertEqual(new_config.get('image_capture_interval', TricapConfig.MISC_SECTION_HEADER),
-                        '-99.99')
+                         '-99.99')
 
         # load the default
-        default_config = TricapConfig(config_fp_to_read = DEFAULT_CONFIG_FP)
+        default_config = TricapConfig(config_fp_to_read=DEFAULT_CONFIG_FP)
         self.assertNotEqual(new_config.get_section_dict(TricapConfig.MISC_SECTION_HEADER),
                             default_config.get_section_dict(TricapConfig.MISC_SECTION_HEADER))
 
@@ -126,7 +126,6 @@ class TestSettings(BaseTestSettings):
 
 
 class TestMiscSettings(BaseTestSettings):
-
     def test_set_and_get_settings(self):
         misc_handler = settings.MiscSettingHandler()
         misc_handler.set_setting('session_description', 'test_misc_handler')
@@ -137,6 +136,7 @@ class TestMiscSettings(BaseTestSettings):
 
         ret_val = misc_handler.set_setting('non_existent', '-1')
         self.assertEqual(ret_val, RET_ERROR)
+
 
 class TestBehaviourSettings(BaseTestSettings):
     """Test stuff that needs interaction from a browser here."""
@@ -168,7 +168,7 @@ class TestBehaviourSettings(BaseTestSettings):
 
             # Open the dumped page using chrome (through Selenium) and
             #  wait untill the page has finished loading
-            driver = webdriver.Chrome()#executable_path='/usr/lib/chromium-browser/chromedriver')
+            driver = webdriver.Chrome()  # executable_path='/usr/lib/chromium-browser/chromedriver')
             driver.get("file:///" + temp_fp)
             wait = WebDriverWait(driver, 10)
             wait.until(ec.visibility_of_element_located((By.ID, "btn_test")))
@@ -196,7 +196,7 @@ class TestBehaviourSettings(BaseTestSettings):
                 temp_html_file.write(response.data.replace(b'/static', TEST_STATIC_DIR))
 
             driver = webdriver.Chrome()
-            driver.get("file:///"+temp_fp)
+            driver.get("file:///" + temp_fp)
             wait = WebDriverWait(driver, 10)
             wait.until(ec.visibility_of_element_located((By.ID, "btn_test")))
 
@@ -218,7 +218,7 @@ class TestBehaviourSettings(BaseTestSettings):
                                         data=form_data,
                                         follow_redirects=True)
 
-            self.assertEqual(tricap_manager.get_setting('shutterspeed'),  '1/2500')
+            self.assertEqual(tricap_manager.get_setting('shutterspeed'), '1/2500')
             self.assertEqual(tricap_manager.get_setting('iso'), '500')
             self.assertEqual(tricap_manager.get_setting('image_capture_interval'), '9.0')
 
@@ -250,7 +250,6 @@ class TestBehaviourSettings(BaseTestSettings):
             new_ici = '5.0'
             if config.get('image_capture_interval', TricapConfig.MISC_SECTION_HEADER) == new_ici:
                 new_ici = '9.0'
-
 
             # Change settings on the form
             ss_select = Select(driver.find_element_by_id('shutterspeed'))
@@ -290,10 +289,10 @@ class TestBehaviourSettings(BaseTestSettings):
         new_config.set_section(section_dict, TricapConfig.MISC_SECTION_HEADER)
         new_config.save_to_file()
         self.assertEqual(new_config.get('image_capture_interval', TricapConfig.MISC_SECTION_HEADER),
-                        '-99.99')
+                         '-99.99')
 
         # load the default
-        default_config = TricapConfig(config_fp_to_read = DEFAULT_CONFIG_FP)
+        default_config = TricapConfig(config_fp_to_read=DEFAULT_CONFIG_FP)
         self.assertNotEqual(new_config.get_section_dict(TricapConfig.MISC_SECTION_HEADER),
                             default_config.get_section_dict(TricapConfig.MISC_SECTION_HEADER))
 

@@ -73,7 +73,6 @@ def serve_cam_img(cam_num_str):
                      as_attachment=True)
 
 
-
 @home_bp.route('/_button_click')
 def handle_button_click():
     button_code = request.args.get('buttonCode', 0, type=int)

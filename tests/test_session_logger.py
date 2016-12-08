@@ -13,7 +13,6 @@ from config import SERVER_LOG_DIR, CONFIG_FP
 
 
 class TestSessionLogger(unittest.TestCase):
-
     format_str = "%(asctime)s | %(pathname)s:%(lineno)d | %(funcName)s | %(levelname)s | %(message)s "
     handler = logging.FileHandler(filename=os.path.join(SERVER_LOG_DIR, 'test_session_logger.log'))
     handler.setLevel(logging.DEBUG)
@@ -98,8 +97,8 @@ class TestSessionLogger(unittest.TestCase):
 
         file_folder_names = os.listdir(session_logger._session_folder)
         # config file (initial.cfg)
-        _, config_filename_with_ext = os.path.split(CONFIG_FP)
-        self.assertEqual(config_filename_with_ext in file_folder_names, True)
+        # _, config_filename_with_ext = os.path.split(CONFIG_FP)
+        self.assertEqual('initial.cfg' in file_folder_names, True)
 
         self.assertEqual('pre_session_server.log' in file_folder_names, True)
         self.assertEqual('session_server.log' in file_folder_names, True)

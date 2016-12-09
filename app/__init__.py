@@ -7,6 +7,7 @@
 import logging
 import os
 
+from threading import Lock
 from logging.handlers import TimedRotatingFileHandler
 
 from flask import Flask
@@ -15,8 +16,12 @@ from flask import Flask
 from sensors.cam_manager import TriCapCamsManager
 
 from sensors.trusense_altimeter import TrusenseAltimeter
+from sensors.dummy_alti import DummyAlti
 from sensors.session_logger import SessionLogger
 from sensors.configure import TricapConfig
+
+from .talkbox import TalkBox
+from .log_list import LogListAccessor
 
 from config import SERVER_LOG_DIR
 
@@ -38,10 +43,11 @@ rootlogger.addHandler(handler)
 rootlogger.setLevel(logging.DEBUG)
 app.logger.info('Initiated logger for new instance of TriCap app.')
 
-# Instantiate a config object, and delete again, as a startup test to validate the config file
-init_config = TricapConfig()
+# Instantiate the system log message tracker
+log_list = LogListAccessor(3)
 
 # Instantiate the sensors
+init_config = TricapConfig()
 misc_settings = init_config.get_section_dict(TricapConfig.MISC_SECTION_HEADER)
 cam_settings = init_config.get_section_dict(TricapConfig.CAMERA_SECTION_HEADER)
 tricap_manager = TriCapCamsManager(misc_settings, cam_settings)
@@ -49,7 +55,16 @@ tricap_cameras = tricap_manager.get_cameras_as_list()
 image_manager = tricap_manager
 
 session_logger = SessionLogger()
-altimeter = TrusenseAltimeter(session_logger)
+
+alti_settings = init_config.get_section_dict(TricapConfig.ALTI_SECTION_HEADER)
+
+if init_config.get('alti_required', TricapConfig.WEB_SECTION_HEADER) == 'dummy':
+    altimeter = DummyAlti(alti_settings, session_logger)
+else:
+    altimeter = TrusenseAltimeter(session_logger)
+
+talkbox = TalkBox(Lock(), 3)
+talkbox.clear()
 
 # Configure the Flask Blueprints
 from .views.home import home_bp

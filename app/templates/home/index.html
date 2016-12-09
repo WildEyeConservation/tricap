@@ -1,65 +1,17 @@
-<html><head>
-    <!-- <script src="{{ url_for('static', filename='js/jquery-3.0.0.min.js')
-    }}" type="text/javascript"></script>
-    <script src="{{ url_for('static', filename='js/bootstrap.js') }}" type="text/javascript"></script> -->
-    <!-- Import the css stylesheets we want -->
-    <!-- <link rel="stylesheet" href="{{ url_for('static', filename='css/bootstrap.css')
-    }}" type="text/css"> -->
-    <!-- Set the SCRIPT_ROOT that is often used to build links -->
-    <script type="text/javascript">
-      var $SCRIPT_ROOT = {{ request.script_root|tojson|safe }};
-    </script>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <script type="text/javascript" src="http://cdnjs.cloudflare.com/ajax/libs/jquery/2.0.3/jquery.min.js"></script>
-    <script type="text/javascript" src="http://netdna.bootstrapcdn.com/bootstrap/3.3.4/js/bootstrap.min.js"></script>
-    <link href="http://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.3.0/css/font-awesome.min.css" rel="stylesheet" type="text/css">
-    <link rel="stylesheet" href="..\..\static\css\bootstrap.css">
-    <link rel="stylesheet" href="..\..\static\css\tricap.css">
-  </head><body>
+{% extends "base.html" %}
+{% block content %}
+
     <div class="section">
       <div class="container">
-        <div class="row">
-          <div class="col-xs-11">
-            <div class="alert alert-tricap-green" id="alt_main_status">
-              <h1 id="h_main_status">Main Status Error Bar</h1>
-            </div>
-          </div>
-          <div class="col-xs-1">
-            <div class="btn-group btn-group-sm">
-              <a class="btn btn-block btn-lg btn-primary dropdown-toggle" data-toggle="dropdown" id="btn_menu"><i class="fa fa-2x fa-bars fa-fw"></i></a>
-              <ul class="dropdown-menu dropdown-menu-right" role="menu">
-                <li>
-                  <a href="{{ url_for('home.index')}}">Home</a>
-                </li>
-                <li>
-                  <a href="{{ url_for('settings.settings')}}">Settings</a>
-                </li>
-                <li>
-                  <a href="{{ url_for('showlog.showlog')}}">Log</a>
-                </li>
-                <li class="divider"></li>
-                <li>
-                  <a href="#" id="a_test">Test</a>
-                </li>
-                <li>
-                  <a href="#" id="a_reset">Reset</a>
-                </li>
-              </ul>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-    <div class="section">
-      <div class="container">
-        <div class="alert alert-tricap-green" id="alt_msgs">
+        <div class="alert alert-success" id="alt_msgs">
           <div class="row">
             <div class="col-xs-6">
-              <div class="alert alert-tricap-blue" id="alt_msgs_sys">Messages</div>
+              <div class="alert alert-info" id="alt_msgs_sys">Error Messages</div>
             </div>
             <div class="col-xs-6">
-              <div class="alert alert-tricap-orange" id="alt_msgs_talkbox">TalkBox</div>
+              <div class="alert alert-info" id="alt_msgs_talkbox">TalkBox
+                  <input class="form-control" id="input_talkbox" type="text">
+              </div>
             </div>
           </div>
         </div>
@@ -67,14 +19,14 @@
     </div>
     <div class="section">
       <div class="container">
-        <div class="alert alert-tricap-green">
+        <div class="alert alert-tricap-grey">
           <div class="row">
             <div class="col-xs-2"></div>
             <div class="col-xs-8">
               <div class="btn-group btn-group-lg btn-group-justified">
-                <a href="#" class="btn btn-tricap-red" style="text-decoration: none" id="btn_startstop">Start</a>
-                <a href="#" data-toggle='collapse' data-target='#con_alti' class="btn btn-tricap-green" style="text-decoration: none" id="btn_alti">Altimeter</a>
-                <a href="#" data-toggle='collapse' data-target='#con_cam' class="btn btn-tricap-orange" style="text-decoration: none" id="btn_cam">Camera</a>
+                <a href="#" class="btn btn-info" style="text-decoration: none" id="btn_startstop">Start</a>
+                <a href="#" data-toggle='collapse' data-target='#con_alti' class="btn btn-warning" style="text-decoration: none" id="btn_alti">Altimeter</a>
+                <a href="#" data-toggle='collapse' data-target='#con_cam' class="btn btn-warning" style="text-decoration: none" id="btn_cam">Camera</a>
               </div>
             </div>
             <div class="col-xs-2"></div>
@@ -83,14 +35,18 @@
       </div>
     </div>
     <div class="section">
+      {% if alti_start_display == 'closed' %}
+      <div class="container collapse" id="con_alti">
+      {% else %}
       <div class="container collapse in" id="con_alti">
-        <div class="alert alert-tricap-green" id="alt_alti">
+      {% endif %}
+        <div class="alert alert-warning" id="alt_alti">
           <div class="row">
             <div class="col-xs-8">
               <h3 class="text-left" id="h_alti">Altitude: 120 m</h3>
             </div>
             <div class="col-xs-4">
-              <div class="alert alert-tricap-orange" id="alt_alti_target">
+              <div class="alert alert-warning" id="alt_alti_target">
                 <h5 class="test-right" id="h_alti_target">Below Target</h5>
               </div>
             </div>
@@ -99,12 +55,16 @@
       </div>
     </div>
     <div class="section">
+      {% if cams_start_display == 'closed' %}
+      <div class="container collapse" id="con_cam">
+      {% else %}
       <div class="container collapse in" id="con_cam">
-        <div class="alert alert-tricap-green" id="alt_cam">
+      {% endif %}
+        <div class="alert alert-warning" id="alt_cam_overall">
           <div class="row">
             {% for cam_num in range(num_cams) %}
               <div class="col-xs-{{12//num_cams}}">
-                <div class="alert alert-tricap-blue" id="alt_cam{{cam_num}}">
+                <div class="alert alert-info" id="alt_cam{{cam_num}}">
                   <img src="http://pingendo.github.io/pingendo-bootstrap/assets/placeholder.png"
                        class="img-responsive" id="img_cam{{cam_num}}">
                 </div>
@@ -121,4 +81,4 @@
         </script>
     {% endblock %}
 
-</body></html>
+{% endblock %}

@@ -39,3 +39,7 @@ class AbstractCamera(ABC):
     @abstractmethod
     def get_state_as_string(self):
         pass
+
+    @abstractmethod
+    def get_cam_image_count(self):
+        pass

@@ -4,17 +4,15 @@
 // Create a namespace if not existing
 var tricap = tricap || {};
 
-// Code here will be linted with JSHint.
+// Code here will be linted with JSHint. Doesn't understand Jinja2.
 /* jshint ignore:start */
 var numCams = {{num_cams}};
-var imgTooOldCount = {{img_too_old_count}};
-var camRefreshRate = {{refresh_rate}}
-var stateRefreshRate = {{refresh_rate}}
-var timeOutPeriod = {{timeout_period}}
+var imgTooOldCount = {{python_data.img_too_old_count}};
+var camRefreshRate = {{python_data.refresh_rate}};
+var stateRefreshRate = {{python_data.refresh_rate}};
+var timeOutPeriod = {{python_data.timeout_period}};
 // Code here will be ignored by JSHint.
 /* jshint ignore:end */
-
-// TODO Need to read the state of the cams before displaying, to update the images
 
 // Constants go first (declared without a var}
 
@@ -37,13 +35,12 @@ tricap.CAPTURE_STATES = Object.freeze({
     STOPPED: 1
 });
 
-//ALTIMETER_STATE = Enum("AltiState", ["NOT_CONNECTED", "CONNECTED", "MEASURING", "ERROR"])
-tricap.ALTI_STATES = Object.freeze({
-    NOT_CONNECTED: 0,
-    CONNECTED: 1,
-    MEASURING: 2,
-    ERROR: 3
-});
+//This should change as you change the CSS file
+tricap.RED_CLASS = 'danger';
+tricap.ORANGE_CLASS = 'warning';
+tricap.GREEN_CLASS = 'success';
+tricap.BLUE_CLASS = 'info';
+tricap.GREY_CLASS = 'tricap-grey';
 
 //Object Constructors
 
@@ -53,14 +50,38 @@ function camImgController() {
     this.oldImgCount = 0;
 }
 
+function timer(timedFunc, delay) {
+    // Uses the setInterval and clearInterval to manage timing a function
+    this._timedFunc = timedFunc;
+    this.running = false;
+    this.delay = delay;
+
+    this._timer = undefined;
+
+    this.runTimer = function(){
+        if (this.running === false){
+            this._timer = setInterval(this._timedFunc, this.delay);
+            this.running = true;
+        }
+    };
+
+    this.stopTimer = function(){
+        if (this.running === true){
+            clearInterval(this._timer);
+            this.running = false;
+        }
+    };
+}
+
 //Globals
 
 var camImgControllers = [];
-var globalState = tricap.GLOBAL_STATES.INITIALISED;
 var timeoutFunc;
+var camRefreshTimer;
 
 // Then function declarations (i.e. function addTwoNumbers(a, b){ return a+b;};) so that hoisting
 // is obvious
+// TODO These colour functions should probably be combined
 function changeStateColour(elem_id, target_colour){
 
     //Check if its an alert (i.e. a div) or a button (i.e. an a)
@@ -74,14 +95,14 @@ function changeStateColour(elem_id, target_colour){
     }
 
     if (target_colour === 'red'){
-        elem.removeClass(pre+'tricap-green '+pre+'tricap-orange');
-        elem.addClass(pre+'tricap-red');
+        elem.removeClass(pre+tricap.GREEN_CLASS+' '+pre+tricap.ORANGE_CLASS);
+        elem.addClass(pre+tricap.RED_CLASS);
     } else if (target_colour === 'green'){
-        elem.removeClass(pre+'tricap-red '+pre+'tricap-orange');
-        elem.addClass(pre+'tricap-green');
+        elem.removeClass(pre+tricap.RED_CLASS+' '+pre+tricap.ORANGE_CLASS);
+        elem.addClass(pre+tricap.GREEN_CLASS);
     } else if (target_colour === 'orange'){
-        elem.removeClass(pre+'tricap-green '+pre+'tricap-red');
-        elem.addClass(pre+'tricap-orange');
+        elem.removeClass(pre+tricap.GREEN_CLASS+' '+pre+tricap.RED_CLASS);
+        elem.addClass(pre+tricap.ORANGE_CLASS);
     }
 }
 
@@ -98,15 +119,27 @@ function changeTimeColour(elem_id, target_colour){
     }
 
     if (target_colour === 'grey'){
-        elem.removeClass(pre+'tricap-blue '+pre+'tricap-red');
-        elem.addClass(pre+'tricap-grey');
+        elem.removeClass(pre+tricap.BLUE_CLASS+' '+pre+tricap.RED_CLASS);
+        elem.addClass(pre+tricap.GREY_CLASS);
     } else if (target_colour === 'blue'){
-        elem.removeClass(pre+'tricap-grey '+pre+'tricap-red');
-        elem.addClass(pre+'tricap-blue');
+        elem.removeClass(pre+tricap.GREY_CLASS+' '+pre+tricap.RED_CLASS);
+        elem.addClass(pre+tricap.BLUE_CLASS);
     } else if (target_colour === 'red'){
-        elem.removeClass(pre+'tricap-blue '+pre+'tricap-grey');
-        elem.addClass(pre+'tricap-red');
+        elem.removeClass(pre+tricap.BLUE_CLASS+' '+pre+tricap.GREY_CLASS);
+        elem.addClass(pre+tricap.RED_CLASS);
     }
+}
+
+function showMainError(msg){
+    $('#h_main_status').html(msg);
+    changeStateColour('alt_main_status', 'red');
+    changeStateColour('alt_msgs', 'red');
+}
+
+function changeMainStatus(colour, msg) {
+    $('#h_main_status').html(msg);
+    changeStateColour('alt_main_status', colour);
+    changeStateColour('alt_msgs', colour);
 }
 
 // Then function expressions (i.e. var a = function(a,b){return a+b;};). Note that the var a is
@@ -116,7 +149,7 @@ var buttonClick = function(buttonCode){
 
     if (buttonCode === tricap.BUTTON_CODES.START || buttonCode === tricap.BUTTON_CODES.STOP ||
         buttonCode === tricap.BUTTON_CODES.STARTSTOP || tricap.BUTTON_CODES.TEST){
-        $.getJSON($SCRIPT_ROOT + '/_button_click', {buttonCode: buttonCode }, buttonClickFollowUp);
+        $.getJSON($SCRIPT_ROOT + '/_button_click', {buttonCode: buttonCode }, startStopFollowUp);
     } else if (buttonCode === tricap.BUTTON_CODES.RESET){
         $.getJSON($SCRIPT_ROOT + '/_button_click', {buttonCode: buttonCode },
                   function(){location.reload(); return false;});
@@ -124,13 +157,13 @@ var buttonClick = function(buttonCode){
     return false;
 };
 
-var buttonClickFollowUp = function (data) {
-    if (data.hasOwnProperty('capture_state')){
-        if (data.capture_state === tricap.CAPTURE_STATES.STARTED){
-            $('#btn_startstop').innerHTML = 'STOP';
-        } else {
-            $('#btn_startstop').innerHTML = 'START';
-        }
+var startStopFollowUp = function (data) {
+    if (data.capture_started === true){
+        camRefreshTimer.runTimer();
+        $('#btn_startstop').html('Stop');
+    } else {
+        camRefreshTimer.stopTimer();
+        $('#btn_startstop').html('Start');
     }
     return false;
 };
@@ -140,13 +173,15 @@ var refreshCamImages = function(){
         if (camImgControllers[index].imgId !== camImgControllers[index].lastRequestId){
             var cam_img_url = $SCRIPT_ROOT + '/cam_img'+index+camImgControllers[index].imgId;
             $('#img_cam'+index).attr('src', cam_img_url);
-            changeTimeColour('alt_cam', 'blue');
+            changeTimeColour('alt_cam'+index, 'blue');
+            camImgControllers[index].lastRequestId = camImgControllers[index].imgId;
+            camImgControllers[index].oldImgCount = 0;
         } else {
             camImgControllers[index].oldImgCount = camImgControllers[index].oldImgCount + 1;
             if (camImgControllers[index].oldImgCount < imgTooOldCount){
-                changeTimeColour('alt_cam', 'grey');
+                changeTimeColour('alt_cam'+index, 'grey');
             } else {
-                changeTimeColour('alt_cam', 'red');
+                changeTimeColour('alt_cam'+index, 'red');
             }
         }
     }
@@ -156,41 +191,112 @@ var refreshCamImages = function(){
 var updateAlti = function(data){
     $('#h_alti').html('Altitude: ' + data.measurement + ' m');
 
-    if (data.state === tricap.ALTI_STATES.CONNECTED) {
-        changeStateColour('alt_alti', 'orange');
-        changeStateColour('btn_alti', 'orange');
-    } else if (data.state === tricap.ALTI_STATES.MEASURING) {
-        changeStateColour('alt_alti', 'green');
-        changeStateColour('btn_alti', 'green');
-    } else {
-        changeStateColour('alt_alti', 'red');
-        changeStateColour('btn_alti', 'red');
+    changeStateColour('alt_alti', data.state_colour);
+    changeStateColour('btn_alti', data.state_colour);
+
+    if (data.state_colour === 'red'){
+        changeMainStatus('red', 'Altimeter Error');
     }
 
     return false;
 };
 
-var requestStateData = function(data){
-    $.getJSON($SCRIPT_ROOT + '/_get_state_data', {},
-              function(data){
-                  updateAlti(data.alti);
 
-                  //Reset the timeout period
-                  clearTimeout(timeoutFunc);
-                  timeoutFunc = setTimeout(showNoResponseMessage, timeOutPeriod);
-                  return false;
-              });
+var updateCamState = function(data){
+    changeStateColour('alt_cam_overall', data.overall_cam_state_colour);
+    changeStateColour('btn_cam', data.overall_cam_state_colour);
+
+    for (index = 0; index < camImgControllers.length; index++){
+        camImgControllers[index].imgId = data.image_counts[index];
+    }
+
+    if (data.overall_cam_state_colour === 'red'){
+        changeMainStatus('red', 'Camera Error');
+    }
+
+    startStopFollowUp(data);
+
     return false;
 };
 
-var showNoResponseMessage = function(){
-    // TODO Implement an observer pattern for the globalState
+var updateTalkBox = function(data){
 
-    $('#h_main_status').html('No Response From Server');
+    // Clear the talkbox of all old messages
+    $('[target=tb_msg]').remove();
 
-    globalState = tricap.GLOBAL_STATES.ERROR;
-    changeStateColour('alt_main_status', 'red');
-    changeStateColour('alt_msgs', 'red');
+    for (var index = data.msgs.length-1; index >= 0; index--){
+        var reply_code = data.reply_codes[index];
+        var yes_class = 'btn-default';
+        var no_class = 'btn-default';
+        if (reply_code === 1){
+            yes_class = 'btn-success';
+        } else if (reply_code === 2){
+            no_class = 'btn-success';
+        }
+
+        $('#alt_msgs_talkbox').append(
+            // '<input type="text" class="form-control" disabled="" target="tb_msg" value="'+data.msgs[index]+'">'
+            '<div class="input-group" target="tb_msg">' +
+                '<input type="text" class="form-control" disabled="" value="'+data.msgs[index]+'">'+
+                '<span class="input-group-btn">'+
+                    '<button type="button" class="btn '+yes_class+'" target="tb_msg_btn">Yes</a>' +
+                    '<button type="button" class="btn '+no_class+'" target="tb_msg_btn">No</a>' +
+                '</span></div>'
+        );
+    }
+
+    $('[target=tb_msg_btn]').click(function(){
+        // Need to change both buttons to default colouring, then change the active buttons colour
+        // There is probably a better way to do this
+        $(this).parent().children().removeClass('btn-success');
+        $(this).parent().children().addClass('btn-default');
+        $(this).removeClass('btn-default');
+        $(this).addClass('btn-success');
+
+        var msg = $(this).parent().parent().find('input').val();
+        var reply_code;
+        if ($(this).html() === 'Yes'){
+            reply_code = 1;
+        } else {
+            reply_code = 2;
+        }
+        $.getJSON($SCRIPT_ROOT + '/_change_message_reply', {msg: msg, reply_code: reply_code});
+    });
+};
+
+var updateSysMsgs = function(data){
+    // Clear the errorbox of all old messages
+    $('[target=sys_msg]').remove();
+
+    for (var index = data.msgs.length-1; index >= 0; index--){
+        $('#alt_msgs_sys').append(
+            '<input type="text" class="form-control" disabled="" target="sys_msg" value="'+
+            data.msgs[index]+'">'
+        );
+    }};
+
+var requestStateData = function(data){
+    $.getJSON($SCRIPT_ROOT + '/_get_state_data', {},
+              function(data){
+
+                  //Reset the timeout period
+                  clearTimeout(timeoutFunc);
+                  timeoutFunc = setTimeout(function(){
+                                    changeMainStatus('red', 'No Response From Server');},
+                                    timeOutPeriod);
+                   //Check if we had recovered from a timeout
+                   if ($('#h_main_status').html() === 'No Response From Server') {
+                       changeMainStatus('green', 'TriCap');
+                   }
+
+                  updateAlti(data.alti);
+                  updateCamState(data.cams);
+                  updateTalkBox(data.talk);
+                  updateSysMsgs(data.sys);
+
+                  return false;
+              });
+    return false;
 };
 
 // All of the following code will only run when the page is ready
@@ -206,9 +312,16 @@ $(function(){
     $("#a_test").on('click', function(event){buttonClick(tricap.BUTTON_CODES.TEST);});
     $("#a_reset").on('click', function(event){buttonClick(tricap.BUTTON_CODES.RESET);});
     $("#img_cam_left").error(function(event){console.log('Error');});
+    
+    $("#input_talkbox").keyup(function(event){
+        if (event.keyCode == 13){
+            $.getJSON($SCRIPT_ROOT + '/_submit_talkbox_msg', {msg:$(this).val()});
+            $(this).val('');
+        }
+    });
 
     // Set the interval functions
-    setInterval(refreshCamImages, camRefreshRate);
+    camRefreshTimer = new timer(refreshCamImages, camRefreshRate);
     setInterval(requestStateData, stateRefreshRate);
-    timeoutFunc = setTimeout(showNoResponseMessage, timeOutPeriod);
+    timeoutFunc = setTimeout(function(){showMainError('No Response From Server');}, timeOutPeriod);
 });

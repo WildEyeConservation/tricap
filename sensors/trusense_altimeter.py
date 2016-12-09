@@ -8,8 +8,7 @@ from time import sleep
 import serial
 import serial.tools.list_ports
 
-from config import ALTIMETER_STATE, RET_OK, RET_ERROR
-from .configure import TricapConfig
+from config import ALTIMETER_STATE
 from functools import partial
 from collections import namedtuple
 from sensors.base_setting import BaseSetting, SettingSpec
@@ -65,7 +64,7 @@ class TrusenseAltimeter(object):
                   '30': 'S100 Error 30: Temperature too High',
                   '31': 'S100 Error 31: Temperature too Low'}
 
-    def __init__(self, data_logger, supported_devices={(1659, 8963)}):
+    def __init__(self, settings, data_logger, supported_devices={(1659, 8963)}):
         # SETTINGS
         # default values
         self._setting_strings = ['measurement_timeout', 'num_frames_to_avg']
@@ -77,11 +76,7 @@ class TrusenseAltimeter(object):
                                               get_value=partial(self._get_setting, "num_frames_to_avg"),
                                               set_value=partial(self._set_setting, "num_frames_to_avg"))})
 
-        # Read the alti values from the initial.cfg file
-        init_configs = TricapConfig()
-        section_dict = init_configs.get_section_dict(TricapConfig.ALTI_SECTION_HEADER)
-        # TODO Check that all keys in section_dict are known
-        self._settings = section_dict
+        self._settings = settings
 
         self._data_logger = data_logger
         self.state = ALTIMETER_STATE.NOT_CONNECTED

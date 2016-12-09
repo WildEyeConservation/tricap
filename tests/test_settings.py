@@ -82,7 +82,6 @@ class TestSettings(BaseTestSettings):
 
             # check that the shutterspeed setting was correctly instantiated
             labels = [cam_select.label for cam_select in form.cam_selects]
-            print(labels)
             self.assertEqual('shutterspeed' in labels, True)
             choices = form.cam_selects[labels.index('shutterspeed')].choices
             ss_choices = [ct[1] for ct in choices]
@@ -128,15 +127,14 @@ class TestSettings(BaseTestSettings):
 class TestMiscSettings(BaseTestSettings):
     def test_set_and_get_settings(self):
         misc_handler = settings.MiscSettingHandler()
-        misc_handler.set_setting('session_description', 'test_misc_handler')
-        self.assertEqual(misc_handler.get_setting('session_description'), 'test_misc_handler')
+        misc_handler.config['session_description'] = 'test_misc_handler'
+        self.assertEqual(misc_handler.config['session_description'], 'test_misc_handler')
 
-        misc_handler.set_setting('image_capture_interval', '-99.99')
-        self.assertEqual(misc_handler.get_setting('image_capture_interval'), '-99.99')
+        misc_handler.config['image_capture_interval'] = '-99.99'
+        self.assertEqual(misc_handler.config['image_capture_interval'], '-99.99')
 
-        ret_val = misc_handler.set_setting('non_existent', '-1')
-        self.assertEqual(ret_val, RET_ERROR)
-
+        with self.assertRaises(KeyError):
+            misc_handler.config['non_existent'] = -1
 
 class TestBehaviourSettings(BaseTestSettings):
     """Test stuff that needs interaction from a browser here."""
@@ -175,12 +173,10 @@ class TestBehaviourSettings(BaseTestSettings):
 
             # Check that all the config fields have been created
             new_config = TricapConfig()
-            section_dict = new_config.get_section_dict(TricapConfig.CAMERA_SECTION_HEADER)
-            num_fields = len(section_dict.keys())
-            section_dict = new_config.get_section_dict(TricapConfig.ALTI_SECTION_HEADER)
-            num_fields += len(section_dict.keys())
-            section_dict = new_config.get_section_dict(TricapConfig.MISC_SECTION_HEADER)
-            num_fields += len(section_dict.keys())
+            num_fields = 0
+            for sh in TricapConfig.SECTION_HEADERS:
+                section_dict = new_config.get_section_dict(sh)
+                num_fields += len(section_dict.keys())
 
             input_fields = driver.find_elements_by_class_name("form-control")
             self.assertEqual(len(input_fields), num_fields)
@@ -218,9 +214,10 @@ class TestBehaviourSettings(BaseTestSettings):
                                         data=form_data,
                                         follow_redirects=True)
 
-            self.assertEqual(tricap_manager.get_setting('shutterspeed'), '1/2500')
-            self.assertEqual(tricap_manager.get_setting('iso'), '500')
-            self.assertEqual(tricap_manager.get_setting('image_capture_interval'), '9.0')
+            self.assertEqual(tricap_manager.config['shutterspeed'], '1/2500')
+            self.assertEqual(tricap_manager.config['iso'], '500')
+            misc_handler = settings.MiscSettingHandler()
+            self.assertEqual(misc_handler.config['image_capture_interval'], '9.0')
 
             driver.quit()
 
@@ -280,7 +277,7 @@ class TestBehaviourSettings(BaseTestSettings):
 
             driver.quit()
 
-    def test_revert(self):
+    def test_revert_button(self):
         """ Test the revert button. """
         # create a new config file, change it and save it
         new_config = TricapConfig()

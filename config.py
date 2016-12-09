@@ -6,6 +6,7 @@ from enum import Enum, IntEnum
 
 import local_paths
 
+# TODO How to import/copy these automatically
 SERVER_LOG_DIR = local_paths.SERVER_LOG_DIR
 SESSION_ROOT_DIR = local_paths.SESSION_ROOT_DIR
 DISPLAY_DOWNLOAD_DIR = local_paths.DISPLAY_DOWNLOAD_DIR
@@ -36,5 +37,5 @@ NUM_DUMMY_CAMS = 3
 CAMERA_STATES = Enum("CamState", ["UNINITIALISED", "INITIALISED", "CAPTURING", "ERROR_CONFIG", "ERROR_CAPTURE"])
 CAM_MANAGER_STATES = Enum("CamManagerState", ["STOPPED", "STARTED", "ERROR_NO_CAMS", "ERROR_CONFIG"])
 ALTIMETER_STATE = Enum("AltiState", ["NOT_CONNECTED", "CONNECTED", "MEASURING", "ERROR"])
-BUTTON_CODE = IntEnum("ButtonCode", {"START": 0, "STOP": 1, "TEST": 2, "RESET": 3})
+BUTTON_CODE = IntEnum("ButtonCode", {"START": 0, "STOP": 1, "TEST": 2, "RESET": 3, "STARTSTOP": 4})
 LOG_CODES = Enum("LogCode", "ALL")

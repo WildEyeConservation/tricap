@@ -6,6 +6,7 @@
 import unittest
 
 from tests.test_settings import TestSettings
+from tests.test_talkbox import TestTalkBox
 
 DO_BEHAVIOUR_TESTS = True
 

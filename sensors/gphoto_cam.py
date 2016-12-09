@@ -1,4 +1,3 @@
-"""Handler for the Canon EOS 6D Camera. Uses gphoto2 to handle the actual communication."""
 # coding=utf-8
 import logging
 import threading
@@ -7,52 +6,21 @@ import gphoto2 as gp
 from anytree import Node, PreOrderIter, RenderTree
 
 from config import CAMERA_STATES
-from config import CE6D_CAP_TARGET_SD_CARD, CE6D_FORMAT_RAW
 from .abstract_cam import CamConfigType
+from .base_setting import BaseSetting
 
 
-class GPhotoConfigWidget:
+class GPhotoSetting(BaseSetting):
     def __init__(self, widget):
-        self._widget = widget
-
-    def _set(self, value):
-        #        if self._widget.get_type()!=CamConfigType.Radio or value in self.choices:
-        self._widget.set_value(str(value))
-
-    #        else:
-    #            raise CameraException("%s is not a valid value for %s. Valid choices are : %s" % (value,self._widget.get_name(),self.choices))
-
-    def __eq__(self, other):
-        return self._widget.get_value().__ne__(str(other))
-
-    def __eq__(self, other):
-        return self._widget.get_value().__eq__(str(other))
-
-    def __lt__(self, other):
-        return self._widget.get_value().__lt__(str(other))
-
-    def __gt__(self, other):
-        return self._widget.get_value().__gt__(str(other))
-
-    def __lt__(self, other):
-        return self._widget.get_value().__le__(str(other))
-
-    def __gt__(self, other):
-        return self._widget.get_value().__ge__(str(other))
+        widget.name = widget.get_name()
+        super().__init__(widget)
 
     @property
     def choices(self):
         try:
             return [self._widget.get_choice(i) for i in range(self._widget.count_choices())]
         except gp.GPhoto2Error:
-            return []
-
-    def __repr__(self):
-        return str(self._widget.get_value())
-
-    @property
-    def label(self):
-        return self._widget.get_label()
+            return None
 
 
 class GPhotoConfig:
@@ -73,16 +41,11 @@ class GPhotoConfig:
             self.__dict__[key] = value
         else:
             config = self._camera.get_config(self._context)
-            config_widget = GPhotoConfigWidget(config.get_child_by_name(key))
-            config_widget._set(value)
+            GPhotoSetting(config.get_child_by_name(key)).set(value)
             self._camera.set_config(config, self._context)
 
     def __getattr__(self, key):
-        if key in GPhotoConfig.dictkeys:
-            return self.__dict__[key]
-        else:
-            config = self._camera.get_config(self._context)
-            return GPhotoConfigWidget(config.get_child_by_name(key))
+        return GPhotoSetting(self._camera.get_config(self._context).get_child_by_name(key))
 
     __setitem__ = __setattr__
     __getitem__ = __getattr__
@@ -97,7 +60,7 @@ class GPhotoConfig:
                 GPhotoConfig._get_config(child, thisnode)
             return thisnode
         else:
-            if (node.get_type() == CamConfigType.Radio):
+            if node.get_type() == CamConfigType.Radio:
                 choices = [node.get_choice(i) for i in range(node.count_choices())]
             else:
                 choices = None
@@ -108,8 +71,9 @@ class GPhotoConfig:
         config = self._camera.get_config(self._context)
         return GPhotoConfig._get_config(config)
 
+
 # noinspection PyUnresolvedReferences
-class GPhotoCam(object):
+class GPhotoCam:
     """Handler for the Canon EOS 6D Camera. Uses gphoto2 to handle the actual communication."""
 
     _port_info_list = gp.PortInfoList()
@@ -118,20 +82,17 @@ class GPhotoCam(object):
     _logger = logging.getLogger(__name__)
 
     def __init__(self, address, settings: dict):
-        self.__dict__ = {'_gp_camera': None,
-                         'state': CAMERA_STATES.UNINITIALISED,
-                         '_address': address,
-                         '_fresh_capture': False,
-                         'data': None}
+
+        self._gp_camera = None
+        self.data = None
+        self._fresh_capture = False
+        self.state = CAMERA_STATES.INITIALISED
+        self._address = address
 
         self._setup_camera(settings)
 
     def is_cam_image_fresh(self):
         return self._fresh_capture
-
-    @property
-    def serial_num(self):
-        return self.config.eosserialnumber
 
     @staticmethod
     def autodetect():
@@ -158,13 +119,13 @@ class GPhotoCam(object):
     def capture(self, continuous=False, barrier: threading.Barrier = None, stop_event=None):
         while True:
             if stop_event:
-                if stop_event.wait(0.01):
+                if stop_event.is_set():
                     return
             self.state = CAMERA_STATES.CAPTURING
             if barrier:
                 barrier.wait()
             success = False
-            while not (success):
+            while not success:
                 try:
                     file_path = self._gp_camera.capture(gp.GP_CAPTURE_IMAGE, GPhotoCam._context)
                     success = True
@@ -180,7 +141,6 @@ class GPhotoCam(object):
             self.state = CAMERA_STATES.INITIALISED
             if not continuous:
                 return self.data
-
 
     def reset(self, settings: dict):
         self.state = CAMERA_STATES.UNINITIALISED

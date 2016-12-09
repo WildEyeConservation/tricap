@@ -28,7 +28,7 @@ class MiscSettingConfig:
         return self._settings.keys()
 
     def __setattr__(self, key, value):
-        setter = self._settings[key].setter(value)
+        self._settings[key].setter(value)
 
     def __getattr__(self, key):
         return self._settings[key].getter()
@@ -77,7 +77,8 @@ def populate_form_section(sdict, handler, form_selects, form_strings, set_data=T
                 if config_val is not None:
                     form_strings[-1].data = config_val
 
-def get_form_for_display(config_fp = CONFIG_FP, set_data=True):
+
+def get_form_for_display(config_fp=CONFIG_FP, set_data=True):
     """ Returns a SettingsForm populated with values from the setting sources as per the config
     file. Current settings need to be checked, so that if something was not set during the overall
     init, we could pick it up here (or if we are just testing a new setting something)"""
@@ -97,9 +98,10 @@ def get_form_for_display(config_fp = CONFIG_FP, set_data=True):
     misc_setting_handler = MiscSettingHandler()
     misc_dict = config.get_section_dict(TricapConfig.MISC_SECTION_HEADER)
     populate_form_section(misc_dict, misc_setting_handler, form.misc_selects, form.misc_strings,
-                             set_data)
+                          set_data)
 
     return form
+
 
 def populate_pushed_form_section(pf_strings, pf_selects, df_strings, df_selects):
     for index in range(len(df_strings)):
@@ -108,6 +110,7 @@ def populate_pushed_form_section(pf_strings, pf_selects, df_strings, df_selects)
     for index in range(len(df_selects)):
         pf_selects[index].label = df_selects[index].label
         pf_selects[index].choices = df_selects[index].choices
+
 
 def populate_pushed_form(pushed_form):
     """ for some reason, the pushed form loses the labels of the added fields, so have to add em"""
@@ -124,6 +127,7 @@ def populate_pushed_form(pushed_form):
 
     return pushed_form
 
+
 def extract_dict_info_from_form_section(section_dict, form_strings, form_selects):
     for index in range(len(form_strings)):
         # Replacing the %20 introducted by the HTML Form when there is a space in a string, because
@@ -134,10 +138,11 @@ def extract_dict_info_from_form_section(section_dict, form_strings, form_selects
         choices = [ct[1] for ct in form_selects[index].choices]
         section_dict[form_selects[index].label] = choices[int(form_selects[index].data)]
 
-def convert_populated_form_to_dict(form):
-    form_dict = {}
 
-    form_dict[TricapConfig.CAMERA_SECTION_HEADER] = {}
+def convert_populated_form_to_dict(form):
+    form_dict = {TricapConfig.CAMERA_SECTION_HEADER: {}, TricapConfig.ALTI_SECTION_HEADER: {},
+                 TricapConfig.MISC_SECTION_HEADER: {}}
+
     extract_dict_info_from_form_section(form_dict[TricapConfig.CAMERA_SECTION_HEADER],
                                         form.cam_strings, form.cam_selects)
 
@@ -151,11 +156,12 @@ def convert_populated_form_to_dict(form):
 
     return form_dict
 
+
 def set_setting_handler_with_dict(handler, sdict):
     # TODO Should we do this here, how should we handle the returns? Figure it out on merging
-    ret_val = 0
     for key, value in sdict.items():
         handler.config[key] = value
+
 
 def change_settings(form):
     form_dict = convert_populated_form_to_dict(form)
@@ -165,6 +171,7 @@ def change_settings(form):
 
     misc_setting_handler = MiscSettingHandler()
     set_setting_handler_with_dict(misc_setting_handler, form_dict[TricapConfig.MISC_SECTION_HEADER])
+
 
 def save_settings(form, config_fp=CONFIG_FP):
     # get the current settings in a dict
@@ -178,6 +185,7 @@ def save_settings(form, config_fp=CONFIG_FP):
 
     config.save_to_file()
 
+
 def revert_to_default_settings(save_to_fp=CONFIG_FP, logger=None):
     # arguments are only supposed to be used during unittesting
     if logger is None:
@@ -190,6 +198,7 @@ def revert_to_default_settings(save_to_fp=CONFIG_FP, logger=None):
         config.set_section(default_config.get_section_dict(section_header), section_header)
 
     config.save_to_file()
+
 
 @settings_bp.route('/settings', methods=['GET', 'POST'])
 def settings():

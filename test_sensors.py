@@ -10,10 +10,5 @@ from tests.test_canon6d_cam import TestDeviceCanon6DCam
 from tests.test_configure import TestConfigure
 from tests.test_session_logger import TestSessionLogger
 
-DO_INTERACTIVE_TESTS = False
-
-if DO_INTERACTIVE_TESTS is True:
-    from tests.test_canon6d_cam import TestInteractiveCanon6DCam
-
 if __name__ == '__main__':
     unittest.main()

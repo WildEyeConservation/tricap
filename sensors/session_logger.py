@@ -8,6 +8,7 @@ import time
 
 from config import SESSION_ROOT_DIR, CONFIG_FP, SERVER_LOG_DIR
 
+
 class SessionLogger:
     """ The session logger is responsible for creating a session folder, a session data file
         (which will most likely only contain the data from the altimeter), copying the config file
@@ -25,8 +26,8 @@ class SessionLogger:
 
         self._data_logger = logging.getLogger('session_logger')
         self._data_logger.setLevel(logging.DEBUG)
-         # The session_logger is not an error logger, messages logged to it should not be pushed to
-         #  the rootlogger
+        # The session_logger is not an error logger, messages logged to it should not be pushed to
+        #  the rootlogger
         self._data_logger.propagate = False
 
         self._session_count = None
@@ -77,7 +78,7 @@ class SessionLogger:
             # need to set ready to true otherwise the log function won't work.
             self._ready = True
             self.log("Session Description : %s" % self._description)
-        except (FileNotFoundError) as ex:
+        except FileNotFoundError as ex:
             self._root_logger.error(ex)
             self._ready = False
 

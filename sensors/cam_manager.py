@@ -14,13 +14,14 @@ from config import RET_OK, RET_ERROR
 # TODO : Create a camera factory that will import cameras according to its config and make them available via its own
 # autodetect function
 from .canon_6D import Canon6DCam
+
 try:
     from .gphoto_cam import GPhotoCam as Camera
 except ImportError:
     from .dummy_cam import DummyCam as Camera
 
 
-class MultiConfig():
+class MultiConfig:
     dictkeys = ["_cameras", "_context"]
 
     def __init__(self, cameras):
@@ -44,6 +45,7 @@ class MultiConfig():
 
     def get_tree(self):
         return self._cameras[0].config.get_tree()
+
 
 class TriCapCamsManager:
     """TriCapCamsManager manages TriCap camera objects"""
@@ -128,6 +130,7 @@ class TriCapCamsManager:
 
     def set_image_capture_interval(self, value):
         self._man_settings['image_capture_interval'] = value
+
     def get_num_cams(self):
         return len(self._cameras)
 
@@ -138,7 +141,6 @@ class TriCapCamsManager:
                 cam_ids.append(cam.serial_num)
             else:
                 cam_ids.append('Unknown')
-
         return cam_ids
 
     @property

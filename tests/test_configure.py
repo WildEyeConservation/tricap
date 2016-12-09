@@ -11,8 +11,8 @@ import configparser
 from config import CONFIG_FP, SERVER_LOG_DIR
 from sensors.configure import TricapConfig, TricapConfigError
 
-class TestBaseConfigure(unittest.TestCase):
 
+class TestBaseConfigure(unittest.TestCase):
     format_str = "%(asctime)s | %(pathname)s:%(lineno)d | %(funcName)s | %(levelname)s | %(message)s "
     handler = logging.FileHandler(filename=os.path.join(SERVER_LOG_DIR, 'test_configure.log'))
     handler.setLevel(logging.DEBUG)
@@ -37,6 +37,7 @@ class TestBaseConfigure(unittest.TestCase):
                 os.remove(os.path.join(root, filename))
 
         shutil.rmtree(self.tempdir)
+
 
 class TestConfigure(TestBaseConfigure):
     def test_init(self):
@@ -80,7 +81,8 @@ class TestConfigure(TestBaseConfigure):
         # get the values manually
         with open(CONFIG_FP) as config_file:
             for line in config_file:
-                if ':' in line or '=' in line:
+                line = line.replace('=', ':')
+                if ':' in line:
                     parts = line.split(':')
                     if parts[0].strip() == 'shutterspeed':
                         ss_string = parts[1].strip()
@@ -104,7 +106,6 @@ class TestConfigure(TestBaseConfigure):
         with self.assertRaises(ValueError):
             config.get('shutterspeed', TricapConfig.CAMERA_SECTION_HEADER,
                        type_str=config.TYPE_INT)
-
 
     def test_value_setting(self):
         config = TricapConfig()

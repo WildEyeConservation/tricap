@@ -6,8 +6,8 @@ import time
 
 
 class Canon6DCam():
-    def __init__(self, cameraDriver):
-        self._camera = cameraDriver
+    def __init__(self, camera_driver):
+        self._camera = camera_driver
         self.config.output = 'Undefined'  # Do not be in live mode
         self.config.drivemode = 'Single'
         self.config.reviewtime = 'None'
@@ -15,7 +15,7 @@ class Canon6DCam():
         self.get_state_as_string = self._camera.get_state_as_string
         self.is_cam_image_fresh = self._camera.is_cam_image_fresh
 
-    def focusInfinity(self, num=2, delay=0.08):
+    def focus_infinity(self):
         # self.config.output = 'PC'
         # drive lens to endstop
         self.config.manualfocusdrive = 'Far 3'

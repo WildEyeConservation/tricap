@@ -43,6 +43,7 @@ def index():
         'timeout_period': config.get('timeout_period', TricapConfig.WEB_SECTION_HEADER),
         'alti_target': config.get('alti_target', TricapConfig.WEB_SECTION_HEADER),
         'alti_range': config.get('alti_range', TricapConfig.WEB_SECTION_HEADER),
+        'vibrate': config.get('vibrate', TricapConfig.WEB_SECTION_HEADER)
     }
 
     cams_start_display = config.get('cams_start_display', TricapConfig.WEB_SECTION_HEADER)

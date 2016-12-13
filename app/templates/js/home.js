@@ -13,6 +13,7 @@ var stateRefreshRate = {{python_data.refresh_rate}};
 var timeOutPeriod = {{python_data.timeout_period}};
 var altiTarget = {{python_data.alti_target}};
 var altiRange = {{python_data.alti_range}};
+var vibrate = "{{python_data.vibrate}}";;
 // Code here will be ignored by JSHint.
 /* jshint ignore:end */
 
@@ -80,6 +81,7 @@ function timer(timedFunc, delay) {
 var camImgControllers = [];
 var timeoutFunc;
 var camRefreshTimer;
+var oldTalkBoxMsgs = [];
 
 // Then function declarations (i.e. function addTwoNumbers(a, b){ return a+b;};) so that hoisting
 // is obvious
@@ -107,6 +109,28 @@ function changeStateColour(elem_id, target_colour){
         elem.addClass(pre+tricap.ORANGE_CLASS);
     }
 }
+
+// function updateOldTalkBoxMsgs(){
+//     oldTalkBoxMsgs = [];
+//     oldTalkBoxMsgs.push($("#input_talkbox").val()+'3');
+//     var tbDiv = $("#alt_msgs_talkbox").find('div').first()
+//     for (var i = 0; i < $("#alt_msgs_talkbox").find('div').length; i++) {
+//         if (i < $("#alt_msgs_talkbox").find('div').length-1) {
+//             var msg = tbDiv.find('input').val();
+//             var btn = tbDiv.find('button').first();
+//             var reply_code = '3';
+//             if (btn.hasClass('btn-success')) {
+//                 reply_code = '1';
+//             } else if (btn.next().hasClass('btn-success')) {
+//                 reply_code = '2';
+//             }
+//             oldTalkBoxMsgs.push(msg+reply_code);
+//         }
+//         tbDiv = tbDiv.next()
+//     }
+//     oldTalkBoxMsgs.reverse();
+//     console.log(oldTalkBoxMsgs);
+// }
 
 function changeTimeColour(elem_id, target_colour){
 
@@ -246,7 +270,33 @@ var updateTalkBox = function(data){
     // Clear the talkbox of all old messages
     $('[target=tb_msg]').remove();
 
-    for (var index = data.msgs.length-1; index >= 0; index--){
+    var newTalkBoxMsgs = [];
+    var newMsgs = false;
+    var index = 0;
+
+    for (index = 0; index < data.msgs.length; index++){
+        newTalkBoxMsgs.push(data.msgs[index]+data.reply_codes[index]);
+    }
+
+    if (oldTalkBoxMsgs.length !== newTalkBoxMsgs.length) {
+        newMsgs = true;
+    } else {
+        for (index = 0; index < data.msgs.length; index++) {
+            if (oldTalkBoxMsgs[index] !== newTalkBoxMsgs[index]){
+                newMsgs = true;
+            }
+        }
+    }
+
+    if (newMsgs === true) {
+        if (vibrate === 'yes') {
+            navigator.vibrate = navigator.vibrate || navigator.webkitVibrate || navigator.mozVibrate || navigator.msVibrate;
+            navigator.vibrate([300, 50, 300, 50, 300]);
+        }
+    }
+    oldTalkBoxMsgs = newTalkBoxMsgs;
+
+    for (index = data.msgs.length-1; index >= 0; index--){
         var reply_code = data.reply_codes[index];
         var yes_class = 'btn-default';
         var no_class = 'btn-default';
@@ -344,6 +394,7 @@ $(function(){
 
     $("#input_talkbox").keyup(function(event){
         if (event.keyCode == 13){
+            // updateOldTalkBoxMsgs();
             $.getJSON($SCRIPT_ROOT + '/_submit_talkbox_msg', {msg:$(this).val()});
             $(this).val('');
         }

@@ -5,7 +5,7 @@ import io
 import pdb
 
 from flask import Blueprint, render_template, send_from_directory, current_app, request, jsonify
-from flask import send_file
+from flask import send_file, redirect, url_for
 
 from app import tricap_manager, altimeter, session_logger, talkbox, log_list
 
@@ -40,7 +40,9 @@ def index():
     js_data = {
         'refresh_rate': config.get('refresh_rate', TricapConfig.WEB_SECTION_HEADER),
         'img_too_old_count': config.get('img_too_old_count', TricapConfig.WEB_SECTION_HEADER),
-        'timeout_period': config.get('timeout_period', TricapConfig.WEB_SECTION_HEADER)
+        'timeout_period': config.get('timeout_period', TricapConfig.WEB_SECTION_HEADER),
+        'alti_target': config.get('alti_target', TricapConfig.WEB_SECTION_HEADER),
+        'alti_range': config.get('alti_range', TricapConfig.WEB_SECTION_HEADER),
     }
 
     cams_start_display = config.get('cams_start_display', TricapConfig.WEB_SECTION_HEADER)
@@ -178,6 +180,16 @@ def _has_capture_started():
     return True
 
 
+@home_bp.route('/_reset')
+def reset():
+    """Stop the server."""
+    func = request.environ.get('werkzeug.server.shutdown')
+    if func is None:
+        raise RuntimeError('Not running with the Werkzeug Server')
+    func()
+    return redirect(url_for('home.index'))
+
+
 @home_bp.route('/_button_click')
 def handle_button_click():
     button_code = request.args.get('buttonCode', 0, type=int)
@@ -186,11 +198,14 @@ def handle_button_click():
         session_logger.create_new_session()
         tricap_manager.start_capturing()
         altimeter.start_measuring()
+        return jsonify(capture_started=_has_capture_started())
     elif button_code == BUTTON_CODE.STOP:
         tricap_manager.stop_capturing()
         altimeter.stop_measuring()
+        return jsonify(capture_started=_has_capture_started())
     elif button_code == BUTTON_CODE.RESET:
-        reset_device_objects()
+        # reset_device_objects()
+        reset()
     elif button_code == BUTTON_CODE.STARTSTOP:
         # get current state
         started = _has_capture_started()
@@ -204,7 +219,6 @@ def handle_button_click():
                 tricap_manager.start_capturing()
             if (config.get('alti_required', TricapConfig.WEB_SECTION_HEADER) != 'no'):
                 altimeter.start_measuring()
-
         # send back the real state of the system
         return jsonify(capture_started=_has_capture_started())
 

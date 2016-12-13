@@ -1,3 +1,5 @@
+"""Various tests to do with the settings page."""
+
 import logging
 import tempfile
 import os
@@ -6,10 +8,7 @@ import shutil
 from flask import url_for
 from app import app
 from flask_testing import TestCase
-from selenium import webdriver
-from selenium.webdriver.support.ui import WebDriverWait, Select
-from selenium.webdriver.support import expected_conditions as ec
-from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import Select
 
 from app.views import settings
 
@@ -17,12 +16,13 @@ from app import tricap_manager
 
 from sensors.configure import TricapConfig
 
-from config import DEFAULT_CONFIG_FP, SERVER_LOG_DIR, CONFIG_FP, TEST_STATIC_DIR, SERVER_LOG_NAME
-from config import RET_ERROR
+from .behaviour_test import BehaviourTest
 
+from config import DEFAULT_CONFIG_FP, SERVER_LOG_DIR, CONFIG_FP
 
 # TODO Create a temp file test base class, from which all tests can inherit that uses temp files
 # TODO Remove all old style tearDowns (i.e. with file counting), temp_file_counts
+
 
 class BaseTestSettings(TestCase):
     # TODO Check how we can setup base classes for the testing
@@ -71,9 +71,11 @@ class BaseTestSettings(TestCase):
 
 
 class TestSettings(BaseTestSettings):
-    """Test stuff that requires modifying the config file here, as we have more control when
-    calling the functions directly than when accessing the page through Selenium, i.e. during
-    behaviour testing."""
+    """Test stuff that requires modifying the config file here.
+
+    We have more control when calling the functions directly than when accessing the page through
+    Selenium, i.e. during behaviour testing.
+    """
 
     def test_form_creation(self):
         with self.client:  # access the web page through a 'client', as if a browser
@@ -136,40 +138,14 @@ class TestMiscSettings(BaseTestSettings):
         with self.assertRaises(KeyError):
             misc_handler.config['non_existent'] = -1
 
-class TestBehaviourSettings(BaseTestSettings):
+
+class TestBehaviourSettings(BehaviourTest):
     """Test stuff that needs interaction from a browser here."""
 
-    @staticmethod
-    def _get_form_data_as_dict(driver):
-        serial_str = driver.execute_script('return $("form").serialize()')
-
-        ret_dict = {}
-        serial_parts = serial_str.split('&')
-        for part in serial_parts:
-            eq_parts = part.split('=')
-            ret_dict[eq_parts[0]] = eq_parts[1]
-
-        return ret_dict
-
     def test_page(self):
+        """Test that the settings page has the correct number of fields."""
         with self.client:  # access the web page through a 'client', as if a browser
-            response = self.client.get(url_for('settings.settings'))
-
-            # Dump the page contents to a temp file, which we can then open using selenium. We have
-            #  replace the /static relative paths with absolute paths to get this to work
-            temp_fp = self.create_temp_file()
-            with open(temp_fp, 'wb') as temp_html_file:
-                temp_html_file.write(response.data.replace(b'/static', TEST_STATIC_DIR))
-
-            # display = Display(visible=0, size=(800,600))
-            # display.start()
-
-            # Open the dumped page using chrome (through Selenium) and
-            #  wait untill the page has finished loading
-            driver = webdriver.Chrome()  # executable_path='/usr/lib/chromium-browser/chromedriver')
-            driver.get("file:///" + temp_fp)
-            wait = WebDriverWait(driver, 10)
-            wait.until(ec.visibility_of_element_located((By.ID, "btn_test")))
+            self._open_page('settings.settings', 'btn_test')
 
             # Check that all the config fields have been created
             new_config = TricapConfig()
@@ -178,62 +154,40 @@ class TestBehaviourSettings(BaseTestSettings):
                 section_dict = new_config.get_section_dict(sh)
                 num_fields += len(section_dict.keys())
 
-            input_fields = driver.find_elements_by_class_name("form-control")
+            input_fields = self.driver.find_elements_by_class_name("form-control")
             self.assertEqual(len(input_fields), num_fields)
 
-            driver.quit()
-
     def test_test(self):
+        """Test using the test button."""
         with self.client:  # access the web page through a 'client', as if a browser
-            response = self.client.get(url_for('settings.settings'))
-
-            temp_fp = self.create_temp_file()
-            with open(temp_fp, 'wb') as temp_html_file:
-                temp_html_file.write(response.data.replace(b'/static', TEST_STATIC_DIR))
-
-            driver = webdriver.Chrome()
-            driver.get("file:///" + temp_fp)
-            wait = WebDriverWait(driver, 10)
-            wait.until(ec.visibility_of_element_located((By.ID, "btn_test")))
+            self._open_page('settings.settings', 'btn_test')
 
             # Change settings on the form
-            ss_select = Select(driver.find_element_by_id('shutterspeed'))
+            ss_select = Select(self.driver.find_element_by_id('shutterspeed'))
             ss_select.select_by_visible_text("1/2500")
 
-            iso_select = Select(driver.find_element_by_id('iso'))
+            iso_select = Select(self.driver.find_element_by_id('iso'))
             iso_select.select_by_visible_text("500")
 
-            ici_string = driver.find_element_by_id('image_capture_interval')
+            ici_string = self.driver.find_element_by_id('image_capture_interval')
             ici_string.clear()
             ici_string.send_keys('9.0')
 
             # simulate posting the data through the test button
-            form_data = self._get_form_data_as_dict(driver)
+            form_data = self._get_form_data_as_dict(self.driver)
             form_data['test'] = 'Test'
-            response = self.client.post(url_for('settings.settings'),
-                                        data=form_data,
-                                        follow_redirects=True)
+            self.client.post(url_for('settings.settings'), data=form_data, follow_redirects=True)
 
             self.assertEqual(tricap_manager.config['shutterspeed'], '1/2500')
             self.assertEqual(tricap_manager.config['iso'], '500')
             misc_handler = settings.MiscSettingHandler()
             self.assertEqual(misc_handler.config['image_capture_interval'], '9.0')
 
-            driver.quit()
-
     def test_save(self):
+        """Test the save button."""
         # TODO Rewrite this test so that it will save differing values!
         with self.client:  # access the web page through a 'client', as if a browser
-            response = self.client.get(url_for('settings.settings'))
-
-            temp_fp = self.create_temp_file()
-            with open(temp_fp, 'wb') as temp_html_file:
-                temp_html_file.write(response.data.replace(b'/static', TEST_STATIC_DIR))
-
-            driver = webdriver.Chrome()
-            driver.get("file:///" + temp_fp)
-            wait = WebDriverWait(driver, 10)
-            wait.until(ec.visibility_of_element_located((By.ID, "btn_test")))
+            self._open_page('settings.settings', 'btn_test')
 
             config = TricapConfig()
             new_ss = '1/2500'
@@ -249,24 +203,22 @@ class TestBehaviourSettings(BaseTestSettings):
                 new_ici = '9.0'
 
             # Change settings on the form
-            ss_select = Select(driver.find_element_by_id('shutterspeed'))
+            ss_select = Select(self.driver.find_element_by_id('shutterspeed'))
             ss_select.select_by_visible_text(new_ss)
 
-            iso_select = Select(driver.find_element_by_id('iso'))
+            iso_select = Select(self.driver.find_element_by_id('iso'))
             iso_select.select_by_visible_text(new_iso)
 
-            ici_string = driver.find_element_by_id('image_capture_interval')
+            ici_string = self.driver.find_element_by_id('image_capture_interval')
             ici_string.clear()
             ici_string.send_keys(new_ici)
 
             # simulate posting the data through the save button
-            form_data = self._get_form_data_as_dict(driver)
+            form_data = self._get_form_data_as_dict(self.driver)
 
             form_data['save'] = 'Save'
 
-            response = self.client.post(url_for('settings.settings'),
-                                        data=form_data,
-                                        follow_redirects=True)
+            self.client.post(url_for('settings.settings'), data=form_data, follow_redirects=True)
 
             new_config = TricapConfig()
             section_dict = new_config.get_section_dict(TricapConfig.CAMERA_SECTION_HEADER)
@@ -275,10 +227,8 @@ class TestBehaviourSettings(BaseTestSettings):
             section_dict = new_config.get_section_dict(TricapConfig.MISC_SECTION_HEADER)
             self.assertEqual(section_dict['image_capture_interval'], new_ici)
 
-            driver.quit()
-
     def test_revert_button(self):
-        """ Test the revert button. """
+        """Test the revert button."""
         # create a new config file, change it and save it
         new_config = TricapConfig()
         section_dict = new_config.get_section_dict(TricapConfig.MISC_SECTION_HEADER)
@@ -294,23 +244,12 @@ class TestBehaviourSettings(BaseTestSettings):
                             default_config.get_section_dict(TricapConfig.MISC_SECTION_HEADER))
 
         with self.client:
-            response = self.client.get(url_for('settings.settings'))
-
-            temp_fp = self.create_temp_file()
-            with open(temp_fp, 'wb') as temp_html_file:
-                temp_html_file.write(response.data.replace(b'/static', TEST_STATIC_DIR))
-
-            driver = webdriver.Chrome()
-            driver.get("file:///" + temp_fp)
-            wait = WebDriverWait(driver, 10)
-            wait.until(ec.visibility_of_element_located((By.ID, "btn_test")))
+            self._open_page('settings.settings', 'btn_test')
 
             # simulate posting the data through the revert button
-            form_data = self._get_form_data_as_dict(driver)
+            form_data = self._get_form_data_as_dict(self.driver)
             form_data['revert'] = 'Revert'
-            response = self.client.post(url_for('settings.settings'),
-                                        data=form_data,
-                                        follow_redirects=True)
+            self.client.post(url_for('settings.settings'), data=form_data, follow_redirects=True)
 
             # check that the config file was overwritten with the default values
             new_config = None

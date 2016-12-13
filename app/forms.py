@@ -17,6 +17,6 @@ class SettingsForm(FlaskForm):
     web_strings = FieldList(StringField(), min_entries=0)
     web_selects = FieldList(SelectField(), min_entries=0)
 
-    test = SubmitField(label='Test')
+    # set = SubmitField(label='Set')
     save = SubmitField(label='Save')
     revert = SubmitField(label='Revert')

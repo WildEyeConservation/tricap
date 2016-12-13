@@ -3,10 +3,12 @@
 
 <!-- TODO Sort out the includes -->
 
-<script src="{{ url_for('static', filename='js/jquery-3.0.0.min.js') }}" type="text/javascript"></script>
-<script type="text/javascript" src="http://cdnjs.cloudflare.com/ajax/libs/jquery/2.0.3/jquery.min.js"></script>
-<script type="text/javascript" src="http://netdna.bootstrapcdn.com/bootstrap/3.3.4/js/bootstrap.min.js"></script>
-<link href="http://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.3.0/css/font-awesome.min.css" rel="stylesheet" type="text/css">
+<script src="{{ url_for('static', filename='js/jquery-2.0.3.min.js') }}" type="text/javascript"></script>
+<script src="{{ url_for('static', filename='js/bootstrap.js') }}" type="text/javascript"></script>
+<!-- <script type="text/javascript" src="http://cdnjs.cloudflare.com/ajax/libs/jquery/2.0.3/jquery.min.js"></script> -->
+<!-- <script type="text/javascript" src="http://netdna.bootstrapcdn.com/bootstrap/3.3.4/js/bootstrap.min.js"></script> -->
+<!-- <link href="http://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.3.0/css/font-awesome.min.css" rel="stylesheet" type="text/css"> -->
+<link rel="stylesheet" href="{{ url_for('static', filename='css/font-awesome.min.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/bootstrap.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/tricap.css') }}">
 
@@ -43,17 +45,17 @@
                   <a href="{{ url_for('home.index')}}">Home</a>
                 </li>
                 <li>
-                  <a href="{{ url_for('settings.settings')}}">Settings</a>
+                  <a href="{{ url_for('settings.settings')}}" id="a_settings">Settings</a>
                 </li>
                 <li>
-                  <a href="{{ url_for('showlog.showlog')}}">Log</a>
+                  <a href="{{ url_for('showlog.showlog')}}" id='a_showlog'>Log</a>
                 </li>
                 <li class="divider"></li>
                 <li>
-                  <a href="#" id="a_test">Test</a>
+                  <a href="{{ url_for('home.index')}}" id="a_test">Test</a>
                 </li>
                 <li>
-                  <a href="#" id="a_reset">Reset</a>
+                  <a href="{{ url_for('home.reset')}}" id="a_reset">Reset</a>
                 </li>
               </ul>
             </div>

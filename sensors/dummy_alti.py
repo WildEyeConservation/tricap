@@ -55,9 +55,14 @@ class DummyAlti(object):
 
         self._settings = settings
 
+        self._read_thread = None
+        self._kill_pill = None
+
+        self._mchange_dir = 'up'
+
         self._data_logger = data_logger
         self.state = ALTIMETER_STATE.NOT_CONNECTED
-        self._measurement = -999
+        self._measurement = 0
 
         self._logger.info('Dummy Alti Port Opened')
         self.state = ALTIMETER_STATE.CONNECTED
@@ -84,8 +89,30 @@ class DummyAlti(object):
     def get_state_as_string(self):
         return self.state.name
 
+    def _read(self, stop_event):
+        while not stop_event.is_set():
+            if self._mchange_dir == 'up':
+                self._measurement += 20
+                if self._measurement > 200:
+                    self._mchange_dir = 'down'
+            else:
+                self._measurement -= 20
+                if self._measurement < 0:
+                    self._mchange_dir = 'up'
+
+            sleep(0.5)
+
+        self.state = ALTIMETER_STATE.CONNECTED
+
     def start_measuring(self):
+        self._kill_pill = threading.Event()
+        self._read_thread = threading.Thread(target=self._read,
+                                             args=(self._kill_pill,), daemon=True)
+        self._read_thread.start()
         self.state = ALTIMETER_STATE.MEASURING
 
     def stop_measuring(self):
+        if self._read_thread and self._read_thread.is_alive():
+            self._kill_pill.set()
+            self._read_thread.join()
         self.state = ALTIMETER_STATE.CONNECTED

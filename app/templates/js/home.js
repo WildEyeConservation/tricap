@@ -11,6 +11,8 @@ var imgTooOldCount = {{python_data.img_too_old_count}};
 var camRefreshRate = {{python_data.refresh_rate}};
 var stateRefreshRate = {{python_data.refresh_rate}};
 var timeOutPeriod = {{python_data.timeout_period}};
+var altiTarget = {{python_data.alti_target}};
+var altiRange = {{python_data.alti_range}};
 // Code here will be ignored by JSHint.
 /* jshint ignore:end */
 
@@ -148,11 +150,19 @@ function changeMainStatus(colour, msg) {
 var buttonClick = function(buttonCode){
 
     if (buttonCode === tricap.BUTTON_CODES.START || buttonCode === tricap.BUTTON_CODES.STOP ||
-        buttonCode === tricap.BUTTON_CODES.STARTSTOP || tricap.BUTTON_CODES.TEST){
+        buttonCode === tricap.BUTTON_CODES.STARTSTOP){
         $.getJSON($SCRIPT_ROOT + '/_button_click', {buttonCode: buttonCode }, startStopFollowUp);
     } else if (buttonCode === tricap.BUTTON_CODES.RESET){
         $.getJSON($SCRIPT_ROOT + '/_button_click', {buttonCode: buttonCode },
                   function(){location.reload(); return false;});
+    } else if (buttonCode === tricap.BUTTON_CODES.TEST){
+        // TODO When we think of other tests to do on the server side, send a test code through
+        $.getJSON($SCRIPT_ROOT + '/_button_click', {buttonCode: tricap.BUTTON_CODES.START},
+                  startStopFollowUp);
+        setTimeout(function(){
+            $.getJSON($SCRIPT_ROOT + '/_button_click', {buttonCode: tricap.BUTTON_CODES.STOP},
+                      startStopFollowUp);
+        }, stateRefreshRate*3);
     }
     return false;
 };
@@ -192,10 +202,22 @@ var updateAlti = function(data){
     $('#h_alti').html('Altitude: ' + data.measurement + ' m');
 
     changeStateColour('alt_alti', data.state_colour);
+    changeStateColour('alt_alti_inner', data.state_colour);
     changeStateColour('btn_alti', data.state_colour);
 
     if (data.state_colour === 'red'){
         changeMainStatus('red', 'Altimeter Error');
+    }
+
+    if (data.measurement < altiTarget-altiRange){
+        changeTimeColour('alt_alti_target', 'red');
+        $('#h_alti_target').html('Below target range');
+    } else if (data.measurement > altiTarget+altiRange) {
+        changeTimeColour('alt_alti_target', 'red');
+        $('#h_alti_target').html('Above target range');
+    } else {
+        changeTimeColour('alt_alti_target', 'blue');
+        $('#h_alti_target').html('Within target range');
     }
 
     return false;
@@ -268,34 +290,41 @@ var updateSysMsgs = function(data){
     // Clear the errorbox of all old messages
     $('[target=sys_msg]').remove();
 
+    if (data.msgs.length === 0) {
+        $('#alt_msgs_sys').append(
+            '<input type="text" class="form-control" disabled="" target="sys_msg" value="'+
+            'No errors to report" id="input_sys_msg0">'
+        );
+    }
+
     for (var index = data.msgs.length-1; index >= 0; index--){
         $('#alt_msgs_sys').append(
             '<input type="text" class="form-control" disabled="" target="sys_msg" value="'+
-            data.msgs[index]+'">'
+            data.msgs[index]+' id=input_sys_msg'+index+'">'
         );
     }};
 
+var updatePage = function(data){
+    //Reset the timeout period
+    clearTimeout(timeoutFunc);
+    timeoutFunc = setTimeout(function(){
+                      changeMainStatus('red', 'No Response From Server');},
+                      timeOutPeriod);
+     //Check if we had recovered from a timeout
+     if ($('#h_main_status').html() === 'No Response From Server') {
+         changeMainStatus('green', 'TriCap');
+     }
+
+     updateAlti(data.alti);
+     updateCamState(data.cams);
+     updateTalkBox(data.talk);
+     updateSysMsgs(data.sys);
+
+     return false;
+};
+
 var requestStateData = function(data){
-    $.getJSON($SCRIPT_ROOT + '/_get_state_data', {},
-              function(data){
-
-                  //Reset the timeout period
-                  clearTimeout(timeoutFunc);
-                  timeoutFunc = setTimeout(function(){
-                                    changeMainStatus('red', 'No Response From Server');},
-                                    timeOutPeriod);
-                   //Check if we had recovered from a timeout
-                   if ($('#h_main_status').html() === 'No Response From Server') {
-                       changeMainStatus('green', 'TriCap');
-                   }
-
-                  updateAlti(data.alti);
-                  updateCamState(data.cams);
-                  updateTalkBox(data.talk);
-                  updateSysMsgs(data.sys);
-
-                  return false;
-              });
+    $.getJSON($SCRIPT_ROOT + '/_get_state_data', {}, updatePage);
     return false;
 };
 
@@ -309,15 +338,34 @@ $(function(){
 
     // Set the specific button functions
     $("#btn_startstop").on('click', function(event){buttonClick(tricap.BUTTON_CODES.STARTSTOP);});
-    $("#a_test").on('click', function(event){buttonClick(tricap.BUTTON_CODES.TEST);});
-    $("#a_reset").on('click', function(event){buttonClick(tricap.BUTTON_CODES.RESET);});
+    $('#a_test').attr('href', '#');
+    $("#a_test").click(function(event){buttonClick(tricap.BUTTON_CODES.TEST); return true;});
     $("#img_cam_left").error(function(event){console.log('Error');});
-    
+
     $("#input_talkbox").keyup(function(event){
         if (event.keyCode == 13){
             $.getJSON($SCRIPT_ROOT + '/_submit_talkbox_msg', {msg:$(this).val()});
             $(this).val('');
         }
+    });
+    //replace the link for settings, making it stop any recording before going to the settings page
+    $('#a_settings').removeProp('onclick');
+    $('#a_settings').click(function(e){
+        $.getJSON($SCRIPT_ROOT + '/_button_click', {buttonCode: tricap.BUTTON_CODES.STOP},
+                  function(data){
+                      $(location).attr('href', "{{url_for('settings.settings')}}");
+                  });
+        return false;
+    });
+
+    //replace the link for settings
+    $('#a_showlog').removeProp('onclick');
+    $('#a_showlog').click(function(e){
+        $.getJSON($SCRIPT_ROOT + '/_button_click', {buttonCode: tricap.BUTTON_CODES.STOP},
+                  function(data){
+                      $(location).attr('href', "{{url_for('showlog.showlog')}}");
+                  });
+        return false;
     });
 
     // Set the interval functions

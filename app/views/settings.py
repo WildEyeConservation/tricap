@@ -245,9 +245,9 @@ def settings():
         tricap_manager.stop_capturing()
         altimeter.stop_measuring()
 
-        if form.test.data is True:
-            change_settings(form)
-        elif form.save.data is True:
+        # if form.test.data is True:
+        #     change_settings(form)
+        if form.save.data is True:
             change_settings(form)
             save_settings(form)
         elif form.revert.data is True:

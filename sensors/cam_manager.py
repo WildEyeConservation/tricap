@@ -5,21 +5,18 @@
 
 import logging
 import threading
-import time
-import pdb
 
 from config import CAM_MANAGER_STATES
-from config import RET_OK, RET_ERROR
 
 # TODO : Create a camera factory that will import cameras according to its config and make them available via its own
 # autodetect function
-
 
 try:
     from .canon_6D import Canon6DCam
     from .gphoto_cam import GPhotoCam as Camera
 except ImportError:
     from .dummy_cam import DummyCam as Camera
+    from .dummy_cam import DummyShell as Canon6DCam
 
 
 class MultiConfig:
@@ -95,9 +92,7 @@ class TriCapCamsManager:
         for name, address in Camera.autodetect():
             if name in TriCapCamsManager.supportedCameras:
                 self._logger.info('Adding camera %s at address %s ' % (name, address))
-                # TODO Make this work under windows testing
-                # tricap_cam = Canon6DCam(Camera(address, self._cam_settings))
-                tricap_cam = Camera(address, self._cam_settings)
+                tricap_cam = Canon6DCam(Camera(address, self._cam_settings))
                 self._cameras.append(tricap_cam)
 
     def reset(self, man_settings: dict, cam_settings: dict):

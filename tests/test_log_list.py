@@ -3,7 +3,7 @@
 import unittest
 import logging
 
-from app.log_list import LogListAccessor
+from support.log_list import LogListAccessor
 
 
 class TestLogList(unittest.TestCase):

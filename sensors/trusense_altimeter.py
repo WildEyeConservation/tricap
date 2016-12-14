@@ -1,5 +1,5 @@
+"""TruSense S100 Altimeter handler."""
 # coding=utf-8
-""" D Joubert 2 November 2016 - TruSense S100 Altimeter handler."""
 
 import logging
 import threading
@@ -185,7 +185,6 @@ class TrusenseAltimeter(object):
 
     def start_measuring(self):
         self._write('GO', 'Error starting measuring mode')
-        # TODO Are there exceptions when starting a thread?
         self._kill_pill = threading.Event()
         self._read_thread = threading.Thread(target=self._read,
                                              args=(self._kill_pill,), daemon=True)

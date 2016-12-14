@@ -14,14 +14,13 @@ from flask import Flask
 # Check if gphoto2 could be imported by the cameras - if not, you are probably in windows
 
 from sensors.cam_manager import TriCapCamsManager
-
 from sensors.trusense_altimeter import TrusenseAltimeter
 from sensors.dummy_alti import DummyAlti
-from sensors.session_logger import SessionLogger
-from sensors.configure import TricapConfig
 
-from .talkbox import TalkBox
-from .log_list import LogListAccessor
+from support.session_logger import SessionLogger
+from support.configure import TricapConfig
+from support.talkbox import TalkBox
+from support.log_list import LogListAccessor
 
 from config import SERVER_LOG_DIR
 
@@ -61,7 +60,7 @@ alti_settings = init_config.get_section_dict(TricapConfig.ALTI_SECTION_HEADER)
 if init_config.get('alti_required', TricapConfig.WEB_SECTION_HEADER) == 'dummy':
     altimeter = DummyAlti(alti_settings, session_logger)
 else:
-    altimeter = TrusenseAltimeter(session_logger)
+    altimeter = TrusenseAltimeter(alti_settings, session_logger)
 
 talkbox = TalkBox(Lock(), 3)
 talkbox.clear()

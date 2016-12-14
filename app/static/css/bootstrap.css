@@ -1,4 +1,6 @@
-@import url("https://fonts.googleapis.com/css?family=Lato:400,700,400italic");
+/*@import url("{{url_for('static', filename='fonts/lato.css')}}");*/
+@import "../fonts/lato.css";
+
 /*!
  * bootswatch v3.3.7
  * Homepage: http://bootswatch.com

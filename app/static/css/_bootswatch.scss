@@ -2,8 +2,11 @@
 // Bootswatch
 // -----------------------------------------------------
 
-$web-font-path: "https://fonts.googleapis.com/css?family=Lato:400,700,400italic" !default;
-@import url($web-font-path);
+// $web-font-path: "https://fonts.googleapis.com/css?family=Lato:400,700,400italic" !default;
+// $web-font-path: "{{url_for('static', filename='fonts/lato.css')}}" !default;
+$web-font-path: "../fonts/lato.css" !default;
+// @import url($web-font-path);
+@import $web-font-path;
 
 // Navbar =====================================================================
 
@@ -323,7 +326,7 @@ a.list-group-item {
     &.active {
       background-color: $state-warning-bg;
     }
-    
+
     &.active:hover,
     &.active:focus {
       background-color: darken($state-warning-bg, 5%);
@@ -334,7 +337,7 @@ a.list-group-item {
     &.active {
       background-color: $state-danger-bg;
     }
-    
+
     &.active:hover,
     &.active:focus {
       background-color: darken($state-danger-bg, 5%);

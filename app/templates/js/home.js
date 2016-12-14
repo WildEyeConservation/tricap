@@ -85,73 +85,52 @@ var oldTalkBoxMsgs = [];
 
 // Then function declarations (i.e. function addTwoNumbers(a, b){ return a+b;};) so that hoisting
 // is obvious
-// TODO These colour functions should probably be combined
-function changeStateColour(elem_id, target_colour){
 
+function _get_element_pre(elem_id){
     //Check if its an alert (i.e. a div) or a button (i.e. an a)
-    var elem = $('#'+elem_id);
+
 
     var pre;
-    if (elem.is('div') === true){
+    if ($('#'+elem_id).is('div') === true){
         pre='alert-';
-    } else if (elem.is('a') === true){
+    } else if ($('#'+elem_id).is('a') === true){
         pre='btn-';
     }
 
+    return pre;
+}
+
+function changeStateColour(elem_id, target_colour){
+
+    var elem = $('#'+elem_id);
+    var pre = _get_element_pre(elem_id);
+
+    // remove state colour
+    elem.removeClass(pre+tricap.GREEN_CLASS+' '+pre+tricap.ORANGE_CLASS+' '+pre+tricap.RED_CLASS);
+
+    // add correct colour
     if (target_colour === 'red'){
-        elem.removeClass(pre+tricap.GREEN_CLASS+' '+pre+tricap.ORANGE_CLASS);
         elem.addClass(pre+tricap.RED_CLASS);
     } else if (target_colour === 'green'){
-        elem.removeClass(pre+tricap.RED_CLASS+' '+pre+tricap.ORANGE_CLASS);
         elem.addClass(pre+tricap.GREEN_CLASS);
     } else if (target_colour === 'orange'){
-        elem.removeClass(pre+tricap.GREEN_CLASS+' '+pre+tricap.RED_CLASS);
         elem.addClass(pre+tricap.ORANGE_CLASS);
     }
 }
 
-// function updateOldTalkBoxMsgs(){
-//     oldTalkBoxMsgs = [];
-//     oldTalkBoxMsgs.push($("#input_talkbox").val()+'3');
-//     var tbDiv = $("#alt_msgs_talkbox").find('div').first()
-//     for (var i = 0; i < $("#alt_msgs_talkbox").find('div').length; i++) {
-//         if (i < $("#alt_msgs_talkbox").find('div').length-1) {
-//             var msg = tbDiv.find('input').val();
-//             var btn = tbDiv.find('button').first();
-//             var reply_code = '3';
-//             if (btn.hasClass('btn-success')) {
-//                 reply_code = '1';
-//             } else if (btn.next().hasClass('btn-success')) {
-//                 reply_code = '2';
-//             }
-//             oldTalkBoxMsgs.push(msg+reply_code);
-//         }
-//         tbDiv = tbDiv.next()
-//     }
-//     oldTalkBoxMsgs.reverse();
-//     console.log(oldTalkBoxMsgs);
-// }
-
 function changeTimeColour(elem_id, target_colour){
 
-    //Check if its an alert (i.e. a div) or a button (i.e. an a)
     var elem = $('#'+elem_id);
+    var pre = _get_element_pre(elem_id);
 
-    var pre;
-    if (elem.is('div') === true){
-        pre='alert-';
-    } else if (elem.is('a') === true){
-        pre='btn-';
-    }
+    // remove state colour
+    elem.removeClass(pre+tricap.BLUE_CLASS+' '+pre+tricap.RED_CLASS+' '+pre+tricap.GREY_CLASS);
 
     if (target_colour === 'grey'){
-        elem.removeClass(pre+tricap.BLUE_CLASS+' '+pre+tricap.RED_CLASS);
         elem.addClass(pre+tricap.GREY_CLASS);
     } else if (target_colour === 'blue'){
-        elem.removeClass(pre+tricap.GREY_CLASS+' '+pre+tricap.RED_CLASS);
         elem.addClass(pre+tricap.BLUE_CLASS);
     } else if (target_colour === 'red'){
-        elem.removeClass(pre+tricap.BLUE_CLASS+' '+pre+tricap.GREY_CLASS);
         elem.addClass(pre+tricap.RED_CLASS);
     }
 }
@@ -424,3 +403,26 @@ $(function(){
     setInterval(requestStateData, stateRefreshRate);
     timeoutFunc = setTimeout(function(){showMainError('No Response From Server');}, timeOutPeriod);
 });
+
+
+// function updateOldTalkBoxMsgs(){
+//     oldTalkBoxMsgs = [];
+//     oldTalkBoxMsgs.push($("#input_talkbox").val()+'3');
+//     var tbDiv = $("#alt_msgs_talkbox").find('div').first()
+//     for (var i = 0; i < $("#alt_msgs_talkbox").find('div').length; i++) {
+//         if (i < $("#alt_msgs_talkbox").find('div').length-1) {
+//             var msg = tbDiv.find('input').val();
+//             var btn = tbDiv.find('button').first();
+//             var reply_code = '3';
+//             if (btn.hasClass('btn-success')) {
+//                 reply_code = '1';
+//             } else if (btn.next().hasClass('btn-success')) {
+//                 reply_code = '2';
+//             }
+//             oldTalkBoxMsgs.push(msg+reply_code);
+//         }
+//         tbDiv = tbDiv.next()
+//     }
+//     oldTalkBoxMsgs.reverse();
+//     console.log(oldTalkBoxMsgs);
+// }

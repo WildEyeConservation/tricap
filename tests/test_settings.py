@@ -1,83 +1,38 @@
 """Various tests to do with the settings page."""
 
 import logging
-import tempfile
 import os
-import shutil
 
 from flask import url_for
-from app import app
-from flask_testing import TestCase
 from selenium.webdriver.support.ui import Select
 
 from app.views import settings
 
-from app import tricap_manager
+from support.configure import TricapConfig
 
-from sensors.configure import TricapConfig
+from .tempfile_test_case import TricapTempFilerTestCase
+from .behaviour_test_case import AppTestCase, BehaviourTestCase
 
-from .behaviour_test import BehaviourTest
-
-from config import DEFAULT_CONFIG_FP, SERVER_LOG_DIR, CONFIG_FP
-
-# TODO Create a temp file test base class, from which all tests can inherit that uses temp files
-# TODO Remove all old style tearDowns (i.e. with file counting), temp_file_counts
+from config import DEFAULT_CONFIG_FP, SERVER_LOG_DIR
 
 
-class BaseTestSettings(TestCase):
-    # TODO Check how we can setup base classes for the testing
-    format_str = "%(asctime)s | %(pathname)s:%(lineno)d | %(funcName)s | %(levelname)s | %(message)s "
-    formatter = logging.Formatter(format_str)
-    log_fp = os.path.join(SERVER_LOG_DIR, 'test_settings.log')
-    handler = logging.FileHandler(filename=log_fp)
-    handler.setLevel(logging.DEBUG)
-    handler.setFormatter(formatter)
-    rootlogger = logging.getLogger('')
-    rootlogger.addHandler(handler)
-    rootlogger.setLevel(logging.DEBUG)
-
-    def create_app(self):
-        # So that form validation behaves as normally
-        app.config['WTF_CSRF_ENABLED'] = False
-        # So that the error catching does not prevent us from seeing exceptions
-        app.config['TESTING'] = True
-
-        return app
-
-    def setUp(self):
-        # backup the actual initial.cfg
-        self.tempdir = tempfile.mkdtemp()
-        self.bk_config_fp = os.path.join(self.tempdir, 'initial.cfg_bk')
-        shutil.copyfile(CONFIG_FP, self.bk_config_fp)
-
-        self.temp_file_count = 0
-
-    def tearDown(self):
-        # copy back the initial.cfg
-        shutil.copyfile(self.bk_config_fp, CONFIG_FP)
-
-        for root, _, filenames in os.walk(self.tempdir):
-            for filename in filenames:
-                os.remove(os.path.join(root, filename))
-
-        shutil.rmtree(self.tempdir)
-
-    def create_temp_file(self):
-        temp_fp = os.path.join(self.tempdir, str(self.temp_file_count) + '.temp')
-        ftemp = open(temp_fp, 'w')
-        ftemp.close()
-        self.temp_file_count += 1
-        return temp_fp
-
-
-class TestSettings(BaseTestSettings):
+class TestSettings(AppTestCase):
     """Test stuff that requires modifying the config file here.
 
     We have more control when calling the functions directly than when accessing the page through
     Selenium, i.e. during behaviour testing.
     """
 
+    format_str = "%(asctime)s | %(pathname)s:%(lineno)d | %(funcName)s | %(levelname)s | %(message)s "
+    handler = logging.FileHandler(filename=os.path.join(SERVER_LOG_DIR, 'test_settings.log'))
+    handler.setLevel(logging.DEBUG)
+    handler.setFormatter(logging.Formatter(format_str))
+    rootlogger = logging.getLogger('')
+    rootlogger.addHandler(handler)
+    rootlogger.setLevel(logging.DEBUG)
+
     def test_form_creation(self):
+        """Test if the form is created with correct number of fields."""
         with self.client:  # access the web page through a 'client', as if a browser
             self.client.get(url_for('settings.settings'))
             form = settings.get_form_for_display()
@@ -99,6 +54,7 @@ class TestSettings(BaseTestSettings):
             self.assertEqual('session_description' in labels, True)
 
     def test_revert(self):
+        """Test if the rever button correctly restored the config file to default."""
         # create a new config file, change it and save it
         new_config = TricapConfig()
         section_dict = new_config.get_section_dict(TricapConfig.MISC_SECTION_HEADER)
@@ -126,8 +82,19 @@ class TestSettings(BaseTestSettings):
                              default_config.get_section_dict(TricapConfig.MISC_SECTION_HEADER))
 
 
-class TestMiscSettings(BaseTestSettings):
+class TestMiscSettings(TricapTempFilerTestCase):
+    """Test the misc settings handler used in the settings view."""
+
+    format_str = "%(asctime)s | %(pathname)s:%(lineno)d | %(funcName)s | %(levelname)s | %(message)s "
+    handler = logging.FileHandler(filename=os.path.join(SERVER_LOG_DIR, 'test_settings.log'))
+    handler.setLevel(logging.DEBUG)
+    handler.setFormatter(logging.Formatter(format_str))
+    rootlogger = logging.getLogger('')
+    rootlogger.addHandler(handler)
+    rootlogger.setLevel(logging.DEBUG)
+
     def test_set_and_get_settings(self):
+        """Test the getting and setting of settings."""
         misc_handler = settings.MiscSettingHandler()
         misc_handler.config['session_description'] = 'test_misc_handler'
         self.assertEqual(misc_handler.config['session_description'], 'test_misc_handler')
@@ -139,13 +106,21 @@ class TestMiscSettings(BaseTestSettings):
             misc_handler.config['non_existent'] = -1
 
 
-class TestBehaviourSettings(BehaviourTest):
+class TestBehaviourSettings(BehaviourTestCase):
     """Test stuff that needs interaction from a browser here."""
+
+    format_str = "%(asctime)s | %(pathname)s:%(lineno)d | %(funcName)s | %(levelname)s | %(message)s "
+    handler = logging.FileHandler(filename=os.path.join(SERVER_LOG_DIR, 'test_settings.log'))
+    handler.setLevel(logging.DEBUG)
+    handler.setFormatter(logging.Formatter(format_str))
+    rootlogger = logging.getLogger('')
+    rootlogger.addHandler(handler)
+    rootlogger.setLevel(logging.DEBUG)
 
     def test_page(self):
         """Test that the settings page has the correct number of fields."""
         with self.client:  # access the web page through a 'client', as if a browser
-            self._open_page('settings.settings', 'btn_test')
+            self._open_page('settings.settings', 'btn_save')
 
             # Check that all the config fields have been created
             new_config = TricapConfig()
@@ -157,37 +132,10 @@ class TestBehaviourSettings(BehaviourTest):
             input_fields = self.driver.find_elements_by_class_name("form-control")
             self.assertEqual(len(input_fields), num_fields)
 
-    def test_test(self):
-        """Test using the test button."""
-        with self.client:  # access the web page through a 'client', as if a browser
-            self._open_page('settings.settings', 'btn_test')
-
-            # Change settings on the form
-            ss_select = Select(self.driver.find_element_by_id('shutterspeed'))
-            ss_select.select_by_visible_text("1/2500")
-
-            iso_select = Select(self.driver.find_element_by_id('iso'))
-            iso_select.select_by_visible_text("500")
-
-            ici_string = self.driver.find_element_by_id('image_capture_interval')
-            ici_string.clear()
-            ici_string.send_keys('9.0')
-
-            # simulate posting the data through the test button
-            form_data = self._get_form_data_as_dict(self.driver)
-            form_data['test'] = 'Test'
-            self.client.post(url_for('settings.settings'), data=form_data, follow_redirects=True)
-
-            self.assertEqual(tricap_manager.config['shutterspeed'], '1/2500')
-            self.assertEqual(tricap_manager.config['iso'], '500')
-            misc_handler = settings.MiscSettingHandler()
-            self.assertEqual(misc_handler.config['image_capture_interval'], '9.0')
-
     def test_save(self):
         """Test the save button."""
-        # TODO Rewrite this test so that it will save differing values!
         with self.client:  # access the web page through a 'client', as if a browser
-            self._open_page('settings.settings', 'btn_test')
+            self._open_page('settings.settings', 'btn_save')
 
             config = TricapConfig()
             new_ss = '1/2500'
@@ -203,13 +151,13 @@ class TestBehaviourSettings(BehaviourTest):
                 new_ici = '9.0'
 
             # Change settings on the form
-            ss_select = Select(self.driver.find_element_by_id('shutterspeed'))
+            ss_select = Select(self.driver.find_element_by_css_selector("[id$='shutterspeed']"))
             ss_select.select_by_visible_text(new_ss)
 
-            iso_select = Select(self.driver.find_element_by_id('iso'))
+            iso_select = Select(self.driver.find_element_by_css_selector("[id$='iso']"))
             iso_select.select_by_visible_text(new_iso)
 
-            ici_string = self.driver.find_element_by_id('image_capture_interval')
+            ici_string = self.driver.find_element_by_css_selector("[id$='image_capture_interval']")
             ici_string.clear()
             ici_string.send_keys(new_ici)
 
@@ -244,7 +192,7 @@ class TestBehaviourSettings(BehaviourTest):
                             default_config.get_section_dict(TricapConfig.MISC_SECTION_HEADER))
 
         with self.client:
-            self._open_page('settings.settings', 'btn_test')
+            self._open_page('settings.settings', 'btn_save')
 
             # simulate posting the data through the revert button
             form_data = self._get_form_data_as_dict(self.driver)
@@ -256,3 +204,29 @@ class TestBehaviourSettings(BehaviourTest):
             new_config = TricapConfig()
             self.assertEqual(new_config.get_section_dict(TricapConfig.MISC_SECTION_HEADER),
                              default_config.get_section_dict(TricapConfig.MISC_SECTION_HEADER))
+
+    # def test_test(self):
+    #     """Test using the test button."""
+    #     with self.client:  # access the web page through a 'client', as if a browser
+    #         self._open_page('settings.settings', 'btn_save')
+    #
+    #         # Change settings on the form
+    #         ss_select = Select(self.driver.find_element_by_css_selector("[id$='shutterspeed']"))
+    #         ss_select.select_by_visible_text("1/2500")
+    #
+    #         iso_select = Select(self.driver.find_element_by_id('iso'))
+    #         iso_select.select_by_visible_text("500")
+    #
+    #         ici_string = self.driver.find_element_by_id('image_capture_interval')
+    #         ici_string.clear()
+    #         ici_string.send_keys('9.0')
+    #
+    #         # simulate posting the data through the test button
+    #         form_data = self._get_form_data_as_dict(self.driver)
+    #         form_data['test'] = 'Test'
+    #         self.client.post(url_for('settings.settings'), data=form_data, follow_redirects=True)
+    #
+    #         self.assertEqual(tricap_manager.config['shutterspeed'], '1/2500')
+    #         self.assertEqual(tricap_manager.config['iso'], '500')
+    #         misc_handler = settings.MiscSettingHandler()
+    #         self.assertEqual(misc_handler.config['image_capture_interval'], '9.0')

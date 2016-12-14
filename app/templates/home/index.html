@@ -67,7 +67,7 @@
             {% for cam_num in range(num_cams) %}
               <div class="col-xs-{{12//num_cams}}">
                 <div class="alert alert-info" id="alt_cam{{cam_num}}">
-                  <img src="http://pingendo.github.io/pingendo-bootstrap/assets/placeholder.png"
+                  <img src="{{url_for('static', filename='img/default.jpg')}}"
                        class="img-responsive" id="img_cam{{cam_num}}">
                 </div>
               </div>

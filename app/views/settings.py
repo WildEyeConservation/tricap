@@ -10,7 +10,7 @@ from flask import Blueprint, current_app, redirect, url_for, render_template, re
 
 from app import forms, tricap_manager, altimeter, session_logger
 from config import DEFAULT_CONFIG_FP, CONFIG_FP
-from sensors.configure import TricapConfig
+from support.configure import TricapConfig
 from collections import namedtuple
 
 settings_bp = Blueprint('settings', __name__)
@@ -180,7 +180,6 @@ def convert_populated_form_to_dict(form):
 
 
 def set_setting_handler_with_dict(handler, sdict):
-    # TODO Should we do this here, how should we handle the returns? Figure it out on merging
     for key, value in sdict.items():
         handler.config[key] = value
 

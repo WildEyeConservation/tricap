@@ -8,7 +8,7 @@ import pdb
 from testfixtures import LogCapture
 from threading import Lock
 
-from app.talkbox import TalkBox, TALK_REPLY, TalkMsg
+from support.talkbox import TalkBox, TALK_REPLY, TalkMsg
 
 from config import SERVER_LOG_DIR
 
@@ -106,7 +106,7 @@ class TestTalkBox(unittest.TestCase):
 
         with LogCapture() as lc:
             talkbox.change_reply('Test Message Fourth', TALK_REPLY.YES.value)
-            lc.check(('app.talkbox', 'WARNING',
+            lc.check(('support.talkbox', 'WARNING',
                       'Could not find Test Message Fourth in list of talks.'))
 
 # TODO Write a unittest simulating multiple clients using the talkbox to communicate

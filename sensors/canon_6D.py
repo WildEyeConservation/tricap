@@ -38,3 +38,10 @@ class Canon6DCam():
     @property
     def serial_num(self):
         return self._camera.config.eosserialnumber
+
+    def get_cam_image_count(self):
+        return self._camera.get_cam_image_count()
+
+    @property
+    def state(self):
+        return self._camera.state

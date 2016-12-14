@@ -38,9 +38,6 @@ class LogFormatter:
 
         return log
 
-
-# TODO Set time correctly on overall logger
-
 @showlog_bp.route('/showlog', methods=['GET'])
 def showlog():
     return render_template('/showlog/showlog.html')

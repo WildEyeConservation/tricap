@@ -13,7 +13,6 @@ from .abstract_cam import AbstractCamera, CameraException
 from .base_setting import BaseSetting, SettingSpec
 
 # TODO Implement a Windows Canon6DCam, which uses the Canon EDSDK to communicate with the camera
-# TODO Have the DummyCam load variables from the config file, like the normal camera would
 CameraSpec = namedtuple("cam", ["name", "model"])
 
 
@@ -136,6 +135,38 @@ class DummyCam(AbstractCamera):
     def get_cam_image_count(self):
         """Get the number of images captured so far."""
         return self._counter
+
+
+class DummyShell():
+    """Mimic the Canon6D for the purposes of testing on system without GPhoto."""
+    def __init__(self, camera_driver):
+        """Constructor."""
+        self._camera = camera_driver
+        self.config.output = 'Undefined'  # Do not be in live mode
+        self.config.drivemode = 'Single'
+        self.config.reviewtime = 'None'
+        self.capture = self._camera.capture
+        self.get_state_as_string = self._camera.get_state_as_string
+        self.is_cam_image_fresh = self._camera.is_cam_image_fresh
+
+    @property
+    def config(self):
+        return self._camera.config
+
+    @property
+    def data(self):
+        return self._camera.data
+
+    @property
+    def serial_num(self):
+        return self._camera.serial_num
+
+    def get_cam_image_count(self):
+        return self._camera.get_cam_image_count()
+
+    @property
+    def state(self):
+        return self._camera.state
 
     # Node('main', label='Camera and Driver Configuration', type=<CamConfigType.Window: 0>)
     # ├── Node('main/actions', label='Camera Actions', type=<CamConfigType.Section: 1>)

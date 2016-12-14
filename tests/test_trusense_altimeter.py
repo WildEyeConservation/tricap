@@ -9,7 +9,8 @@ import shutil
 from time import sleep
 
 from sensors.trusense_altimeter import TrusenseAltimeter, AltiError
-from sensors.session_logger import SessionLogger
+
+from support.session_logger import SessionLogger
 
 from config import ALTIMETER_STATE, SERVER_LOG_DIR
 
@@ -97,8 +98,6 @@ class TestDeviceTruSense(unittest.TestCase):
         self.assertEqual(alti.config.num_frames_to_avg, 2)
         self.assertEqual(alti.state, ALTIMETER_STATE.CONNECTED)
         self.logger.info("Done with test meas")
-
-        # TODO Test session logger, if it takes the input?
 
     def test_timeout(self):
         alti = TrusenseAltimeter(self.session_logger)

@@ -15,7 +15,7 @@ class TempFilerTestCase(unittest.TestCase):
     def setUp(self):
         """Instantiate a temporary directory. Serves as an init."""
         self.temp_file_count = 0
-        self.temp_dir = None
+        self.tempdir = None
         self.bk_config_fp = None
 
         self.tempdir = tempfile.mkdtemp()

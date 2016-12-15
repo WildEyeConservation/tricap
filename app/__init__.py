@@ -55,12 +55,23 @@ image_manager = tricap_manager
 
 session_logger = SessionLogger()
 
+class AltiMeasurementObserver():
+    def __init__(self, session_logger):
+        self.session_logger = session_logger
+
+    def update(self, alti):
+        self.session_logger.log('Alti Measurement: %f' % alti.measurement)
+
+
 alti_settings = init_config.get_section_dict(TricapConfig.ALTI_SECTION_HEADER)
 
 if init_config.get('alti_required', TricapConfig.WEB_SECTION_HEADER) == 'dummy':
     altimeter = DummyAlti(alti_settings, session_logger)
 else:
-    altimeter = TrusenseAltimeter(alti_settings, session_logger)
+    altimeter = TrusenseAltimeter(alti_settings)
+    alti_observer = AltiMeasurementObserver(session_logger)
+    altimeter.attach(alti_observer)
+
 
 talkbox = TalkBox(Lock(), 3)
 talkbox.clear()

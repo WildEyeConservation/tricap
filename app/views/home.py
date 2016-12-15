@@ -212,6 +212,7 @@ def handle_button_click():
             tricap_manager.stop_capturing()
             altimeter.stop_measuring()
         else:  # we want to start
+            session_logger.create_new_session()
             config = TricapConfig()
             if (config.get('cams_required', TricapConfig.WEB_SECTION_HEADER) != 'no'):
                 tricap_manager.start_capturing()

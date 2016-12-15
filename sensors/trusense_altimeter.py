@@ -5,6 +5,8 @@ import logging
 import threading
 from time import sleep
 
+from abc import ABCMeta, abstractmethod
+
 import serial
 import serial.tools.list_ports
 
@@ -44,8 +46,37 @@ class MiscSettingConfig:
     __getitem__ = __getattr__
 
 
-class TrusenseAltimeter(object):
-    """Handles serial communication with the TruSense S100 Laser Altimeter"""
+
+class Subject(object):
+    """Abstract base class for observable objects (implementing the observer design pattern)."""
+    __metaclass__ = ABCMeta
+
+    def __init__(self):
+        """Constructor."""
+        self._observers = []
+
+    def attach(self, observer):
+        """Attach observer to list of observers."""
+        if observer not in self._observers:
+            self._observers.append(observer)
+
+    def detach(self, observer):
+        """Detach the observer from the list."""
+        try:
+            self._observers.remove(observer)
+        except ValueError:
+            pass
+
+    def notify(self, modifier=None):
+        """Update all of the observers, except for the observer doing the update."""
+        for observer in self._observers:
+            if modifier != observer:
+                observer.update(self)
+
+
+class TrusenseAltimeter(Subject):
+    """Handles serial communication with the TruSense S100 Laser Altimeter."""
+
     _logger = logging.getLogger(__name__)
     errorCodes = {'00': 'S100 Error 00: Invalid Command',
                   '01': 'S100 Error 01: No Target',
@@ -64,9 +95,10 @@ class TrusenseAltimeter(object):
                   '30': 'S100 Error 30: Temperature too High',
                   '31': 'S100 Error 31: Temperature too Low'}
 
-    def __init__(self, settings, data_logger, supported_devices={(1659, 8963)}):
+    def __init__(self, settings, supported_devices={(1659, 8963)}):
         # SETTINGS
         # default values
+        super().__init__()
         self._setting_strings = ['measurement_timeout', 'num_frames_to_avg']
         self._config = MiscSettingConfig(
             {'measurement_timeout': SettingSpec(choices=None,
@@ -78,7 +110,6 @@ class TrusenseAltimeter(object):
 
         self._settings = settings
 
-        self._data_logger = data_logger
         self.state = ALTIMETER_STATE.NOT_CONNECTED
         self._kill_pill = None
         self._read_thread = None
@@ -149,12 +180,12 @@ class TrusenseAltimeter(object):
         self._write('CA,%d' % int(self._settings['num_frames_to_avg']), 'Error setting continous mode frame averaging')
         self._write('FA,%d' % int(self._settings['num_frames_to_avg']), 'Error setting fast mode frame averaging')
 
-    def reset(self):
+    def reset(self, settings):
         """Get the altimeter object to re-initialise, establishing comms again, etc"""
         if self.state == ALTIMETER_STATE.MEASURING:
             self.stop_measuring()
 
-        self.__init__(self._data_logger)
+        self.__init__(settings)
 
     def get_state_as_string(self):
         return self.state.name
@@ -173,7 +204,8 @@ class TrusenseAltimeter(object):
                 consecutive_timeouts = 0
                 dist_str = msg[4:].split(b',')[0]
                 self._measurement = float(dist_str)
-                self._data_logger.log("Alti measure: %s" % dist_str)
+                # let any observers know that the measurement has been updated
+                self.notify()
             else:
                 consecutive_timeouts += 1
                 self._logger.error('Empty message read from alti port, indicates a timeout')

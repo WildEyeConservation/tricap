@@ -5,7 +5,7 @@ import logging
 import threading
 from time import sleep
 
-from abc import ABCMeta, abstractmethod
+from abc import ABCMeta
 
 import serial
 import serial.tools.list_ports

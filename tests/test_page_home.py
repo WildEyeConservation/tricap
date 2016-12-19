@@ -2,14 +2,16 @@
 
 from time import sleep
 
-from .behaviour_test_case import BehaviourTestCase
+from .behaviour_test_case import BehaviourTestCase, AppTestCase
 
 from selenium import webdriver
 from selenium.webdriver.support.ui import WebDriverWait, Select
 from selenium.webdriver.support import expected_conditions as ec
 from selenium.webdriver.common.by import By
 
-from app import app, views, tricap_manager, altimeter
+import json
+
+from app import app, views, tricap_manager, altimeter, talkbox
 
 import unittest
 
@@ -17,8 +19,10 @@ from flask import url_for
 
 from support.configure import TricapConfig
 
-from config import CAMERA_STATES, CAM_MANAGER_STATES, ALTIMETER_STATE
+from config import CAMERA_STATES, CAM_MANAGER_STATES, ALTIMETER_STATE, BUTTON_CODE
 from app.views.home import CAM_STATE_COLOURS, CAM_MAN_STATE_COLOURS, ALTI_STATE_COLOURS
+
+from support.talkbox import TALK_REPLY
 
 
 class TestHome(unittest.TestCase):
@@ -32,6 +36,73 @@ class TestHome(unittest.TestCase):
         self.assertEqual(len(CAM_STATE_COLOURS), len(CAMERA_STATES)+1)
         self.assertEqual(len(CAM_MAN_STATE_COLOURS), len(CAM_MANAGER_STATES)+1)
         self.assertEqual(len(ALTI_STATE_COLOURS), len(ALTIMETER_STATE)+1)
+
+
+class TestAppHome(AppTestCase):
+    """TestAppHome."""
+
+    def _setup_dummies(self):
+        triconfig = TricapConfig()
+
+        web_settings = triconfig.get_section_dict(TricapConfig.WEB_SECTION_HEADER)
+        web_settings['alti_required'] = 'dummy'
+        web_settings['cams_required'] = 'dummy'
+        triconfig.set_section(web_settings, TricapConfig.WEB_SECTION_HEADER)
+        triconfig.save_to_file()
+
+    def test_talkbox_messaging(self):
+        '''Test talkbox message.'''
+        self._setup_dummies()
+
+        with self.client:
+            self.client.get(url_for('home.index'))
+
+            self.send_ajax_request('/_submit_talkbox_msg', {'msg': 'Test Message 1'})
+
+            msgs = [tmsg.msg for tmsg in talkbox.talk_msgs]
+            self.assertEqual(msgs[0], 'Test Message 1')
+
+            self.send_ajax_request('/_change_message_reply', {'msg': 'Test Message 1',
+                                                              'reply_code': str(TALK_REPLY.YES.value)})
+
+            replies = [tmsg.reply for tmsg in talkbox.talk_msgs]
+            self.assertEqual(replies[0], TALK_REPLY.YES)
+
+    def test_button_presses(self):
+        """Test that the button presses do what they should do."""
+        self._setup_dummies()
+
+        with self.client:  # access the web page through a 'client', as if a browser
+            # open home page
+            self.client.get(url_for('home.index'))
+
+            # Start
+            response = self.client.get('/_button_click?buttonCode='+str(BUTTON_CODE.START.value),
+                                       content_type='application/json')
+
+            self.assertEqual(tricap_manager.state == CAM_MANAGER_STATES.STARTED, True)
+            self.assertEqual(altimeter.state == ALTIMETER_STATE.MEASURING, True)
+
+            # Stop
+            response = self.client.get('/_button_click?buttonCode='+str(BUTTON_CODE.STOP.value),
+                                       content_type='application/json')
+
+            self.assertEqual(tricap_manager.state == CAM_MANAGER_STATES.STARTED, False)
+            self.assertEqual(altimeter.state == ALTIMETER_STATE.MEASURING, False)
+
+            # StartStop
+            response = self.client.get('/_button_click?buttonCode='+str(BUTTON_CODE.STARTSTOP.value),
+                                       content_type='application/json')
+
+            self.assertEqual(tricap_manager.state == CAM_MANAGER_STATES.STARTED, True)
+            self.assertEqual(altimeter.state == ALTIMETER_STATE.MEASURING, True)
+
+            # Stop
+            response = self.client.get('/_button_click?buttonCode='+str(BUTTON_CODE.STARTSTOP.value),
+                                       content_type='application/json')
+
+            self.assertEqual(tricap_manager.state == CAM_MANAGER_STATES.STARTED, False)
+            self.assertEqual(altimeter.state == ALTIMETER_STATE.MEASURING, False)
 
 
 class TestBehaviourHome(BehaviourTestCase):
@@ -93,33 +164,3 @@ class TestBehaviourHome(BehaviourTestCase):
 
             h_main_status = self.driver.find_element_by_id('h_main_status')
             self.assertEqual(h_main_status.get_attribute('innerHTML'), 'No Response From Server')
-
-    # def test_button_presses(self):
-    #     """Test that the button presses do what they should do."""
-    #
-    #     triconfig = TricapConfig()
-    #
-    #     web_settings = triconfig.get_section_dict(TricapConfig.WEB_SECTION_HEADER)
-    #     refresh_rate = web_settings['refresh_rate']
-    #     web_settings['alti_required'] = 'dummy'
-    #     web_settings['cams_required'] = 'dummy'
-    #     triconfig.set_section(web_settings, TricapConfig.WEB_SECTION_HEADER)
-    #     triconfig.save_to_file()
-    #
-    #     with self.client:  # access the web page through a 'client', as if a browser
-    #         self._open_page('home.index', 'btn_startstop')
-    #
-    #         btn_startstop = self.driver.find_element_by_id('btn_startstop')
-    #         btn_startstop.click()
-    #
-    #         cams_started = tricap_manager.state == CAM_MANAGER_STATES.STARTED
-    #         alti_started = altimeter.state == ALTIMETER_STATE.MEASURING
-    #
-    #         self.assertEqual(alti_started, True)
-    #         self.assertEqual(cams_started, True)
-    #
-    #         btn_startstop = self.driver.find_element_by_id('btn_startstop')
-    #         btn_startstop.click()
-    #
-    #         self.assertEqual(cams_started, False)
-    #         self.assertEqual(alti_started, False)

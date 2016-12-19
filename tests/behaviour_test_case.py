@@ -3,7 +3,7 @@
 import os
 
 from flask import url_for
-from flask_testing import TestCase as FlaskTestCase
+from flask_testing import TestCase as FlaskTestCase, LiveServerTestCase
 
 from .tempfile_test_case import TricapTempFilerTestCase
 
@@ -26,6 +26,20 @@ class AppTestCase(FlaskTestCase, TricapTempFilerTestCase):
         app.config['TESTING'] = True
 
         return app
+
+    def send_ajax_request(self, ajax_url: str, args=None):
+        """Send a correctly formatted ajax request to the app server."""
+        if args is None:
+            return self.client.get(ajax_url, content_type='application/json')
+
+        args_str = None
+        for index, key in enumerate(args.keys()):
+            if index == 0:
+                args_str = '?'+key+'='+args[key]
+            else:
+                args_str += '&'+key+'='+args[key]
+
+        return self.client.get(ajax_url+args_str, content_type='application/json')
 
 
 class BehaviourTestCase(AppTestCase):

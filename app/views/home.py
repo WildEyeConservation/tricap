@@ -131,8 +131,8 @@ def _receive_talkbox_msg():
 
 @home_bp.route('/_change_message_reply')
 def _change_message_reply():
-    msg = request.args.get('msg', '', type=str)
-    reply_code = request.args.get('reply_code', 0, type=int)
+    msg = request.args.get('msg', type=str)
+    reply_code = request.args.get('reply_code', type=int)
     talkbox.change_reply(msg, reply_code)
     return jsonify()
 
@@ -166,6 +166,8 @@ def _has_capture_started():
     # if non of the sensors are required, then at least one has had to have started
     if not(alti_a_must or cams_a_must) and (cams_started or alti_started):
         return True
+    else:
+        return False
 
     # if a sensor is required, then capture has not started
     if (alti_a_must and not alti_started):
@@ -187,9 +189,9 @@ def reset():
     return redirect(url_for('home.index'))
 
 
-@home_bp.route('/_button_click')
+@home_bp.route('/_button_click', methods=['GET', 'POST'])
 def handle_button_click():
-    button_code = request.args.get('buttonCode', 0, type=int)
+    button_code = int(request.args.get('buttonCode'))
 
     if button_code == BUTTON_CODE.START:
         session_logger.create_new_session()
@@ -205,7 +207,6 @@ def handle_button_click():
         reset()
     elif button_code == BUTTON_CODE.STARTSTOP:
         # get current state
-
         started = _has_capture_started()
         if started:
             # we want to stop

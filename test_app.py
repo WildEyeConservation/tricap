@@ -6,7 +6,7 @@ These unit-like tests that need to instantiate a flask instant of the app.
 import unittest
 
 from tests.test_settings import TestSettings, TestMiscSettings
-from tests.test_page_home import TestHome
+from tests.test_page_home import TestHome, TestAppHome
 
 if __name__ == '__main__':
     unittest.main()

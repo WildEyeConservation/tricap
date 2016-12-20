@@ -20,6 +20,8 @@ node_modules
 *.log
 *.log.*
 *.bak
+*.swp
+*.save
 *~
 
 # specific files

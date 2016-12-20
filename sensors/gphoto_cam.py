@@ -89,6 +89,8 @@ class GPhotoCam:
         self.state = CAMERA_STATES.INITIALISED
         self._address = address
 
+        self._image_count = 0
+
         self._setup_camera(settings)
 
     def is_cam_image_fresh(self):
@@ -137,6 +139,7 @@ class GPhotoCam:
             # # Make a copy, so that we can release the file_data object
             self.data = memoryview(file_data).tobytes()
             self._fresh_capture = True
+            self._image_count += 1
             del camera_file
             self.state = CAMERA_STATES.INITIALISED
             if not continuous:
@@ -148,3 +151,6 @@ class GPhotoCam:
 
     def get_state_as_string(self):
         return self.state.name
+
+    def get_cam_image_count(self):
+        return self._image_count

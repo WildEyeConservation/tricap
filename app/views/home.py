@@ -102,8 +102,6 @@ def provide_state_data():
                  'measurement': str(altimeter.measurement)}
 
     cam_image_counts = [cam.get_cam_image_count() for cam in tricap_manager.get_cameras_as_list()]
-    print('image counts')
-    print(cam_image_counts)
     cam_data = {'image_counts': cam_image_counts,
                 'overall_cam_state_colour': _determine_overall_cam_state_colour(),
                 'capture_started': _has_capture_started()}
@@ -144,7 +142,6 @@ def serve_cam_img(img_str):
     """Serve the image as described by the img_str = camera id + image id."""
     cam_num = int(img_str[0])
     img_num = int(img_str[1:])
-    print('Got a request for image ' + img_str[0] + ' from cam ' + img_str[1:])
 
     return send_file(io.BytesIO(tricap_manager.get_data(cam_num)), attachment_filename='image.jpg',
                      as_attachment=True)
@@ -169,10 +166,11 @@ def _has_capture_started():
     # if non of the sensors are required, then at least one has had to have started
     if not(alti_a_must or cams_a_must) and (cams_started or alti_started):
         return True
-    else:
-        return False
+    # else:
+    #     return False
 
     # if a sensor is required, then capture has not started
+
     if (alti_a_must and not alti_started):
         return False
 

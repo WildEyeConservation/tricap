@@ -59,7 +59,8 @@ class BehaviourTestCase(AppTestCase):
         #options.add_argument('--no-first-run')
         #options.add_argument('--disable-default-apps')
         #self.driver = webdriver.Chrome("/usr/lib/chromium-browser/chromedriver", chrome_options=options)
-        self.driver = webdriver.Firefox()
+        self.driver = webdriver.Chrome()
+        # self.driver = webdriver.Firefox()
 
     def tearDown(self):
         """Restore the config file and destroy the temporary directory and the webdriver."""
@@ -71,8 +72,8 @@ class BehaviourTestCase(AppTestCase):
     def _get_form_data_as_dict(driver):
         """Get the form fields of a rendered page as a dict."""
         #sleep(10)
-        driver.execute_script('window.get_form = function(){return $("form").serialize();}')
-        serial_str = driver.execute_script('get_form()')
+        # driver.execute_script('window.get_form = function(){return $("form").serialize();}')
+        serial_str = driver.execute_script('return get_form()')
 
         ret_dict = {}
         serial_parts = serial_str.split('&')

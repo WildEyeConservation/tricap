@@ -56,12 +56,15 @@ class TestAppHome(AppTestCase):
 
         with self.client:
             self.client.get(url_for('home.index'))
-
+            # response = self.client.get('/_submit_talkbox_msg?msg='+str('Test Message 1'),
+            #                            content_type='application/json')
             self.send_ajax_request('/_submit_talkbox_msg', {'msg': 'Test Message 1'})
 
             msgs = [tmsg.msg for tmsg in talkbox.talk_msgs]
             self.assertEqual(msgs[0], 'Test Message 1')
 
+            # response = self.client.get('/_change_message_reply?msg='+str('Test Message 1')+'&reply_code='+str(TALK_REPLY.YES.value),
+            #                            content_type='application/json')
             self.send_ajax_request('/_change_message_reply', {'msg': 'Test Message 1',
                                                               'reply_code': str(TALK_REPLY.YES.value)})
 

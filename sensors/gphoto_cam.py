@@ -133,8 +133,14 @@ class GPhotoCam:
                     success = True
                 except gp.GPhoto2Error:
                     pass
-            camera_file = self._gp_camera.file_get(file_path.folder, file_path.name, gp.GP_FILE_TYPE_PREVIEW,
-                                                   GPhotoCam._context)
+
+            try:
+                camera_file = self._gp_camera.file_get(file_path.folder, file_path.name, gp.GP_FILE_TYPE_PREVIEW,
+                                                       GPhotoCam._context)
+            except gp.GPhoto2Error:
+                self._logger.error('Error retrieving preview, is the capturetarget correctly set?')
+                raise
+
             file_data = camera_file.get_data_and_size()
             # # Make a copy, so that we can release the file_data object
             self.data = memoryview(file_data).tobytes()

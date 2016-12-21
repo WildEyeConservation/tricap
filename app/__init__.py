@@ -49,7 +49,13 @@ log_list = LogListAccessor(3)
 init_config = TricapConfig()
 misc_settings = init_config.get_section_dict(TricapConfig.MISC_SECTION_HEADER)
 cam_settings = init_config.get_section_dict(TricapConfig.CAMERA_SECTION_HEADER)
-tricap_manager = TriCapCamsManager(misc_settings, cam_settings)
+
+if init_config.get('cams_required', TricapConfig.WEB_SECTION_HEADER) == 'dummy':
+    use_dummy_cams = True
+else:
+    use_dummy_cams = False
+  
+tricap_manager = TriCapCamsManager(misc_settings, cam_settings, use_dummy_cams)
 tricap_cameras = tricap_manager.get_cameras_as_list()
 image_manager = tricap_manager
 

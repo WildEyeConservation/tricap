@@ -15,8 +15,10 @@ try:
     from .canon_6D import Canon6DCam
     from .gphoto_cam import GPhotoCam as Camera
 except ImportError:
-    from .dummy_cam import DummyCam as Camera
-    from .dummy_cam import DummyShell as Canon6DCam
+    logging.getLogger(__name__).warning('Could not import gphoto based libs.')
+    
+from .dummy_cam import DummyCam
+from .dummy_cam import DummyShell
 
 
 class MultiConfig:
@@ -50,7 +52,7 @@ class TriCapCamsManager:
     supportedCameras = {"Canon EOS 6D", "Dummy Cam"}
     _logger = logging.getLogger(__name__)
 
-    def __init__(self, man_settings: dict, cam_settings: dict):
+    def __init__(self, man_settings: dict, cam_settings: dict, use_dummy_cams=False):
         self.state = CAM_MANAGER_STATES.STOPPED
 
         self._capture_thread = None
@@ -61,7 +63,8 @@ class TriCapCamsManager:
         self._capture_thread = None
         self._kill_pill = None
         self._cam_settings = cam_settings
-        self._man_settings = man_settings
+        self._man_settings = man_settings        
+        self.use_dummy_cams = use_dummy_cams
         self._initialise()
 
     def _initialise(self):
@@ -89,11 +92,19 @@ class TriCapCamsManager:
         self._cameras = []
         # Do not catch exceptions here. If any detected camera fails to instantiate, it is a critical error and we want
         # to halt and catch fire.
-        for name, address in Camera.autodetect():
-            if name in TriCapCamsManager.supportedCameras:
-                self._logger.info('Adding camera %s at address %s ' % (name, address))
-                tricap_cam = Canon6DCam(Camera(address, self._cam_settings))
-                self._cameras.append(tricap_cam)
+
+        if self.use_dummy_cams:
+            for name, address in DummyCam.autodetect():
+                if name in TriCapCamsManager.supportedCameras:
+                    self._logger.info('Adding camera %s at address %s ' % (name, address))
+                    tricap_cam = DummyShell(DummyCam(address, self._cam_settings))
+                    self._cameras.append(tricap_cam)	
+        else:
+            for name, address in Camera.autodetect():
+                if name in TriCapCamsManager.supportedCameras:
+                    self._logger.info('Adding camera %s at address %s ' % (name, address))
+                    tricap_cam = Canon6DCam(Camera(address, self._cam_settings))
+                    self._cameras.append(tricap_cam)
 
     def reset(self, man_settings: dict, cam_settings: dict):
         self._man_settings = man_settings

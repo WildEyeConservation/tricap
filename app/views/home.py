@@ -164,10 +164,11 @@ def _has_capture_started():
         alti_a_must = True
 
     # if non of the sensors are required, then at least one has had to have started
-    if not(alti_a_must or cams_a_must) and (cams_started or alti_started):
-        return True
-    # else:
-    #     return False
+    if not(alti_a_must or cams_a_must):
+        if (cams_started or alti_started):
+            return True
+        else:
+            return False
 
     # if a sensor is required, then capture has not started
 

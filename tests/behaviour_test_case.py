@@ -1,4 +1,9 @@
-"""Base class for all behaviour tests. Instantiates an app."""
+"""Base class for all behaviour tests. Instantiates an app.
+
+Important to note that this is not using a live server, (the LiveServerTestCase seems to be broken).
+Lots of work arounds to accomodate this, and most importantly, these work arounds prevents testing
+in Firefox, because Firefox stops you from loading local files directly (or something).
+"""
 
 import os
 
@@ -52,15 +57,11 @@ class BehaviourTestCase(AppTestCase):
     def setUp(self):
         """Instantiate a temporary directory and backup the config file and start the webdriver."""
         super().setUp()
-        #options = webdriver.ChromeOptions()
-        #options.binary_location = '/usr/lib/chromium-browser'
-        #options.add_argument('--no-sandbox')
-        #options.add_argument('--no-default-browser-check')
-        #options.add_argument('--no-first-run')
-        #options.add_argument('--disable-default-apps')
-        #self.driver = webdriver.Chrome("/usr/lib/chromium-browser/chromedriver", chrome_options=options)
-        self.driver = webdriver.Chrome()
-        # self.driver = webdriver.Firefox()
+
+        if os.path.isfile('/usr/lib/chromium-browser/chromedriver'):
+            self.driver = webdriver.Chrome("/usr/lib/chromium-browser/chromedriver")
+        else:
+            self.driver = webdriver.Chrome()
 
     def tearDown(self):
         """Restore the config file and destroy the temporary directory and the webdriver."""
@@ -71,7 +72,7 @@ class BehaviourTestCase(AppTestCase):
     @staticmethod
     def _get_form_data_as_dict(driver):
         """Get the form fields of a rendered page as a dict."""
-        #sleep(10)
+        # sleep(10)
         # driver.execute_script('window.get_form = function(){return $("form").serialize();}')
         serial_str = driver.execute_script('return get_form()')
 

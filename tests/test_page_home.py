@@ -130,6 +130,7 @@ class TestBehaviourHome(BehaviourTestCase):
             self.assertEqual(len(response.json['sys']['msgs']), 0)
 
             json_str = str(response.json).replace('True', 'true').replace('False', 'false')
+
             self.driver.execute_script('return updatePage(data='+json_str+');')
 
             wait = WebDriverWait(self.driver, 5)

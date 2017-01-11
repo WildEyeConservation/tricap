@@ -16,7 +16,7 @@ try:
     from .gphoto_cam import GPhotoCam as Camera
 except ImportError:
     logging.getLogger(__name__).warning('Could not import gphoto based libs.')
-    
+
 from .dummy_cam import DummyCam
 from .dummy_cam import DummyShell
 
@@ -47,8 +47,32 @@ class MultiConfig:
         return self._cameras[0].config.get_tree()
 
 
+class RepeatingBarrierPasser(threading.Thread):
+    """
+    A thread object that passes a threading barrier every x seconds.
+
+    Serves as a timing mechanism for synchronised threads that also use the barrier.
+
+    Source:
+    stackoverflow.com/questions/12435211/python-threading-timer-repeat-function-every-n-seconds.
+    """
+
+    def __init__(self, repeat_rate: float, stop_event: threading.Event, barrier: threading.Barrier):
+        """Initialise a timing mechanism to repeat every repeat_rate seconds."""
+        threading.Thread.__init__(self)
+        self._stop_event = stop_event
+        self._barrier = barrier
+        self._repeat_rate = repeat_rate
+
+    def run(self):
+        """Do not invoke this function directly, begin the timer by calling start."""
+        while not self._stop_event.wait(self._repeat_rate):
+            self._barrier.wait()
+
+
 class TriCapCamsManager:
     """TriCapCamsManager manages TriCap camera objects"""
+
     supportedCameras = {"Canon EOS 6D", "Dummy Cam"}
     _logger = logging.getLogger(__name__)
 
@@ -61,9 +85,10 @@ class TriCapCamsManager:
         self._cameras = None
         self._cam_threads = None
         self._capture_thread = None
+        self._rate_timer = None
         self._kill_pill = None
         self._cam_settings = cam_settings
-        self._man_settings = man_settings        
+        self._man_settings = man_settings
         self.use_dummy_cams = use_dummy_cams
         self._initialise()
 
@@ -98,7 +123,7 @@ class TriCapCamsManager:
                 if name in TriCapCamsManager.supportedCameras:
                     self._logger.info('Adding camera %s at address %s ' % (name, address))
                     tricap_cam = DummyShell(DummyCam(address, self._cam_settings))
-                    self._cameras.append(tricap_cam)	
+                    self._cameras.append(tricap_cam)
         else:
             for name, address in Camera.autodetect():
                 if name in TriCapCamsManager.supportedCameras:
@@ -119,8 +144,16 @@ class TriCapCamsManager:
         if len(self._cameras) == 0:
             self.state = CAM_MANAGER_STATES.ERROR_NO_CAMS
         elif self.state == CAM_MANAGER_STATES.STOPPED:
-            barrier = threading.Barrier(len(self._cameras))
             self._kill_pill = threading.Event()
+
+            if self._image_capture_interval != 0:
+                barrier = threading.Barrier(len(self._cameras)+1)  # add one for the timer
+                self._rate_timer = RepeatingBarrierPasser(self._image_capture_interval,
+                                                          self._kill_pill, barrier)
+                self._rate_timer.start()
+            else:
+                barrier = threading.Barrier(len(self._cameras))
+
             for cam in self._cameras:
                 thread = threading.Thread(target=cam.capture, daemon=True,
                                           kwargs={"continuous": True, "barrier": barrier,

@@ -5,10 +5,11 @@ import threading
 import time
 from collections import namedtuple
 from glob import glob
+from datetime import datetime
 
 from anytree import PreOrderIter, RenderTree
 
-from config import CAMERA_STATES
+from config import CAMERA_STATES, SERVER_LOG_DIR
 from .abstract_cam import AbstractCamera, CameraException
 from .base_setting import BaseSetting, SettingSpec
 
@@ -101,6 +102,8 @@ class DummyCam(AbstractCamera):
         for setting_name, setting_value in settings.items():
             self.config[setting_name] = setting_value
 
+        self.rate_fp = os.path.join(SERVER_LOG_DIR, 'dummycam_%s_rates.txt' % self._address)
+
     @property
     def config(self):
         return self._config
@@ -117,6 +120,10 @@ class DummyCam(AbstractCamera):
         return self.state.name
 
     def capture(self, continuous=False, barrier: threading.Barrier = None, stop_event=None):
+        """Start capturing photos, typically called by a thread."""
+        if self._rate_file is None:
+            self._rate_file = open(self.rate_fp, 'w')
+
         while True:
             if stop_event:
                 if stop_event.is_set():
@@ -126,11 +133,15 @@ class DummyCam(AbstractCamera):
             if barrier:
                 barrier.wait()
             self._counter += 1
+            self.record_timestamp_to_rate_file('before capture')
             self.data = self._imgs[self._counter % len(self._imgs)]
+            self.record_timestamp_to_rate_file('before preview fetch')
             self._fresh_capture = True
             self.state = CAMERA_STATES.INITIALISED
             if not continuous:
                 return
+            self.record_timestamp_to_rate_file('after preview fetch')
+            self._rate_file.flush()
 
     def get_cam_image_count(self):
         """Get the number of images captured so far."""

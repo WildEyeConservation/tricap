@@ -1,12 +1,14 @@
 # coding=utf-8
 import logging
 import threading
+import os
 
 import gphoto2 as gp
 from anytree import Node, PreOrderIter, RenderTree
+from datetime import datetime
 
-from config import CAMERA_STATES
-from .abstract_cam import CamConfigType
+from config import CAMERA_STATES, SERVER_LOG_DIR
+from .abstract_cam import AbstractCamera, CamConfigType
 from .base_setting import BaseSetting
 
 
@@ -73,8 +75,8 @@ class GPhotoConfig:
 
 
 # noinspection PyUnresolvedReferences
-class GPhotoCam:
-    """Handler for the Canon EOS 6D Camera. Uses gphoto2 to handle the actual communication."""
+class GPhotoCam(AbstractCamera):
+    """Handler for a generic gphoto2 based cameras. Uses this library to handle communication."""
 
     _port_info_list = gp.PortInfoList()
     _port_info_list.load()
@@ -82,6 +84,8 @@ class GPhotoCam:
     _logger = logging.getLogger(__name__)
 
     def __init__(self, address, settings: dict):
+        """Constructor, requires address and camera settings dict."""
+        super().__init__()
 
         self._gp_camera = None
         self.data = None
@@ -92,6 +96,10 @@ class GPhotoCam:
         self._image_count = 0
 
         self._setup_camera(settings)
+
+        import pdb; pdb.set_trace()
+
+        self.rate_fp = os.path.join(SERVER_LOG_DIR, 'gphotocam_%s_rate.txt' % self._address)
 
     def is_cam_image_fresh(self):
         return self._fresh_capture
@@ -119,14 +127,19 @@ class GPhotoCam:
         return GPhotoConfig(self._gp_camera, self._context)
 
     def capture(self, continuous=False, barrier: threading.Barrier = None, stop_event=None):
+        """Start capturing photos, typically called by a thread."""
         while True:
             if stop_event:
                 if stop_event.is_set():
                     return
+
             self.state = CAMERA_STATES.CAPTURING
             if barrier:
                 barrier.wait()
             success = False
+
+            # timing point
+            self.record_timestamp_to_rate_file('before capture')
             while not success:
                 try:
                     file_path = self._gp_camera.capture(gp.GP_CAPTURE_IMAGE, GPhotoCam._context)
@@ -134,6 +147,8 @@ class GPhotoCam:
                 except gp.GPhoto2Error:
                     pass
 
+            # Timing point
+            self.record_timestamp_to_rate_file('before preview fetch')
             try:
                 camera_file = self._gp_camera.file_get(file_path.folder, file_path.name, gp.GP_FILE_TYPE_PREVIEW,
                                                        GPhotoCam._context)
@@ -141,6 +156,7 @@ class GPhotoCam:
                 self._logger.error('Error retrieving preview, is the capturetarget correctly set?')
                 raise
 
+            self.record_timestamp_to_rate_file('after preview fetch')
             file_data = camera_file.get_data_and_size()
             # # Make a copy, so that we can release the file_data object
             self.data = memoryview(file_data).tobytes()

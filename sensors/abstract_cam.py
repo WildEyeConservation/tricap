@@ -1,7 +1,9 @@
 # coding=utf-8
+import threading
+
 from enum import IntEnum
 from abc import ABC, abstractmethod
-import threading
+from datetime import datetime
 
 
 class CameraException(Exception):
@@ -13,11 +15,23 @@ CamConfigType = IntEnum("CamConfigType",
 
 
 class AbstractCamera(ABC):
-    """ Handler for the Canon EOS 6D Camera. Uses gphoto2 to handle the actual communication. """
+    """Abstract base class for all camera objects."""
 
-    @abstractmethod
     def __init__(self, address, settings):
-        pass
+        """Constructor, requires address and camera settings dict."""
+        self.rate_fp = 'Does/Not/Exist.txt'
+        self._rate_file = None
+
+    def init_rate_file_if_needed(self):
+        """Initialise the rate file, not done during construction to allow path manipulation."""
+        if self._rate_file is None:
+            self._rate_file = open(self.rate_fp, 'w')
+
+    def record_timestamp_to_rate_file(self, descriptor: str = 'timestamp'):
+        """Record the timestamp to the rate file."""
+        self.init_rate_file_if_needed()
+        self._rate_file.write('%s : %s\n' % (str(datetime.now()), descriptor))
+        self._rate_file.flush()
 
     @abstractmethod
     def is_cam_image_fresh(self):

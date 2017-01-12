@@ -6,7 +6,7 @@
 import logging
 import threading
 
-from config import CAM_MANAGER_STATES
+from config import CAM_MANAGER_STATES, SERVER_LOG_DIR
 
 # TODO : Create a camera factory that will import cameras according to its config and make them available via its own
 # autodetect function
@@ -129,6 +129,8 @@ class TriCapCamsManager:
                 if name in TriCapCamsManager.supportedCameras:
                     self._logger.info('Adding camera %s at address %s ' % (name, address))
                     tricap_cam = Canon6DCam(Camera(address, self._cam_settings))
+                    tricap_cam.rate_fp = os.path.join(SERVER_LOG_DIR,
+                                                      'canon6dcam_%s_rates.txt' % tricap_cam.serial_num)
                     self._cameras.append(tricap_cam)
 
     def reset(self, man_settings: dict, cam_settings: dict):

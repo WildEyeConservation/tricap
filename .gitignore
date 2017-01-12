@@ -2,6 +2,7 @@
 /notes
 /downloads
 /tmp
+/logs
 /.idea
 /.coverage
 /htmlcov

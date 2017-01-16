@@ -1,0 +1,12 @@
+# Copy to /etc/systemd/system
+[Unit]
+Description=Tricap Launcher
+After=network.target
+
+[Service]
+User=rpi3
+ExecStart=/home/rpi3/Projects/tricap/tricap/tricap_launcher.sh
+
+[Install]
+WantedBy=multi-user.target
+

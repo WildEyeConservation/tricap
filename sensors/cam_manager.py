@@ -130,7 +130,7 @@ class TriCapCamsManager:
                 if name in TriCapCamsManager.supportedCameras:
                     self._logger.info('Adding camera %s at address %s ' % (name, address))
                     tricap_cam = Canon6DCam(Camera(address, self._cam_settings))
-                    tricap_cam.rate_fp = os.path.join(SERVER_LOG_DIR,
+                    tricap_cam._camera.rate_fp = os.path.join(SERVER_LOG_DIR,
                                                       'canon6dcam_%s_rates.txt' % tricap_cam.serial_num)
                     self._cameras.append(tricap_cam)
 

@@ -85,7 +85,7 @@ class GPhotoCam(AbstractCamera):
 
     def __init__(self, address, settings: dict):
         """Constructor, requires address and camera settings dict."""
-        super().__init__()
+        super().__init__(address, settings)
 
         self._gp_camera = None
         self.data = None
@@ -97,9 +97,7 @@ class GPhotoCam(AbstractCamera):
 
         self._setup_camera(settings)
 
-        import pdb; pdb.set_trace()
-
-        self.rate_fp = os.path.join(SERVER_LOG_DIR, 'gphotocam_%s_rate.txt' % self._address)
+        self.rate_fp = os.path.join(SERVER_LOG_DIR, 'gphotocam_%s_rate.txt' % self._address.replace(':', '_').replace(',', '_'))
 
     def is_cam_image_fresh(self):
         return self._fresh_capture

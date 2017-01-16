@@ -5,6 +5,7 @@ After=network.target
 
 [Service]
 User=rpi3
+Restart=always
 ExecStart=/home/rpi3/Projects/tricap/tricap/tricap_launcher.sh
 
 [Install]

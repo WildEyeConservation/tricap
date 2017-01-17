@@ -121,9 +121,6 @@ class DummyCam(AbstractCamera):
 
     def capture(self, continuous=False, barrier: threading.Barrier = None, stop_event=None):
         """Start capturing photos, typically called by a thread."""
-        if self._rate_file is None:
-            self._rate_file = open(self.rate_fp, 'w')
-
         while True:
             if stop_event:
                 if stop_event.is_set():
@@ -141,7 +138,6 @@ class DummyCam(AbstractCamera):
             if not continuous:
                 return
             self.record_timestamp_to_rate_file('after preview fetch')
-            self._rate_file.flush()
 
     def get_cam_image_count(self):
         """Get the number of images captured so far."""

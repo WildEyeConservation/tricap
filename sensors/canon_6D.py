@@ -6,7 +6,7 @@ import time
 
 
 class Canon6DCam():
-    def __init__(self, camera_driver):        
+    def __init__(self, camera_driver):
         self._camera = camera_driver
         self.config.output = 'Undefined'  # Do not be in live mode
         self.config.drivemode = 'Single'

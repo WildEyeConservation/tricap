@@ -60,6 +60,11 @@ class DummyConfig:
         return self._tree
 
 
+# TODO Bad Coding, bad oop
+def external_dummy_calibrate_func():
+    print('Calibrate!')
+
+
 class DummyCam(AbstractCamera):
     """ Serves as a fake camera for testing purposes."""
 
@@ -135,6 +140,12 @@ class DummyCam(AbstractCamera):
             self.record_timestamp_to_rate_file('before preview fetch')
             self._fresh_capture = True
             self.state = CAMERA_STATES.INITIALISED
+
+            if self.calibrate_func is not None:
+                if self.calibrate_step > 0:
+                    if self._counter % self.calibrate_step == 0:
+                        self.calibrate_func()
+
             if not continuous:
                 return
             self.record_timestamp_to_rate_file('after preview fetch')

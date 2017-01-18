@@ -162,6 +162,12 @@ class GPhotoCam(AbstractCamera):
             self._image_count += 1
             del camera_file
             self.state = CAMERA_STATES.INITIALISED
+
+            if self.calibrate_func is not None:
+                if self.calibrate_step > 0:
+                    if self._image_count % self.calibrate_step == 0:
+                        self.calibrate_func()
+
             if not continuous:
                 return self.data
 

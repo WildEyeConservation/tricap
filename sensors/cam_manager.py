@@ -19,7 +19,7 @@ except ImportError:
     logging.getLogger(__name__).warning('Could not import gphoto based libs.')
 
 from .dummy_cam import DummyCam
-from .dummy_cam import DummyShell
+from .dummy_cam import DummyShell, external_dummy_calibrate_func
 
 
 class MultiConfig:
@@ -124,6 +124,8 @@ class TriCapCamsManager:
                 if name in TriCapCamsManager.supportedCameras:
                     self._logger.info('Adding camera %s at address %s ' % (name, address))
                     tricap_cam = DummyShell(DummyCam(address, self._cam_settings))
+                    tricap_cam._camera.calibrate_func = external_dummy_calibrate_func
+                    tricap_cam._camera.calibrate_step = int(self._man_settings['calibrate_step'])
                     self._cameras.append(tricap_cam)
         else:
             for name, address in Camera.autodetect():
@@ -132,6 +134,8 @@ class TriCapCamsManager:
                     tricap_cam = Canon6DCam(Camera(address, self._cam_settings))
                     tricap_cam._camera.rate_fp = os.path.join(SERVER_LOG_DIR,
                                                       'canon6dcam_%s_rates.txt' % tricap_cam.serial_num)
+                    tricap_cam._camera.calibrate_func = tricap_cam.focus_infinity()
+                    tricap_cam._camera.calibrate_step = int(self._man_settings['calibrate_step'])
                     self._cameras.append(tricap_cam)
 
     def reset(self, man_settings: dict, cam_settings: dict):
@@ -174,6 +178,12 @@ class TriCapCamsManager:
 
     def set_image_capture_interval(self, value):
         self._man_settings['image_capture_interval'] = value
+
+    def get_calibrate_step(self):
+        return self._man_settings['calibrate_step']
+
+    def set_calibrate_step(self, value):
+        self._man_settings['calibrate_step'] = value
 
     def get_num_cams(self):
         return len(self._cameras)

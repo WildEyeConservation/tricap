@@ -23,6 +23,10 @@ class AbstractCamera(ABC):
         self.rate_fp = 'Does/Not/Exist.txt'
         self._rate_logger = None
 
+        # TODO This is bad OOP Code, fix this!
+        self.calibrate_func = None
+        self.calibrate_timing = 0
+
     def init_rate_file_if_needed(self):
         """Initialise the rate file, not done during construction to allow path manipulation."""
 

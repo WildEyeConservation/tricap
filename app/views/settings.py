@@ -22,7 +22,9 @@ class MiscSettingConfig:
     _settings = {'session_description': Accessors(getter=session_logger.get_description,
                                                   setter=session_logger.set_description),
                  'image_capture_interval': Accessors(getter=tricap_manager.get_image_capture_interval,
-                                                     setter=tricap_manager.set_image_capture_interval)}
+                                                     setter=tricap_manager.set_image_capture_interval),
+                 'calibrate_step': Accessors(getter=tricap_manager.get_calibrate_step,
+                                             setter=tricap_manager.set_calibrate_step)}
 
     def __repr__(self):
         return str(self._settings.keys())

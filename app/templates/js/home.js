@@ -173,10 +173,12 @@ var buttonClick = function(buttonCode){
 var startStopFollowUp = function (data) {
     if (data.capture_started === true){
         camRefreshTimer.runTimer();
-        $('#btn_startstop').html('Stop');
+        // $('#btn_startstop').html('Stop');
+        $('[name="btn_startstop"]').html('Stop');
     } else {
         camRefreshTimer.stopTimer();
-        $('#btn_startstop').html('Start');
+        // $('#btn_startstop').html('Start');
+        $('[name="btn_startstop"]').html('Start');
     }
     return false;
 };
@@ -366,7 +368,8 @@ $(function(){
     }
 
     // Set the specific button functions
-    $("#btn_startstop").on('click', function(event){buttonClick(tricap.BUTTON_CODES.STARTSTOP);});
+    // $("#btn_startstop").on('click', function(event){buttonClick(tricap.BUTTON_CODES.STARTSTOP);});
+    $('[name="btn_startstop"]').on('click', function(event){buttonClick(tricap.BUTTON_CODES.STARTSTOP);});
     $('#a_test').attr('href', '#');
     $("#a_test").click(function(event){buttonClick(tricap.BUTTON_CODES.TEST); return true;});
     $("#img_cam_left").error(function(event){console.log('Error');});

@@ -200,12 +200,13 @@ class LinuxIPMonitor(IPMonitor):
 
     def monitor_step(self):
         """Ping the address."""
-        with os.popen('timeout 0.5 ping %s -c 1 -l 32' % self.address) as cmd_output:
+        with os.popen('timeout 0.5 ping %s -c 1 -s 32' % self.address) as cmd_output:
             lines = cmd_output.readlines()
 
-            if len(lines) == 1:  # if the timeout happened
+            if len(lines) <= 1:  # if the timeout happened
                 self.reachable = False
                 self.latency = None
+                return
 
             if lines[1].split(' ')[-1].strip() == 'Unreachable':
                 self.reachable = False

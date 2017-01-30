@@ -20,7 +20,8 @@ from support.configure import TricapConfig
 from support.talkbox import TalkBox
 from support.log_list import LogListAccessor
 
-from support.network_monitor import generate_net_monitor, NetworkMonitorLogger
+from support.connection_monitor import generate_net_monitor, NetworkMonitorLogger
+from support.connection_monitor import generate_ip_monitor, IPMonitorLogger
 
 from config import SERVER_LOG_DIR
 
@@ -100,15 +101,25 @@ else:
 talkbox = TalkBox(Lock(), 3)
 talkbox.clear()
 
-# Setup the network monitors and loggers
-net_mon = generate_net_monitor(period=60)
-net_mon_logger = NetworkMonitorLogger(net_mon)
-net_mon.start()
+# Setup monitor and logger for wireless network connection
+wlan_mon = generate_net_monitor(period=30)
+net_mon_logger = NetworkMonitorLogger(wlan_mon)
+wlan_mon.start()
+
+# Setup monitor and logger for vpn and internet connection
+vpn_mon = generate_ip_monitor('192.168.88.1', period=30)
+internet_mon = generate_ip_monitor('8.8.8.8', period=30)
+ip_mon_logger = IPMonitorLogger([vpn_mon, internet_mon])
+vpn_mon.start()
+internet_mon.start()
 
 
 def stop_all_threads():
     """Helper function for a clean exit."""
-    net_mon.stop()
+    wlan_mon.stop()
+    vpn_mon.stop()
+    internet_mon.stop()
+
     tricap_manager.stop_capturing()
     altimeter.stop_measuring()
 

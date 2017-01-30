@@ -5,7 +5,8 @@ import time
 import os
 import logging
 
-from support.network_monitor import generate_net_monitor, NetworkMonitorLogger, generate_ip_monitor
+from support.connection_monitor import generate_net_monitor, NetworkMonitorLogger
+from support.connection_monitor import generate_ip_monitor, IPMonitorLogger
 
 from config import SERVER_LOG_DIR
 
@@ -155,3 +156,49 @@ class TestIPMonitor(unittest.TestCase):
         self.assertEqual(observer.reachable, False)
         self.assertEqual(observer.latency, None)
         ip_monitor.stop()
+
+
+class TestIPMonLogger(unittest.TestCase):
+    """Log all ip mon logger output to a local file, so to make it easier, only one test."""
+
+    # Remove the log file if it exists (make sure we are testing it right now)
+    log_fp = os.path.join(SERVER_LOG_DIR, 'test_ip_mon_logger.log')
+    if os.path.isfile(log_fp):
+        os.remove(log_fp)
+
+    logging_name = 'test_ip_mon_logger'
+
+    format_str = "%(message)s"
+    handler = logging.FileHandler(filename=log_fp)
+    handler.setLevel(logging.DEBUG)
+    handler.setFormatter(logging.Formatter(format_str))
+    handler.addFilter(logging.Filter(name=logging_name))
+    rootLogger = logging.getLogger('')
+    rootLogger.addHandler(handler)
+    rootLogger.setLevel(logging.DEBUG)
+
+    def setUp(self):
+        """setUp."""
+        self.period = 1
+        self.ip_monitor = generate_ip_monitor('127.0.0.1', period=self.period)
+
+    def tearDown(self):
+        """tearDown."""
+        self.ip_monitor.stop()
+        self.ip_monitor = None
+
+    def test_ip_mon_logger(self):
+        """Test a ip monitor, see that it generates output."""
+        IPMonitorLogger(self.ip_monitor, logging_name=self.logging_name)
+        self.ip_monitor.start()
+        time.sleep(self.period*2)
+        self.ip_monitor.stop()
+
+        with open(self.log_fp, 'r') as log_file:
+            lines = log_file.readlines()
+            self.assertGreater(len(lines), 0)
+            line = lines[0]
+            parts = line.replace(',', ':').split(':')
+            self.assertEqual(parts[0].strip(), 'IP Address')
+            self.assertEqual(parts[2].strip(), 'Reachable')
+            self.assertEqual(parts[4].strip(), 'Latency(ms)')

@@ -228,3 +228,23 @@ def generate_ip_monitor(address, period):
         raise UnknownOperatingSystem
 
     return ip_mon
+
+
+class IPMonitorLogger():
+    """An observer, hooks up to a ip monitor, log stats to the root logger."""
+
+    def __init__(self, ip_monitors, logging_name=''):
+        """Constructor, hook up the logger to the monitor."""
+        super(IPMonitorLogger, self).__init__()
+        self.logger = logging.getLogger(name=logging_name)
+
+        if type(ip_monitors) is not list:
+            ip_monitors = [ip_monitors]
+
+        for ip_monitor in ip_monitors:
+            ip_monitor.attach(self)
+
+    def update(self, ip_monitor):
+        """Update method called by net monitor subject."""
+        self.logger.info('IP Address: %s, Reachable: %s, Latency(ms): %f',
+                         ip_monitor.address, ip_monitor.reachable, ip_monitor.latency)

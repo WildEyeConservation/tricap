@@ -21,7 +21,7 @@ class SessionLogger:
     _root_logger = logging.getLogger(__name__)
 
     def __init__(self, description='Default Description', root_folder=SESSION_ROOT_DIR):
-
+        """Constructor."""
         self._root_folder = root_folder
 
         self._data_logger = logging.getLogger('session_logger')
@@ -40,6 +40,7 @@ class SessionLogger:
         self._ready = False
 
     def __del__(self):
+        """Destructor, have to explicitly remove the handlers from the log file."""
         self._remove_handlers()
 
     def _remove_handlers(self):

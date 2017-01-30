@@ -7,7 +7,7 @@ import pdb
 from flask import Blueprint, render_template, send_from_directory, current_app, request, jsonify
 from flask import send_file, redirect, url_for
 
-from app import tricap_manager, altimeter, session_logger, talkbox, log_list
+from app import tricap_manager, altimeter, session_logger, talkbox, log_list, stop_all_threads
 
 from support.configure import TricapConfig
 
@@ -184,10 +184,13 @@ def _has_capture_started():
 @home_bp.route('/_reset')
 def reset():
     """Stop the server."""
-    func = request.environ.get('werkzeug.server.shutdown')
-    if func is None:
+    flask_reset_func = request.environ.get('werkzeug.server.shutdown')
+    if flask_reset_func is None:
         raise RuntimeError('Not running with the Werkzeug Server')
-    func()
+
+    stop_all_threads()
+
+    flask_reset_func()
     return redirect(url_for('home.index'))
 
 

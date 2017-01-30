@@ -14,6 +14,7 @@ from config import ALTIMETER_STATE
 from functools import partial
 from collections import namedtuple
 from sensors.base_setting import BaseSetting, SettingSpec
+from support.basic import Subject
 
 
 # TODO How to deal with disconnect?
@@ -44,34 +45,6 @@ class MiscSettingConfig:
 
     __setitem__ = __setattr__
     __getitem__ = __getattr__
-
-
-
-class Subject(object):
-    """Abstract base class for observable objects (implementing the observer design pattern)."""
-    __metaclass__ = ABCMeta
-
-    def __init__(self):
-        """Constructor."""
-        self._observers = []
-
-    def attach(self, observer):
-        """Attach observer to list of observers."""
-        if observer not in self._observers:
-            self._observers.append(observer)
-
-    def detach(self, observer):
-        """Detach the observer from the list."""
-        try:
-            self._observers.remove(observer)
-        except ValueError:
-            pass
-
-    def notify(self, modifier=None):
-        """Update all of the observers, except for the observer doing the update."""
-        for observer in self._observers:
-            if modifier != observer:
-                observer.update(self)
 
 
 class TrusenseAltimeter(Subject):

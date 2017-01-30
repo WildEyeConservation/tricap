@@ -25,12 +25,8 @@ class Canon6DCam():
             # and two medium steps back
             self.config.manualfocusdrive = 'Near 2'
             time.sleep(0.08)
-<<<<<<< HEAD
             self.config.manualfocusdrive = 'Near 2'
-=======
-            self.config.manualfocusdrive = 'Near 1'
->>>>>>> a7c71eb2e18f81f809388a81e4389069ccc98950
-            # time.sleep(0.08)
+            time.sleep(0.08)
             self.config.output = 'Undefined'
 
     @property

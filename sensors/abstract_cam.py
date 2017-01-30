@@ -1,6 +1,7 @@
 # coding=utf-8
 import threading
 import logging
+import os
 
 from enum import IntEnum
 from abc import ABC, abstractmethod
@@ -20,7 +21,7 @@ class AbstractCamera(ABC):
 
     def __init__(self, address, settings):
         """Constructor, requires address and camera settings dict."""
-        self.rate_fp = 'Does/Not/Exist.txt'
+        self.rate_fp = 'Does/Not/Exist/Error.txt'
         self._rate_logger = None
 
         # TODO This is bad OOP Code, fix this!
@@ -36,10 +37,11 @@ class AbstractCamera(ABC):
             handler.setLevel(logging.DEBUG)
             handler.setFormatter(logging.Formatter(format_str))
             self._rate_logger = logging.getLogger(self.rate_fp)
+            self._rate_logger.propagate = False  # prevent rate messages from popping up in root log
             self._rate_logger.addHandler(handler)
             self._rate_logger.info('Rate Logging Started')
-
-            # self._rate_file = open(self.rate_fp, 'w')_
+            fp, filename = os.path.split(self.rate_fp)
+            logging.getLogger().info('Rate logging started for a camera at %s.', filename)
 
     def record_timestamp_to_rate_file(self, descriptor: str = 'timestamp'):
         """Record the timestamp to the rate file."""

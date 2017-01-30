@@ -21,6 +21,8 @@ except ImportError:
 from .dummy_cam import DummyCam
 from .dummy_cam import DummyShell, external_dummy_calibrate_func
 
+from support.basic import RepeatingBarrierPasser
+
 
 class MultiConfig:
     dictkeys = ["_cameras", "_context"]
@@ -46,29 +48,6 @@ class MultiConfig:
 
     def get_tree(self):
         return self._cameras[0].config.get_tree()
-
-
-class RepeatingBarrierPasser(threading.Thread):
-    """
-    A thread object that passes a threading barrier every x seconds.
-
-    Serves as a timing mechanism for synchronised threads that also use the barrier.
-
-    Source:
-    stackoverflow.com/questions/12435211/python-threading-timer-repeat-function-every-n-seconds.
-    """
-
-    def __init__(self, repeat_rate: float, stop_event: threading.Event, barrier: threading.Barrier):
-        """Initialise a timing mechanism to repeat every repeat_rate seconds."""
-        threading.Thread.__init__(self)
-        self._stop_event = stop_event
-        self._barrier = barrier
-        self._repeat_rate = repeat_rate
-
-    def run(self):
-        """Do not invoke this function directly, begin the timer by calling start."""
-        while not self._stop_event.wait(self._repeat_rate):
-            self._barrier.wait()
 
 
 class TriCapCamsManager:

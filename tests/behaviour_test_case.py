@@ -19,11 +19,16 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as ec
 from selenium.webdriver.common.by import By
 
-from app import app
+from app import app, stop_all_threads
 
 
 class AppTestCase(FlaskTestCase, TricapTempFilerTestCase):
     """Base class for all behaviour tests."""
+
+    def tearDown(self):
+        """TearDown."""
+        stop_all_threads()
+        super.tearDown()
 
     def create_app(self):
         """Additional setup function needed for flask tests."""

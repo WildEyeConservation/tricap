@@ -43,9 +43,10 @@ class RepeatingBarrierPasser(threading.Thread):
     stackoverflow.com/questions/12435211/python-threading-timer-repeat-function-every-n-seconds.
     """
 
-    def __init__(self, repeat_rate: float, stop_event: threading.Event, barrier: threading.Barrier):
+    def __init__(self, repeat_rate: float, stop_event: threading.Event, barrier: threading.Barrier,
+                 daemon: bool = False):
         """Initialise a timing mechanism to repeat every repeat_rate seconds."""
-        threading.Thread.__init__(self)
+        threading.Thread.__init__(self, daemon=daemon)
         self._stop_event = stop_event
         self._barrier = barrier
         self._repeat_rate = repeat_rate

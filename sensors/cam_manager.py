@@ -135,7 +135,7 @@ class TriCapCamsManager:
             if self._image_capture_interval != 0:
                 barrier = threading.Barrier(len(self._cameras)+1)  # add one for the timer
                 self._rate_timer = RepeatingBarrierPasser(self._image_capture_interval,
-                                                          self._kill_pill, barrier)
+                                                          self._kill_pill, barrier, daemon=True)
                 self._rate_timer.start()
             else:
                 barrier = threading.Barrier(len(self._cameras))

@@ -37,7 +37,7 @@ class NetworkMonitor(Subject):
     def __del__(self):
         """Destructor."""
         self.stop()
-    
+
 
     @abstractmethod
     def update_status(self):
@@ -58,7 +58,7 @@ class NetworkMonitor(Subject):
         self._stop_event = threading.Event()
         self._barrier = threading.Barrier(2)  # one for the timer, one for the status checking
         self._period_timer = RepeatingBarrierPasser(self.period,
-                                                    self._stop_event, self._barrier)
+                                                    self._stop_event, self._barrier, daemon=True)
         thread = threading.Thread(target=self.monitor, daemon=True)
         self._period_timer.start()
         thread.start()
@@ -107,7 +107,7 @@ class LinuxNetworkMonitor(NetworkMonitor):
             line = cmd_output.readline()
             if len(line) > 0:
                 self.network_name = line.strip()
-                
+
         if self.network_name is not None:
             with os.popen('iwconfig wlan0 | grep "Link Quality" ') as cmd_output:
                 ss = cmd_output.readline().split('Signal level')[0].split('=')[1].strip()

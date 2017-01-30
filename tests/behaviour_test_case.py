@@ -19,11 +19,16 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as ec
 from selenium.webdriver.common.by import By
 
-from app import app, stop_all_threads
+from app import app, net_mon
 
 
 class AppTestCase(FlaskTestCase, TricapTempFilerTestCase):
     """Base class for all behaviour tests."""
+
+    def tearDown(self):
+        """Have to stop the network monitor, otherwise it keeps on running after testing."""
+        # net_mon.stop()
+        pass
 
     def create_app(self):
         """Additional setup function needed for flask tests."""

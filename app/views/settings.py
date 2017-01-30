@@ -13,6 +13,8 @@ from config import DEFAULT_CONFIG_FP, CONFIG_FP
 from support.configure import TricapConfig
 from collections import namedtuple
 
+from app import rootlogger
+
 settings_bp = Blueprint('settings', __name__)
 
 
@@ -214,11 +216,8 @@ def save_settings(form, config_fp=CONFIG_FP):
     config.save_to_file()
 
 
-def revert_to_default_settings(save_to_fp=CONFIG_FP, logger=None):
-    # arguments are only supposed to be used during unittesting
-    if logger is None:
-        logger = current_app.logger
-
+def revert_to_default_settings(save_to_fp=CONFIG_FP):
+    """Copy the default settings file over the current used one."""
     default_config = TricapConfig(config_fp_to_read=DEFAULT_CONFIG_FP)
     config = TricapConfig(config_fp_to_read=save_to_fp)
 
@@ -230,6 +229,7 @@ def revert_to_default_settings(save_to_fp=CONFIG_FP, logger=None):
 
 @settings_bp.route('/settings', methods=['GET', 'POST'])
 def settings():
+    rootlogger.info('Settings Page Requested.')
     if request.method == 'GET':
         # When the user initially opens the page, we need to setup the choices and labels for the
         #  forms

@@ -129,6 +129,7 @@ class TriCapCamsManager:
     def start_capturing(self):
         if len(self._cameras) == 0:
             self.state = CAM_MANAGER_STATES.ERROR_NO_CAMS
+            self._logger.debug('Tried to start capture threads with no cameras connected.')
         elif self.state == CAM_MANAGER_STATES.STOPPED:
             self._kill_pill = threading.Event()
 
@@ -146,11 +147,13 @@ class TriCapCamsManager:
                                                   "stop_event": self._kill_pill})
                 thread.start()
             self.state = CAM_MANAGER_STATES.STARTED
+            self._logger.debug('Cam manager - capture threads started.')
 
     def stop_capturing(self):
         if self.state == CAM_MANAGER_STATES.STARTED:
             self._kill_pill.set()
             self.state = CAM_MANAGER_STATES.STOPPED
+            self._logger.debug('Cam manager - capture threads stopped.')
 
     def get_image_capture_interval(self):
         return self._man_settings['image_capture_interval']

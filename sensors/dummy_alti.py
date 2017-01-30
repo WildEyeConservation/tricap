@@ -110,9 +110,11 @@ class DummyAlti(object):
                                              args=(self._kill_pill,), daemon=True)
         self._read_thread.start()
         self.state = ALTIMETER_STATE.MEASURING
+        self._logger.debug('Alti - measuring started')
 
     def stop_measuring(self):
         if self._read_thread and self._read_thread.is_alive():
             self._kill_pill.set()
             self._read_thread.join()
+            self._logger.debug('Alti - measuring stopped')
         self.state = ALTIMETER_STATE.CONNECTED

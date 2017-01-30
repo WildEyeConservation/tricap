@@ -15,14 +15,14 @@ class UnknownOperatingSystem(Exception):
     pass
 
 
-class NetworkMonitor(Subject):
-    """NetworkMonitor, abstract observable for checking network statuses."""
+class PeriodicMonitor(Subject):
+    """A subject that periodically checks something and updates the observers."""
 
     __metaclass__ = ABCMeta
 
-    def __init__(self, period: float = 60):
+    def __init__(self, period):
         """Constructor."""
-        super(NetworkMonitor, self).__init__()
+        super(PeriodicMonitor, self).__init__()
 
         self.period = period
 
@@ -30,18 +30,13 @@ class NetworkMonitor(Subject):
         self._barrier = None
         self._period_timer = None
 
-        self.status = None
-        self.signal_strength = None
-        self.network_name = None
-
     def __del__(self):
         """Destructor."""
         self.stop()
 
-
     @abstractmethod
-    def update_status(self):
-        """Use whatever means and parsing to update the status of the network connecction."""
+    def monitor_step(self):
+        """Check up on whatever is monitored."""
         pass
 
     def monitor(self):
@@ -50,7 +45,7 @@ class NetworkMonitor(Subject):
             if self._stop_event.is_set():
                 return
             self._barrier.wait()
-            self.update_status()
+            self.monitor_step()
             self.notify()
 
     def start(self):
@@ -68,6 +63,20 @@ class NetworkMonitor(Subject):
         self._stop_event.set()
 
 
+class NetworkMonitor(PeriodicMonitor):
+    """NetworkMonitor, abstract observable for checking network statuses."""
+
+    __metaclass__ = ABCMeta
+
+    def __init__(self, period: float = 60):
+        """Constructor."""
+        super(NetworkMonitor, self).__init__(period)
+
+        self.status = None
+        self.signal_strength = None
+        self.network_name = None
+
+
 class WindowsNetworkMonitor(NetworkMonitor):
     """WindowsNetworkMonitor, checks the status of the windows network."""
 
@@ -75,7 +84,7 @@ class WindowsNetworkMonitor(NetworkMonitor):
         """constructor."""
         super(WindowsNetworkMonitor, self).__init__(period)
 
-    def update_status(self):
+    def monitor_step(self):
         """Update the status using the windows netsh commands."""
         with os.popen('netsh wlan show interfaces') as cmd_output:
             lines = cmd_output.readlines()
@@ -99,7 +108,7 @@ class LinuxNetworkMonitor(NetworkMonitor):
         """constructor."""
         super(LinuxNetworkMonitor, self).__init__(period)
 
-    def update_status(self):
+    def monitor_step(self):
         """Update the status using linux terminal commands."""
         self.network_name = None
 
@@ -116,6 +125,7 @@ class LinuxNetworkMonitor(NetworkMonitor):
         else:
             self.status = 'disconnected'
             self.signal_strength = None
+
 
 def generate_net_monitor(period=60):
     """Generate the correct NetworkMonitor based on os."""
@@ -144,3 +154,76 @@ class NetworkMonitorLogger():
         """Update method called by net monitor subject."""
         self.logger.info('Network Name: SSID %s, Status: %s, Signal Strength: %s',
                          net_monitor.network_name, net_monitor.status, net_monitor.signal_strength)
+
+
+class IPMonitor(PeriodicMonitor):
+    """Periodically ping a particular IP address."""
+
+    __metaclass__ = ABCMeta
+
+    def __init__(self, address: str, period: float):
+        """Constructor, takes an address string and the period."""
+        if period < 0.6:
+            period = 0.6
+        super(IPMonitor, self).__init__(period)
+        self.address = address
+
+        self.reachable = None
+        self.latency = None
+
+
+class WindowsIPMonitor(IPMonitor):
+    """Periodically ping an address in windows."""
+
+    def __init__(self, address: str, period: float):
+        """Constructor. Period is hard limited to more that 0.6."""
+        super(WindowsIPMonitor, self).__init__(address, period)
+
+    def monitor_step(self):
+        """Ping the address."""
+        with os.popen('ping %s -n 1 -l 32 -w 500' % self.address) as cmd_output:
+            lines = cmd_output.readlines()
+            if lines[2].strip() == 'Request timed out.':
+                self.reachable = False
+                self.latency = None
+            else:
+                self.reachable = True
+                self.latency = float(lines[7].split('=')[-1].strip()[:-2])
+
+
+class LinuxIPMonitor(IPMonitor):
+    """Periodically ping an address in Linux."""
+
+    def __init__(self, address: str, period: float):
+        """Constructor. Period is hard limited to more that 0.6."""
+        super(LinuxIPMonitor, self).__init__(address, period)
+
+    def monitor_step(self):
+        """Ping the address."""
+        with os.popen('timeout 0.5 ping %s -c 1 -l 32' % self.address) as cmd_output:
+            lines = cmd_output.readlines()
+
+            if len(lines) == 1:  # if the timeout happened
+                self.reachable = False
+                self.latency = None
+
+            if lines[1].split(' ')[-1].strip() == 'Unreachable':
+                self.reachable = False
+                self.latency = None
+            else:
+                self.reachable = True
+                self.latency = float(lines[5].split('=')[1].split('/')[1].strip())
+
+
+def generate_ip_monitor(address, period):
+    """Generate the correct IPMonitor based on os."""
+    ip_mon = None
+
+    if os.name == 'nt':
+        ip_mon = WindowsIPMonitor(address, period)
+    elif os.name == 'posix':
+        ip_mon = LinuxIPMonitor(address, period)
+    else:
+        raise UnknownOperatingSystem
+
+    return ip_mon

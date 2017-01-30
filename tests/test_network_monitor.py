@@ -5,7 +5,7 @@ import time
 import os
 import logging
 
-from support.network_monitor import generate_net_monitor, NetworkMonitorLogger
+from support.network_monitor import generate_net_monitor, NetworkMonitorLogger, generate_ip_monitor
 
 from config import SERVER_LOG_DIR
 
@@ -31,6 +31,26 @@ class NetMonitorObserver():
         print('network name: %s' % self.name)
         print('network status: %s' % self.status)
         print('network signal_strength: %s' % self.signal_strength)
+
+
+class IPMonitorObserver():
+    """An observer of a IP Monitor subject."""
+
+    def __init__(self):
+        """Constructor."""
+        self.reachable = None
+        self.latency = None
+
+    def update(self, ip_mon):
+        """Update."""
+        self.reachable = ip_mon.reachable
+        self.latency = ip_mon.latency
+
+    def print_info(self):
+        """Helper method."""
+        print('ip mon status:')
+        print('reachable: %s' % self.reachable)
+        print('latency: %s' % self.latency)
 
 
 class TestNetMonitor(unittest.TestCase):
@@ -71,7 +91,7 @@ class TestNetMonLogger(unittest.TestCase):
 
     logging_name = 'test_net_mon_logger'
 
-    format_str ="%(message)s"
+    format_str = "%(message)s"
     handler = logging.FileHandler(filename=log_fp)
     handler.setLevel(logging.DEBUG)
     handler.setFormatter(logging.Formatter(format_str))
@@ -92,7 +112,8 @@ class TestNetMonLogger(unittest.TestCase):
 
     def test_net_mon_logger(self):
         """Test a net monitor, see that it generates output."""
-        observer = NetworkMonitorLogger(self.net_monitor, logging_name=self.logging_name)
+        # observer = NetworkMonitorLogger(self.net_monitor, logging_name=self.logging_name)
+        NetworkMonitorLogger(self.net_monitor, logging_name=self.logging_name)
         self.net_monitor.start()
         time.sleep(self.period*2)
         self.net_monitor.stop()
@@ -108,3 +129,29 @@ class TestNetMonLogger(unittest.TestCase):
             self.assertEqual(parts[0].strip(), 'Network Name')
             self.assertEqual(parts[2].strip(), 'Status')
             self.assertEqual(parts[4].strip(), 'Signal Strength')
+
+
+class TestIPMonitor(unittest.TestCase):
+    """Test class to test the ip monitor."""
+
+    def test_localhost_ip_monitor(self):
+        """Test a ip monitor with localhost."""
+        ip_monitor = generate_ip_monitor(period=1.0, address='127.0.0.1')
+        observer = IPMonitorObserver()
+        ip_monitor.attach(observer)
+        ip_monitor.start()
+        time.sleep(2.0)
+        self.assertEqual(observer.reachable, True)
+        self.assertLess(observer.latency, 10)
+        ip_monitor.stop()
+
+    def test_wrong_ip_monitor(self):
+        """Test a ip monitor with non existant ip."""
+        ip_monitor = generate_ip_monitor(period=1.0, address='192.168.78.87')
+        observer = IPMonitorObserver()
+        ip_monitor.attach(observer)
+        ip_monitor.start()
+        time.sleep(2.0)
+        self.assertEqual(observer.reachable, False)
+        self.assertEqual(observer.latency, None)
+        ip_monitor.stop()

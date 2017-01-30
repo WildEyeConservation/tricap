@@ -8,6 +8,7 @@ from flask import Blueprint, render_template, send_from_directory, current_app, 
 from flask import send_file, redirect, url_for
 
 from app import tricap_manager, altimeter, session_logger, talkbox, log_list, stop_all_threads
+from app import rootlogger
 
 from support.configure import TricapConfig
 
@@ -33,6 +34,8 @@ def index_slash():
 @home_bp.route('/index', methods=['GET'])
 def index():
     """The Main GUI interface page."""
+    rootlogger.info('Home Page Requested.')
+
     config = TricapConfig()
     js_data = {
         'refresh_rate': config.get('refresh_rate', TricapConfig.WEB_SECTION_HEADER),
@@ -49,15 +52,6 @@ def index():
     return render_template('/home/index.html', num_cams=tricap_manager.get_num_cams(),
                            cams_start_display=cams_start_display,
                            alti_start_display=alti_start_display, python_data=js_data)
-
-
-# def reset_device_objects():
-#     """Reset all the handlers that can be reset."""
-#     config = TricapConfig()
-#     misc_settings = config.get_section_dict(TricapConfig.MISC_SECTION_HEADER)
-#     cam_settings = config.get_section_dict(TricapConfig.CAMERA_SECTION_HEADER)
-#     tricap_manager.reset(misc_settings, cam_settings)
-#     altimeter.reset(config.get_section_dict(TricapConfig.ALTI_SECTION_HEADER))
 
 
 def _determine_overall_cam_state_colour():
@@ -199,15 +193,18 @@ def handle_button_click():
     button_code = int(request.args.get('buttonCode'))
 
     if button_code == BUTTON_CODE.START:
+        rootlogger.info('User requested capture to start.')
         session_logger.create_new_session()
         tricap_manager.start_capturing()
         altimeter.start_measuring()
         return jsonify(capture_started=_has_capture_started())
     elif button_code == BUTTON_CODE.STOP:
+        rootlogger.info('User requested capture to stop.')
         tricap_manager.stop_capturing()
         altimeter.stop_measuring()
         return jsonify(capture_started=_has_capture_started())
     elif button_code == BUTTON_CODE.RESET:
+        rootlogger.info('User requested server reset.')
         # reset_device_objects()
         reset()
     elif button_code == BUTTON_CODE.STARTSTOP:
@@ -215,9 +212,11 @@ def handle_button_click():
         started = _has_capture_started()
         if started:
             # we want to stop
+            rootlogger.info('User requested capture to stop.')
             tricap_manager.stop_capturing()
             altimeter.stop_measuring()
         else:  # we want to start
+            rootlogger.info('User requested capture to start.')
             session_logger.create_new_session()
             config = TricapConfig()
             if (config.get('cams_required', TricapConfig.WEB_SECTION_HEADER) != 'no'):

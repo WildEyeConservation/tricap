@@ -195,10 +195,12 @@ class TrusenseAltimeter(Subject):
                                              args=(self._kill_pill,), daemon=True)
         self._read_thread.start()
         self.state = ALTIMETER_STATE.MEASURING
+        self._logger.debug("Alti - started measuring.")
 
     def stop_measuring(self):
         # Not using asserts, need to have this not fall over when testing the GUI
         if self._read_thread and self._read_thread.is_alive():
             self._kill_pill.set()
             self._read_thread.join()
+            self._logger.debug("Alti - stopped measuring.")
         self.state = ALTIMETER_STATE.CONNECTED

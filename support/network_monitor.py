@@ -101,8 +101,21 @@ class LinuxNetworkMonitor(NetworkMonitor):
 
     def update_status(self):
         """Update the status using linux terminal commands."""
-        pass
+        self.network_name = None
 
+        with os.popen('iwgetid -r') as cmd_output:
+            line = cmd_output.readline()
+            if len(line) > 0:
+                self.network_name = line.strip()
+                
+        if self.network_name is not None:
+            with os.popen('iwconfig wlan0 | grep "Link Quality" ') as cmd_output:
+                ss = cmd_output.readline().split('Signal level')[0].split('=')[1].strip()
+                self.signal_strength = str(float(ss.split('/')[0])/float(ss.split('/')[1])*100)+'%'
+            self.status = 'connected'
+        else:
+            self.status = 'disconnected'
+            self.signal_strength = None
 
 def generate_net_monitor(period=60):
     """Generate the correct NetworkMonitor based on os."""

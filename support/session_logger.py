@@ -118,7 +118,7 @@ class SessionLogger:
         shutil.copyfile(CONFIG_FP, os.path.join(self._session_folder, 'initial.cfg'))
 
         # copy the root logger file, and create a new session_server.log
-        root_log = os.path.join(SERVER_LOG_DIR, 'tricap_server.log')
+        root_log = os.path.join(SERVER_LOG_DIR, 'tricap_master.log')
         if os.path.isfile(root_log):
             # Don't care if it overwrites any existing pre-session_server log, it will contain same
             #  info anyway

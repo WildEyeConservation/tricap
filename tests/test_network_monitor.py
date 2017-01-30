@@ -38,7 +38,7 @@ class TestNetMonitor(unittest.TestCase):
 
     def setUp(self):
         """setUp."""
-        self.period = 1
+        self.period = 0.25
         self.net_monitor = generate_net_monitor(period=self.period)
 
     def tearDown(self):

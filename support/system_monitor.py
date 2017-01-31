@@ -113,16 +113,16 @@ class LinuxCPUUsageMonitor(SystemMonitor):
         if period < 2:
             period = 2
 
-        super(WindowsCPUUsageMonitor, self).__init__(period)
+        super(LinuxCPUUsageMonitor, self).__init__(period)
 
         self.type_id = 'Linux CPU'
         self.unit = '%'
 
     def monitor_step(self):
         """Update the value with the percentage of CPU used."""
-        with os.popen('top -bn1 | grep Cpu(s)') as cmd_output:
+        with os.popen('top -bn1 | grep Cpu') as cmd_output:
             line = cmd_output.readline()
-            parts = [part for part in line.split(' ') if part != ' ']
+            parts = [part for part in line.split(' ') if part != '']
             # adding together the user and the kernel space cpu stats
             self.value = float(parts[1])+float(parts[3])
 
@@ -138,7 +138,7 @@ class LinuxDiskUsageMonitor(SystemMonitor):
 
     def monitor_step(self):
         """Update the value with the available space in MB on the root."""
-        with os.popen('df  %s' % self.disk_fp) as cmd_output:
+        with os.popen('df | grep root') as cmd_output:
             lines = cmd_output.readlines()
             parts = lines[0].split(' ')
             parts = [part for part in parts if part != '']
@@ -158,7 +158,14 @@ def generate_system_monitor(period: float, type_id: str, add_arg: str = None):
         else:
             raise UnkownSysMonTypeID
     elif os.name == 'posix':
-        pass
+        if type_id == 'RAM':
+            sys_mon = LinuxFreeRAMMonitor(period)
+        elif type_id == 'CPU':
+            sys_mon = LinuxCPUUsageMonitor(period)
+        elif type_id == 'Disk':
+            sys_mon = LinuxDiskUsageMonitor(period)
+        else:
+            raise UnknownSysMonTypeID
     else:
         raise UnknownOperatingSystem
 

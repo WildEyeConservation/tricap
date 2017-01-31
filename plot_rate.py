@@ -6,6 +6,13 @@ import matplotlib.pyplot as plt
 
 from datetime import datetime
 
+
+class PlotRateException(Exception):
+    """An exception for if something goes wrong with plotting the rate."""
+
+    pass
+
+
 CAM_413_STR = '413051000325'
 CAM_023_STR = '023052000180'
 CAM_032_STR = '032024003117'
@@ -73,9 +80,10 @@ def get_target_timestamps(fp: str, target_string: str):
 
 def get_deltas_from_fp(fp: str, target_string: str):
     """Get timestamps from text file with target_string description."""
-    timestamps = get_target_timestamps(rate_fp, target_string)
+    timestamps = get_target_timestamps(fp, target_string)
 
     if len(timestamps) == 0:
+        print("No timestamps obtained from file ", fp)
         raise Exception
 
     # process
@@ -93,33 +101,38 @@ def get_deltas_from_fp(fp: str, target_string: str):
 
 if __name__ == '__main__':
     # setup variables
-    target_cam_string = '413051000325'
+    target_folder = 'C:/Projects/IndlovuCode/tricap/Results/prelim_test3'
+    _, test_name = os.path.split(target_folder)
+    title = 'Inter-frame time differences for %s' % test_name
     target_string = 'before capture \n'
-    # target_string = 'after preview fetch \n'
-    # folder_path = 'C:/Tools/rigtest2'
-    folder_path = 'C:/Tools/rigtest'
-    # folder_path = 'C:/Tools/flighttest1'
-    # folder_path = 'C:/Tools/flighttest3'
-    prefix = 'canon6dcam_'
-    postix = '_outside.txt'
-    # postix = '_rates.txt'
-    # postix = '_flighttest1.txt'
-    old_method = False
+    # prefix = 'canon6dcam_'
+    # postix = '_outside.txt'
+
+    if os.path.isdir(target_folder) is False:
+        print("Error, target folder does not exist.")
+        raise PlotRateException
+
+    capture_fps = []
+    for filename_with_ext in os.listdir(target_folder):
+        filename, ext = os.path.splitext(filename_with_ext)
+        if ext == '.txt' and filename != 'readme':
+            capture_fps.append(os.path.join(target_folder, filename_with_ext))
+
+    if len(capture_fps) == 0:
+        print("Error, no text files found within the target folder")
+        raise PlotRateException
 
     all_deltas = []
     linehandles = []
-    for cam_str in CAM_STRS:
-        rate_fp = os.path.join(folder_path, prefix+cam_str+postix)
-        if old_method:
-            deltas = get_old_delta(rate_fp, target_string)
-        else:
-            deltas = get_deltas_from_fp(rate_fp, target_string)
-        linehandles.append(plt.plot(deltas, label=cam_str, linewidth=2.0)[0])
+    for capture_fp in capture_fps:
+        deltas = get_deltas_from_fp(capture_fp, target_string)
+        _, capture_filename_with_ext = os.path.split(capture_fp)
+        linehandles.append(plt.plot(deltas, label=capture_filename_with_ext, linewidth=2.0)[0])
 
     plt.legend(handles=linehandles, loc=1, fontsize=20)
     plt.ylabel('Time (s)')
     plt.xlabel('Image index')
-    plt.title('Inter-frame time differences')
+    plt.title(title)
 
     ax = plt.gca()
     for item in ([ax.title, ax.xaxis.label, ax.yaxis.label]):

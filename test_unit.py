@@ -8,6 +8,7 @@ from tests.test_configure import TestConfigure
 from tests.test_session_logger import TestSessionLogger
 from tests.test_connection_monitor import TestNetMonitor, TestNetMonLogger, TestIPMonitor
 from tests.test_connection_monitor import TestIPMonLogger
+from tests.test_system_monitor import TestSysMon, TestSysMonLogger
 
 if __name__ == '__main__':
     unittest.main()

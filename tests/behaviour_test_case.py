@@ -7,10 +7,8 @@ in Firefox, because Firefox stops you from loading local files directly (or some
 
 import os
 
-from time import sleep
-
 from flask import url_for
-from flask_testing import TestCase as FlaskTestCase, LiveServerTestCase
+from flask_testing import TestCase as FlaskTestCase
 
 from .tempfile_test_case import TricapTempFilerTestCase
 
@@ -19,7 +17,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as ec
 from selenium.webdriver.common.by import By
 
-from app import app, net_mon
+from app import app
 
 
 class AppTestCase(FlaskTestCase, TricapTempFilerTestCase):

@@ -1,66 +1,11 @@
 """network_monitor - monitors the network, logs the status, through observer patterns."""
 
 import os
-import threading
 import logging
 
-from abc import ABCMeta, abstractmethod
+from abc import ABCMeta
 
-from support.basic import Subject, RepeatingBarrierPasser
-
-
-class UnknownOperatingSystem(Exception):
-    """Exception for when os.name returns an unkown operating system id."""
-
-    pass
-
-
-class PeriodicMonitor(Subject):
-    """A subject that periodically checks something and updates the observers."""
-
-    __metaclass__ = ABCMeta
-
-    def __init__(self, period):
-        """Constructor."""
-        super(PeriodicMonitor, self).__init__()
-
-        self.period = period
-
-        self._stop_event = None
-        self._barrier = None
-        self._period_timer = None
-
-    def __del__(self):
-        """Destructor."""
-        self.stop()
-
-    @abstractmethod
-    def monitor_step(self):
-        """Check up on whatever is monitored."""
-        pass
-
-    def monitor(self):
-        """In a loop, check the network connection."""
-        while True:
-            if self._stop_event.is_set():
-                return
-            self._barrier.wait()
-            self.monitor_step()
-            self.notify()
-
-    def start(self):
-        """Start the network monitoring in separate threads."""
-        self._stop_event = threading.Event()
-        self._barrier = threading.Barrier(2)  # one for the timer, one for the status checking
-        self._period_timer = RepeatingBarrierPasser(self.period,
-                                                    self._stop_event, self._barrier, daemon=True)
-        thread = threading.Thread(target=self.monitor, daemon=True)
-        self._period_timer.start()
-        thread.start()
-
-    def stop(self):
-        """Stop the threads involved in the montoring."""
-        self._stop_event.set()
+from support.basic import PeriodicMonitor, UnknownOperatingSystem
 
 
 class NetworkMonitor(PeriodicMonitor):
@@ -246,5 +191,9 @@ class IPMonitorLogger():
 
     def update(self, ip_monitor):
         """Update method called by net monitor subject."""
-        self.logger.info('IP Address: %s, Reachable: %s, Latency(ms): %f',
-                         ip_monitor.address, ip_monitor.reachable, ip_monitor.latency)
+        if ip_monitor.reachable is False:
+            self.logger.info('IP Address: %s, Reachable: %s', ip_monitor.address,
+                             ip_monitor.reachable)
+        else:
+            self.logger.info('IP Address: %s, Reachable: %s, Latency(ms): %f',
+                             ip_monitor.address, ip_monitor.reachable, ip_monitor.latency)

@@ -148,6 +148,7 @@ class TestIPMonitor(unittest.TestCase):
 
     def test_wrong_ip_monitor(self):
         """Test a ip monitor with non existant ip."""
+        # TODO How do you choose an address that will never be connectable?
         ip_monitor = generate_ip_monitor(period=1.0, address='192.168.78.87')
         observer = IPMonitorObserver()
         ip_monitor.attach(observer)

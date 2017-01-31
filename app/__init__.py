@@ -23,6 +23,8 @@ from support.log_list import LogListAccessor
 from support.connection_monitor import generate_net_monitor, NetworkMonitorLogger
 from support.connection_monitor import generate_ip_monitor, IPMonitorLogger
 
+from support.system_monitor import generate_system_monitor, SystemMonitorLogger
+
 from config import SERVER_LOG_DIR
 
 
@@ -113,12 +115,24 @@ ip_mon_logger = IPMonitorLogger([vpn_mon, internet_mon])
 vpn_mon.start()
 internet_mon.start()
 
+# Setup monitors for system values
+sys_mons = []
+sys_mons.append(generate_system_monitor(period=30, type_id='RAM'))
+sys_mons.append(generate_system_monitor(period=30, type_id='CPU'))
+sys_mons.append(generate_system_monitor(period=30, type_id='Disk'))
+sys_mon_logger = SystemMonitorLogger(sys_mons)
+for sm in sys_mons:
+    sm.start()
+
 
 def stop_all_threads():
     """Helper function for a clean exit."""
     wlan_mon.stop()
     vpn_mon.stop()
     internet_mon.stop()
+
+    for sm in sys_mons:
+        sm.stop()
 
     tricap_manager.stop_capturing()
     altimeter.stop_measuring()

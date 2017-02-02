@@ -61,7 +61,7 @@ class TestSysMon(unittest.TestCase):
         self.assertEqual(type(observer.value), float)
 
     def test_disk_monitor(self):
-        """Test a Disk Usage monitor, see that it generates output."""
+        """Test a Disk Usage monitor, see that it generates output.  """
         observer = SystemMonitorObserver()
         sys_mon = generate_system_monitor(self.period, 'Disk')
         sys_mon.attach(observer)

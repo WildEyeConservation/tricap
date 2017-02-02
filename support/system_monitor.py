@@ -7,7 +7,7 @@ from abc import ABCMeta
 from .basic import PeriodicMonitor, UnknownOperatingSystem
 
 
-class UnkownSysMonTypeID(Exception):
+class UnknownSysMonTypeID(Exception):
     """Exception for when an unknown type id is used for the system monitor generator."""
 
     pass
@@ -146,6 +146,33 @@ class LinuxDiskUsageMonitor(SystemMonitor):
             self.value = float(parts[3])/1000.0
 
 
+class LinuxDiskIOMonitor(SystemMonitor):
+    """Monitor how much time is spent in IO, using /proc/diskstat in Linux."""
+
+    def __init__(self, period):
+        """Constructor."""
+        super(LinuxDiskIOMonitor, self).__init__(period)
+
+        self.type_id = 'Linux IO'
+        self._prev_val = None
+
+    def monitor_step(self):
+        """Update the value using /proc/diskstat."""
+        with os.popen('cat /proc/diskstats | grep "mmcblk0 "') as cmd_output:
+            lines = cmd_output.readlines()
+            if len(lines) == 0:
+                self.value = -1
+            else:
+                parts = lines[0].split(' ')
+                val = int(parts[-1].strip())
+                if self._prev_val is None:
+                    self.value = 0
+                else:
+                    self.value = val-self._prev_val
+
+                self._prev_val = val
+
+
 def generate_system_monitor(period: float, type_id: str, add_arg: str = None):
     """Generate the appropriate system monitor based on OS type and the type asked for."""
     sys_mon = None
@@ -156,8 +183,10 @@ def generate_system_monitor(period: float, type_id: str, add_arg: str = None):
             sys_mon = WindowsCPUUsageMonitor(period)
         elif type_id == 'Disk':
             sys_mon = WindowsDiskUsageMonitor(period, add_arg)
+        elif type_id == 'IO':
+            sys_mon = None
         else:
-            raise UnkownSysMonTypeID
+            raise UnknownSysMonTypeID
     elif os.name == 'posix':
         if type_id == 'RAM':
             sys_mon = LinuxFreeRAMMonitor(period)
@@ -165,6 +194,8 @@ def generate_system_monitor(period: float, type_id: str, add_arg: str = None):
             sys_mon = LinuxCPUUsageMonitor(period)
         elif type_id == 'Disk':
             sys_mon = LinuxDiskUsageMonitor(period)
+        elif type_id == 'IO':
+            sys_mon = LinuxDiskIOMonitor(period)
         else:
             raise UnknownSysMonTypeID
     else:
@@ -184,7 +215,8 @@ class SystemMonitorLogger():
             system_monitors = [system_monitors]
 
         for sys_mon in system_monitors:
-            sys_mon.attach(self)
+            if sys_mon is not None:
+                sys_mon.attach(self)
 
     def update(self, sys_mon):
         """Update method called by net monitor subject."""

@@ -158,6 +158,7 @@ class LinuxIPMonitor(IPMonitor):
                 self.latency = None
             else:
                 self.reachable = True
+                # TODO Don't let a fallover make you lose it
                 self.latency = float(lines[5].split('=')[1].split('/')[1].strip())
 
 

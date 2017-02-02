@@ -120,9 +120,11 @@ sys_mons = []
 sys_mons.append(generate_system_monitor(period=3, type_id='RAM'))
 sys_mons.append(generate_system_monitor(period=3, type_id='CPU'))
 sys_mons.append(generate_system_monitor(period=3, type_id='Disk'))
+sys_mons.append(generate_system_monitor(period=1, type_id='IO'))
 sys_mon_logger = SystemMonitorLogger(sys_mons)
 for sm in sys_mons:
-    sm.start()
+    if sm is not None:
+        sm.start()
 
 
 def stop_all_threads():
@@ -132,7 +134,8 @@ def stop_all_threads():
     internet_mon.stop()
 
     for sm in sys_mons:
-        sm.stop()
+        if sm is not None:
+            sm.stop()
 
     tricap_manager.stop_capturing()
     altimeter.stop_measuring()

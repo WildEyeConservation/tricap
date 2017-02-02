@@ -1,15 +1,14 @@
 """Plot some system monitor related value from a log file."""
 
 import os
+import sys
 from datetime import datetime
 
 import matplotlib.pyplot as plt
 
-if __name__ == '__main__':
-    target_fp = 'C:/Projects/IndlovuCode/tricap/Results/prelim_test1/tricap_master.log'
-    type_id = 'Linux Disk'
-    title = 'Linux Disk Usage'
 
+def get_sys_vals_and_timestamps(target_fp, type_id):
+    """Get the values and timestamps for the type_id sys monitor from target folder."""
     if os.path.isfile(target_fp) is False:
         print('target fp is not found : ', target_fp)
         raise Exception
@@ -26,15 +25,29 @@ if __name__ == '__main__':
                     values.append(float(more_parts[-1].strip()))
                     times.append(datetime.strptime(parts[0].strip(), '%Y-%m-%d %H:%M:%S,%f'))
 
-    times_vals = zip(times, values)
-    for tv in times_vals:
-        print(tv)
+    return values, times
+
+
+if __name__ == '__main__':
+    if len(sys.argv) == 3:
+        target_fp = os.path.join('C:/Projects/IndlovuCode/tricap/Results', sys.argv[1],
+                                 'tricap_master.log')
+        type_id = sys.argv[2]
+        sys.argv.pop()
+        sys.argv.pop()
+    else:
+        type_id = 'Linux CPU'
+        target_fp = 'C:/Projects/IndlovuCode/tricap/Results/prelim_test5/tricap_master.log'
+
+    title = type_id
+
+    values, times = get_sys_vals_and_timestamps(target_fp=target_fp, type_id=type_id)
 
     plt.plot(times, values, label=type_id, linewidth=2.0)
     plt.gcf().autofmt_xdate()
-    plt.ylabel('Sample')
-    plt.xlabel('Disk Space Free')
-    plt.title('Disk Space Free')
+    plt.ylabel('Value')
+    plt.xlabel('Timestamp')
+    plt.title(title)
 
     ax = plt.gca()
     for item in ([ax.title, ax.xaxis.label, ax.yaxis.label]):

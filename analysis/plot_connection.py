@@ -1,15 +1,17 @@
 """Plot some connection monitor related value from a log file."""
 
 import os
+import sys
 from datetime import datetime
 
 import matplotlib.pyplot as plt
 
-if __name__ == '__main__':
-    target_fp = 'C:/Projects/IndlovuCode/tricap/Results/prelim_test2/tricap_master.log'
-    address = '8.8.8.8'
-    title = 'Latency to %s' % address
 
+def get_connection_latencies_and_timestamps(target_fp, address):
+    """Get the latencies and timestamps for the address connection monitor from target folder.
+
+    Breaks in connection (i.e. unreachable) are given as 1000.
+    """
     if os.path.isfile(target_fp) is False:
         print('target fp is not found : ', target_fp)
         raise Exception
@@ -24,15 +26,29 @@ if __name__ == '__main__':
                 more_parts = parts[-1].replace(',', ':').split(':')
                 if more_parts[1].strip() == address:
                     if more_parts[3].strip() == 'False':
-                        values.append(-1.0)
+                        values.append(1000.0)
                     else:
                         values.append(float(more_parts[-1].strip()))
 
                     times.append(datetime.strptime(parts[0].strip(), '%Y-%m-%d %H:%M:%S,%f'))
 
-    times_vals = zip(times, values)
-    for tv in times_vals:
-        print(tv)
+    return values, times
+
+
+if __name__ == '__main__':
+    if len(sys.argv) == 3:
+        target_fp = os.path.join('C:/Projects/IndlovuCode/tricap/Results', sys.argv[1],
+                                 'tricap_master.log')
+        address = sys.argv[2]
+        sys.argv.pop()
+        sys.argv.pop()
+    else:
+        address = '8.8.8.8'
+        target_fp = 'C:/Projects/IndlovuCode/tricap/Results/prelim_test5/tricap_master.log'
+
+    title = 'Latency to %s' % address
+
+    values, times = get_connection_latencies_and_timestamps(target_fp=target_fp, address=address)
 
     plt.plot(times, values, label=address, linewidth=2.0)
     plt.gcf().autofmt_xdate()

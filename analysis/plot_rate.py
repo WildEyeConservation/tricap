@@ -1,6 +1,7 @@
 """Script to generate graphs on capture rates."""
 
 import os
+import sys
 
 import matplotlib.pyplot as plt
 
@@ -11,13 +12,6 @@ class PlotRateException(Exception):
     """An exception for if something goes wrong with plotting the rate."""
 
     pass
-
-
-CAM_413_STR = '413051000325'
-CAM_023_STR = '023052000180'
-CAM_032_STR = '032024003117'
-
-CAM_STRS = [CAM_413_STR, CAM_023_STR, CAM_032_STR]
 
 
 def get_old_ts(fp: str, target_string: str):
@@ -42,6 +36,7 @@ def get_old_delta(fp: str, target_string: str):
     above_count = 0
     for index in range(1, len(timestamps)):
         if (timestamps[index] - timestamps[index-1]).total_seconds() > 2.1:
+            print('Event at ', timestamps[index])
             above_count += 1
         deltas.append((timestamps[index] - timestamps[index-1]).total_seconds())
 
@@ -67,7 +62,7 @@ def get_target_timestamps(fp: str, target_string: str):
                 continue
 
             if parts[2] == target_string:
-                timestamps.append(datetime.strptime(parts[0].split(' ')[1], '%H:%M:%S,%f'))
+                timestamps.append(datetime.strptime(parts[0].split(' : ')[0], '%Y-%m-%d %H:%M:%S,%f'))
                 if image_count == 0:
                     image_count = int(parts[1])
                 else:
@@ -92,22 +87,16 @@ def get_deltas_from_fp(fp: str, target_string: str):
     for index in range(1, len(timestamps)):
         if (timestamps[index] - timestamps[index-1]).total_seconds() > 2.1:
             above_count += 1
+            print('Event at ', timestamps[index])
         deltas.append((timestamps[index] - timestamps[index-1]).total_seconds())
 
     print('Above count: %d Above rate: %f' % (above_count, float(above_count)/len(deltas)))
 
-    return deltas
+    return deltas, timestamps[1:]
 
 
-if __name__ == '__main__':
-    # setup variables
-    target_folder = 'C:/Projects/IndlovuCode/tricap/Results/prelim_test3'
-    _, test_name = os.path.split(target_folder)
-    title = 'Inter-frame time differences for %s' % test_name
-    target_string = 'before capture \n'
-    # prefix = 'canon6dcam_'
-    # postix = '_outside.txt'
-
+def get_deltas_and_timestamps(target_folder, target_string):
+    """Get the deltas and the timestamps from the target folder for multiple cam rate files."""
     if os.path.isdir(target_folder) is False:
         print("Error, target folder does not exist.")
         raise PlotRateException
@@ -123,15 +112,40 @@ if __name__ == '__main__':
         raise PlotRateException
 
     all_deltas = []
-    linehandles = []
+    all_ts = []
     for capture_fp in capture_fps:
-        deltas = get_deltas_from_fp(capture_fp, target_string)
-        _, capture_filename_with_ext = os.path.split(capture_fp)
-        linehandles.append(plt.plot(deltas, label=capture_filename_with_ext, linewidth=2.0)[0])
+        deltas, ts = get_deltas_from_fp(capture_fp, target_string)
+        all_deltas.append(deltas)
+        all_ts.append(ts)
 
+    return all_deltas, all_ts
+
+
+if __name__ == '__main__':
+    if len(sys.argv) == 3:
+        target_folder = os.path.join('C:/Projects/IndlovuCode/tricap/Results', sys.argv[1])
+        target_string = sys.argv[2] + ' \n'
+        sys.argv.pop()
+        sys.argv.pop()
+    else:
+        target_string = 'before capture \n'
+        target_folder = 'C:/Projects/IndlovuCode/tricap/Results/prelim_test5'
+
+    # setup variables
+    _, test_name = os.path.split(target_folder)
+    title = 'Inter-frame time differences for %s' % test_name
+
+    all_deltas, all_ts = get_deltas_and_timestamps(target_folder=target_folder,
+                                                   target_string=target_string)
+
+    linehandles = []
+    for index, deltas in enumerate(all_deltas):
+        linehandles.append(plt.plot(all_ts[index], deltas, label=str(index), linewidth=2.0)[0])
+
+    plt.gcf().autofmt_xdate()
     plt.legend(handles=linehandles, loc=1, fontsize=20)
     plt.ylabel('Time (s)')
-    plt.xlabel('Image index')
+    plt.xlabel('Timestamps')
     plt.title(title)
 
     ax = plt.gca()

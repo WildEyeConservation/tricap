@@ -110,8 +110,8 @@ class LinuxCPUUsageMonitor(SystemMonitor):
 
     def __init__(self, period):
         """Constructor, lower limites the period to 2 seconds."""
-        if period < 2:
-            period = 2
+        if period < 5:
+            period = 5
 
         super(LinuxCPUUsageMonitor, self).__init__(period)
 
@@ -120,7 +120,8 @@ class LinuxCPUUsageMonitor(SystemMonitor):
 
     def monitor_step(self):
         """Update the value with the percentage of CPU used."""
-        with os.popen('top -bn1 | grep Cpu') as cmd_output:
+        with os.popen('top -bn2 | grep Cpu') as cmd_output:
+            line = cmd_output.readline()
             line = cmd_output.readline()
             parts = [part for part in line.split(' ') if part != '']
             # adding together the user and the kernel space cpu stats

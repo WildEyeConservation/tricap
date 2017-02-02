@@ -117,9 +117,9 @@ internet_mon.start()
 
 # Setup monitors for system values
 sys_mons = []
-sys_mons.append(generate_system_monitor(period=30, type_id='RAM'))
-sys_mons.append(generate_system_monitor(period=30, type_id='CPU'))
-sys_mons.append(generate_system_monitor(period=30, type_id='Disk'))
+sys_mons.append(generate_system_monitor(period=3, type_id='RAM'))
+sys_mons.append(generate_system_monitor(period=3, type_id='CPU'))
+sys_mons.append(generate_system_monitor(period=3, type_id='Disk'))
 sys_mon_logger = SystemMonitorLogger(sys_mons)
 for sm in sys_mons:
     sm.start()

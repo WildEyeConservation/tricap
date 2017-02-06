@@ -73,9 +73,9 @@ class TestNetMonitor(unittest.TestCase):
         self.net_monitor.attach(observer)
         self.net_monitor.start()
         time.sleep(self.period*2)
-        print('\nTest Network Monitor Output, please check to see if this is as expected.\n')
-        observer.print_info()
-        print('\n')
+        # print('\nTest Network Monitor Output, please check to see if this is as expected.\n')
+        # observer.print_info()
+        # print('\n')
         self.assertNotEqual(observer.status, None)
         if observer.status != 'disconnected':
             self.assertNotEqual(observer.name, None)
@@ -122,9 +122,9 @@ class TestNetMonLogger(unittest.TestCase):
         with open(self.log_fp, 'r') as log_file:
             lines = log_file.readlines()
             self.assertGreater(len(lines), 0)
-            print('\nNet Mon Logger, please verify that output is as expected:')
-            print(lines)
-            print('\n')
+            # print('\nNet Mon Logger, please verify that output is as expected:')
+            # print(lines)
+            # print('\n')
             line = lines[0]
             parts = line.replace(',', ':').split(':')
             self.assertEqual(parts[0].strip(), 'Network Name')

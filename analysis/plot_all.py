@@ -17,7 +17,7 @@ def get_timestamps_from_syslog(target_fp):
         print("target_fp does not exist ", target_fp)
         raise Exception
 
-    timestamps = []
+    times = []
     with open(target_fp, 'r') as log_file:
         lines = log_file.readlines()
         for line in lines:
@@ -36,10 +36,10 @@ if __name__ == '__main__':
     else:
         target_folder = 'C:/Projects/IndlovuCode/tricap/Results/prelim_test5'
 
-    target_fp = os.path.join(target_folder, 'tricap_master.log.2017-02-01')
-    # target_fp = os.path.join(target_folder, 'tricap_master.log')
+    # target_fp = os.path.join(target_folder, 'tricap_master.log.2017-02-01')
+    target_fp = os.path.join(target_folder, 'tricap_master.log')
 
-    fig, axarr = plt.subplots(6, sharex=True)
+    fig, axarr = plt.subplots(7, sharex=True)
 
     # inter frame deltas
     if_all_deltas, if_all_ts = get_deltas_and_timestamps(target_folder=target_folder,
@@ -64,15 +64,19 @@ if __name__ == '__main__':
     axarr[3].plot(times, values)
     axarr[3].set_title('Linux Disk')
 
+    values, times = get_sys_vals_and_timestamps(target_fp=target_fp, type_id='Linux IO')
+    axarr[4].plot(times, values)
+    axarr[4].set_title('Linux IO')
+
     # connection values
     values, times = get_connection_latencies_and_timestamps(target_fp=target_fp, address='8.8.8.8')
-    axarr[4].plot(times, values)
-    axarr[4].set_title('8.8.8.8 Latency')
+    axarr[5].plot(times, values)
+    axarr[5].set_title('8.8.8.8 Latency')
 
     values, times = get_connection_latencies_and_timestamps(target_fp=target_fp,
                                                             address='192.168.88.1')
-    axarr[5].plot(times, values)
-    axarr[5].set_title('192.168.88.1 Latency')
+    axarr[6].plot(times, values)
+    axarr[6].set_title('192.168.88.1 Latency')
 
     # sys log events
     # times = get_timestamps_from_syslog(os.path.join(target_folder, 'syslog'))

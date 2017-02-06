@@ -6,6 +6,7 @@ import os
 
 from enum import IntEnum
 from abc import ABC, abstractmethod
+from support.basic import Subject
 
 
 class CameraException(Exception):
@@ -19,36 +20,21 @@ CamConfigType = IntEnum("CamConfigType",
                          "Button": 7, "Date": 8})
 
 
-class AbstractCamera(ABC):
-    """Abstract base class for all camera objects."""
+class AbstractCamera(Subject):
+    """Abstract base class for all camera objects.
+
+    Inherits from Subject the ability to notify subscribers of whatever you want.
+    """
 
     def __init__(self, address, settings):
         """Constructor, requires address and camera settings dict."""
-        self.rate_fp = 'Does/Not/Exist/Error.txt'
-        self._rate_logger = None
+        super(AbstractCamera, self).__init__()
 
         # TODO This is bad OOP Code, fix this!
         self.calibrate_func = None
         self.calibrate_timing = 0
 
-    def init_rate_file_if_needed(self):
-        """Initialise the rate file, not done during construction to allow path manipulation."""
-        if self._rate_logger is None:
-            format_str = "%(asctime)s : %(message)s "
-            handler = logging.FileHandler(filename=self.rate_fp)
-            handler.setLevel(logging.DEBUG)
-            handler.setFormatter(logging.Formatter(format_str))
-            self._rate_logger = logging.getLogger(self.rate_fp)
-            self._rate_logger.propagate = False  # prevent rate messages from popping up in root log
-            self._rate_logger.addHandler(handler)
-            self._rate_logger.info('Rate Logging Started')
-            fp, filename = os.path.split(self.rate_fp)
-            logging.getLogger().info('Rate logging started for a camera at %s.', filename)
-
-    def record_timestamp_to_rate_file(self, descriptor: str = 'timestamp'):
-        """Record the timestamp to the rate file."""
-        self.init_rate_file_if_needed()
-        self._rate_logger.info('%d : %s' % (self.get_cam_image_count(), descriptor))
+        self.update_message = 'Camera observer update message.'
 
     @abstractmethod
     def is_cam_image_fresh(self):

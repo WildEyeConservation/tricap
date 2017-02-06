@@ -97,8 +97,6 @@ class GPhotoCam(AbstractCamera):
 
         self._setup_camera(settings)
 
-        self.rate_fp = os.path.join(SERVER_LOG_DIR, 'gphotocam_%s_rate.txt' % self._address.replace(':', '_').replace(',', '_'))
-
     def is_cam_image_fresh(self):
         return self._fresh_capture
 
@@ -137,7 +135,8 @@ class GPhotoCam(AbstractCamera):
             success = False
 
             # timing point
-            self.record_timestamp_to_rate_file('before capture')
+            self.update_message = 'before capture'
+            self.notify()
             while not success:
                 try:
                     file_path = self._gp_camera.capture(gp.GP_CAPTURE_IMAGE, GPhotoCam._context)
@@ -146,7 +145,8 @@ class GPhotoCam(AbstractCamera):
                     pass
 
             # Timing point
-            self.record_timestamp_to_rate_file('before preview fetch')
+            self.update_message = 'before preview fetch'
+            self.notify()
             try:
                 camera_file = self._gp_camera.file_get(file_path.folder, file_path.name, gp.GP_FILE_TYPE_PREVIEW,
                                                        GPhotoCam._context)
@@ -154,7 +154,8 @@ class GPhotoCam(AbstractCamera):
                 self._logger.error('Error retrieving preview, is the capturetarget correctly set?')
                 raise
 
-            self.record_timestamp_to_rate_file('after preview fetch')
+            self.update_message = 'after preview fetch'
+            self.notify()
             file_data = camera_file.get_data_and_size()
             # # Make a copy, so that we can release the file_data object
             self.data = memoryview(file_data).tobytes()

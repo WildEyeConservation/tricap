@@ -14,6 +14,7 @@ from flask import Flask
 from sensors.cam_manager import TriCapCamsManager
 from sensors.trusense_altimeter import TrusenseAltimeter
 from sensors.dummy_alti import DummyAlti
+from sensors.camera_logger import cameraLoggingObserver
 
 from support.session_logger import SessionLogger
 from support.configure import TricapConfig
@@ -87,6 +88,16 @@ else:
 
 tricap_manager = TriCapCamsManager(misc_settings, cam_settings, use_dummy_cams)
 tricap_cameras = tricap_manager.get_cameras_as_list()
+camera_loggers = []
+for index, cam in enumerate(tricap_cameras):
+    if use_dummy_cams is True:
+        cam_log_fp = os.path.join(SERVER_LOG_DIR, 'dummycam_%d_rates.txt' % index)
+    else:
+        filename = 'gphotocam_%s_rate.txt' % cam._address.replace(':', '_').replace(',', '_')
+        cam_log_fp = os.path.join(SERVER_LOG_DIR, filename)
+
+    camera_loggers.append(cameraLoggingObserver(log_fp=cam_log_fp, subject_cameras=cam._camera))
+
 image_manager = tricap_manager
 
 session_logger = SessionLogger()
@@ -104,23 +115,23 @@ talkbox = TalkBox(Lock(), 3)
 talkbox.clear()
 
 # Setup monitor and logger for wireless network connection
-wlan_mon = generate_net_monitor(period=30)
+wlan_mon = generate_net_monitor(period=26)
 net_mon_logger = NetworkMonitorLogger(wlan_mon)
 wlan_mon.start()
 
 # Setup monitor and logger for vpn and internet connection
-vpn_mon = generate_ip_monitor('192.168.88.1', period=30)
-internet_mon = generate_ip_monitor('8.8.8.8', period=30)
+vpn_mon = generate_ip_monitor('192.168.88.1', period=27)
+internet_mon = generate_ip_monitor('8.8.8.8', period=32)
 ip_mon_logger = IPMonitorLogger([vpn_mon, internet_mon])
 vpn_mon.start()
 internet_mon.start()
 
 # Setup monitors for system values
 sys_mons = []
-sys_mons.append(generate_system_monitor(period=3, type_id='RAM'))
-sys_mons.append(generate_system_monitor(period=3, type_id='CPU'))
-sys_mons.append(generate_system_monitor(period=3, type_id='Disk'))
-sys_mons.append(generate_system_monitor(period=1, type_id='IO'))
+sys_mons.append(generate_system_monitor(period=28, type_id='RAM'))
+sys_mons.append(generate_system_monitor(period=29, type_id='CPU'))
+sys_mons.append(generate_system_monitor(period=30, type_id='Disk'))
+sys_mons.append(generate_system_monitor(period=31, type_id='IO'))
 sys_mon_logger = SystemMonitorLogger(sys_mons)
 for sm in sys_mons:
     if sm is not None:

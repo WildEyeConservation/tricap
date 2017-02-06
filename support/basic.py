@@ -33,6 +33,26 @@ class Subject(object):
                 observer.update(self)
 
 
+class Observer(object):
+    """Basic Observer Pattern Implementation."""
+
+    __metaclass__ = ABCMeta
+
+    def __init__(self, subjects=None):
+        """Constructor with optional attachment to subjects."""
+        if subjects is not None:
+            if type(subjects) is not list:
+                subjects = [subjects]
+
+            for sub in subjects:
+                sub.attach(self)
+
+    @abstractmethod
+    def update(self, subject):
+        """Update method called by the subject."""
+        pass
+
+
 class RepeatingBarrierPasser(threading.Thread):
     """
     A thread object that passes a threading barrier every x seconds.

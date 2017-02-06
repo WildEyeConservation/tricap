@@ -107,8 +107,6 @@ class DummyCam(AbstractCamera):
         for setting_name, setting_value in settings.items():
             self.config[setting_name] = setting_value
 
-        self.rate_fp = os.path.join(SERVER_LOG_DIR, 'dummycam_%s_rates.txt' % self._address)
-
     @property
     def config(self):
         return self._config
@@ -135,9 +133,11 @@ class DummyCam(AbstractCamera):
             if barrier:
                 barrier.wait()
             self._counter += 1
-            self.record_timestamp_to_rate_file('before capture')
+            self.update_message = 'before capture'
+            self.notify()
             self.data = self._imgs[self._counter % len(self._imgs)]
-            self.record_timestamp_to_rate_file('before preview fetch')
+            self.update_message = 'before preview fetch'
+            self.notify()
             self._fresh_capture = True
             self.state = CAMERA_STATES.INITIALISED
 
@@ -148,7 +148,8 @@ class DummyCam(AbstractCamera):
 
             if not continuous:
                 return
-            self.record_timestamp_to_rate_file('after preview fetch')
+            self.update_message = 'after preview fetch'
+            self.notify()
 
     def get_cam_image_count(self):
         """Get the number of images captured so far."""

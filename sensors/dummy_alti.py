@@ -11,6 +11,7 @@ from config import ALTIMETER_STATE, RET_OK, RET_ERROR
 from functools import partial
 from collections import namedtuple
 from sensors.base_setting import BaseSetting, SettingSpec
+from support.basic import Subject
 
 class MiscSettingConfig:
     dict_keys = {'_settings'}
@@ -37,11 +38,12 @@ class MiscSettingConfig:
     __getitem__ = __getattr__
 
 
-class DummyAlti(object):
+class DummyAlti(Subject):
     """Handles serial communication with the TruSense S100 Laser Altimeter"""
     _logger = logging.getLogger(__name__)
 
     def __init__(self, settings, data_logger, supported_devices={(1659, 8963)}):
+        super().__init__()
         # SETTINGS
         # default values
         self._setting_strings = ['measurement_timeout', 'num_frames_to_avg']
@@ -100,6 +102,7 @@ class DummyAlti(object):
                 if self._measurement < 0:
                     self._mchange_dir = 'up'
 
+            self.notify()
             sleep(0.5)
 
         self.state = ALTIMETER_STATE.CONNECTED

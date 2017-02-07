@@ -55,6 +55,40 @@ def get_timestamps_from_syslog(target_fp):
 
     return vals, times, msgs
 
+def get_timestamps_from_flasklogs(target_fp):
+    """Get timestamps of events from syslog."""
+    if os.path.isfile(target_fp) is False:
+        print("target_fp does not exist ", target_fp)
+        raise Exception
+
+    times = []
+    vals = []
+    msgs = []
+    with open(target_fp, 'r') as log_file:
+        lines = log_file.readlines()
+        for line in lines:
+            parts = line.split(' | _log | ')
+            try:
+                ts = datetime.strptime(parts[0], '%Y-%m-%d %H:%M:%S,%f')
+            except ValueError:
+                continue
+            if len(times) == 0 or ts > times[-1]:
+                ts_before = ts - timedelta(microseconds=1)
+
+                ts_after = ts + timedelta(microseconds=1)
+
+                times.append(ts_before)
+                vals.append(0)
+                msgs.append(line)
+                times.append(ts)
+                vals.append(1)
+                msgs.append(line)
+                times.append(ts_after)
+                vals.append(0)
+                msgs.append(line)
+
+    return vals, times, msgs
+
 
 if __name__ == '__main__':
     if len(sys.argv) == 2:
@@ -107,7 +141,19 @@ if __name__ == '__main__':
     axarr[6].set_title('192.168.88.1 Latency')
 
     # sys log event
-    values, times, syslog_msgs = get_timestamps_from_syslog(os.path.join(target_folder, 'syslog.1'))
+    # values, times, syslog_msgs = get_timestamps_from_syslog(os.path.join(target_folder, 'syslog.1'))
+    #
+    # def on_syslog_pick(event):
+    #     """Syslog event to run."""
+    #     for ind in event.ind:
+    #         print('on syslog :', ind, syslog_msgs[ind])
+    #
+    # plotline = axarr[7].plot(times, values, picker=True)
+    # fig.canvas.mpl_connect('pick_event', on_syslog_pick)
+    # axarr[7].set_title('syslog events')
+
+    # flask log event
+    values, times, syslog_msgs = get_timestamps_from_flasklogs(os.path.join(target_folder, 'tricap_flask.log'))
 
     def on_syslog_pick(event):
         """Syslog event to run."""
@@ -116,7 +162,9 @@ if __name__ == '__main__':
 
     plotline = axarr[7].plot(times, values, picker=True)
     fig.canvas.mpl_connect('pick_event', on_syslog_pick)
-    axarr[7].set_title('syslog events')
+    axarr[7].set_title('flask requests')
+
+    print(len(times))
 
     fig.autofmt_xdate()
     plt.show()

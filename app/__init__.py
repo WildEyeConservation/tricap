@@ -108,8 +108,9 @@ if init_config.get('alti_required', TricapConfig.WEB_SECTION_HEADER) == 'dummy':
     altimeter = DummyAlti(alti_settings, session_logger)
 else:
     altimeter = TrusenseAltimeter(alti_settings)
-    alti_observer = AltiMeasurementObserver(session_logger)
-    altimeter.attach(alti_observer)
+    
+alti_observer = AltiMeasurementObserver(session_logger)
+altimeter.attach(alti_observer)
 
 talkbox = TalkBox(Lock(), 3)
 talkbox.clear()

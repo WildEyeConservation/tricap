@@ -2,13 +2,25 @@
 
 import os
 import sys
+import re
 
 import matplotlib.pyplot as plt
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from plot_rate import get_deltas_and_timestamps
 from plot_connection import get_connection_latencies_and_timestamps
 from plot_sys import get_sys_vals_and_timestamps
+
+REJECTION_PATTERNS = ['brcmfmac: brcmf_sdio_hdparse: seq .*: sequence number error, expect']
+
+
+def check_if_useful_syslog(message: str):
+    """Use RegEx to reject boring syslog messages."""
+    for pat in REJECTION_PATTERNS:
+        if re.search(pat, message) is not None:
+            return False
+
+    return True
 
 
 def get_timestamps_from_syslog(target_fp):
@@ -18,14 +30,30 @@ def get_timestamps_from_syslog(target_fp):
         raise Exception
 
     times = []
+    vals = []
+    msgs = []
     with open(target_fp, 'r') as log_file:
         lines = log_file.readlines()
         for line in lines:
             parts = line.split(' rpi3-desktop ')
-            ts = datetime.strptime(parts[0].replace("  1", ' 01'), '%b %d %H:%M:%S').replace(year=2017)
-            times.append(ts)
+            if check_if_useful_syslog(parts[1]) is True:
+                ts = datetime.strptime(parts[0].replace("  1", ' 01'), '%b %d %H:%M:%S').replace(year=2017)
+                if ts not in times:
+                    ts_before = ts - timedelta(microseconds=1)
 
-    return times
+                    ts_after = ts + timedelta(microseconds=1)
+
+                    times.append(ts_before)
+                    vals.append(0)
+                    msgs.append(line)
+                    times.append(ts)
+                    vals.append(1)
+                    msgs.append(line)
+                    times.append(ts_after)
+                    vals.append(0)
+                    msgs.append(line)
+
+    return vals, times, msgs
 
 
 if __name__ == '__main__':
@@ -39,7 +67,7 @@ if __name__ == '__main__':
     # target_fp = os.path.join(target_folder, 'tricap_master.log.2017-02-01')
     target_fp = os.path.join(target_folder, 'tricap_master.log')
 
-    fig, axarr = plt.subplots(7, sharex=True)
+    fig, axarr = plt.subplots(8, sharex=True)
 
     # inter frame deltas
     if_all_deltas, if_all_ts = get_deltas_and_timestamps(target_folder=target_folder,
@@ -78,10 +106,17 @@ if __name__ == '__main__':
     axarr[6].plot(times, values)
     axarr[6].set_title('192.168.88.1 Latency')
 
-    # sys log events
-    # times = get_timestamps_from_syslog(os.path.join(target_folder, 'syslog'))
-    # axarr[5].plot(times, [1 for t in times])
-    # axarr[5].set_title('syslog events')
+    # sys log event
+    values, times, syslog_msgs = get_timestamps_from_syslog(os.path.join(target_folder, 'syslog.1'))
+
+    def on_syslog_pick(event):
+        """Syslog event to run."""
+        for ind in event.ind:
+            print('on syslog :', ind, syslog_msgs[ind])
+
+    plotline = axarr[7].plot(times, values, picker=True)
+    fig.canvas.mpl_connect('pick_event', on_syslog_pick)
+    axarr[7].set_title('syslog events')
 
     fig.autofmt_xdate()
     plt.show()

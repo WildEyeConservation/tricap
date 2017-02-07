@@ -40,6 +40,7 @@ class Observer(object):
 
     def __init__(self, subjects=None):
         """Constructor with optional attachment to subjects."""
+        super(Observer, self).__init__()
         if subjects is not None:
             if type(subjects) is not list:
                 subjects = [subjects]
@@ -129,3 +130,55 @@ class PeriodicMonitor(Subject):
     def stop(self):
         """Stop the threads involved in the montoring."""
         self._stop_event.set()
+
+
+class ThreadedLogger(object):
+    """ThreadedLogger is an abstract class to log messages in a separate thread.
+
+    Its left up to the user to implement the mechanism with which the log event is set and the
+    message list is filled.
+    """
+
+    __metaclass__ = ABCMeta
+
+    def __init__(self):
+        """Constructor for ThreadedLogger.
+
+        The user is responsible for starting the thread.
+        """
+        super(ThreadedLogger, self).__init__()
+        self._logger = None  # Up to the user to instantiate the log
+        self._stop_event = threading.Event()
+        self._log_event = threading.Event()
+        self._messages = []
+
+        self.thread = None
+
+    def start_thread(self):
+        """Start the thread, can use function to restart it as well."""
+        if self.thread is not None:
+            self._stop_event.set()
+            self.thread.join()
+            self.thread = None
+            self._stop_event.clear()
+
+        self.thread = threading.Thread(target=self._log_message, daemon=True,
+                                       kwargs={"log_event": self._log_event,
+                                               "stop_event": self._stop_event})
+        self.thread.start()
+
+    def __del__(self):
+        """Destructor."""
+        self._stop_event.set()
+
+    def _log_message(self, log_event: threading.Event, stop_event: threading.Event):
+        """Log message, to be called by threaded function."""
+        while True:
+            if stop_event.is_set():
+                return
+
+            if log_event.wait(1):
+                for message in self._messages:
+                    self._logger.info(message)
+                self._messages.clear()
+                log_event.clear()

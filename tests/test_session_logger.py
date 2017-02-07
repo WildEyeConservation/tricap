@@ -23,10 +23,17 @@ class TestSessionLogger(TempFilerTestCase):
     rootLogger.addHandler(handler)
     rootLogger.setLevel(logging.DEBUG)
 
+    # def tearDown(self):
+    #     """Remove the handlers, release the file."""
+    #     session_logger._remove_handlers()
+    #     super(TestSessionLogger, self).tearDown()
+
     def test_init(self):
         """Test that the session_logger starts up correctly."""
         session_logger = SessionLogger(root_folder=self.tempdir)
         session_logger.create_new_session()
+
+        time.sleep(1)
 
         expected_fp = os.path.join(self.tempdir, time.strftime("%Y_%m_%d"),
                                    time.strftime("%Y_%m_%d_session00"))
@@ -37,23 +44,30 @@ class TestSessionLogger(TempFilerTestCase):
             parts = first_line.split(' | ')
             self.assertEqual(parts[1], 'Session Description : Default Description\n')
 
+        session_logger._remove_handlers()
+
     def test_log(self):
         """Check whether logging happens correctly."""
         session_logger = SessionLogger(root_folder=self.tempdir)
         session_logger.create_new_session()
 
         session_logger.log('TestTestTest')
+        time.sleep(1)
         with open(session_logger._log_fp, 'r') as log_file:
             log_file.readline()  # Ignore first line
             second_line = log_file.readline()
             parts = second_line.split(' | ')
             self.assertEqual(parts[1], 'TestTestTest\n')
 
+        session_logger._remove_handlers()
+
     def test_bad_root_folder(self):
         """Test what happens when you cause the session_logger to not setup properly."""
         session_logger = SessionLogger(root_folder='I/Do/Not/Exist')
         session_logger.create_new_session()
         self.assertEqual(session_logger.is_ready(), False)
+
+        session_logger._remove_handlers()
 
     def test_create_two_sessions(self):
         """Check that the folder names created are correct for subsequent sessions."""
@@ -65,11 +79,14 @@ class TestSessionLogger(TempFilerTestCase):
                                    time.strftime("%Y_%m_%d_session01"))
         self.assertEqual(session_logger._session_folder, expected_fp)
 
+        session_logger._remove_handlers()
+
     def test_get_set_session_descriptor(self):
         """Test that the session_descriptor can be set and gotten correctly."""
         session_logger = SessionLogger(root_folder=self.tempdir)
         session_logger.set_description('Test Description')
         session_logger.create_new_session()
+        time.sleep(1)
 
         with open(session_logger._log_fp, 'r') as log_file:
             first_line = log_file.readline()
@@ -79,13 +96,20 @@ class TestSessionLogger(TempFilerTestCase):
         self.assertEqual(session_logger.get_description(), 'Test Description')
 
         session_logger.create_new_session('Another Test Description')
+        time.sleep(1)
         with open(session_logger._log_fp, 'r') as log_file:
             first_line = log_file.readline()
             parts = first_line.split(' | ')
             self.assertEqual(parts[1], 'Session Description : Another Test Description\n')
 
+        session_logger._remove_handlers()
+
     def test_folder_prepping(self):
         """Check that the created folder contains all that we want it to."""
+        if os.path.isfile(os.path.join(SERVER_LOG_DIR, 'tricap_master.log')) is False:
+            with open(os.path.join(SERVER_LOG_DIR, 'tricap_master.log'), 'w') as tfile:
+                tfile.write('test')
+
         session_logger = SessionLogger(root_folder=self.tempdir)
         session_logger.create_new_session()
 
@@ -96,3 +120,5 @@ class TestSessionLogger(TempFilerTestCase):
 
         self.assertEqual('pre_session_server.log' in file_folder_names, True)
         self.assertEqual('session_server.log' in file_folder_names, True)
+
+        session_logger._remove_handlers()

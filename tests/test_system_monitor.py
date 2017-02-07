@@ -107,7 +107,7 @@ class TestSysMonLogger(unittest.TestCase):
         for sys_mon in sys_mons:
             sys_mon.start()
 
-        time.sleep(self.period*2)
+        time.sleep(sys_mons[1].period*2)
 
         for sys_mon in sys_mons:
             sys_mon.stop()
@@ -115,17 +115,24 @@ class TestSysMonLogger(unittest.TestCase):
         with open(self.log_fp, 'r') as log_file:
             lines = log_file.readlines()
             self.assertGreater(len(lines), 0)
-            line = lines[0]
-            parts = line.replace(',', ':').split(':')
-            self.assertEqual(parts[0].strip(), 'Sys Mon')
+
+            got_ram = False
+            got_cpu = False
+
             if os.name == 'nt':
-                self.assertEqual(parts[1].strip(), 'Windows RAM')
+                ram_str = 'Windows RAM'
+                cpu_str = 'Windows CPU'
             elif os.name == 'posix':
-                self.assertEqual(parts[1].strip(), 'Linux RAM')
-            line = lines[1]
-            parts = line.replace(',', ':').split(':')
-            self.assertEqual(parts[0].strip(), 'Sys Mon')
-            if os.name == 'nt':
-                self.assertEqual(parts[1].strip(), 'Windows CPU')
-            elif os.name == 'posix':
-                self.assertEqual(parts[1].strip(), 'Linux CPU')
+                ram_str = 'Linux RAM'
+                cpu_str = 'Linux CPU'
+
+            for line in lines:
+                parts = line.replace(',', ':').split(':')
+                self.assertEqual(parts[0].strip(), 'Sys Mon')
+                if parts[1].strip() == ram_str:
+                    got_ram = True
+                elif parts[1].strip() == cpu_str:
+                    got_cpu = True
+
+            self.assertEqual(got_ram, True)
+            self.assertEqual(got_cpu, True)

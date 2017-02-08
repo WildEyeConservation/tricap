@@ -126,8 +126,6 @@ def _receive_talkbox_msg():
 @home_bp.route('/_submit_session_description')
 def _receive_session_description():
     description = request.args.get('sessionDescription', type=str)
-    print('new session des')
-    print(description)
     session_logger.set_description(description)
     return jsonify()
 

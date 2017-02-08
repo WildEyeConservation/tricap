@@ -157,18 +157,7 @@ var buttonClick = function(buttonCode){
         buttonCode === tricap.BUTTON_CODES.STARTSTOP){
         // If we are starting a new session, get a new description
         if ($('[name="btn_startstop"]').html() === 'Start'){
-            $('#btn_modal_session_description_submit').on('click', function(event){
-                $.getJSON($SCRIPT_ROOT + '/_submit_session_description',
-                          {sessionDescription: $('#input_modal_session_description').val()},
-                          function(){
-                              $.getJSON($SCRIPT_ROOT + '/_button_click', {buttonCode: buttonCode },
-                                        startStopFollowUp);
-                          }
-                    );
-                return true;
-            });
             $('#input_modal_session_description').val(defaultSessionDescription)
-            $('#input_modal_session_description').focus();
             $('#modal_session_description').modal();
         } else {
             $.getJSON($SCRIPT_ROOT + '/_button_click', {buttonCode: buttonCode }, startStopFollowUp);
@@ -389,6 +378,23 @@ $(function(){
     // Set the specific button functions
     // $("#btn_startstop").on('click', function(event){buttonClick(tricap.BUTTON_CODES.STARTSTOP);});
     $('[name="btn_startstop"]').on('click', function(event){buttonClick(tricap.BUTTON_CODES.STARTSTOP);});
+
+    //modal submit button click code
+    $('#btn_modal_session_description_submit').on('click', function(event){
+        $.getJSON($SCRIPT_ROOT + '/_submit_session_description',
+                  {sessionDescription: $('#input_modal_session_description').val()},
+                  function(){
+                      $.getJSON($SCRIPT_ROOT + '/_button_click', {buttonCode: tricap.BUTTON_CODES.STARTSTOP },
+                                startStopFollowUp);
+                  }
+            );
+        return true;
+    });
+
+    //When modal appears, make the focus go to the input
+    $('#modal_session_description').on('shown.bs.modal', function () {
+        $('#input_modal_session_description').focus();
+    });
 
     $('#a_test').attr('href', '#');
     $("#a_test").click(function(event){buttonClick(tricap.BUTTON_CODES.TEST); return true;});

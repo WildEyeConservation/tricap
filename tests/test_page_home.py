@@ -11,7 +11,7 @@ from selenium.webdriver.common.by import By
 
 import json
 
-from app import app, views, tricap_manager, altimeter, talkbox
+from app import app, views, tricap_manager, altimeter, talkbox, session_logger
 
 import unittest
 
@@ -150,7 +150,6 @@ class TestBehaviourHome(BehaviourTestCase):
 
     def test_no_server_response(self):
         """Test that the home page shows an error message when the server does not respond."""
-
         # Make it so that the timeout_period is very short
         triconfig = TricapConfig()
         web_settings = triconfig.get_section_dict(TricapConfig.WEB_SECTION_HEADER)
@@ -168,3 +167,48 @@ class TestBehaviourHome(BehaviourTestCase):
 
             h_main_status = self.driver.find_element_by_id('h_main_status')
             self.assertEqual(h_main_status.get_attribute('innerHTML'), 'No Response From Server')
+
+    def test_request_session_description_on_start(self):
+        """Test that the user is requested to enter a session description on pressing start.
+
+        But not when pressing stop. Also, the text box should be filled with a default description.
+        """
+        new_session_description = 'TEST1'
+
+        triconfig = TricapConfig()
+        misc_settings = triconfig.get_section_dict(TricapConfig.MISC_SECTION_HEADER)
+        default_session_description = misc_settings['session_description']
+
+        with self.client:  # access the web page through a 'client', as if a browser
+            self._open_page('home.index', 'btn_menu')
+
+            # make the modal appear
+            self.driver.find_element_by_css_selector('[name="btn_startstop"]').click()
+
+            # wait for the modal to appear
+            wait = WebDriverWait(self.driver, 5)
+            wait.until(ec.visibility_of_element_located((By.ID, 'modal_session_description')))
+
+            # check if default session description is correct
+            modal_input = self.driver.find_element_by_css_selector('#input_modal_session_description')
+            self.assertEqual(modal_input.get_property('value'), default_session_description)
+
+            # clear input and send own values
+            modal_input.clear()
+            modal_input.send_keys(new_session_description)
+
+            # make the modal go away
+            self.driver.find_element_by_css_selector('#btn_modal_session_description_submit').click()
+
+            # get the session description to actually change
+            self.send_ajax_request('/_submit_session_description', {'sessionDescription': new_session_description})
+
+            # start capture to create the session
+            self.send_ajax_request('/_button_click', {'buttonCode': str(BUTTON_CODE.STARTSTOP.value)})
+            self.assertEqual(session_logger.get_description(), new_session_description)
+            # stop capture
+            self.send_ajax_request('/_button_click', {'buttonCode': str(BUTTON_CODE.STARTSTOP.value)})
+
+            # confirm the modal is not displayed
+            modal = self.driver.find_element_by_css_selector('#modal_session_description')
+            self.assertEqual(modal.is_displayed(), False)

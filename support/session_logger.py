@@ -74,7 +74,6 @@ class SessionLogger(ThreadedLogger):
 
         if description is not None:
             self._description = description
-
         try:
             self._remove_handlers()
             self.start_thread()

@@ -42,7 +42,8 @@ def index():
         'timeout_period': config.get('timeout_period', TricapConfig.WEB_SECTION_HEADER),
         'alti_target': config.get('alti_target', TricapConfig.WEB_SECTION_HEADER),
         'alti_range': config.get('alti_range', TricapConfig.WEB_SECTION_HEADER),
-        'vibrate': config.get('vibrate', TricapConfig.WEB_SECTION_HEADER)
+        'vibrate': config.get('vibrate', TricapConfig.WEB_SECTION_HEADER),
+        'default_session_description': session_logger.get_description()
     }
 
     cams_start_display = config.get('cams_start_display', TricapConfig.WEB_SECTION_HEADER)
@@ -119,6 +120,13 @@ def provide_state_data():
 def _receive_talkbox_msg():
     msg = request.args.get('msg', '', type=str)
     talkbox.add_message(msg)
+    return jsonify()
+
+
+@home_bp.route('/_submit_session_description')
+def _receive_session_description():
+    description = request.args.get('sessionDescription', type=str)
+    session_logger.set_description(description)
     return jsonify()
 
 

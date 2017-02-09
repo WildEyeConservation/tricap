@@ -13,7 +13,8 @@ var stateRefreshRate = {{python_data.refresh_rate}};
 var timeOutPeriod = {{python_data.timeout_period}};
 var altiTarget = {{python_data.alti_target}};
 var altiRange = {{python_data.alti_range}};
-var vibrate = "{{python_data.vibrate}}";;
+var vibrate = "{{python_data.vibrate}}";
+var defaultSessionDescription = "{{python_data.default_session_description}}"
 // Code here will be ignored by JSHint.
 /* jshint ignore:end */
 
@@ -154,7 +155,14 @@ var buttonClick = function(buttonCode){
 
     if (buttonCode === tricap.BUTTON_CODES.START || buttonCode === tricap.BUTTON_CODES.STOP ||
         buttonCode === tricap.BUTTON_CODES.STARTSTOP){
-        $.getJSON($SCRIPT_ROOT + '/_button_click', {buttonCode: buttonCode }, startStopFollowUp);
+        // If we are starting a new session, get a new description
+        if ($('[name="btn_startstop"]').html() === 'Start'){
+            $('#input_modal_session_description').val(defaultSessionDescription)
+            $('#modal_session_description').modal();
+        } else {
+            $.getJSON($SCRIPT_ROOT + '/_button_click', {buttonCode: buttonCode }, startStopFollowUp);
+        }
+
     } else if (buttonCode === tricap.BUTTON_CODES.RESET){
         $.getJSON($SCRIPT_ROOT + '/_button_click', {buttonCode: buttonCode },
                   function(){location.reload(); return false;});
@@ -370,6 +378,24 @@ $(function(){
     // Set the specific button functions
     // $("#btn_startstop").on('click', function(event){buttonClick(tricap.BUTTON_CODES.STARTSTOP);});
     $('[name="btn_startstop"]').on('click', function(event){buttonClick(tricap.BUTTON_CODES.STARTSTOP);});
+
+    //modal submit button click code
+    $('#btn_modal_session_description_submit').on('click', function(event){
+        $.getJSON($SCRIPT_ROOT + '/_submit_session_description',
+                  {sessionDescription: $('#input_modal_session_description').val()},
+                  function(){
+                      $.getJSON($SCRIPT_ROOT + '/_button_click', {buttonCode: tricap.BUTTON_CODES.STARTSTOP },
+                                startStopFollowUp);
+                  }
+            );
+        return true;
+    });
+
+    //When modal appears, make the focus go to the input
+    $('#modal_session_description').on('shown.bs.modal', function () {
+        $('#input_modal_session_description').focus();
+    });
+
     $('#a_test').attr('href', '#');
     $("#a_test").click(function(event){buttonClick(tricap.BUTTON_CODES.TEST); return true;});
     $("#img_cam_left").error(function(event){console.log('Error');});

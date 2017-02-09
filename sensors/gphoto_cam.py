@@ -139,7 +139,10 @@ class GPhotoCam(AbstractCamera):
             self.notify()
             while not success:
                 try:
-                    file_path = self._gp_camera.capture(gp.GP_CAPTURE_IMAGE, GPhotoCam._context)
+                    # file_path = self._gp_camera.capture(gp.GP_CAPTURE_IMAGE, GPhotoCam._context)
+                    self._gp_camera.trigger_capture(GPhotoCam._context)
+                    event = self._gp_camera.wait_for_event(5000, GPhotoCam._context)
+                    print(event)
                     success = True
                 except gp.GPhoto2Error:
                     pass

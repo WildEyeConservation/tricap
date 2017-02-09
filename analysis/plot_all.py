@@ -91,17 +91,29 @@ def get_timestamps_from_flasklogs(target_fp):
 
 
 if __name__ == '__main__':
-    if len(sys.argv) == 2:
+    plot_syslog = False
+    plot_flask = False
+    plot_count = 7
+    target_folder = 'C:/Projects/IndlovuCode/tricap/Results/prelim_test5'
+
+    if len(sys.argv) > 1:
         target_folder = os.path.join('C:/Projects/IndlovuCode/tricap/Results', sys.argv[1])
-        sys.argv.pop()
-        sys.argv.pop()
-    else:
-        target_folder = 'C:/Projects/IndlovuCode/tricap/Results/prelim_test5'
+
+    if len(sys.argv) > 2:
+        if sys.argv[2] == '1':
+            plot_syslog = True
+            plot_count += 1
+
+    if len(sys.argv) > 3:
+        if sys.argv[3] == '1':
+            plot_flask = True
+            plot_count += 1
+
 
     # target_fp = os.path.join(target_folder, 'tricap_master.log.2017-02-01')
     target_fp = os.path.join(target_folder, 'tricap_master.log')
 
-    fig, axarr = plt.subplots(8, sharex=True)
+    fig, axarr = plt.subplots(plot_count, sharex=True)
 
     # inter frame deltas
     if_all_deltas, if_all_ts = get_deltas_and_timestamps(target_folder=target_folder,
@@ -140,31 +152,33 @@ if __name__ == '__main__':
     axarr[6].plot(times, values)
     axarr[6].set_title('192.168.88.1 Latency')
 
-    # sys log event
-    # values, times, syslog_msgs = get_timestamps_from_syslog(os.path.join(target_folder, 'syslog.1'))
-    #
-    # def on_syslog_pick(event):
-    #     """Syslog event to run."""
-    #     for ind in event.ind:
-    #         print('on syslog :', ind, syslog_msgs[ind])
-    #
-    # plotline = axarr[7].plot(times, values, picker=True)
-    # fig.canvas.mpl_connect('pick_event', on_syslog_pick)
-    # axarr[7].set_title('syslog events')
+    axis_index = 6
+    if plot_syslog:
+        values, times, syslog_msgs = get_timestamps_from_syslog(os.path.join(target_folder, 'syslog'))
+
+        def on_syslog_pick(event):
+            """Syslog event to run."""
+            for ind in event.ind:
+                print('on syslog :', ind, syslog_msgs[ind])
+
+        axis_index += 1
+        plotline = axarr[axis_index].plot(times, values, picker=True)
+        fig.canvas.mpl_connect('pick_event', on_syslog_pick)
+        axarr[axis_index].set_title('syslog events')
 
     # flask log event
-    values, times, syslog_msgs = get_timestamps_from_flasklogs(os.path.join(target_folder, 'tricap_flask.log'))
+    if plot_flask:
+        values, times, flask_msgs = get_timestamps_from_flasklogs(os.path.join(target_folder, 'tricap_flask.log'))
 
-    def on_syslog_pick(event):
-        """Syslog event to run."""
-        for ind in event.ind:
-            print('on syslog :', ind, syslog_msgs[ind])
+        def on_flask_pick(event):
+            """Flask event to run."""
+            for ind in event.ind:
+                print('on flasklog :', ind, flask_msgs[ind])
 
-    plotline = axarr[7].plot(times, values, picker=True)
-    fig.canvas.mpl_connect('pick_event', on_syslog_pick)
-    axarr[7].set_title('flask requests')
-
-    print(len(times))
+        axis_index += 1
+        plotline = axarr[axis_index].plot(times, values, picker=True)
+        fig.canvas.mpl_connect('pick_event', on_flask_pick)
+        axarr[axis_index].set_title('flask requests')
 
     fig.autofmt_xdate()
     plt.show()

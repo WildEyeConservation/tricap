@@ -87,24 +87,24 @@ var oldTalkBoxMsgs = [];
 // Then function declarations (i.e. function addTwoNumbers(a, b){ return a+b;};) so that hoisting
 // is obvious
 
-function _get_element_pre(elem_id){
+function _get_element_pre(elem_selector){
     //Check if its an alert (i.e. a div) or a button (i.e. an a)
 
 
     var pre;
-    if ($('#'+elem_id).is('div') === true){
+    if ($(elem_selector).is('div') === true){
         pre='alert-';
-    } else if ($('#'+elem_id).is('a') === true){
+    } else if ($(elem_selector).is('a') === true){
         pre='btn-';
     }
 
     return pre;
 }
 
-function changeStateColour(elem_id, target_colour){
+function changeStateColour(elem_selector, target_colour){
 
-    var elem = $('#'+elem_id);
-    var pre = _get_element_pre(elem_id);
+    var elem = $(elem_selector);
+    var pre = _get_element_pre(elem_selector);
 
     // remove state colour
     elem.removeClass(pre+tricap.GREEN_CLASS+' '+pre+tricap.ORANGE_CLASS+' '+pre+tricap.RED_CLASS);
@@ -119,10 +119,10 @@ function changeStateColour(elem_id, target_colour){
     }
 }
 
-function changeTimeColour(elem_id, target_colour){
+function changeTimeColour(elem_selector, target_colour){
 
-    var elem = $('#'+elem_id);
-    var pre = _get_element_pre(elem_id);
+    var elem = $(elem_selector);
+    var pre = _get_element_pre(elem_selector);
 
     // remove state colour
     elem.removeClass(pre+tricap.BLUE_CLASS+' '+pre+tricap.RED_CLASS+' '+pre+tricap.GREY_CLASS);
@@ -138,14 +138,14 @@ function changeTimeColour(elem_id, target_colour){
 
 function showMainError(msg){
     $('#h_main_status').html(msg);
-    changeStateColour('alt_main_status', 'red');
-    changeStateColour('alt_msgs', 'red');
+    changeStateColour('#alt_main_status', 'red');
+    changeStateColour('#alt_msgs', 'red');
 }
 
 function changeMainStatus(colour, msg) {
     $('#h_main_status').html(msg);
-    changeStateColour('alt_main_status', colour);
-    changeStateColour('alt_msgs', colour);
+    changeStateColour('#alt_main_status', colour);
+    changeStateColour('#alt_msgs', colour);
 }
 
 // Then function expressions (i.e. var a = function(a,b){return a+b;};). Note that the var a is
@@ -196,15 +196,15 @@ var refreshCamImages = function(){
         if (camImgControllers[index].imgId !== camImgControllers[index].lastRequestId){
             var cam_img_url = $SCRIPT_ROOT + '/cam_img'+index+camImgControllers[index].imgId;
             $('#img_cam'+index).attr('src', cam_img_url);
-            changeTimeColour('alt_cam'+index, 'blue');
+            changeTimeColour('#alt_cam'+index, 'blue');
             camImgControllers[index].lastRequestId = camImgControllers[index].imgId;
             camImgControllers[index].oldImgCount = 0;
         } else {
             camImgControllers[index].oldImgCount = camImgControllers[index].oldImgCount + 1;
             if (camImgControllers[index].oldImgCount < imgTooOldCount){
-                changeTimeColour('alt_cam'+index, 'grey');
+                changeTimeColour('#alt_cam'+index, 'grey');
             } else {
-                changeTimeColour('alt_cam'+index, 'red');
+                changeTimeColour('#alt_cam'+index, 'red');
             }
         }
     }
@@ -214,22 +214,22 @@ var refreshCamImages = function(){
 var updateAlti = function(data){
     $('#h_alti').html('Altitude: ' + data.measurement + ' m');
 
-    changeStateColour('alt_alti', data.state_colour);
-    changeStateColour('alt_alti_inner', data.state_colour);
-    changeStateColour('btn_alti', data.state_colour);
+    changeStateColour('#alt_alti', data.state_colour);
+    changeStateColour('#alt_alti_inner', data.state_colour);
+    changeStateColour('[name="btn_alti"]', data.state_colour);
 
     if (data.state_colour === 'red'){
         changeMainStatus('red', 'Altimeter Error');
     }
 
     if (data.measurement < altiTarget-altiRange){
-        changeTimeColour('alt_alti_target', 'red');
+        changeTimeColour('#alt_alti_target', 'red');
         $('#h_alti_target').html('Below target range');
     } else if (data.measurement > altiTarget+altiRange) {
-        changeTimeColour('alt_alti_target', 'red');
+        changeTimeColour('#alt_alti_target', 'red');
         $('#h_alti_target').html('Above target range');
     } else {
-        changeTimeColour('alt_alti_target', 'blue');
+        changeTimeColour('#alt_alti_target', 'blue');
         $('#h_alti_target').html('Within target range');
     }
 
@@ -238,8 +238,8 @@ var updateAlti = function(data){
 
 
 var updateCamState = function(data){
-    changeStateColour('alt_cam_overall', data.overall_cam_state_colour);
-    changeStateColour('btn_cam', data.overall_cam_state_colour);
+    changeStateColour('#alt_cam_overall', data.overall_cam_state_colour);
+    changeStateColour('[name="btn_cam"]', data.overall_cam_state_colour);
 
     for (index = 0; index < camImgControllers.length; index++){
         camImgControllers[index].imgId = data.image_counts[index];
@@ -417,7 +417,7 @@ $(function(){
         return false;
     });
 
-    //replace the link for settings
+    //replace the link for showlog
     $('#a_showlog').removeProp('onclick');
     $('#a_showlog').click(function(e){
         $.getJSON($SCRIPT_ROOT + '/_button_click', {buttonCode: tricap.BUTTON_CODES.STOP},

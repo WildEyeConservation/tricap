@@ -93,7 +93,7 @@ for index, cam in enumerate(tricap_cameras):
     if use_dummy_cams is True:
         cam_log_fp = os.path.join(SERVER_LOG_DIR, 'dummycam_%d_rates.txt' % index)
     else:
-        filename = 'gphotocam_%s_rate.txt' % cam._address.replace(':', '_').replace(',', '_')
+        filename = 'gphotocam_%s_rate.txt' % cam._camera._address.replace(':', '_').replace(',', '_')
         cam_log_fp = os.path.join(SERVER_LOG_DIR, filename)
 
     camera_loggers.append(cameraLoggingObserver(log_fp=cam_log_fp, subject_cameras=cam._camera))

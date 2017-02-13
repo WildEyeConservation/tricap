@@ -148,7 +148,7 @@ class GPhotoCam(AbstractCamera):
                     self._gp_camera.trigger_capture(GPhotoCam._context)
                     event = self._gp_camera.wait_for_event(100, GPhotoCam._context)
                     count = 0
-                    while event[0] != gp.GP_EVENT_FILE_ADDED and count < 1000 and self._image_count % 5 != 0:
+                    while event[0] != gp.GP_EVENT_FILE_ADDED and count < 1000 and self._image_count % 5 == 0:
                         sleep(0.01)
                         event = self._gp_camera.wait_for_event(100, GPhotoCam._context)
                         count += 1

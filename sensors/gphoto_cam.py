@@ -134,49 +134,55 @@ class GPhotoCam(AbstractCamera):
             self.state = CAMERA_STATES.CAPTURING
             if barrier:
                 barrier.wait()
-            success = False
+
+            triggered = False
+            file_path = None
 
             # timing point
             self.update_message = 'before capture'
             self.notify()
-            while not success:
+            while not triggered:
                 try:
                     # file_path = self._gp_camera.capture(gp.GP_CAPTURE_IMAGE, GPhotoCam._context)
                     self._gp_camera.trigger_capture(GPhotoCam._context)
                     event = self._gp_camera.wait_for_event(5000, GPhotoCam._context)
-                    print(event)
                     count = 0
-                    while event[0] == gp.GP_EVENT_UNKNOWN and count < 1000:
+                    while event[0] != gp.GP_EVENT_FILE_ADDED and count < 1000:
                         sleep(0.01)
                         event = self._gp_camera.wait_for_event(5000, GPhotoCam._context)
-                        print(event)
                         count += 1
 
-                    print('Got a known event')
-                    print(event[0])
-                    print(event[1])
-                    success = True
+                    if event[0] == gp.GP_EVENT_FILE_ADDED:
+                        file_path = event[1]
+
+                    triggered = True
                 except gp.GPhoto2Error:
                     pass
 
             # Timing point
             self.update_message = 'before preview fetch'
             self.notify()
-            # try:
-            #     camera_file = self._gp_camera.file_get(file_path.folder, file_path.name, gp.GP_FILE_TYPE_PREVIEW,
-            #                                            GPhotoCam._context)
-            # except gp.GPhoto2Error:
-            #     self._logger.error('Error retrieving preview, is the capturetarget correctly set?')
-            #     raise
+
+            camera_file = None
+            try:
+                if file_path is not None:
+                    camera_file = self._gp_camera.file_get(file_path.folder, file_path.name,
+                                                           gp.GP_FILE_TYPE_PREVIEW,
+                                                           GPhotoCam._context)
+            except gp.GPhoto2Error:
+                self._logger.error('Error retrieving preview, is the capturetarget correctly set?')
+                raise
 
             self.update_message = 'after preview fetch'
             self.notify()
-            # file_data = camera_file.get_data_and_size()
-            # # # Make a copy, so that we can release the file_data object
-            # self.data = memoryview(file_data).tobytes()
-            # self._fresh_capture = True
+            if camera_file is not None:
+                file_data = camera_file.get_data_and_size()
+                # Make a copy, so that we can release the file_data object
+                self.data = memoryview(file_data).tobytes()
+                self._fresh_capture = True
+                del camera_file
+
             self._image_count += 1
-            # del camera_file
             self.state = CAMERA_STATES.INITIALISED
 
             if self.calibrate_func is not None:

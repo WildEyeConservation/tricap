@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 from plot_rate import get_target_timestamps, get_deltas_from_fp
 
 
-def get_section_deltas(capture_fp, target_string1, target_string2, event_limit=2.1):
+def get_section_deltas(capture_fp, target_string1, target_string2, event_limit=2.1, return_ts_id=0):
     """Get the sectional deltas from a rate file."""
     ts1 = get_target_timestamps(capture_fp, target_string1)
     ts2 = get_target_timestamps(capture_fp, target_string2)
@@ -17,7 +17,12 @@ def get_section_deltas(capture_fp, target_string1, target_string2, event_limit=2
         if deltas[-1] > event_limit:
             print('Event at ', ts2[index])
 
-    return deltas, ts2
+    if return_ts_id == 0:
+        ret_ts = ts1
+    else:
+        ret_ts = ts2
+
+    return deltas, ret_ts
 
 
 if __name__ == '__main__':
@@ -42,19 +47,19 @@ if __name__ == '__main__':
         raise Exception
 
     print('before capture <-> before preview fetch')
-    deltas1, ts1 = get_section_deltas(capture_fp, 'before capture \n', 'before preview fetch \n', event_limit=1.5)
+    deltas1, ts1 = get_section_deltas(capture_fp, 'before capture \n', 'before preview fetch \n', event_limit=1.5, return_ts_id = 1)
     print('before preview fetch <-> after preview fetch')
-    deltas2, ts2 = get_section_deltas(capture_fp, 'before preview fetch \n', 'after preview fetch \n', event_limit=0.5)
+    deltas2, ts2 = get_section_deltas(capture_fp, 'before preview fetch \n', 'after preview fetch \n', event_limit=0.5, return_ts_id = 0)
     print('before capture')
     deltas3, ts3 = get_deltas_from_fp(capture_fp, 'before capture \n')
 
     fig, axarr = plt.subplots(3, sharex=True)
 
-    axarr[0].plot(ts1, deltas1, linewidth=2.0)
+    axarr[0].plot(ts1, deltas1, 'o', linewidth=2.0)
     axarr[0].set_title('before capture <-> before preview fetch')
-    axarr[1].plot(ts2, deltas2, linewidth=2.0)
+    axarr[1].plot(ts2, deltas2, 'o', linewidth=2.0)
     axarr[1].set_title('before preview fetch <-> after preview fetch')
-    axarr[2].plot(ts3, deltas3, linewidth=2.0)
+    axarr[2].plot(ts3, deltas3, 'o', linewidth=2.0)
     axarr[2].set_title('inter-frame delta')
     fig.autofmt_xdate()
     plt.show()

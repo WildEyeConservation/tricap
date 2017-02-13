@@ -141,15 +141,16 @@ class GPhotoCam(AbstractCamera):
             # timing point
             self.update_message = 'before capture'
             self.notify()
+            before_capture_ts = datetime.now()
             while not triggered:
                 try:
                     # file_path = self._gp_camera.capture(gp.GP_CAPTURE_IMAGE, GPhotoCam._context)
                     self._gp_camera.trigger_capture(GPhotoCam._context)
-                    event = self._gp_camera.wait_for_event(5000, GPhotoCam._context)
+                    event = self._gp_camera.wait_for_event(100, GPhotoCam._context)
                     count = 0
                     while event[0] != gp.GP_EVENT_FILE_ADDED and count < 1000 and self._image_count % 5 != 0:
                         sleep(0.01)
-                        event = self._gp_camera.wait_for_event(5000, GPhotoCam._context)
+                        event = self._gp_camera.wait_for_event(100, GPhotoCam._context)
                         count += 1
 
                     if event[0] == gp.GP_EVENT_FILE_ADDED:
@@ -158,6 +159,9 @@ class GPhotoCam(AbstractCamera):
                     triggered = True
                 except gp.GPhoto2Error:
                     pass
+
+            if (datetime.now() - before_capture_ts).total_seconds() > 1.5:
+                file_path = None
 
             # Timing point
             self.update_message = 'before preview fetch'

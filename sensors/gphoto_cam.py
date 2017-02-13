@@ -143,6 +143,16 @@ class GPhotoCam(AbstractCamera):
                     self._gp_camera.trigger_capture(GPhotoCam._context)
                     event = self._gp_camera.wait_for_event(5000, GPhotoCam._context)
                     print(event)
+                    count = 0
+                    while event[0] == gp.GP_EVENT_UNKNOWN and count < 1000:
+                        sleep(0.01)
+                        event = self._gp_camera.wait_for_event(5000, GPhotoCam._context)
+                        print(event)
+                        count += 1
+
+                    print('Got a known event')
+                    print(event[0])
+                    print(event[1])
                     success = True
                 except gp.GPhoto2Error:
                     pass
@@ -150,21 +160,21 @@ class GPhotoCam(AbstractCamera):
             # Timing point
             self.update_message = 'before preview fetch'
             self.notify()
-            try:
-                camera_file = self._gp_camera.file_get(file_path.folder, file_path.name, gp.GP_FILE_TYPE_PREVIEW,
-                                                       GPhotoCam._context)
-            except gp.GPhoto2Error:
-                self._logger.error('Error retrieving preview, is the capturetarget correctly set?')
-                raise
+            # try:
+            #     camera_file = self._gp_camera.file_get(file_path.folder, file_path.name, gp.GP_FILE_TYPE_PREVIEW,
+            #                                            GPhotoCam._context)
+            # except gp.GPhoto2Error:
+            #     self._logger.error('Error retrieving preview, is the capturetarget correctly set?')
+            #     raise
 
             self.update_message = 'after preview fetch'
             self.notify()
-            file_data = camera_file.get_data_and_size()
-            # # Make a copy, so that we can release the file_data object
-            self.data = memoryview(file_data).tobytes()
-            self._fresh_capture = True
+            # file_data = camera_file.get_data_and_size()
+            # # # Make a copy, so that we can release the file_data object
+            # self.data = memoryview(file_data).tobytes()
+            # self._fresh_capture = True
             self._image_count += 1
-            del camera_file
+            # del camera_file
             self.state = CAMERA_STATES.INITIALISED
 
             if self.calibrate_func is not None:

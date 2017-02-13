@@ -3,6 +3,8 @@ import logging
 import threading
 import os
 
+from time import sleep
+
 import gphoto2 as gp
 from anytree import Node, PreOrderIter, RenderTree
 from datetime import datetime

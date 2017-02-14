@@ -108,6 +108,9 @@ function changeStateColour(elem_selector, target_colour){
 
     // remove state colour
     elem.removeClass(pre+tricap.GREEN_CLASS+' '+pre+tricap.ORANGE_CLASS+' '+pre+tricap.RED_CLASS);
+    // remove time colour
+    elem.removeClass(pre+tricap.BLUE_CLASS+' '+pre+tricap.RED_CLASS+' '+pre+tricap.GREY_CLASS);
+
 
     // add correct colour
     if (target_colour === 'red'){
@@ -116,6 +119,10 @@ function changeStateColour(elem_selector, target_colour){
         elem.addClass(pre+tricap.GREEN_CLASS);
     } else if (target_colour === 'orange'){
         elem.addClass(pre+tricap.ORANGE_CLASS);
+    } else if (target_colour === 'grey'){
+        elem.addClass(pre+tricap.GREY_CLASS);
+    } else if (target_colour === 'blue'){
+        elem.addClass(pre+tricap.BLUE_CLASS);
     }
 }
 
@@ -125,14 +132,21 @@ function changeTimeColour(elem_selector, target_colour){
     var pre = _get_element_pre(elem_selector);
 
     // remove state colour
+    elem.removeClass(pre+tricap.GREEN_CLASS+' '+pre+tricap.ORANGE_CLASS+' '+pre+tricap.RED_CLASS);
+    // remove time colour
     elem.removeClass(pre+tricap.BLUE_CLASS+' '+pre+tricap.RED_CLASS+' '+pre+tricap.GREY_CLASS);
 
-    if (target_colour === 'grey'){
+    // add correct colour
+    if (target_colour === 'red'){
+        elem.addClass(pre+tricap.RED_CLASS);
+    } else if (target_colour === 'green'){
+        elem.addClass(pre+tricap.GREEN_CLASS);
+    } else if (target_colour === 'orange'){
+        elem.addClass(pre+tricap.ORANGE_CLASS);
+    } else if (target_colour === 'grey'){
         elem.addClass(pre+tricap.GREY_CLASS);
     } else if (target_colour === 'blue'){
         elem.addClass(pre+tricap.BLUE_CLASS);
-    } else if (target_colour === 'red'){
-        elem.addClass(pre+tricap.RED_CLASS);
     }
 }
 
@@ -157,7 +171,7 @@ var buttonClick = function(buttonCode){
         buttonCode === tricap.BUTTON_CODES.STARTSTOP){
         // If we are starting a new session, get a new description
         if ($('[name="btn_startstop"]').html() === 'Start'){
-            $('#input_modal_session_description').val(defaultSessionDescription)
+            $('#input_modal_session_description').val(defaultSessionDescription);
             $('#modal_session_description').modal();
         } else {
             $.getJSON($SCRIPT_ROOT + '/_button_click', {buttonCode: buttonCode }, startStopFollowUp);
@@ -180,32 +194,52 @@ var buttonClick = function(buttonCode){
 
 var startStopFollowUp = function (data) {
     if (data.capture_started === true){
-        camRefreshTimer.runTimer();
-        // $('#btn_startstop').html('Stop');
+        if ($('#con_cam').hasClass('collapse in') === true){
+            //i.e. the container is visible
+            camRefreshTimer.runTimer();
+        } else {
+            //i.e. the container is collapsed, don't request data no one will see.
+            camRefreshTimer.stopTimer();
+        }
         $('[name="btn_startstop"]').html('Stop');
     } else {
         camRefreshTimer.stopTimer();
-        // $('#btn_startstop').html('Start');
         $('[name="btn_startstop"]').html('Start');
     }
     return false;
 };
 
+var getTimeColourForCamImage = function(index){
+    //Determine the correct time colour code to be used for the images from a camera.
+
+    var retColourCode;
+
+    if (camImgControllers[index].imgId !== camImgControllers[index].lastRequestId){
+        //The cam image is new, time colour should be blue
+        camImgControllers[index].lastRequestId = camImgControllers[index].imgId;
+        camImgControllers[index].oldImgCount = 0;
+        retColourCode = 'blue';
+    } else {
+        camImgControllers[index].oldImgCount = camImgControllers[index].oldImgCount + 1;
+        if (camImgControllers[index].oldImgCount < imgTooOldCount){
+            retColourCode = 'grey';
+        } else {
+            retColourCode = 'red';
+        }
+    }
+
+    return retColourCode;
+};
+
 var refreshCamImages = function(){
+    // Function called to force the images to update their paths to new ones.
     for (index = 0; index < camImgControllers.length; index++){
-        if (camImgControllers[index].imgId !== camImgControllers[index].lastRequestId){
+        var timeColourCode = getTimeColourForCamImage(index);
+        changeTimeColour('#alt_cam'+index, timeColourCode);
+
+        if (timeColourCode === 'blue'){
             var cam_img_url = $SCRIPT_ROOT + '/cam_img'+index+camImgControllers[index].imgId;
             $('#img_cam'+index).attr('src', cam_img_url);
-            changeTimeColour('#alt_cam'+index, 'blue');
-            camImgControllers[index].lastRequestId = camImgControllers[index].imgId;
-            camImgControllers[index].oldImgCount = 0;
-        } else {
-            camImgControllers[index].oldImgCount = camImgControllers[index].oldImgCount + 1;
-            if (camImgControllers[index].oldImgCount < imgTooOldCount){
-                changeTimeColour('#alt_cam'+index, 'grey');
-            } else {
-                changeTimeColour('#alt_cam'+index, 'red');
-            }
         }
     }
     return false;
@@ -238,8 +272,18 @@ var updateAlti = function(data){
 
 
 var updateCamState = function(data){
+    //Update the overall status of the camera, but not the images, that happens separately."""
+    if (data.capture_started === true && $('#con_cam').hasClass('collapse in') === false){
+        //need to change the colour based on timing info
+        for (index = 0; index < camImgControllers.length; index++){
+            var timeColourCode = getTimeColourForCamImage(index);
+            changeTimeColour('[name="btn_cam"]', timeColourCode);
+        }
+    } else {
+        changeStateColour('[name="btn_cam"]', data.overall_cam_state_colour);
+    }
+
     changeStateColour('#alt_cam_overall', data.overall_cam_state_colour);
-    changeStateColour('[name="btn_cam"]', data.overall_cam_state_colour);
 
     for (index = 0; index < camImgControllers.length; index++){
         camImgControllers[index].imgId = data.image_counts[index];

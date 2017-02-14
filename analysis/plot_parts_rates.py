@@ -13,6 +13,8 @@ def get_section_deltas(capture_fp, target_string1, target_string2, event_limit=2
 
     deltas = []
     for index in range(len(ts1)):
+        if index >= len(ts2):
+            break
         deltas.append((ts2[index]-ts1[index]).total_seconds())
         if deltas[-1] > event_limit:
             print('Event at ', ts2[index])

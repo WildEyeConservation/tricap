@@ -156,7 +156,6 @@ class SessionLogger(ThreadedLogger):
 
             # pre copying
             # assumme that there is only one handler, which is a fileHandler.
-            print(log_file_handler)
             original_fp = log_file_handler.baseFilename
             _, original_filename_with_ext = os.path.split(original_fp)
             shutil.copyfile(original_fp, os.path.join(self._session_folder, 'pre',
@@ -174,22 +173,6 @@ class SessionLogger(ThreadedLogger):
 
         # update the names tracked with those actually tracked
         self.log_names_tracked = real_log_names_tracked
-
-        # # copy the root logger file, and create a new session_server.log
-        # root_log = os.path.join(SERVER_LOG_DIR, 'tricap_master.log')
-        # if os.path.isfile(root_log):
-        #     # Don't care if it overwrites any existing pre-session_server log, it will contain same
-        #     #  info anyway
-        #     shutil.copyfile(root_log, os.path.join(self._session_folder, 'pre_session_server.log'))
-        #
-        # # create a file handler so that all messages to root log are also sent to the session log
-        # format_str = "%(asctime)s | %(pathname)s:%(lineno)d | %(funcName)s | %(levelname)s | %(message)s "
-        # log_fp = os.path.join(self._session_folder, 'session_server.log')
-        # self._tricap_master_copy_fh = logging.FileHandler(filename=log_fp)
-        # self._tricap_master_copy_fh.setLevel(logging.DEBUG)
-        # self._tricap_master_copy_fh.setFormatter(logging.Formatter(format_str))
-        # rootlogger = logging.getLogger('')
-        # rootlogger.addHandler(self._tricap_master_copy_fh)
 
     def log(self, msg):
         """Log the msg to the session log."""

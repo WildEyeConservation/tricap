@@ -14,14 +14,14 @@ from config import SERVER_LOG_DIR
 class TestSessionLogger(TempFilerTestCase):
     """Log all session_logger module errors to a local file."""
 
-    format_str = "%(asctime)s | %(pathname)s:%(lineno)d | %(funcName)s | %(levelname)s | %(message)s "
-    handler = logging.FileHandler(filename=os.path.join(SERVER_LOG_DIR, 'test_session_logger.log'))
-    handler.setLevel(logging.DEBUG)
-    handler.setFormatter(logging.Formatter(format_str))
-    handler.addFilter(logging.Filter(name='sensors.session_logger'))
-    rootLogger = logging.getLogger('')
-    rootLogger.addHandler(handler)
-    rootLogger.setLevel(logging.DEBUG)
+    # format_str = "%(asctime)s | %(pathname)s:%(lineno)d | %(funcName)s | %(levelname)s | %(message)s "
+    # handler = logging.FileHandler(filename=os.path.join(SERVER_LOG_DIR, 'test_session_logger.log'))
+    # handler.setLevel(logging.DEBUG)
+    # handler.setFormatter(logging.Formatter(format_str))
+    # handler.addFilter(logging.Filter(name='sensors.session_logger'))
+    # rootLogger = logging.getLogger('')
+    # rootLogger.addHandler(handler)
+    # rootLogger.setLevel(logging.DEBUG)
 
     # def tearDown(self):
     #     """Remove the handlers, release the file."""
@@ -106,19 +106,58 @@ class TestSessionLogger(TempFilerTestCase):
 
     def test_folder_prepping(self):
         """Check that the created folder contains all that we want it to."""
-        if os.path.isfile(os.path.join(SERVER_LOG_DIR, 'tricap_master.log')) is False:
-            with open(os.path.join(SERVER_LOG_DIR, 'tricap_master.log'), 'w') as tfile:
-                tfile.write('test')
 
-        session_logger = SessionLogger(root_folder=self.tempdir)
+        # create two new loggers
+        a_handler = logging.FileHandler(filename=os.path.join(SERVER_LOG_DIR, 'a.log'))
+        a_handler.setFormatter(logging.Formatter("%(message)s"))
+        a_logger = logging.getLogger('a')
+        a_logger.addHandler(a_handler)
+
+        b_handler = logging.FileHandler(filename=os.path.join(SERVER_LOG_DIR, 'b.log'))
+        b_handler.setFormatter(logging.Formatter("%(message)s"))
+        b_logger = logging.getLogger('b')
+        b_logger.addHandler(b_handler)
+
+        session_logger = SessionLogger(root_folder=self.tempdir, log_names_to_track=['a', 'b'])
         session_logger.create_new_session()
 
-        file_folder_names = os.listdir(session_logger._session_folder)
-        # config file (initial.cfg)
-        # _, config_filename_with_ext = os.path.split(CONFIG_FP)
-        self.assertEqual('initial.cfg' in file_folder_names, True)
+        a_logger.info('Test A')
+        b_logger.info('Test B')
 
-        self.assertEqual('pre_session_server.log' in file_folder_names, True)
-        self.assertEqual('session_server.log' in file_folder_names, True)
+        pre_file_folder_names = os.listdir(os.path.join(session_logger._session_folder, 'pre'))
+        file_folder_names = os.listdir(session_logger._session_folder)
+
+        self.assertEqual('a.log' in pre_file_folder_names, True)
+        self.assertEqual('b.log' in pre_file_folder_names, True)
+
+        self.assertEqual('initial.cfg' in file_folder_names, True)
+        self.assertEqual('a.log' in file_folder_names, True)
+        self.assertEqual('b.log' in file_folder_names, True)
+
+        with open(os.path.join(session_logger._session_folder, a_handler.stream.name), 'r') as af:
+            self.assertEqual(af.readline(), 'Test A\n')
+
+        with open(os.path.join(session_logger._session_folder, b_handler.stream.name), 'r') as bf:
+            self.assertEqual(bf.readline(), 'Test B\n')
 
         session_logger._remove_handlers()
+
+
+    # def test_folder_prepping(self):
+    #     """Check that the created folder contains all that we want it to."""
+    #     if os.path.isfile(os.path.join(SERVER_LOG_DIR, 'tricap_master.log')) is False:
+    #         with open(os.path.join(SERVER_LOG_DIR, 'tricap_master.log'), 'w') as tfile:
+    #             tfile.write('test')
+    #
+    #     session_logger = SessionLogger(root_folder=self.tempdir)
+    #     session_logger.create_new_session()
+    #
+    #     file_folder_names = os.listdir(session_logger._session_folder)
+    #     # config file (initial.cfg)
+    #     # _, config_filename_with_ext = os.path.split(CONFIG_FP)
+    #     self.assertEqual('initial.cfg' in file_folder_names, True)
+    #
+    #     self.assertEqual('pre_session_server.log' in file_folder_names, True)
+    #     self.assertEqual('session_server.log' in file_folder_names, True)
+    #
+    #     session_logger._remove_handlers()

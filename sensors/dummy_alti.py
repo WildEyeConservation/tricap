@@ -42,7 +42,7 @@ class DummyAlti(Subject):
     """Handles serial communication with the TruSense S100 Laser Altimeter"""
     _logger = logging.getLogger(__name__)
 
-    def __init__(self, settings, data_logger, supported_devices={(1659, 8963)}):
+    def __init__(self, settings, supported_devices={(1659, 8963)}):
         super().__init__()
         # SETTINGS
         # default values
@@ -62,7 +62,6 @@ class DummyAlti(Subject):
 
         self._mchange_dir = 'up'
 
-        self._data_logger = data_logger
         self.state = ALTIMETER_STATE.NOT_CONNECTED
         self._measurement = 0
 

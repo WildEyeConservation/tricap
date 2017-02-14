@@ -100,17 +100,12 @@ for index, cam in enumerate(tricap_cameras):
 
 image_manager = tricap_manager
 
-session_logger = SessionLogger()
-
 alti_settings = init_config.get_section_dict(TricapConfig.ALTI_SECTION_HEADER)
 
 if init_config.get('alti_required', TricapConfig.WEB_SECTION_HEADER) == 'dummy':
-    altimeter = DummyAlti(alti_settings, session_logger)
+    altimeter = DummyAlti(alti_settings)
 else:
     altimeter = TrusenseAltimeter(alti_settings)
-    
-alti_observer = AltiMeasurementObserver(session_logger)
-altimeter.attach(alti_observer)
 
 talkbox = TalkBox(Lock(), 3)
 talkbox.clear()
@@ -137,6 +132,13 @@ sys_mon_logger = SystemMonitorLogger(sys_mons)
 for sm in sys_mons:
     if sm is not None:
         sm.start()
+
+# setup the session logger, hook it up to the alti and all the other logs
+log_names_to_track = [rootlogger.name, app.logger.name]
+log_names_to_track += [cam_log._logger.name for cam_log in camera_loggers]
+session_logger = SessionLogger(log_names_to_track=log_names_to_track)
+alti_observer = AltiMeasurementObserver(session_logger)
+altimeter.attach(alti_observer)
 
 
 def stop_all_threads():

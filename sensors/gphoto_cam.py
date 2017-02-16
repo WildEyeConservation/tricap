@@ -4,6 +4,7 @@ import logging
 import threading
 
 from time import sleep
+from datetime import datetime
 
 import gphoto2 as gp
 from anytree import Node, PreOrderIter, RenderTree
@@ -107,9 +108,11 @@ class GPhotoCam(AbstractCamera):
         self._address = address
 
         self._image_count = 0
+        self._trigger_count = 0
 
         # TODO delete this!
         self._old_image_path = None
+        self._old_trigger_count = 0
 
         self._setup_camera(settings)
 
@@ -167,17 +170,23 @@ class GPhotoCam(AbstractCamera):
                 if self._image_count % self.calibrate_step == 0:
                     self.calibrate_func()
 
-    def _wait_for_image_path(self):
+    def _wait_for_image_path(self, before_capture_ts=None):
         image_path = None
+
         event = self._gp_camera.wait_for_event(100, GPhotoCam._context)
         count = 0
-        while event[0] != gp.GP_EVENT_FILE_ADDED and count < 1000:
-            sleep(0.01)
-            event = self._gp_camera.wait_for_event(100, GPhotoCam._context)
-            count += 1
+
+        if before_capture_ts is None:
+            while event[0] != gp.GP_EVENT_FILE_ADDED and count < 1000:
+                sleep(0.01)
+                event = self._gp_camera.wait_for_event(100, GPhotoCam._context)
+                count += 1
+        else:
+            while event[0] != gp.GP_EVENT_FILE_ADDED and (datetime.now() - before_capture_ts).total_seconds < 1.2:
+                sleep(0.01)
+                event = self._gp_camera.wait_for_event(100, GPhotoCam._context)
 
         if event[0] == gp.GP_EVENT_FILE_ADDED:
-            # file_path = event[1]
             image_path = event[1]
 
         return image_path
@@ -197,14 +206,18 @@ class GPhotoCam(AbstractCamera):
             # timing point
             self.update_message = 'before capture'
             self.notify()
-            # before_capture_ts = datetime.now()
+            before_capture_ts = datetime.now()
             while not triggered:
                 try:
                     # file_path = self._gp_camera.capture(gp.GP_CAPTURE_IMAGE, GPhotoCam._context)
                     self._gp_camera.trigger_capture(GPhotoCam._context)
+                    self._trigger_count += 1
 
-                    if self._old_image_path is None:
-                        self._old_image_path = self._wait_for_image_path()
+                    print('trigger count : ', self._trigger_count)
+                    if self._old_image_path is None or self._trigger_count - self._old_trigger_count >= 10:
+                        print('waiting for path on trigger_count :', self._trigger_count)
+                        self._old_image_path = self._wait_for_image_path(before_capture_ts)
+                        self._old_trigger_count = self._trigger_count
 
                     triggered = True
                 except gp.GPhoto2Error:
@@ -217,16 +230,18 @@ class GPhotoCam(AbstractCamera):
             self.update_message = 'before preview fetch'
             self.notify()
 
-            print('Fetching ', self._old_image_path)
-
-            camera_file = self._fetch_preview_camera_file(self._old_image_path)
+            camera_file = None
+            if self._trigger_count - self._old_trigger_count == 5:
+                print('fetching image %s on trigger count %d' % (self._old_image_path.name, self._trigger_count))
+                camera_file = self._fetch_preview_camera_file(self._old_image_path)
 
             self.update_message = 'after preview fetch'
             self.notify()
 
-            self._update_image(camera_file)
+            if camera_file:
+                self._update_image(camera_file)
+                del camera_file
 
-            del camera_file
             self.state = CAMERA_STATES.INITIALISED
 
             self._run_calibrate_if_needed()

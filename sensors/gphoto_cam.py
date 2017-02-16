@@ -182,7 +182,7 @@ class GPhotoCam(AbstractCamera):
                 event = self._gp_camera.wait_for_event(100, GPhotoCam._context)
                 count += 1
         else:
-            while event[0] != gp.GP_EVENT_FILE_ADDED and (datetime.now() - before_capture_ts).total_seconds < 1.2:
+            while event[0] != gp.GP_EVENT_FILE_ADDED and (datetime.now() - before_capture_ts).total_seconds() < 1.2:
                 sleep(0.01)
                 event = self._gp_camera.wait_for_event(100, GPhotoCam._context)
 

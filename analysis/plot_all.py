@@ -90,6 +90,32 @@ def get_timestamps_from_flasklogs(target_fp):
     return vals, times, msgs
 
 
+def get_wlan_signal_strength(target_fp):
+    """Get the signal strength of the wireless lan connection."""
+    if os.path.isfile(target_fp) is False:
+        print('target fp is not found : ', target_fp)
+        raise Exception
+
+    values = []
+    times = []
+    with open(target_fp, 'r') as log_file:
+        lines = log_file.readlines()
+        for line in lines:
+            parts = line.split('|')
+            if parts[-1][:len(' Network Name')] == ' Network Name':
+                more_parts = parts[-1].replace(',', ':').split(':')
+                # import pdb; pdb.set_trace()
+
+                if more_parts[-1].strip()[-1] == '%':
+                    values.append(float(more_parts[-1].strip()[:-1]))
+                else:
+                    values.append(0)
+
+                times.append(datetime.strptime(parts[0].strip(), '%Y-%m-%d %H:%M:%S,%f'))
+
+    return values, times
+
+
 if __name__ == '__main__':
     plot_syslog = False
     plot_flask = False
@@ -119,11 +145,16 @@ if __name__ == '__main__':
     if_all_deltas, if_all_ts = get_deltas_and_timestamps(target_folder=target_folder,
                                                          target_string='before capture \n')
 
+    print('number of deltas')
     linehandles = []
     for index, deltas in enumerate(if_all_deltas):
         linehandles.append(axarr[0].plot(if_all_ts[index], deltas)[0])
+        print(len(deltas))
 
     axarr[0].set_title('Inter-frame deltas')
+
+
+
 
     # sys vals
     values, times = get_sys_vals_and_timestamps(target_fp=target_fp, type_id='Linux RAM')
@@ -138,10 +169,14 @@ if __name__ == '__main__':
     axarr[3].plot(times, values)
     axarr[3].set_title('Linux Disk')
 
-    values, times = get_sys_vals_and_timestamps(target_fp=target_fp, type_id='Linux IO')
-    axarr[4].plot(times, values)
-    axarr[4].set_title('Linux IO')
+    # values, times = get_sys_vals_and_timestamps(target_fp=target_fp, type_id='Linux IO')
+    # axarr[4].plot(times, values)
+    # axarr[4].set_title('Linux IO')
 
+    # signal strength
+    values, times = get_wlan_signal_strength(target_fp=target_fp)
+    axarr[4].plot(times, values)
+    axarr[4].set_title('Signal Strength')
     # connection values
     values, times = get_connection_latencies_and_timestamps(target_fp=target_fp, address='8.8.8.8')
     axarr[5].plot(times, values)

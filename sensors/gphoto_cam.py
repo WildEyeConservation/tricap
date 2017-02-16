@@ -1,26 +1,29 @@
-# coding=utf-8
+"""Camera driver for a generic camera that can be accessed using the libgphoto2 library."""
+
 import logging
 import threading
-import os
 
 from time import sleep
 
 import gphoto2 as gp
 from anytree import Node, PreOrderIter, RenderTree
-from datetime import datetime
 
-from config import CAMERA_STATES, SERVER_LOG_DIR
+from config import CAMERA_STATES
 from .abstract_cam import AbstractCamera, CamConfigType
 from .base_setting import BaseSetting
 
 
 class GPhotoSetting(BaseSetting):
+    """Setting handler for gphoto cameras."""
+
     def __init__(self, widget):
+        """Constructor."""
         widget.name = widget.get_name()
         super().__init__(widget)
 
     @property
     def choices(self):
+        """Access the choices for a widget as a list."""
         try:
             return [self._widget.get_choice(i) for i in range(self._widget.count_choices())]
         except gp.GPhoto2Error:
@@ -28,19 +31,25 @@ class GPhotoSetting(BaseSetting):
 
 
 class GPhotoConfig:
+    """Configuration handler for gphoto cameras."""
+
     dictkeys = ["_camera", "_context"]
 
     def __init__(self, camera, context):
+        """Constructor."""
         self._camera = camera
         self._context = context
 
     def __repr__(self):
+        """Represent the configuration settings as a tree."""
         return str(RenderTree(self.get_tree()))
 
     def __dir__(self):
+        """dir."""
         return [node.name for node in PreOrderIter(self.get_tree()) if node.is_leaf]
 
     def __setattr__(self, key, value):
+        """Set a configuration setting to a new value."""
         if key in GPhotoConfig.dictkeys:
             self.__dict__[key] = value
         else:
@@ -49,6 +58,7 @@ class GPhotoConfig:
             self._camera.set_config(config, self._context)
 
     def __getattr__(self, key):
+        """Get a configuration setting from the camera."""
         return GPhotoSetting(self._camera.get_config(self._context).get_child_by_name(key))
 
     __setitem__ = __setattr__
@@ -72,6 +82,7 @@ class GPhotoConfig:
                         value=node.get_value(), choices=choices)
 
     def get_tree(self):
+        """Return the configuration tree."""
         config = self._camera.get_config(self._context)
         return GPhotoConfig._get_config(config)
 
@@ -97,13 +108,18 @@ class GPhotoCam(AbstractCamera):
 
         self._image_count = 0
 
+        # TODO delete this!
+        self._old_image_path = None
+
         self._setup_camera(settings)
 
     def is_cam_image_fresh(self):
+        """Check if the camera image is new."""
         return self._fresh_capture
 
     @staticmethod
     def autodetect():
+        """Run gphoto2 camera autodetection."""
         return GPhotoCam._context.camera_autodetect()
 
     def _setup_camera(self, settings):
@@ -122,13 +138,54 @@ class GPhotoCam(AbstractCamera):
 
     @property
     def config(self):
+        """Return a GPhotoConfig object for the camera."""
         return GPhotoConfig(self._gp_camera, self._context)
+
+    def _fetch_preview_camera_file(self, file_path: str):
+        camera_file = None
+        try:
+            camera_file = self._gp_camera.file_get(file_path.folder,
+                                                   file_path.name,
+                                                   gp.GP_FILE_TYPE_PREVIEW,
+                                                   GPhotoCam._context)
+        except gp.GPhoto2Error:
+            self._logger.error('Error retrieving preview, is the capturetarget correctly set?')
+            raise
+
+        return camera_file
+
+    def _update_image(self, camera_file):
+        file_data = camera_file.get_data_and_size()
+        # Make a copy, so that we can release the file_data object
+        self.data = memoryview(file_data).tobytes()
+        self._fresh_capture = True
+        self._image_count += 1
+
+    def _run_calibrate_if_needed(self):
+        if self.calibrate_func is not None:
+            if self.calibrate_step > 0:
+                if self._image_count % self.calibrate_step == 0:
+                    self.calibrate_func()
+
+    def _wait_for_image_path(self):
+        image_path = None
+        event = self._gp_camera.wait_for_event(100, GPhotoCam._context)
+        count = 0
+        while event[0] != gp.GP_EVENT_FILE_ADDED and count < 1000:
+            sleep(0.01)
+            event = self._gp_camera.wait_for_event(100, GPhotoCam._context)
+            count += 1
+
+        if event[0] == gp.GP_EVENT_FILE_ADDED:
+            # file_path = event[1]
+            image_path = event[1]
+
+        return image_path
 
     def capture(self, continuous=False, barrier: threading.Barrier = None, stop_event=None):
         """Start capturing photos, typically called by a thread."""
         while True:
-            if stop_event:
-                if stop_event.is_set():
+            if stop_event and stop_event.is_set():
                     return
 
             self.state = CAMERA_STATES.CAPTURING
@@ -136,7 +193,6 @@ class GPhotoCam(AbstractCamera):
                 barrier.wait()
 
             triggered = False
-            # file_path = None
 
             # timing point
             self.update_message = 'before capture'
@@ -146,15 +202,9 @@ class GPhotoCam(AbstractCamera):
                 try:
                     # file_path = self._gp_camera.capture(gp.GP_CAPTURE_IMAGE, GPhotoCam._context)
                     self._gp_camera.trigger_capture(GPhotoCam._context)
-                    # event = self._gp_camera.wait_for_event(100, GPhotoCam._context)
-                    # count = 0
-                    # while event[0] != gp.GP_EVENT_FILE_ADDED and count < 1000 and self._image_count % 5 == 0:
-                    #     sleep(0.01)
-                    #     event = self._gp_camera.wait_for_event(100, GPhotoCam._context)
-                    #     count += 1
-                    #
-                    # if event[0] == gp.GP_EVENT_FILE_ADDED:
-                    #     file_path = event[1]
+
+                    if self._old_image_path is None:
+                        self._old_image_path = self._wait_for_image_path()
 
                     triggered = True
                 except gp.GPhoto2Error:
@@ -167,42 +217,32 @@ class GPhotoCam(AbstractCamera):
             self.update_message = 'before preview fetch'
             self.notify()
 
-            # camera_file = None
-            # try:
-            #     if file_path is not None:
-            #         camera_file = self._gp_camera.file_get(file_path.folder, file_path.name,
-            #                                                gp.GP_FILE_TYPE_PREVIEW,
-            #                                                GPhotoCam._context)
-            # except gp.GPhoto2Error:
-            #     self._logger.error('Error retrieving preview, is the capturetarget correctly set?')
-            #     raise
+            print('Fetching ', self._old_image_path)
+
+            camera_file = self._fetch_preview_camera_file(self._old_image_path)
 
             self.update_message = 'after preview fetch'
             self.notify()
-            # if camera_file is not None:
-            #     file_data = camera_file.get_data_and_size()
-            #     # Make a copy, so that we can release the file_data object
-            #     self.data = memoryview(file_data).tobytes()
-            #     self._fresh_capture = True
-            #     del camera_file
 
-            self._image_count += 1
+            self._update_image(camera_file)
+
+            del camera_file
             self.state = CAMERA_STATES.INITIALISED
 
-            if self.calibrate_func is not None:
-                if self.calibrate_step > 0:
-                    if self._image_count % self.calibrate_step == 0:
-                        self.calibrate_func()
+            self._run_calibrate_if_needed()
 
             if not continuous:
                 return self.data
 
     def reset(self, settings: dict):
+        """Reset the camera."""
         self.state = CAMERA_STATES.UNINITIALISED
         self._setup_camera(settings)
 
     def get_state_as_string(self):
+        """Return the state of the camera as a string."""
         return self.state.name
 
     def get_cam_image_count(self):
+        """Return the number of images captured by the camera, as tracked by this object."""
         return self._image_count

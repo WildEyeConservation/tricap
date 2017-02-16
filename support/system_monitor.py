@@ -40,9 +40,12 @@ class WindowsFreeRAMMonitor(SystemMonitor):
     def monitor_step(self):
         """Update the value with the amount of free RAM available."""
         with os.popen('wmic OS get FreePhysicalMemory /Value') as cmd_output:
-            lines = cmd_output.readlines()
-            val = float(lines[4].split('=')[1].strip())
-            self.value = val/1000.0
+            try:
+                lines = cmd_output.readlines()
+                val = float(lines[4].split('=')[1].strip())
+                self.value = val/1000.0
+            except (ValueError, IndexError) as exp:
+                self.logger.error('Error while monitoring system resources: %s', str(exp))
 
 
 class WindowsCPUUsageMonitor(SystemMonitor):
@@ -61,8 +64,11 @@ class WindowsCPUUsageMonitor(SystemMonitor):
     def monitor_step(self):
         """Update the value with the percentage of CPU used."""
         with os.popen('wmic cpu get loadpercentage') as cmd_output:
-            lines = cmd_output.readlines()
-            self.value = float(lines[2].strip())
+            try:
+                lines = cmd_output.readlines()
+                self.value = float(lines[2].strip())
+            except (ValueError, IndexError) as exp:
+                self.logger.error('Error while monitoring system resources: %s', str(exp))
 
 
 class WindowsDiskUsageMonitor(SystemMonitor):
@@ -82,10 +88,13 @@ class WindowsDiskUsageMonitor(SystemMonitor):
     def monitor_step(self):
         """Update the value with the free space on the disk in MB."""
         with os.popen('dir %s' % self.disk_fp) as cmd_output:
-            lines = cmd_output.readlines()
-            val = lines[-1].split(')')[1].split('bytes')[0]
-            val = re.sub("[^0-9]", "", val.strip())
-            self.value = float(val)/1000.0/1000.0
+            try:
+                lines = cmd_output.readlines()
+                val = lines[-1].split(')')[1].split('bytes')[0]
+                val = re.sub("[^0-9]", "", val.strip())
+                self.value = float(val)/1000.0/1000.0
+            except (ValueError, IndexError) as exp:
+                self.logger.error('Error while monitoring system resources: %s', str(exp))
 
 
 class LinuxFreeRAMMonitor(SystemMonitor):
@@ -100,9 +109,12 @@ class LinuxFreeRAMMonitor(SystemMonitor):
     def monitor_step(self):
         """Update the value with the amount of free RAM available."""
         with os.popen('free') as cmd_output:
-            lines = cmd_output.readlines()
-            val = float(lines[1].split(' ')[-1].strip())
-            self.value = val/1000.0
+            try:
+                lines = cmd_output.readlines()
+                val = float(lines[1].split(' ')[-1].strip())
+                self.value = val/1000.0
+            except (ValueError, IndexError) as exp:
+                self.logger.error('Error while monitoring system resources: %s', str(exp))
 
 
 class LinuxCPUUsageMonitor(SystemMonitor):
@@ -121,11 +133,14 @@ class LinuxCPUUsageMonitor(SystemMonitor):
     def monitor_step(self):
         """Update the value with the percentage of CPU used."""
         with os.popen('top -bn2 | grep Cpu') as cmd_output:
-            line = cmd_output.readline()
-            line = cmd_output.readline()
-            parts = [part for part in line.split(' ') if part != '']
-            # adding together the user and the kernel space cpu stats
-            self.value = float(parts[1])+float(parts[3])
+            try:
+                line = cmd_output.readline()
+                line = cmd_output.readline()
+                parts = [part for part in line.split(' ') if part != '']
+                # adding together the user and the kernel space cpu stats
+                self.value = float(parts[1])+float(parts[3])
+            except (ValueError, IndexError) as exp:
+                self.logger.error('Error while monitoring system resources: %s', str(exp))
 
 
 class LinuxDiskUsageMonitor(SystemMonitor):
@@ -140,10 +155,13 @@ class LinuxDiskUsageMonitor(SystemMonitor):
     def monitor_step(self):
         """Update the value with the available space in MB on the root."""
         with os.popen('df | grep root') as cmd_output:
-            lines = cmd_output.readlines()
-            parts = lines[0].split(' ')
-            parts = [part for part in parts if part != '']
-            self.value = float(parts[3])/1000.0
+            try:
+                lines = cmd_output.readlines()
+                parts = lines[0].split(' ')
+                parts = [part for part in parts if part != '']
+                self.value = float(parts[3])/1000.0
+            except (ValueError, IndexError) as exp:
+                self.logger.error('Error while monitoring system resources: %s', str(exp))
 
 
 class LinuxDiskIOMonitor(SystemMonitor):
@@ -159,18 +177,21 @@ class LinuxDiskIOMonitor(SystemMonitor):
     def monitor_step(self):
         """Update the value using /proc/diskstat."""
         with os.popen('cat /proc/diskstats | grep "mmcblk0 "') as cmd_output:
-            lines = cmd_output.readlines()
-            if len(lines) == 0:
-                self.value = -1
-            else:
-                parts = lines[0].split(' ')
-                val = int(parts[-1].strip())
-                if self._prev_val is None:
-                    self.value = 0
+            try:
+                lines = cmd_output.readlines()
+                if len(lines) == 0:
+                    self.value = -1
                 else:
-                    self.value = val-self._prev_val
+                    parts = lines[0].split(' ')
+                    val = int(parts[-1].strip())
+                    if self._prev_val is None:
+                        self.value = 0
+                    else:
+                        self.value = val-self._prev_val
 
-                self._prev_val = val
+                    self._prev_val = val
+            except (ValueError, IndexError) as exp:
+                self.logger.error('Error while monitoring system resources: %s', str(exp))
 
 
 def generate_system_monitor(period: float, type_id: str, add_arg: str = None):

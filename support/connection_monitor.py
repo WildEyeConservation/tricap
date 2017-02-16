@@ -34,16 +34,19 @@ class WindowsNetworkMonitor(NetworkMonitor):
         with os.popen('netsh wlan show interfaces') as cmd_output:
             lines = cmd_output.readlines()
             self.signal_strength = '0%'
-            for line in lines:
-                parts = line.split(':')
-                if len(parts) > 1:
-                    id_str = parts[0].strip()
-                    if id_str == 'State':
-                        self.status = parts[1].strip()
-                    elif id_str == 'Signal':
-                        self.signal_strength = parts[1].strip()
-                    elif id_str == 'SSID':
-                        self.network_name = parts[1].strip()
+            try:
+                for line in lines:
+                    parts = line.split(':')
+                    if len(parts) > 1:
+                        id_str = parts[0].strip()
+                        if id_str == 'State':
+                            self.status = parts[1].strip()
+                        elif id_str == 'Signal':
+                            self.signal_strength = parts[1].strip()
+                        elif id_str == 'SSID':
+                            self.network_name = parts[1].strip()
+            except (ValueError, IndexError) as exp:
+                self.logger.error('Error while monitoring network: %s', str(exp))
 
 
 class LinuxNetworkMonitor(NetworkMonitor):
@@ -62,14 +65,17 @@ class LinuxNetworkMonitor(NetworkMonitor):
             if len(line) > 0:
                 self.network_name = line.strip()
 
-        if self.network_name is not None:
-            with os.popen('iwconfig wlan0 | grep "Link Quality" ') as cmd_output:
-                ss = cmd_output.readline().split('Signal level')[0].split('=')[1].strip()
-                self.signal_strength = str(float(ss.split('/')[0])/float(ss.split('/')[1])*100)+'%'
-            self.status = 'connected'
-        else:
-            self.status = 'disconnected'
-            self.signal_strength = None
+        try:
+            if self.network_name is not None:
+                with os.popen('iwconfig wlan0 | grep "Link Quality" ') as cmd_output:
+                    ss = cmd_output.readline().split('Signal level')[0].split('=')[1].strip()
+                    self.signal_strength = str(float(ss.split('/')[0])/float(ss.split('/')[1])*100)+'%'
+                self.status = 'connected'
+            else:
+                self.status = 'disconnected'
+                self.signal_strength = None
+        except (ValueError, IndexError) as exp:
+            self.logger.error('Error while monitoring network: %s', str(exp))
 
 
 def generate_net_monitor(period=60):
@@ -127,13 +133,16 @@ class WindowsIPMonitor(IPMonitor):
     def monitor_step(self):
         """Ping the address."""
         with os.popen('ping %s -n 1 -l 32 -w 500' % self.address) as cmd_output:
-            lines = cmd_output.readlines()
-            if lines[2].strip() == 'Request timed out.':
-                self.reachable = False
-                self.latency = None
-            else:
-                self.reachable = True
-                self.latency = float(lines[7].split('=')[-1].strip()[:-2])
+            try:
+                lines = cmd_output.readlines()
+                if lines[2].strip() == 'Request timed out.':
+                    self.reachable = False
+                    self.latency = None
+                else:
+                    self.reachable = True
+                    self.latency = float(lines[7].split('=')[-1].strip()[:-2])
+            except (ValueError, IndexError) as exp:
+                self.logger.error('Error while monitoring ip address: %s', str(exp))
 
 
 class LinuxIPMonitor(IPMonitor):
@@ -146,20 +155,23 @@ class LinuxIPMonitor(IPMonitor):
     def monitor_step(self):
         """Ping the address."""
         with os.popen('timeout 0.5 ping %s -c 1 -s 32' % self.address) as cmd_output:
-            lines = cmd_output.readlines()
+            try:
+                lines = cmd_output.readlines()
 
-            if len(lines) <= 1:  # if the timeout happened
-                self.reachable = False
-                self.latency = None
-                return
+                if len(lines) <= 1:  # if the timeout happened
+                    self.reachable = False
+                    self.latency = None
+                    return
 
-            if lines[1].split(' ')[-1].strip() == 'Unreachable':
-                self.reachable = False
-                self.latency = None
-            else:
-                self.reachable = True
-                # TODO Don't let a fallover make you lose it
-                self.latency = float(lines[5].split('=')[1].split('/')[1].strip())
+                if lines[1].split(' ')[-1].strip() == 'Unreachable':
+                    self.reachable = False
+                    self.latency = None
+                else:
+                    self.reachable = True
+                    # TODO Don't let a fallover make you lose it
+                    self.latency = float(lines[5].split('=')[1].split('/')[1].strip())
+            except (ValueError, IndexError) as exp:
+                self.logger.error('Error while monitoring ip address: %s', str(exp))
 
 
 def generate_ip_monitor(address, period):

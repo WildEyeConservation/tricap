@@ -394,6 +394,19 @@ $(function(){
         camImgControllers.push(new camImgController());
     }
 
+    // Bind the collapse events to the json requests to activate or deactivate fetching
+    $('#con_cam').on('show.bs.collapse', function(){
+        console.log('Requesting should now be made active');
+        $.getJSON($SCRIPT_ROOT + '/_set_image_fetching_state', {image_fetching_state: 'True'});
+        return true;
+    });
+
+    $('#con_cam').on('hide.bs.collapse', function(){
+        console.log('Requesting should now be made not active');
+        $.getJSON($SCRIPT_ROOT + '/_set_image_fetching_state', {image_fetching_state: 'False'});
+        return true;
+    });
+
     // Set the specific button functions
     $('[name="btn_startstop"]').on('click', function(event){buttonClick(tricap.BUTTON_CODES.STARTSTOP);});
 

@@ -201,6 +201,8 @@ class GPhotoCam(AbstractCamera):
             if barrier:
                 barrier.wait()
 
+            print('fetch state: ', self.fetch_state)
+
             triggered = False
 
             # timing point
@@ -213,9 +215,7 @@ class GPhotoCam(AbstractCamera):
                     self._gp_camera.trigger_capture(GPhotoCam._context)
                     self._trigger_count += 1
 
-                    print('trigger count : ', self._trigger_count)
                     if self._old_image_path is None or self._trigger_count - self._old_trigger_count >= 20:
-                        print('waiting for path on trigger_count :', self._trigger_count)
                         self._old_image_path = self._wait_for_image_path(before_capture_ts)
                         self._old_trigger_count = self._trigger_count
 
@@ -231,8 +231,7 @@ class GPhotoCam(AbstractCamera):
             self.notify()
 
             camera_file = None
-            if self._trigger_count - self._old_trigger_count == 10:
-                print('fetching image %s on trigger count %d' % (self._old_image_path.name, self._trigger_count))
+            if self.fetch_state and self._trigger_count - self._old_trigger_count == 10:
                 camera_file = self._fetch_preview_camera_file(self._old_image_path)
 
             self.update_message = 'after preview fetch'

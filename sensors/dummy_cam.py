@@ -134,13 +134,15 @@ class DummyCam(AbstractCamera):
             time.sleep(self.generation_period)
             if barrier:
                 barrier.wait()
+
             self._counter += 1
             self.update_message = 'before capture'
             self.notify()
             self.data = self._imgs[self._counter % len(self._imgs)]
             self.update_message = 'before preview fetch'
             self.notify()
-            self._fresh_capture = True
+            if self.fetch_state is True:
+                self._fresh_capture = True
             self.state = CAMERA_STATES.INITIALISED
 
             if self.calibrate_func is not None:

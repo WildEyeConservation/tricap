@@ -34,6 +34,8 @@ class AbstractCamera(Subject):
         self.calibrate_func = None
         self.calibrate_timing = 0
 
+        self.fetch_state = False
+
         self.update_message = 'Camera observer update message.'
 
     @abstractmethod

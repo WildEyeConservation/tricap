@@ -49,6 +49,12 @@ def index():
     cams_start_display = config.get('cams_start_display', TricapConfig.WEB_SECTION_HEADER)
     alti_start_display = config.get('alti_start_display', TricapConfig.WEB_SECTION_HEADER)
 
+    # TODO Do a check to see if cams_start_display is True, to setup fetch requesting
+    if cams_start_display.lower() == 'open':
+        print('Cams should be started with requesting active.')
+        for cam in tricap_manager.get_cameras_as_list():
+            cam._camera.fetch_state = True
+
     return render_template('/home/index.html', num_cams=tricap_manager.get_num_cams(),
                            cams_start_display=cams_start_display,
                            alti_start_display=alti_start_display, python_data=js_data)
@@ -87,6 +93,21 @@ def _determine_alti_state_colour():
         return 'orange'
 
     return alti_state_colour
+
+
+@home_bp.route('/_set_image_fetching_state')
+def _set_image_fetching_state():
+    image_fetch_state_str = str(request.args.get('image_fetching_state'))
+    # TODO Do something with the new image fetch state
+    if image_fetch_state_str == 'True':
+        new_state = True
+    elif image_fetch_state_str == 'False':
+        new_state = False
+
+    for cam in tricap_manager.get_cameras_as_list():
+        cam._camera.fetch_state = new_state
+
+    return jsonify()
 
 
 @home_bp.route('/_get_state_data')
@@ -142,7 +163,7 @@ def _change_message_reply():
 def serve_cam_img(img_str):
     """Serve the image as described by the img_str = camera id + image id."""
     cam_num = int(img_str[0])
-    img_num = int(img_str[1:])
+    # img_num = int(img_str[1:])
 
     return send_file(io.BytesIO(tricap_manager.get_data(cam_num)), attachment_filename='image.jpg',
                      as_attachment=True)

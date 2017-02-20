@@ -2,7 +2,7 @@
 
 from time import sleep
 
-from .behaviour_test_case import BehaviourTestCase, AppTestCase
+from .behaviour_test_case import BehaviourTestCase, TriCapAppTestCase
 
 from selenium import webdriver
 from selenium.webdriver.support.ui import WebDriverWait, Select
@@ -38,7 +38,7 @@ class TestHome(unittest.TestCase):
         self.assertEqual(len(ALTI_STATE_COLOURS), len(ALTIMETER_STATE)+1)
 
 
-class TestAppHome(AppTestCase):
+class TestAppHome(TriCapAppTestCase):
     """TestAppHome."""
 
     def _setup_dummies(self):
@@ -123,7 +123,7 @@ class TestBehaviourHome(BehaviourTestCase):
         triconfig.save_to_file()
 
         with self.client:  # access the web page through a 'client', as if a browser
-            self._open_page('home.index', 'btn_menu')
+            self.open_page('home.index', 'btn_menu')
             # get the update info from the server
             response = self.client.get(url_for('home.provide_state_data'))
 
@@ -144,7 +144,7 @@ class TestBehaviourHome(BehaviourTestCase):
     def test_index_slash_redirection(self):
         """Test that the page opens when the url is only a slash."""
         with self.client:  # access the web page through a 'client', as if a browser
-            self._open_page('home.index_slash', 'btn_menu')
+            self.open_page('home.index_slash', 'btn_menu')
             h_main_status = self.driver.find_element_by_id('h_main_status')
             self.assertEqual(h_main_status.get_attribute('innerHTML'), 'TriCap')
 
@@ -158,7 +158,7 @@ class TestBehaviourHome(BehaviourTestCase):
         triconfig.save_to_file()
 
         with self.client:  # access the web page through a 'client', as if a browser
-            self._open_page('home.index', 'btn_menu')
+            self.open_page('home.index', 'btn_menu')
 
             sleep(1)
 
@@ -180,7 +180,7 @@ class TestBehaviourHome(BehaviourTestCase):
         default_session_description = misc_settings['session_description']
 
         with self.client:  # access the web page through a 'client', as if a browser
-            self._open_page('home.index', 'btn_menu')
+            self.open_page('home.index', 'btn_menu')
 
             # make the modal appear
             self.driver.find_element_by_css_selector('[name="btn_startstop"]').click()

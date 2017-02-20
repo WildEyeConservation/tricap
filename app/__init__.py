@@ -134,7 +134,7 @@ for sm in sys_mons:
         sm.start()
 
 # setup the session logger, hook it up to the alti and all the other logs
-log_names_to_track = [rootlogger.name, app.logger.name]
+log_names_to_track = [rootlogger.name, app.logger.name, wz_log.name]
 log_names_to_track += [cam_log._logger.name for cam_log in camera_loggers]
 session_logger = SessionLogger(log_names_to_track=log_names_to_track)
 alti_observer = AltiMeasurementObserver(session_logger)

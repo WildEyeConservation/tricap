@@ -11,12 +11,12 @@ from app.views import settings
 from support.configure import TricapConfig
 
 from .tempfile_test_case import TricapTempFilerTestCase
-from .behaviour_test_case import AppTestCase, BehaviourTestCase
+from .behaviour_test_case import TriCapAppTestCase, BehaviourTestCase
 
 from config import DEFAULT_CONFIG_FP, SERVER_LOG_DIR
 
 
-class TestSettings(AppTestCase):
+class TestSettings(TriCapAppTestCase):
     """Test stuff that requires modifying the config file here.
 
     We have more control when calling the functions directly than when accessing the page through
@@ -120,7 +120,7 @@ class TestBehaviourSettings(BehaviourTestCase):
     def test_page(self):
         """Test that the settings page has the correct number of fields."""
         with self.client:  # access the web page through a 'client', as if a browser
-            self._open_page('settings.settings', 'btn_save')
+            self.open_page('settings.settings', 'btn_save')
 
             # Check that all the config fields have been created
             new_config = TricapConfig()
@@ -135,7 +135,7 @@ class TestBehaviourSettings(BehaviourTestCase):
     def test_save(self):
         """Test the save button."""
         with self.client:  # access the web page through a 'client', as if a browser
-            self._open_page('settings.settings', 'btn_save')
+            self.open_page('settings.settings', 'btn_save')
 
             config = TricapConfig()
             new_ss = '1/2500'
@@ -162,7 +162,7 @@ class TestBehaviourSettings(BehaviourTestCase):
             ici_string.send_keys(new_ici)
 
             # simulate posting the data through the save button
-            form_data = self._get_form_data_as_dict(self.driver)
+            form_data = self.get_form_data_as_dict(self.driver)
 
             form_data['save'] = 'Save'
 
@@ -192,10 +192,10 @@ class TestBehaviourSettings(BehaviourTestCase):
                             default_config.get_section_dict(TricapConfig.MISC_SECTION_HEADER))
 
         with self.client:
-            self._open_page('settings.settings', 'btn_save')
+            self.open_page('settings.settings', 'btn_save')
 
             # simulate posting the data through the revert button
-            form_data = self._get_form_data_as_dict(self.driver)
+            form_data = self.get_form_data_as_dict(self.driver)
             form_data['revert'] = 'Revert'
             self.client.post(url_for('settings.settings'), data=form_data, follow_redirects=True)
 
@@ -208,7 +208,7 @@ class TestBehaviourSettings(BehaviourTestCase):
     # def test_test(self):
     #     """Test using the test button."""
     #     with self.client:  # access the web page through a 'client', as if a browser
-    #         self._open_page('settings.settings', 'btn_save')
+    #         self.open_page('settings.settings', 'btn_save')
     #
     #         # Change settings on the form
     #         ss_select = Select(self.driver.find_element_by_css_selector("[id$='shutterspeed']"))
@@ -222,7 +222,7 @@ class TestBehaviourSettings(BehaviourTestCase):
     #         ici_string.send_keys('9.0')
     #
     #         # simulate posting the data through the test button
-    #         form_data = self._get_form_data_as_dict(self.driver)
+    #         form_data = self.get_form_data_as_dict(self.driver)
     #         form_data['test'] = 'Test'
     #         self.client.post(url_for('settings.settings'), data=form_data, follow_redirects=True)
     #

@@ -90,6 +90,7 @@ class SessionLogger(ThreadedLogger):
             self._session_folder = self._create_folder()
             self._prep_folder()
             self._session_fh = self._create_file_handler()
+            self._session_fh.setLevel(logging.DEBUG)
             self._logger.addHandler(self._session_fh)
 
             # need to set ready to true otherwise the log function won't work.

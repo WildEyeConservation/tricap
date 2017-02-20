@@ -106,12 +106,12 @@ class TestSessionLogger(TempFilerTestCase):
 
     def test_folder_prepping(self):
         """Check that the created folder contains all that we want it to."""
-
         # create two new loggers
         a_handler = logging.FileHandler(filename=os.path.join(SERVER_LOG_DIR, 'a.log'))
         a_handler.setFormatter(logging.Formatter("%(message)s"))
         a_logger = logging.getLogger('a')
         a_logger.addHandler(a_handler)
+        a_logger.propagate = False
 
         b_handler = logging.FileHandler(filename=os.path.join(SERVER_LOG_DIR, 'b.log'))
         b_handler.setFormatter(logging.Formatter("%(message)s"))
@@ -121,7 +121,7 @@ class TestSessionLogger(TempFilerTestCase):
         session_logger = SessionLogger(root_folder=self.tempdir, log_names_to_track=['a', 'b'])
         session_logger.create_new_session()
 
-        a_logger.info('Test A')
+        a_logger.debug('Test A')
         b_logger.info('Test B')
 
         pre_file_folder_names = os.listdir(os.path.join(session_logger._session_folder, 'pre'))

@@ -57,11 +57,11 @@ if __name__ == '__main__':
 
     fig, axarr = plt.subplots(3, sharex=True)
 
-    axarr[0].plot(ts1, deltas1, 'o', linewidth=2.0)
+    axarr[0].plot(ts1, deltas1, '-', linewidth=2.0)
     axarr[0].set_title('before capture <-> before preview fetch')
-    axarr[1].plot(ts2, deltas2, 'o', linewidth=2.0)
+    axarr[1].plot(ts2, deltas2, '-', linewidth=2.0)
     axarr[1].set_title('before preview fetch <-> after preview fetch')
-    axarr[2].plot(ts3, deltas3, 'o', linewidth=2.0)
+    axarr[2].plot(ts3, deltas3, '-', linewidth=2.0)
     axarr[2].set_title('inter-frame delta')
     fig.autofmt_xdate()
     plt.show()

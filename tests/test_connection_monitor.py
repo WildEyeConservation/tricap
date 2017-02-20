@@ -4,6 +4,7 @@ import unittest
 import time
 import os
 import logging
+from testfixtures import LogCapture
 
 from support.connection_monitor import generate_net_monitor, NetworkMonitorLogger
 from support.connection_monitor import generate_ip_monitor, IPMonitorLogger
@@ -26,7 +27,7 @@ class NetMonitorObserver():
         self.status = net_monitor.status
         self.signal_strength = net_monitor.signal_strength
 
-    def print_info(self):
+    def print_info(self):  # pragma: no cover
         """Helper method."""
         print('net_monitor status:')
         print('network name: %s' % self.name)
@@ -47,7 +48,7 @@ class IPMonitorObserver():
         self.reachable = ip_mon.reachable
         self.latency = ip_mon.latency
 
-    def print_info(self):
+    def print_info(self):  # pragma: no cover
         """Helper method."""
         print('ip mon status:')
         print('reachable: %s' % self.reachable)
@@ -80,6 +81,15 @@ class TestNetMonitor(unittest.TestCase):
         if observer.status != 'disconnected':
             self.assertNotEqual(observer.name, None)
             self.assertNotEqual(observer.signal_strength, None)
+
+        # TODO Move this test somewhere legitimate
+        # get the code coverage up, check that detaching works as expected
+        self.net_monitor.detach(observer)
+
+        with LogCapture() as lc:
+            self.net_monitor.detach(observer)
+            lc.check(('root', 'WARNING',
+                      'Subject asked to detach non-existent observer : %s' % str(observer)))
 
 
 class TestNetMonLogger(unittest.TestCase):

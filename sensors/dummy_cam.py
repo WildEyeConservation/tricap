@@ -107,12 +107,14 @@ class DummyCam(AbstractCamera):
         for setting_name, setting_value in settings.items():
             self.config[setting_name] = setting_value
 
+        self.generation_period = 1
+
     @property
     def config(self):
         return self._config
-
-    def reset(self, settings=None):
-        self.__init__(self._address, settings)
+    #
+    # def reset(self, settings=None):
+    #     self.__init__(self._address, settings)
 
     def is_cam_image_fresh(self):
         cache = self._fresh_capture
@@ -129,7 +131,7 @@ class DummyCam(AbstractCamera):
                 if stop_event.is_set():
                     return
             self.state = CAMERA_STATES.CAPTURING
-            time.sleep(1)
+            time.sleep(self.generation_period)
             if barrier:
                 barrier.wait()
             self._counter += 1

@@ -21,7 +21,7 @@ class SystemMonitorObserver():
         """Update."""
         self.value = sys_mon.value
 
-    def print_info(self):
+    def print_info(self):  # pragma: no cover
         """Helper method."""
         print('Sys_Mon status:')
         print('Value: %s' % self.value)

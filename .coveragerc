@@ -1,3 +1,7 @@
+[run]
+omit =
+    *python_commons*
+
 [report]
 # Regexes for lines to exclude from consideration
 exclude_lines =
@@ -6,3 +10,10 @@ exclude_lines =
 
     # Don't complain about unittest main
     unittest.main()
+
+    # Don't bother with repr and dir
+    def __repr__
+    def __dir__
+
+    # Don't bother with abstractmethods
+    @abstractmethod

@@ -1,6 +1,7 @@
 """The basics of basic classes. Should be so abstract as to do nothing."""
 
 import threading
+import logging
 
 from abc import ABCMeta, abstractmethod
 
@@ -24,6 +25,8 @@ class Subject(object):
         try:
             self._observers.remove(observer)
         except ValueError:
+            logging.getLogger('root').warning('Subject asked to detach non-existent observer : %s',
+                                              str(observer))
             pass
 
     def notify(self, modifier=None):

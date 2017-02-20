@@ -6,27 +6,11 @@ import logging
 
 from support.session_logger import SessionLogger
 
-from .tempfile_test_case import TempFilerTestCase
-
-from config import SERVER_LOG_DIR
+from .tricap_tempfile_test_case import TriCapTempFilerTestCase
 
 
-class TestSessionLogger(TempFilerTestCase):
+class TestSessionLogger(TriCapTempFilerTestCase):
     """Log all session_logger module errors to a local file."""
-
-    # format_str = "%(asctime)s | %(pathname)s:%(lineno)d | %(funcName)s | %(levelname)s | %(message)s "
-    # handler = logging.FileHandler(filename=os.path.join(SERVER_LOG_DIR, 'test_session_logger.log'))
-    # handler.setLevel(logging.DEBUG)
-    # handler.setFormatter(logging.Formatter(format_str))
-    # handler.addFilter(logging.Filter(name='sensors.session_logger'))
-    # rootLogger = logging.getLogger('')
-    # rootLogger.addHandler(handler)
-    # rootLogger.setLevel(logging.DEBUG)
-
-    # def tearDown(self):
-    #     """Remove the handlers, release the file."""
-    #     session_logger._remove_handlers()
-    #     super(TestSessionLogger, self).tearDown()
 
     def test_init(self):
         """Test that the session_logger starts up correctly."""

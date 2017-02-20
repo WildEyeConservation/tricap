@@ -249,10 +249,10 @@ class GPhotoCam(AbstractCamera):
             if not continuous:
                 return self.data
 
-    def reset(self, settings: dict):
-        """Reset the camera."""
-        self.state = CAMERA_STATES.UNINITIALISED
-        self._setup_camera(settings)
+    # def reset(self, settings: dict):
+    #     """Reset the camera."""
+    #     self.state = CAMERA_STATES.UNINITIALISED
+    #     self._setup_camera(settings)
 
     def get_state_as_string(self):
         """Return the state of the camera as a string."""

@@ -1,17 +1,15 @@
 """Behaviour tests for the home page."""
 
+import threading
 from time import sleep
 
-from .behaviour_test_case import BehaviourTestCase, TriCapAppTestCase
+from .tricap_flask_test_case import TriCapBehaviourTestCase, TriCapAppTestCase
 
-from selenium import webdriver
-from selenium.webdriver.support.ui import WebDriverWait, Select
+from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as ec
 from selenium.webdriver.common.by import By
 
-import json
-
-from app import app, views, tricap_manager, altimeter, talkbox, session_logger
+from app import tricap_manager, altimeter, talkbox, session_logger, stop_all_threads
 
 import unittest
 
@@ -51,7 +49,7 @@ class TestAppHome(TriCapAppTestCase):
         triconfig.save_to_file()
 
     def test_talkbox_messaging(self):
-        '''Test talkbox message.'''
+        """Test talkbox message."""
         self._setup_dummies()
 
         with self.client:
@@ -94,21 +92,21 @@ class TestAppHome(TriCapAppTestCase):
             self.assertEqual(altimeter.state == ALTIMETER_STATE.MEASURING, False)
 
             # StartStop
-            response = self.client.get('/_button_click?buttonCode='+str(BUTTON_CODE.STARTSTOP.value),
-                                       content_type='application/json')
+            self.client.get('/_button_click?buttonCode='+str(BUTTON_CODE.STARTSTOP.value),
+                            content_type='application/json')
 
             self.assertEqual(tricap_manager.state == CAM_MANAGER_STATES.STARTED, True)
             self.assertEqual(altimeter.state == ALTIMETER_STATE.MEASURING, True)
 
             # Stop
-            response = self.client.get('/_button_click?buttonCode='+str(BUTTON_CODE.STARTSTOP.value),
-                                       content_type='application/json')
+            self.client.get('/_button_click?buttonCode='+str(BUTTON_CODE.STARTSTOP.value),
+                            content_type='application/json')
 
             self.assertEqual(tricap_manager.state == CAM_MANAGER_STATES.STARTED, False)
             self.assertEqual(altimeter.state == ALTIMETER_STATE.MEASURING, False)
 
 
-class TestBehaviourHome(BehaviourTestCase):
+class TestBehaviourHome(TriCapBehaviourTestCase):
     """docstring for TestBehaviourHome."""
 
     def test_no_error_msg(self):
@@ -116,7 +114,7 @@ class TestBehaviourHome(BehaviourTestCase):
         triconfig = TricapConfig()
 
         web_settings = triconfig.get_section_dict(TricapConfig.WEB_SECTION_HEADER)
-        refresh_rate = web_settings['refresh_rate']
+        # refresh_rate = web_settings['refresh_rate']
         web_settings['alti_required'] = 'dummy'
         web_settings['cams_required'] = 'dummy'
         triconfig.set_section(web_settings, TricapConfig.WEB_SECTION_HEADER)
@@ -212,3 +210,36 @@ class TestBehaviourHome(BehaviourTestCase):
             # confirm the modal is not displayed
             modal = self.driver.find_element_by_css_selector('#modal_session_description')
             self.assertEqual(modal.is_displayed(), False)
+
+    def test_stopping_all_threads(self):
+        """Test that all threads can be stopped by the stop_all_threads() function.
+
+        Not a great test, can only test that we have reduced the number of threads, as we have no
+        idea what other modules are creating threads."""
+        with self.client:  # access the web page through a 'client', as if a browser
+            self.open_page('home.index', 'btn_menu')
+
+            # make the modal appear
+            self.driver.find_element_by_css_selector('[name="btn_startstop"]').click()
+
+            # wait for the modal to appear
+            wait = WebDriverWait(self.driver, 5)
+            wait.until(ec.visibility_of_element_located((By.ID, 'modal_session_description')))
+
+            # make the modal go away
+            self.driver.find_element_by_css_selector('#btn_modal_session_description_submit').click()
+
+            # start capture to create the session
+            self.send_ajax_request('/_button_click', {'buttonCode': str(BUTTON_CODE.STARTSTOP.value)})
+            # stop capture
+            self.send_ajax_request('/_button_click', {'buttonCode': str(BUTTON_CODE.STARTSTOP.value)})
+
+            before_stop_threads = threading.enumerate()
+
+            stop_all_threads()
+            sleep(5)
+
+            after_stop_threads = threading.enumerate()
+
+            self.assertLess(len(after_stop_threads), len(before_stop_threads))
+            # TODO Check that all the monitors have been stopped and the sensors as well

@@ -47,10 +47,10 @@ class AbstractCamera(Subject):
         """Find connected cameras."""
         pass
 
-    @abstractmethod
-    def reset(self):
-        """Reset the camera, reload the settings."""
-        pass
+    # @abstractmethod
+    # def reset(self):
+    #     """Reset the camera, reload the settings."""
+    #     pass
 
     @abstractmethod
     def capture(self, continuous=False, barrier: threading.Barrier = None):

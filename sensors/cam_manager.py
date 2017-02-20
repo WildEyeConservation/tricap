@@ -117,14 +117,14 @@ class TriCapCamsManager:
                     tricap_cam._camera.calibrate_step = int(self._man_settings['calibrate_step'])
                     self._cameras.append(tricap_cam)
 
-    def reset(self, man_settings: dict, cam_settings: dict):
-        self._man_settings = man_settings
-        self._cam_settings = cam_settings
-
-        if self.state == CAM_MANAGER_STATES.STARTED:
-            self.stop_capturing()
-
-        self._initialise()
+    # def reset(self, man_settings: dict, cam_settings: dict):
+    #     self._man_settings = man_settings
+    #     self._cam_settings = cam_settings
+    #
+    #     if self.state == CAM_MANAGER_STATES.STARTED:
+    #         self.stop_capturing()
+    #
+    #     self._initialise()
 
     def start_capturing(self):
         if len(self._cameras) == 0:

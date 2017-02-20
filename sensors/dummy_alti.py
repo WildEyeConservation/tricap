@@ -68,6 +68,8 @@ class DummyAlti(Subject):
         self._logger.info('Dummy Alti Port Opened')
         self.state = ALTIMETER_STATE.CONNECTED
 
+        self.generation_period = 1
+
     @property
     def config(self):
         return self._config
@@ -82,10 +84,10 @@ class DummyAlti(Subject):
     def _set_setting(self, key, value):
         self._settings[key] = value
 
-    def reset(self):
-        """Get the altimeter object to re-initialise, establishing comms again, etc"""
-        if self.state == ALTIMETER_STATE.MEASURING:
-            self.stop_measuring()
+    # def reset(self):
+    #     """Get the altimeter object to re-initialise, establishing comms again, etc"""
+    #     if self.state == ALTIMETER_STATE.MEASURING:
+    #         self.stop_measuring()
 
     def get_state_as_string(self):
         return self.state.name
@@ -102,7 +104,7 @@ class DummyAlti(Subject):
                     self._mchange_dir = 'up'
 
             self.notify()
-            sleep(0.5)
+            sleep(self.generation_period)
 
         self.state = ALTIMETER_STATE.CONNECTED
 

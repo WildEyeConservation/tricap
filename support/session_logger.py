@@ -55,6 +55,10 @@ class SessionLogger(ThreadedLogger):
 
     def __del__(self):
         """Destructor, have to explicitly remove the handlers from the log file."""
+
+        # import pdb; pdb.set_trace()
+
+        self._stop_event.set()
         self.thread.join()
         self._remove_handlers()
         super(SessionLogger, self).__del__()
@@ -140,10 +144,12 @@ class SessionLogger(ThreadedLogger):
         real_log_names_tracked = []
         self._additional_fhs = []
         for log_name in self.log_names_tracked:
+            # the root log is weird: log.name will give 'root', but must be added using ''
             if log_name == 'root':
                 log_name = ''
             log = logging.getLogger(log_name)
             if len(log.handlers) == 0:
+                logging.getLogger('').warning('No loggers were found named %s', log_name)
                 continue
 
             # need to search the logger for a handler with a file output
@@ -153,6 +159,7 @@ class SessionLogger(ThreadedLogger):
                     log_file_handler = handler
                     break
             if log_file_handler is None:
+                logging.getLogger('').warning('Logger %s has no file handlers.', log_name)
                 continue
 
             # pre copying

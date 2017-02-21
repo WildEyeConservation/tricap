@@ -142,6 +142,7 @@ class DummyCam(AbstractCamera):
             self.update_message = 'before preview fetch'
             self.notify()
             if self.fetch_state is True:
+                print('Fetching')
                 self._fresh_capture = True
             self.state = CAMERA_STATES.INITIALISED
 

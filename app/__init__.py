@@ -6,7 +6,7 @@ Lots of instantiation going on here, not recommended to run this unnecessarily w
 import logging
 import os
 
-from threading import Lock
+from threading import Lock, Timer
 from logging.handlers import TimedRotatingFileHandler
 
 from flask import Flask
@@ -28,6 +28,8 @@ from support.system_monitor import generate_system_monitor, SystemMonitorLogger
 
 from config import SERVER_LOG_DIR
 
+# define the glue code objects
+
 
 class AltiMeasurementObserver():
     """A custom observer to link the alti to the session logger."""
@@ -39,6 +41,39 @@ class AltiMeasurementObserver():
     def update(self, alti):
         """Update."""
         self.session_logger.log('Alti Measurement: %f' % alti.measurement)
+
+
+# TODO Bad metaphor
+class GateCloser():
+    """Manages a timer, which if triggered will run a piece of code, unless kept open."""
+
+    def __init__(self, delay: float, close_function):
+        """Construct."""
+        self.delay = delay
+        self.close_function = close_function
+
+        self.timer = None
+
+        self.start_timer()
+
+    def __del__(self):
+        """Deconstructor."""
+        if self.timer:
+            self.timer.cancel()
+            self.timer.join()
+
+    def start_timer(self):
+        """Create the timer and start it."""
+        self.timer = Timer(self.delay, self.close_function)
+        self.timer.daemon = True
+        self.timer.start()
+
+    def keep_open(self):
+        """Keep the gate open, or open it."""
+        print('Keeping the gate open.')
+        if self.timer and self.timer.is_alive():
+            self.timer.cancel()
+        self.start_timer()
 
 
 # Set up rotating log file for the overall log
@@ -139,6 +174,18 @@ log_names_to_track += [cam_log._logger.name for cam_log in camera_loggers]
 session_logger = SessionLogger(log_names_to_track=log_names_to_track)
 alti_observer = AltiMeasurementObserver(session_logger)
 altimeter.attach(alti_observer)
+
+# some glue functions, which use the module level functions
+
+
+def stop_fetching():
+    """Turn off fetching for all cameras."""
+    print("closign the gates.")
+    for cam in tricap_manager.get_cameras_as_list():
+        cam._camera.fetch_state = False
+
+
+fetch_stopper = GateCloser(20.0, stop_fetching)
 
 
 def stop_all_threads():

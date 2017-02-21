@@ -7,7 +7,7 @@ from flask import Blueprint, render_template, send_from_directory, current_app, 
 from flask import send_file, redirect, url_for
 
 from app import tricap_manager, altimeter, session_logger, talkbox, log_list, stop_all_threads
-from app import rootlogger
+from app import rootlogger, fetch_stopper
 
 from support.configure import TricapConfig
 
@@ -164,6 +164,9 @@ def serve_cam_img(img_str):
     """Serve the image as described by the img_str = camera id + image id."""
     cam_num = int(img_str[0])
     # img_num = int(img_str[1:])
+
+    # an image was requested, so either turn on fetching, or keep it going.
+    fetch_stopper.keep_open()
 
     return send_file(io.BytesIO(tricap_manager.get_data(cam_num)), attachment_filename='image.jpg',
                      as_attachment=True)

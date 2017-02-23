@@ -7,7 +7,7 @@ import logging
 import threading
 import os
 
-from config import CAM_MANAGER_STATES, SERVER_LOG_DIR
+from config import CAM_MANAGER_STATES, SERVER_LOG_DIR, SESSION_ROOT_DIR
 
 # TODO : Create a camera factory that will import cameras according to its config and make them available via its own
 # autodetect function
@@ -126,7 +126,23 @@ class TriCapCamsManager:
     #
     #     self._initialise()
 
+    def check_camera_gps_status(self):
+        """Check gps status of all connected cameras and return boolean for each camera.
+
+        For each camera, take a picture, download it, and check the gps info in the exif data.
+        """
+        gps_status_of_cams = []
+        for index, cam in enumerate(self._cameras):
+            cam.capture_and_download(target_folder=SESSION_ROOT_DIR, target_name=str(index)+'.CR2')
+            # get the camera to capture an image and download it to a provided folder
+            # get the exif data from the image
+            # check if the exif data has the appropriate fields in it.
+            # add that to the list
+
+        return gps_status_of_cams
+
     def start_capturing(self):
+        """Start the capturing threads of all connected cams."""
         if len(self._cameras) == 0:
             self.state = CAM_MANAGER_STATES.ERROR_NO_CAMS
             self._logger.debug('Tried to start capture threads with no cameras connected.')

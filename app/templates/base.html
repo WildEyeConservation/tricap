@@ -51,12 +51,21 @@
                 <li>
                   <a href="{{ url_for('home.reset')}}" id="a_reset">Reset</a>
                 </li>
+                <li>
+                  <a href="#" id="a_check_gps">Check GPS</a>
+                </li>
               </ul>
             </div>
           </div>
         </div>
       </div>
     </div>
+
+    {% block base_js %}
+        <script type="text/javascript">
+            {% include 'js/base.js' %}
+        </script>
+    {% endblock %}
 
     {% block content %}{% endblock %}
 

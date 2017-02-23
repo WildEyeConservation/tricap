@@ -137,6 +137,13 @@ def provide_state_data():
     return jsonify(data)
 
 
+@home_bp.route('/_check_gps')
+def _check_gps():
+    print('checking gps')
+    data = {'nothing': 123}
+    return jsonify(data)
+
+
 @home_bp.route('/_submit_talkbox_msg')
 def _receive_talkbox_msg():
     msg = request.args.get('msg', '', type=str)

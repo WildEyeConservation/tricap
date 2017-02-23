@@ -60,6 +60,11 @@ class AbstractCamera(Subject):
         pass
 
     @abstractmethod
+    def capture_and_download(self, target_folder: str, target_name: str):
+        """Capture an image and download it to a target folder."""
+        pass
+
+    @abstractmethod
     def get_state_as_string(self):
         """Return the state of the camera as a string."""
         pass

@@ -1,5 +1,6 @@
 """Camera driver for a generic camera that can be accessed using the libgphoto2 library."""
 
+import os
 import logging
 import threading
 
@@ -191,8 +192,25 @@ class GPhotoCam(AbstractCamera):
 
         return image_path
 
+    def capture_and_download(self, target_folder: str, target_name: str = None):
+        """Capture an image and download it."""
+        file_path = self._gp_camera.capture(gp.GP_CAPTURE_IMAGE, GPhotoCam._context)
+        camera_file = self._gp_camera.file_get(file_path.folder,
+                                               file_path.name,
+                                               gp.GP_FILE_TYPE_NORMAL,
+                                               GPhotoCam._context)
+        if target_name is None:
+            target_name = file_path.name
+
+        target_fp = os.path.join(target_folder, target_name)
+
+        camera_file.file_save(target_fp)
+
+        return target_fp
+
+
     def capture(self, continuous=False, barrier: threading.Barrier = None, stop_event=None):
-        """Start capturing photos, typically called by a thread."""
+        """Start capturing photos, typically called by   a thread."""
         while True:
             if stop_event and stop_event.is_set():
                     return

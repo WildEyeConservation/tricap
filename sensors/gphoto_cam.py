@@ -201,7 +201,7 @@ class GPhotoCam(AbstractCamera):
             if barrier:
                 barrier.wait()
 
-            print('fetch state: ', self.fetch_state)
+            # print('fetch state: ', self.fetch_state)
 
             triggered = False
 

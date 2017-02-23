@@ -6,6 +6,7 @@
 import logging
 import threading
 import os
+import exifread
 
 from config import CAM_MANAGER_STATES, SERVER_LOG_DIR, SESSION_ROOT_DIR
 
@@ -133,7 +134,14 @@ class TriCapCamsManager:
         """
         gps_status_of_cams = []
         for index, cam in enumerate(self._cameras):
-            cam.capture_and_download(target_folder=SESSION_ROOT_DIR, target_name=str(index)+'.CR2')
+            fp = cam.capture_and_download(target_folder=SESSION_ROOT_DIR, target_name=str(index)+'.CR2')
+            with open(fp, 'rb') as im_f:
+                tags = exifread.process_file(im_f)
+                if 'GPS GPSLongitude' in tags.keys():
+                   gps_status_of_cams.append(True)
+                else:
+                   gps_status_of_cams.append(False)
+
             # get the camera to capture an image and download it to a provided folder
             # get the exif data from the image
             # check if the exif data has the appropriate fields in it.

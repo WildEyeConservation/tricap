@@ -140,7 +140,10 @@ def provide_state_data():
 @home_bp.route('/_check_gps')
 def _check_gps():
     print('checking gps')
-    data = {'nothing': 123}
+    gps_status_of_cams = tricap_manager.check_camera_gps_status()
+    data = {}
+    for index, stat in enumerate(gps_status_of_cams):
+        data[str(index)] = stat
     return jsonify(data)
 
 

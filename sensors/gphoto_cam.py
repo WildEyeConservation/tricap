@@ -204,7 +204,7 @@ class GPhotoCam(AbstractCamera):
 
         target_fp = os.path.join(target_folder, target_name)
 
-        camera_file.file_save(target_fp)
+        gp.gp_file_save(camera_file, target_fp)
 
         return target_fp
 

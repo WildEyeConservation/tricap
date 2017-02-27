@@ -28,8 +28,6 @@ from support.system_monitor import generate_system_monitor, SystemMonitorLogger
 
 from config import SERVER_LOG_DIR
 
-# define the glue code objects
-
 
 class AltiMeasurementObserver():
     """A custom observer to link the alti to the session logger."""
@@ -49,6 +47,7 @@ class GateCloser():
 
     def __init__(self, delay: float, close_function):
         """Construct."""
+        """Delay - time to wait untill the close_function action is called."""
         self.delay = delay
         self.close_function = close_function
 
@@ -70,7 +69,6 @@ class GateCloser():
 
     def keep_open(self):
         """Keep the gate open, or open it."""
-        print('Keeping the gate open.')
         if self.timer and self.timer.is_alive():
             self.timer.cancel()
         self.start_timer()
@@ -86,7 +84,7 @@ master_handler.setFormatter(formatter)
 rootlogger = logging.getLogger('')
 rootlogger.addHandler(master_handler)
 rootlogger.setLevel(logging.DEBUG)
-rootlogger.info('Initiating new instance of TriCap app.')
+rootlogger.info('Initiating new instance of the TriCap app.')
 
 # Setup the Flask Server, configuring it using the config.py file
 app = Flask(__name__)
@@ -106,7 +104,7 @@ wz_log.addHandler(flask_handler)
 
 app.logger.addHandler(flask_handler)
 app.logger.setLevel(logging.DEBUG)
-app.logger.info('Initiated flask logger for new instance of TriCap app.')
+app.logger.info('Initiated flask logger for new instance of the TriCap app.')
 
 # Instantiate the system log message tracker
 log_list = LogListAccessor(3)
@@ -118,8 +116,10 @@ cam_settings = init_config.get_section_dict(TricapConfig.CAMERA_SECTION_HEADER)
 
 if init_config.get('cams_required', TricapConfig.WEB_SECTION_HEADER) == 'dummy':
     use_dummy_cams = True
+    rootlogger.debug('Dummy cams will be, in acccordance to configuration.')
 else:
     use_dummy_cams = False
+    rootlogger.debug('Real cams will be used, in accordance to configuration')
 
 tricap_manager = TriCapCamsManager(misc_settings, cam_settings, use_dummy_cams)
 tricap_cameras = tricap_manager.get_cameras_as_list()
@@ -135,12 +135,18 @@ for index, cam in enumerate(tricap_cameras):
 
 image_manager = tricap_manager
 
+rootlogger.debug('Cameras have been configured.')
+
 alti_settings = init_config.get_section_dict(TricapConfig.ALTI_SECTION_HEADER)
 
 if init_config.get('alti_required', TricapConfig.WEB_SECTION_HEADER) == 'dummy':
+    rootlogger.debug('Using a dummy altimeter.')
     altimeter = DummyAlti(alti_settings)
 else:
+    rootlogger.debug('Using a real altimeter.')
     altimeter = TrusenseAltimeter(alti_settings)
+
+rootlogger.debug('Altimeter has been configured.')
 
 talkbox = TalkBox(Lock(), 3)
 talkbox.clear()
@@ -180,7 +186,6 @@ altimeter.attach(alti_observer)
 
 def stop_fetching():
     """Turn off fetching for all cameras."""
-    print("closign the gates.")
     for cam in tricap_manager.get_cameras_as_list():
         cam._camera.fetch_state = False
 
@@ -210,3 +215,5 @@ from .views.settings import settings_bp
 app.register_blueprint(home_bp)
 app.register_blueprint(showlog_bp)
 app.register_blueprint(settings_bp)
+
+rootlogger.info('New instance of TriCap app has been initiated.')

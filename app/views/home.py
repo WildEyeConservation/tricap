@@ -142,8 +142,13 @@ def _check_gps():
     print('checking gps')
     gps_status_of_cams = tricap_manager.check_camera_gps_status()
     data = {}
+    list_of_status = []
     for index, stat in enumerate(gps_status_of_cams):
-        data[str(index)] = stat
+        if stat is True:
+            list_of_status.append('True')
+        else:
+            list_of_status.append('False')
+    data['gps_status_of_cams'] = list_of_status
     return jsonify(data)
 
 

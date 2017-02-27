@@ -208,9 +208,8 @@ class GPhotoCam(AbstractCamera):
 
         return target_fp
 
-
     def capture(self, continuous=False, barrier: threading.Barrier = None, stop_event=None):
-        """Start capturing photos, typically called by   a thread."""
+        """Start capturing photos, typically called by a thread."""
         while True:
             if stop_event and stop_event.is_set():
                     return

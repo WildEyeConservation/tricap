@@ -2,6 +2,7 @@
 
 import time
 
+
 class Canon6DCam():
     """Canon EOS 6D shell for the gphoto2 cam."""
 
@@ -17,7 +18,7 @@ class Canon6DCam():
         self.is_cam_image_fresh = self._camera.is_cam_image_fresh
 
     def focus_infinity(self):
-        """Focus lens to infinity using series of manual focus events."""
+        """Change the focus of the lens to infinity using series of manual focus events."""
         if self.serial_num == '413051000325':
             print("Focus!")
             self.config.output = 'PC'

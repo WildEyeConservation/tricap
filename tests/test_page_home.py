@@ -243,3 +243,14 @@ class TestBehaviourHome(TriCapBehaviourTestCase):
 
             self.assertLess(len(after_stop_threads), len(before_stop_threads))
             # TODO Check that all the monitors have been stopped and the sensors as well
+    # 
+    # def test_gps_check(self):
+    #     """Test that the gps check button doesn't fall over."""
+    #     with self.client:  # access the web page through a 'client', as if a browser
+    #         self.open_page('home.index', 'btn_menu')
+    #
+    #         # open the menu and click the button
+    #         self.driver.find_element_by_css_selector('#btn_menu').click()
+    #         self.driver.find_element_by_css_selector('#a_check_gps').click()
+    #
+    #         sleep(5)

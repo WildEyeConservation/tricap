@@ -1,3 +1,5 @@
+"""Dummy Camera - Helps to test the TriCap interface when no cameras are connected."""
+
 # coding=utf-8
 import os
 import pickle
@@ -78,6 +80,10 @@ class DummyCam(AbstractCamera):
 
     @staticmethod
     def autodetect():
+        """Return a list of tuples that contain a camera name and a dummmy address.
+
+        Imitates the autodetect funcionality of the gphoto2 cameras.
+        """
         return [(cam.name, index) for index, cam in enumerate(DummyCam.cameras)]
 
     def __init__(self, address, settings=None):
@@ -117,12 +123,31 @@ class DummyCam(AbstractCamera):
     #     self.__init__(self._address, settings)
 
     def is_cam_image_fresh(self):
+        """Return true if the latest camera images has not been copied yet."""
         cache = self._fresh_capture
         self._fresh_capture = False
         return cache
 
     def get_state_as_string(self):
+        """Get the state of the camera in string format."""
         return self.state.name
+
+    def capture_and_download(self, target_folder: str, target_name: str = None):
+        """Return the filepath to an image just 'captured' and downloaded to target folder.
+
+        User must specify the target to download to, but target_name defaults to cam index.
+        """
+        if target_name is None:
+            target_name = str(self._address)
+
+        target_fp = os.path.join(target_folder, target_name)
+
+        data = self._imgs[self._counter % len(self._imgs)]
+
+        with open(target_fp, 'wb') as im_f:
+            im_f.write(data)
+
+        return target_fp
 
     def capture(self, continuous=False, barrier: threading.Barrier = None, stop_event=None):
         """Start capturing photos, typically called by a thread."""
@@ -142,7 +167,6 @@ class DummyCam(AbstractCamera):
             self.update_message = 'before preview fetch'
             self.notify()
             if self.fetch_state is True:
-                print('Fetching')
                 self._fresh_capture = True
             self.state = CAMERA_STATES.INITIALISED
 
@@ -162,7 +186,8 @@ class DummyCam(AbstractCamera):
 
 
 class DummyShell():
-    """Mimic the Canon6D for the purposes of testing on system without GPhoto."""
+    """Mimic the Canon6D camera shell for the purposes of testing on system without GPhoto."""
+
     def __init__(self, camera_driver):
         """Constructor."""
         self._camera = camera_driver
@@ -170,6 +195,7 @@ class DummyShell():
         self.config.drivemode = 'Single'
         self.config.reviewtime = 'None'
         self.capture = self._camera.capture
+        self.capture_and_download = self._camera.capture_and_download
         self.get_state_as_string = self._camera.get_state_as_string
         self.is_cam_image_fresh = self._camera.is_cam_image_fresh
 

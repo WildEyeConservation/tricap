@@ -1,5 +1,5 @@
+"""D Joubert 16 November 2016 - Camera managers for Tricap app."""
 # coding=utf-8
-""" D Joubert 16 November 2016 - Camera managers for Tricap app"""
 
 # TODO Settings page should show warning for all incorrectly formatted settings
 
@@ -12,7 +12,6 @@ from config import CAM_MANAGER_STATES, SERVER_LOG_DIR, SESSION_ROOT_DIR
 
 # TODO : Create a camera factory that will import cameras according to its config and make them available via its own
 # autodetect function
-
 try:
     from .canon_6D import Canon6DCam
     from .gphoto_cam import GPhotoCam as Camera
@@ -138,9 +137,9 @@ class TriCapCamsManager:
             with open(fp, 'rb') as im_f:
                 tags = exifread.process_file(im_f)
                 if 'GPS GPSLongitude' in tags.keys():
-                   gps_status_of_cams.append(True)
+                    gps_status_of_cams.append(True)
                 else:
-                   gps_status_of_cams.append(False)
+                    gps_status_of_cams.append(False)
 
             # get the camera to capture an image and download it to a provided folder
             # get the exif data from the image

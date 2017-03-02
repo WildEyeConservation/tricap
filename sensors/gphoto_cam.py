@@ -109,11 +109,9 @@ class GPhotoCam(AbstractCamera):
         self._address = address
 
         self._image_count = 0
-        self._trigger_count = 0
 
-        # TODO delete this!
         self._old_image_path = None
-        self._old_trigger_count = 0
+        self._old_image_count = 0
 
         self._setup_camera(settings)
 
@@ -163,7 +161,6 @@ class GPhotoCam(AbstractCamera):
         # Make a copy, so that we can release the file_data object
         self.data = memoryview(file_data).tobytes()
         self._fresh_capture = True
-        self._image_count += 1
 
     def _run_calibrate_if_needed(self):
         if self.calibrate_func is not None:
@@ -230,11 +227,11 @@ class GPhotoCam(AbstractCamera):
                 try:
                     # file_path = self._gp_camera.capture(gp.GP_CAPTURE_IMAGE, GPhotoCam._context)
                     self._gp_camera.trigger_capture(GPhotoCam._context)
-                    self._trigger_count += 1
+                    self._image_count += 1
 
-                    if self.fetch_state and (self._old_image_path is None or self._trigger_count - self._old_trigger_count >= 10):
+                    if self.fetch_state and (self._old_image_path is None or self._image_count - self._old_image_count >= 10):
                         self._old_image_path = self._wait_for_image_path(before_capture_ts)
-                        self._old_trigger_count = self._trigger_count
+                        self._old_image_count = self._image_count
 
                     triggered = True
                 except gp.GPhoto2Error:
@@ -245,7 +242,7 @@ class GPhotoCam(AbstractCamera):
             self.notify()
 
             camera_file = None
-            if self.fetch_state and self._old_image_path and self._trigger_count - self._old_trigger_count == 5:
+            if self.fetch_state and self._old_image_path and self._image_count - self._old_image_count == 5:
                 camera_file = self._fetch_preview_camera_file(self._old_image_path)
 
             self.update_message = 'after preview fetch'

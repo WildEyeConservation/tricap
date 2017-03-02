@@ -7,7 +7,7 @@ from flask import Blueprint, render_template, send_from_directory, current_app, 
 from flask import send_file, redirect, url_for
 
 from app import tricap_manager, altimeter, session_logger, talkbox, log_list, stop_all_threads
-from app import rootlogger
+from app import rootlogger, fetch_stopper
 
 from support.configure import TricapConfig
 
@@ -42,12 +42,17 @@ def index():
         'timeout_period': config.get('timeout_period', TricapConfig.WEB_SECTION_HEADER),
         'alti_target': config.get('alti_target', TricapConfig.WEB_SECTION_HEADER),
         'alti_range': config.get('alti_range', TricapConfig.WEB_SECTION_HEADER),
+        'alti_convert_to_feet': config.get('alti_convert_to_feet', TricapConfig.WEB_SECTION_HEADER),
         'vibrate': config.get('vibrate', TricapConfig.WEB_SECTION_HEADER),
         'default_session_description': session_logger.get_description()
     }
 
     cams_start_display = config.get('cams_start_display', TricapConfig.WEB_SECTION_HEADER)
     alti_start_display = config.get('alti_start_display', TricapConfig.WEB_SECTION_HEADER)
+
+    if cams_start_display.lower() == 'open':
+        for cam in tricap_manager.get_cameras_as_list():
+            cam._camera.fetch_state = True
 
     return render_template('/home/index.html', num_cams=tricap_manager.get_num_cams(),
                            cams_start_display=cams_start_display,
@@ -89,6 +94,21 @@ def _determine_alti_state_colour():
     return alti_state_colour
 
 
+@home_bp.route('/_set_image_fetching_state')
+def _set_image_fetching_state():
+    image_fetch_state_str = str(request.args.get('image_fetching_state'))
+    # TODO Do something with the new image fetch state
+    if image_fetch_state_str == 'True':
+        new_state = True
+    elif image_fetch_state_str == 'False':
+        new_state = False
+
+    for cam in tricap_manager.get_cameras_as_list():
+        cam._camera.fetch_state = new_state
+
+    return jsonify()
+
+
 @home_bp.route('/_get_state_data')
 def provide_state_data():
     """Jsonify all the data pertaining to the state of the system."""
@@ -113,6 +133,20 @@ def provide_state_data():
             'talk': talk_data,
             'sys': sys_data}
 
+    return jsonify(data)
+
+
+@home_bp.route('/_check_gps')
+def _check_gps():
+    gps_status_of_cams = tricap_manager.check_camera_gps_status()
+    data = {}
+    list_of_status = []
+    for index, stat in enumerate(gps_status_of_cams):
+        if stat is True:
+            list_of_status.append('True')
+        else:
+            list_of_status.append('False')
+    data['gps_status_of_cams'] = list_of_status
     return jsonify(data)
 
 
@@ -142,7 +176,10 @@ def _change_message_reply():
 def serve_cam_img(img_str):
     """Serve the image as described by the img_str = camera id + image id."""
     cam_num = int(img_str[0])
-    img_num = int(img_str[1:])
+    # img_num = int(img_str[1:])
+
+    # an image was requested, so either turn on fetching, or keep it going.
+    fetch_stopper.keep_open()
 
     return send_file(io.BytesIO(tricap_manager.get_data(cam_num)), attachment_filename='image.jpg',
                      as_attachment=True)

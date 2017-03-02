@@ -3,7 +3,6 @@
 import logging
 import unittest
 import os
-import pdb
 
 from testfixtures import LogCapture
 from threading import Lock

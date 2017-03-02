@@ -1,5 +1,7 @@
-""" D Joubert - Innoventix Consulting - 18 November 2016 - session_logger.py
-    Logger for data, to be used for importing the data into the larger system """
+"""D Joubert - Innoventix Consulting - 18 November 2016 - session_logger.py.
+
+Logger for data, to be used for importing the data into the larger system.
+"""
 
 import logging
 import os
@@ -25,7 +27,8 @@ class SessionLogger(ThreadedLogger):
 
     _root_logger = logging.getLogger(__name__)
 
-    def __init__(self, description='Default Description', root_folder=SESSION_ROOT_DIR):
+    def __init__(self, description='Default Description', root_folder=SESSION_ROOT_DIR,
+                 log_names_to_track=[]):
         """Constructor, inherits from ThreadedLogger."""
         super(SessionLogger, self).__init__()
         self._root_folder = root_folder
@@ -36,29 +39,40 @@ class SessionLogger(ThreadedLogger):
         #  the rootlogger
         self._logger.propagate = False
 
+        # Note: Important to keep equivalency between the log names tracked and the filehandlers
+        self.log_names_tracked = log_names_to_track
+
         self._session_count = None
         self._log_fp = None
         self._session_folder = None
-        self._fh = None
-        self._tricap_master_copy_fh = None
+        self._session_fh = None
+
+        self._additional_fhs = None
+
         self._description = description
 
         self._ready = False
 
     def __del__(self):
         """Destructor, have to explicitly remove the handlers from the log file."""
+
+        # import pdb; pdb.set_trace()
+
+        self._stop_event.set()
         self.thread.join()
         self._remove_handlers()
         super(SessionLogger, self).__del__()
 
     def _remove_handlers(self):
-        if self._fh is not None:
-            self._logger.removeHandler(self._fh)
-            self._fh.close()
+        if self._session_fh is not None:
+            self._logger.removeHandler(self._session_fh)
+            self._session_fh.close()
 
-        if self._tricap_master_copy_fh is not None:
-            logging.getLogger('').removeHandler(self._tricap_master_copy_fh)
-            self._tricap_master_copy_fh.close()
+        if self._additional_fhs is not None and len(self._additional_fhs) > 0:
+            for index, log_name in enumerate(self.log_names_tracked):
+                logging.getLogger(log_name).removeHandler(self._additional_fhs[index])
+                self._additional_fhs[index].close()
+            self._additional_fhs = []
 
     def is_ready(self):
         return self._ready
@@ -79,8 +93,9 @@ class SessionLogger(ThreadedLogger):
             self.start_thread()
             self._session_folder = self._create_folder()
             self._prep_folder()
-            self._fh = self._create_file_handler()
-            self._logger.addHandler(self._fh)
+            self._session_fh = self._create_file_handler()
+            self._session_fh.setLevel(logging.DEBUG)
+            self._logger.addHandler(self._session_fh)
 
             # need to set ready to true otherwise the log function won't work.
             self._ready = True
@@ -121,23 +136,51 @@ class SessionLogger(ThreadedLogger):
         if os.path.isdir(os.path.join(self._session_folder, 'images')) is False:
             os.mkdir(os.path.join(self._session_folder, 'images'))
 
+        if os.path.isdir(os.path.join(self._session_folder, 'pre')) is False:
+            os.mkdir(os.path.join(self._session_folder, 'pre'))
+
         shutil.copyfile(CONFIG_FP, os.path.join(self._session_folder, 'initial.cfg'))
 
-        # copy the root logger file, and create a new session_server.log
-        root_log = os.path.join(SERVER_LOG_DIR, 'tricap_master.log')
-        if os.path.isfile(root_log):
-            # Don't care if it overwrites any existing pre-session_server log, it will contain same
-            #  info anyway
-            shutil.copyfile(root_log, os.path.join(self._session_folder, 'pre_session_server.log'))
+        real_log_names_tracked = []
+        self._additional_fhs = []
+        for log_name in self.log_names_tracked:
+            # the root log is weird: log.name will give 'root', but must be added using ''
+            if log_name == 'root':
+                log_name = ''
+            log = logging.getLogger(log_name)
+            if len(log.handlers) == 0:
+                logging.getLogger('').warning('No loggers were found named %s', log_name)
+                continue
 
-        # create a file handler so that all messages to root log are also sent to the session log
-        format_str = "%(asctime)s | %(pathname)s:%(lineno)d | %(funcName)s | %(levelname)s | %(message)s "
-        log_fp = os.path.join(self._session_folder, 'session_server.log')
-        self._tricap_master_copy_fh = logging.FileHandler(filename=log_fp)
-        self._tricap_master_copy_fh.setLevel(logging.DEBUG)
-        self._tricap_master_copy_fh.setFormatter(logging.Formatter(format_str))
-        rootlogger = logging.getLogger('')
-        rootlogger.addHandler(self._tricap_master_copy_fh)
+            # need to search the logger for a handler with a file output
+            log_file_handler = None
+            for handler in log.handlers:
+                if hasattr(handler, 'baseFilename'):
+                    log_file_handler = handler
+                    break
+            if log_file_handler is None:
+                logging.getLogger('').warning('Logger %s has no file handlers.', log_name)
+                continue
+
+            # pre copying
+            # assumme that there is only one handler, which is a fileHandler.
+            original_fp = log_file_handler.baseFilename
+            _, original_filename_with_ext = os.path.split(original_fp)
+            shutil.copyfile(original_fp, os.path.join(self._session_folder, 'pre',
+                                                      original_filename_with_ext))
+
+            # hook up to the log
+            new_handler = logging.FileHandler(filename=os.path.join(self._session_folder,
+                                                                    original_filename_with_ext))
+            new_handler.setLevel(logging.DEBUG)
+            new_handler.setFormatter(log.handlers[0].formatter)
+            log.addHandler(new_handler)
+            self._additional_fhs.append(new_handler)
+
+            real_log_names_tracked.append(log_name)
+
+        # update the names tracked with those actually tracked
+        self.log_names_tracked = real_log_names_tracked
 
     def log(self, msg):
         """Log the msg to the session log."""

@@ -6,7 +6,7 @@ Lots of instantiation going on here, not recommended to run this unnecessarily w
 import logging
 import os
 
-from threading import Lock
+from threading import Lock, Timer
 from logging.handlers import TimedRotatingFileHandler
 
 from flask import Flask
@@ -41,6 +41,39 @@ class AltiMeasurementObserver():
         self.session_logger.log('Alti Measurement: %f' % alti.measurement)
 
 
+# TODO Bad metaphor
+class GateCloser():
+    """Manages a timer, which if triggered will run a piece of code, unless kept open."""
+
+    def __init__(self, delay: float, close_function):
+        """Construct."""
+        """Delay - time to wait untill the close_function action is called."""
+        self.delay = delay
+        self.close_function = close_function
+
+        self.timer = None
+
+        self.start_timer()
+
+    def __del__(self):
+        """Deconstructor."""
+        if self.timer:
+            self.timer.cancel()
+            self.timer.join()
+
+    def start_timer(self):
+        """Create the timer and start it."""
+        self.timer = Timer(self.delay, self.close_function)
+        self.timer.daemon = True
+        self.timer.start()
+
+    def keep_open(self):
+        """Keep the gate open, or open it."""
+        if self.timer and self.timer.is_alive():
+            self.timer.cancel()
+        self.start_timer()
+
+
 # Set up rotating log file for the overall log
 format_str = "%(asctime)s | %(pathname)s:%(lineno)d | %(funcName)s | %(levelname)s | %(message)s "
 formatter = logging.Formatter(format_str)
@@ -51,7 +84,7 @@ master_handler.setFormatter(formatter)
 rootlogger = logging.getLogger('')
 rootlogger.addHandler(master_handler)
 rootlogger.setLevel(logging.DEBUG)
-rootlogger.info('Initiating new instance of TriCap app.')
+rootlogger.info('Initiating new instance of the TriCap app.')
 
 # Setup the Flask Server, configuring it using the config.py file
 app = Flask(__name__)
@@ -71,7 +104,7 @@ wz_log.addHandler(flask_handler)
 
 app.logger.addHandler(flask_handler)
 app.logger.setLevel(logging.DEBUG)
-app.logger.info('Initiated flask logger for new instance of TriCap app.')
+app.logger.info('Initiated flask logger for new instance of the TriCap app.')
 
 # Instantiate the system log message tracker
 log_list = LogListAccessor(3)
@@ -83,8 +116,10 @@ cam_settings = init_config.get_section_dict(TricapConfig.CAMERA_SECTION_HEADER)
 
 if init_config.get('cams_required', TricapConfig.WEB_SECTION_HEADER) == 'dummy':
     use_dummy_cams = True
+    rootlogger.debug('Dummy cams will be, in acccordance to configuration.')
 else:
     use_dummy_cams = False
+    rootlogger.debug('Real cams will be used, in accordance to configuration')
 
 tricap_manager = TriCapCamsManager(misc_settings, cam_settings, use_dummy_cams)
 tricap_cameras = tricap_manager.get_cameras_as_list()
@@ -93,24 +128,26 @@ for index, cam in enumerate(tricap_cameras):
     if use_dummy_cams is True:
         cam_log_fp = os.path.join(SERVER_LOG_DIR, 'dummycam_%d_rates.txt' % index)
     else:
-        filename = 'gphotocam_%s_rate.txt' % cam._camera._address.replace(':', '_').replace(',', '_')
+        # filename = 'gphotocam_%s_rate.txt' % cam._camera._address.replace(':', '_').replace(',', '_')
+        filename = 'canon6dcam_%s_rate.txt' % cam.serial_num
         cam_log_fp = os.path.join(SERVER_LOG_DIR, filename)
 
     camera_loggers.append(cameraLoggingObserver(log_fp=cam_log_fp, subject_cameras=cam._camera))
 
 image_manager = tricap_manager
 
-session_logger = SessionLogger()
+rootlogger.debug('Cameras have been configured.')
 
 alti_settings = init_config.get_section_dict(TricapConfig.ALTI_SECTION_HEADER)
 
 if init_config.get('alti_required', TricapConfig.WEB_SECTION_HEADER) == 'dummy':
-    altimeter = DummyAlti(alti_settings, session_logger)
+    rootlogger.debug('Using a dummy altimeter.')
+    altimeter = DummyAlti(alti_settings)
 else:
+    rootlogger.debug('Using a real altimeter.')
     altimeter = TrusenseAltimeter(alti_settings)
-    
-alti_observer = AltiMeasurementObserver(session_logger)
-altimeter.attach(alti_observer)
+
+rootlogger.debug('Altimeter has been configured.')
 
 talkbox = TalkBox(Lock(), 3)
 talkbox.clear()
@@ -138,6 +175,24 @@ for sm in sys_mons:
     if sm is not None:
         sm.start()
 
+# setup the session logger, hook it up to the alti and all the other logs
+log_names_to_track = [rootlogger.name, app.logger.name, wz_log.name]
+log_names_to_track += [cam_log._logger.name for cam_log in camera_loggers]
+session_logger = SessionLogger(log_names_to_track=log_names_to_track)
+alti_observer = AltiMeasurementObserver(session_logger)
+altimeter.attach(alti_observer)
+
+# some glue functions, which use the module level functions
+
+
+def stop_fetching():
+    """Turn off fetching for all cameras."""
+    for cam in tricap_manager.get_cameras_as_list():
+        cam._camera.fetch_state = False
+
+
+fetch_stopper = GateCloser(20.0, stop_fetching)
+
 
 def stop_all_threads():
     """Helper function for a clean exit."""
@@ -161,3 +216,5 @@ from .views.settings import settings_bp
 app.register_blueprint(home_bp)
 app.register_blueprint(showlog_bp)
 app.register_blueprint(settings_bp)
+
+rootlogger.info('New instance of TriCap app has been initiated.')

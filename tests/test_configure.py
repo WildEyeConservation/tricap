@@ -7,10 +7,10 @@ import configparser
 from config import CONFIG_FP, SERVER_LOG_DIR
 from support.configure import TricapConfig, TricapConfigError
 
-from .tempfile_test_case import TricapTempFilerTestCase
+from .tricap_tempfile_test_case import TriCapTempFilerTestCase
 
 
-class TestConfigure(TricapTempFilerTestCase):
+class TestConfigure(TriCapTempFilerTestCase):
     """Child of TricapTempFilerTestCase, with logging of only the configure module."""
 
     format_str = "%(asctime)s | %(pathname)s:%(lineno)d | %(funcName)s | %(levelname)s | %(message)s "

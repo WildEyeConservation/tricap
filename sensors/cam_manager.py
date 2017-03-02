@@ -1,17 +1,17 @@
+"""D Joubert 16 November 2016 - Camera managers for Tricap app."""
 # coding=utf-8
-""" D Joubert 16 November 2016 - Camera managers for Tricap app"""
 
 # TODO Settings page should show warning for all incorrectly formatted settings
 
 import logging
 import threading
 import os
+import exifread
 
-from config import CAM_MANAGER_STATES, SERVER_LOG_DIR
+from config import CAM_MANAGER_STATES, SERVER_LOG_DIR, SESSION_ROOT_DIR
 
 # TODO : Create a camera factory that will import cameras according to its config and make them available via its own
 # autodetect function
-
 try:
     from .canon_6D import Canon6DCam
     from .gphoto_cam import GPhotoCam as Camera
@@ -57,6 +57,7 @@ class TriCapCamsManager:
     _logger = logging.getLogger(__name__)
 
     def __init__(self, man_settings: dict, cam_settings: dict, use_dummy_cams=False):
+        """Construct."""
         self.state = CAM_MANAGER_STATES.STOPPED
 
         self._capture_thread = None
@@ -117,16 +118,39 @@ class TriCapCamsManager:
                     tricap_cam._camera.calibrate_step = int(self._man_settings['calibrate_step'])
                     self._cameras.append(tricap_cam)
 
-    def reset(self, man_settings: dict, cam_settings: dict):
-        self._man_settings = man_settings
-        self._cam_settings = cam_settings
+    # def reset(self, man_settings: dict, cam_settings: dict):
+    #     self._man_settings = man_settings
+    #     self._cam_settings = cam_settings
+    #
+    #     if self.state == CAM_MANAGER_STATES.STARTED:
+    #         self.stop_capturing()
+    #
+    #     self._initialise()
 
-        if self.state == CAM_MANAGER_STATES.STARTED:
-            self.stop_capturing()
+    def check_camera_gps_status(self):
+        """Check gps status of all connected cameras and return boolean for each camera.
 
-        self._initialise()
+        For each camera, take a picture, download it, and check the gps info in the exif data.
+        """
+        gps_status_of_cams = []
+        for index, cam in enumerate(self._cameras):
+            fp = cam.capture_and_download(target_folder=SESSION_ROOT_DIR, target_name=str(index)+'.CR2')
+            with open(fp, 'rb') as im_f:
+                tags = exifread.process_file(im_f)
+                if 'GPS GPSLongitude' in tags.keys():
+                    gps_status_of_cams.append(True)
+                else:
+                    gps_status_of_cams.append(False)
+
+            # get the camera to capture an image and download it to a provided folder
+            # get the exif data from the image
+            # check if the exif data has the appropriate fields in it.
+            # add that to the list
+
+        return gps_status_of_cams
 
     def start_capturing(self):
+        """Start the capturing threads of all connected cams."""
         if len(self._cameras) == 0:
             self.state = CAM_MANAGER_STATES.ERROR_NO_CAMS
             self._logger.debug('Tried to start capture threads with no cameras connected.')

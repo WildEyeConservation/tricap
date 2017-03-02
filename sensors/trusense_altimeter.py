@@ -153,12 +153,12 @@ class TrusenseAltimeter(Subject):
         self._write('CA,%d' % int(self._settings['num_frames_to_avg']), 'Error setting continous mode frame averaging')
         self._write('FA,%d' % int(self._settings['num_frames_to_avg']), 'Error setting fast mode frame averaging')
 
-    def reset(self, settings):
-        """Get the altimeter object to re-initialise, establishing comms again, etc"""
-        if self.state == ALTIMETER_STATE.MEASURING:
-            self.stop_measuring()
-
-        self.__init__(settings)
+    # def reset(self, settings):
+    #     """Get the altimeter object to re-initialise, establishing comms again, etc"""
+    #     if self.state == ALTIMETER_STATE.MEASURING:
+    #         self.stop_measuring()
+    #
+    #     self.__init__(settings)
 
     def get_state_as_string(self):
         return self.state.name

@@ -34,6 +34,8 @@ class AbstractCamera(Subject):
         self.calibrate_func = None
         self.calibrate_timing = 0
 
+        self.fetch_state = False
+
         self.update_message = 'Camera observer update message.'
 
     @abstractmethod
@@ -47,14 +49,19 @@ class AbstractCamera(Subject):
         """Find connected cameras."""
         pass
 
-    @abstractmethod
-    def reset(self):
-        """Reset the camera, reload the settings."""
-        pass
+    # @abstractmethod
+    # def reset(self):
+    #     """Reset the camera, reload the settings."""
+    #     pass
 
     @abstractmethod
     def capture(self, continuous=False, barrier: threading.Barrier = None):
         """Capture an image, typically used by a threading function."""
+        pass
+
+    @abstractmethod
+    def capture_and_download(self, target_folder: str, target_name: str):
+        """Capture an image and download it to a target folder."""
         pass
 
     @abstractmethod

@@ -13,6 +13,7 @@ var stateRefreshRate = {{python_data.refresh_rate}};
 var timeOutPeriod = {{python_data.timeout_period}};
 var altiTarget = {{python_data.alti_target}};
 var altiRange = {{python_data.alti_range}};
+var altiConvertToFeet = "{{python_data.alti_convert_to_feet}}"
 var vibrate = "{{python_data.vibrate}}";
 var defaultSessionDescription = "{{python_data.default_session_description}}"
 // Code here will be ignored by JSHint.
@@ -101,13 +102,15 @@ function _get_element_pre(elem_selector){
     return pre;
 }
 
-function changeStateColour(elem_selector, target_colour){
-
+function changeElementColour(elem_selector, target_colour){
+    //Remove all other colour classes and input the colour class based on the target_colour string.
     var elem = $(elem_selector);
     var pre = _get_element_pre(elem_selector);
 
     // remove state colour
     elem.removeClass(pre+tricap.GREEN_CLASS+' '+pre+tricap.ORANGE_CLASS+' '+pre+tricap.RED_CLASS);
+    // remove time colour
+    elem.removeClass(pre+tricap.BLUE_CLASS+' '+pre+tricap.RED_CLASS+' '+pre+tricap.GREY_CLASS);
 
     // add correct colour
     if (target_colour === 'red'){
@@ -116,48 +119,34 @@ function changeStateColour(elem_selector, target_colour){
         elem.addClass(pre+tricap.GREEN_CLASS);
     } else if (target_colour === 'orange'){
         elem.addClass(pre+tricap.ORANGE_CLASS);
-    }
-}
-
-function changeTimeColour(elem_selector, target_colour){
-
-    var elem = $(elem_selector);
-    var pre = _get_element_pre(elem_selector);
-
-    // remove state colour
-    elem.removeClass(pre+tricap.BLUE_CLASS+' '+pre+tricap.RED_CLASS+' '+pre+tricap.GREY_CLASS);
-
-    if (target_colour === 'grey'){
+    } else if (target_colour === 'grey'){
         elem.addClass(pre+tricap.GREY_CLASS);
     } else if (target_colour === 'blue'){
         elem.addClass(pre+tricap.BLUE_CLASS);
-    } else if (target_colour === 'red'){
-        elem.addClass(pre+tricap.RED_CLASS);
     }
 }
 
 function showMainError(msg){
     $('#h_main_status').html(msg);
-    changeStateColour('#alt_main_status', 'red');
-    changeStateColour('#alt_msgs', 'red');
+    changeElementColour('#alt_main_status', 'red');
+    changeElementColour('#alt_msgs', 'red');
 }
 
 function changeMainStatus(colour, msg) {
     $('#h_main_status').html(msg);
-    changeStateColour('#alt_main_status', colour);
-    changeStateColour('#alt_msgs', colour);
+    changeElementColour('#alt_main_status', colour);
+    changeElementColour('#alt_msgs', colour);
 }
 
 // Then function expressions (i.e. var a = function(a,b){return a+b;};). Note that the var a is
 // hoisted as var a = undefined. So watch out.
 
 var buttonClick = function(buttonCode){
-
     if (buttonCode === tricap.BUTTON_CODES.START || buttonCode === tricap.BUTTON_CODES.STOP ||
         buttonCode === tricap.BUTTON_CODES.STARTSTOP){
         // If we are starting a new session, get a new description
         if ($('[name="btn_startstop"]').html() === 'Start'){
-            $('#input_modal_session_description').val(defaultSessionDescription)
+            $('#input_modal_session_description').val(defaultSessionDescription);
             $('#modal_session_description').modal();
         } else {
             $.getJSON($SCRIPT_ROOT + '/_button_click', {buttonCode: buttonCode }, startStopFollowUp);
@@ -180,56 +169,81 @@ var buttonClick = function(buttonCode){
 
 var startStopFollowUp = function (data) {
     if (data.capture_started === true){
-        camRefreshTimer.runTimer();
-        // $('#btn_startstop').html('Stop');
+        if ($('#con_cam').hasClass('collapse in') === true){
+            //i.e. the container is visible
+            camRefreshTimer.runTimer();
+        } else {
+            //i.e. the container is collapsed, don't request data no one will see.
+            camRefreshTimer.stopTimer();
+        }
         $('[name="btn_startstop"]').html('Stop');
     } else {
         camRefreshTimer.stopTimer();
-        // $('#btn_startstop').html('Start');
         $('[name="btn_startstop"]').html('Start');
     }
     return false;
 };
 
+var getTimeColourForCamImage = function(index){
+    //Determine the correct time colour code to be used for the images from a camera.
+
+    var retColourCode;
+
+    if (camImgControllers[index].imgId !== camImgControllers[index].lastRequestId){
+        //The cam image is new, time colour should be blue
+        camImgControllers[index].lastRequestId = camImgControllers[index].imgId;
+        camImgControllers[index].oldImgCount = 0;
+        retColourCode = 'blue';
+    } else {
+        camImgControllers[index].oldImgCount = camImgControllers[index].oldImgCount + 1;
+        if (camImgControllers[index].oldImgCount < imgTooOldCount){
+            retColourCode = 'grey';
+        } else {
+            retColourCode = 'red';
+        }
+    }
+
+    return retColourCode;
+};
+
 var refreshCamImages = function(){
+    // Function called to force the images to update their paths to new ones.
     for (index = 0; index < camImgControllers.length; index++){
-        if (camImgControllers[index].imgId !== camImgControllers[index].lastRequestId){
+        var timeColourCode = getTimeColourForCamImage(index);
+        changeElementColour('#alt_cam'+index, timeColourCode);
+
+        if (timeColourCode === 'blue'){
             var cam_img_url = $SCRIPT_ROOT + '/cam_img'+index+camImgControllers[index].imgId;
             $('#img_cam'+index).attr('src', cam_img_url);
-            changeTimeColour('#alt_cam'+index, 'blue');
-            camImgControllers[index].lastRequestId = camImgControllers[index].imgId;
-            camImgControllers[index].oldImgCount = 0;
-        } else {
-            camImgControllers[index].oldImgCount = camImgControllers[index].oldImgCount + 1;
-            if (camImgControllers[index].oldImgCount < imgTooOldCount){
-                changeTimeColour('#alt_cam'+index, 'grey');
-            } else {
-                changeTimeColour('#alt_cam'+index, 'red');
-            }
         }
     }
     return false;
 };
 
 var updateAlti = function(data){
-    $('#h_alti').html('Altitude: ' + data.measurement + ' m');
 
-    changeStateColour('#alt_alti', data.state_colour);
-    changeStateColour('#alt_alti_inner', data.state_colour);
-    changeStateColour('[name="btn_alti"]', data.state_colour);
+    if (altiConvertToFeet === 'True'){
+        $('#h_alti').html('Altitude: ' + Math.round(data.measurement*3.28084) + ' ft');
+    } else {
+        $('#h_alti').html('Altitude: ' + Math.round(data.measurement) + ' m');
+    }
+
+    changeElementColour('#alt_alti', data.state_colour);
+    changeElementColour('#alt_alti_inner', data.state_colour);
+    changeElementColour('[name="btn_alti"]', data.state_colour);
 
     if (data.state_colour === 'red'){
         changeMainStatus('red', 'Altimeter Error');
     }
 
     if (data.measurement < altiTarget-altiRange){
-        changeTimeColour('#alt_alti_target', 'red');
+        changeElementColour('#alt_alti_target', 'red');
         $('#h_alti_target').html('Below target range');
     } else if (data.measurement > altiTarget+altiRange) {
-        changeTimeColour('#alt_alti_target', 'red');
+        changeElementColour('#alt_alti_target', 'red');
         $('#h_alti_target').html('Above target range');
     } else {
-        changeTimeColour('#alt_alti_target', 'blue');
+        changeElementColour('#alt_alti_target', 'blue');
         $('#h_alti_target').html('Within target range');
     }
 
@@ -238,8 +252,18 @@ var updateAlti = function(data){
 
 
 var updateCamState = function(data){
-    changeStateColour('#alt_cam_overall', data.overall_cam_state_colour);
-    changeStateColour('[name="btn_cam"]', data.overall_cam_state_colour);
+    //Update the overall status of the camera, but not the images, that happens separately."""
+    if (data.capture_started === true && $('#con_cam').hasClass('collapse in') === false){
+        //need to change the colour based on timing info
+        for (index = 0; index < camImgControllers.length; index++){
+            var timeColourCode = getTimeColourForCamImage(index);
+            changeElementColour('[name="btn_cam"]', timeColourCode);
+        }
+    } else {
+        changeElementColour('[name="btn_cam"]', data.overall_cam_state_colour);
+    }
+
+    changeElementColour('#alt_cam_overall', data.overall_cam_state_colour);
 
     for (index = 0; index < camImgControllers.length; index++){
         camImgControllers[index].imgId = data.image_counts[index];
@@ -375,8 +399,20 @@ $(function(){
         camImgControllers.push(new camImgController());
     }
 
+    // Bind the collapse events to the json requests to activate or deactivate fetching
+    $('#con_cam').on('show.bs.collapse', function(){
+        console.log('Requesting should now be made active');
+        $.getJSON($SCRIPT_ROOT + '/_set_image_fetching_state', {image_fetching_state: 'True'});
+        return true;
+    });
+
+    $('#con_cam').on('hide.bs.collapse', function(){
+        console.log('Requesting should now be made not active');
+        $.getJSON($SCRIPT_ROOT + '/_set_image_fetching_state', {image_fetching_state: 'False'});
+        return true;
+    });
+
     // Set the specific button functions
-    // $("#btn_startstop").on('click', function(event){buttonClick(tricap.BUTTON_CODES.STARTSTOP);});
     $('[name="btn_startstop"]').on('click', function(event){buttonClick(tricap.BUTTON_CODES.STARTSTOP);});
 
     //modal submit button click code
@@ -432,26 +468,3 @@ $(function(){
     setInterval(requestStateData, stateRefreshRate);
     timeoutFunc = setTimeout(function(){showMainError('No Response From Server');}, timeOutPeriod);
 });
-
-
-// function updateOldTalkBoxMsgs(){
-//     oldTalkBoxMsgs = [];
-//     oldTalkBoxMsgs.push($("#input_talkbox").val()+'3');
-//     var tbDiv = $("#alt_msgs_talkbox").find('div').first()
-//     for (var i = 0; i < $("#alt_msgs_talkbox").find('div').length; i++) {
-//         if (i < $("#alt_msgs_talkbox").find('div').length-1) {
-//             var msg = tbDiv.find('input').val();
-//             var btn = tbDiv.find('button').first();
-//             var reply_code = '3';
-//             if (btn.hasClass('btn-success')) {
-//                 reply_code = '1';
-//             } else if (btn.next().hasClass('btn-success')) {
-//                 reply_code = '2';
-//             }
-//             oldTalkBoxMsgs.push(msg+reply_code);
-//         }
-//         tbDiv = tbDiv.next()
-//     }
-//     oldTalkBoxMsgs.reverse();
-//     console.log(oldTalkBoxMsgs);
-// }

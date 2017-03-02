@@ -1,21 +1,24 @@
-from sensors.gphoto_cam import GPhotoCam
-import threading
-from config import CAMERA_STATES
-import gphoto2 as gp
+"""A shell for GPhotoCam, implementing properties required specifically for the Canon EOS 6D."""
+
 import time
 
 
 class Canon6DCam():
+    """Canon EOS 6D shell for the gphoto2 cam."""
+
     def __init__(self, camera_driver):
+        """Constructor."""
         self._camera = camera_driver
-        self.config.output = 'Undefined'  # Do not be in live mode
+        self.config.output = 'Off'  # Do not be in live mode
         self.config.drivemode = 'Single'
         self.config.reviewtime = 'None'
         self.capture = self._camera.capture
+        self.capture_and_download = self._camera.capture_and_download
         self.get_state_as_string = self._camera.get_state_as_string
         self.is_cam_image_fresh = self._camera.is_cam_image_fresh
 
     def focus_infinity(self):
+        """Change the focus of the lens to infinity using series of manual focus events."""
         if self.serial_num == '413051000325':
             print("Focus!")
             self.config.output = 'PC'

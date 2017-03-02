@@ -24,7 +24,7 @@
 
 <body>
     <div class="section">
-      <div class="container">
+      <div class="container" id="base_container">
         <div class="row">
           <div class="col-xs-11">
             <div class="alert alert-success" id="alt_main_status">
@@ -51,12 +51,21 @@
                 <li>
                   <a href="{{ url_for('home.reset')}}" id="a_reset">Reset</a>
                 </li>
+                <li>
+                  <a href="#" id="a_check_gps">Check GPS</a>
+                </li>
               </ul>
             </div>
           </div>
         </div>
       </div>
     </div>
+
+    {% block base_js %}
+        <script type="text/javascript">
+            {% include 'js/base.js' %}
+        </script>
+    {% endblock %}
 
     {% block content %}{% endblock %}
 

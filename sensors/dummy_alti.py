@@ -42,7 +42,7 @@ class DummyAlti(Subject):
     """Handles serial communication with the TruSense S100 Laser Altimeter"""
     _logger = logging.getLogger(__name__)
 
-    def __init__(self, settings, data_logger, supported_devices={(1659, 8963)}):
+    def __init__(self, settings, supported_devices={(1659, 8963)}):
         super().__init__()
         # SETTINGS
         # default values
@@ -62,12 +62,13 @@ class DummyAlti(Subject):
 
         self._mchange_dir = 'up'
 
-        self._data_logger = data_logger
         self.state = ALTIMETER_STATE.NOT_CONNECTED
         self._measurement = 0
 
         self._logger.info('Dummy Alti Port Opened')
         self.state = ALTIMETER_STATE.CONNECTED
+
+        self.generation_period = 1
 
     @property
     def config(self):
@@ -83,10 +84,10 @@ class DummyAlti(Subject):
     def _set_setting(self, key, value):
         self._settings[key] = value
 
-    def reset(self):
-        """Get the altimeter object to re-initialise, establishing comms again, etc"""
-        if self.state == ALTIMETER_STATE.MEASURING:
-            self.stop_measuring()
+    # def reset(self):
+    #     """Get the altimeter object to re-initialise, establishing comms again, etc"""
+    #     if self.state == ALTIMETER_STATE.MEASURING:
+    #         self.stop_measuring()
 
     def get_state_as_string(self):
         return self.state.name
@@ -103,7 +104,7 @@ class DummyAlti(Subject):
                     self._mchange_dir = 'up'
 
             self.notify()
-            sleep(0.5)
+            sleep(self.generation_period)
 
         self.state = ALTIMETER_STATE.CONNECTED
 

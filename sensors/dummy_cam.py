@@ -20,15 +20,20 @@ CameraSpec = namedtuple("cam", ["name", "model"])
 
 
 class DummyConfig:
+    """Dummy Configuration Class."""
+
     dictkeys = ["_tree"]
 
     def __init__(self, tree):
+        """Construct."""
         self._tree = tree
 
     def __repr__(self):
+        """Representation."""
         return str(RenderTree(self._tree))
 
     def __dir__(self):
+        """Dir."""
         return [node.name for node in PreOrderIter(self.get_tree()) if node.is_leaf]
 
     def _get_child_by_name(self, key):
@@ -46,6 +51,7 @@ class DummyConfig:
         return BaseSetting(set_spec)
 
     def __setattr__(self, key, value):
+        """__setattr__."""
         if key in DummyConfig.dictkeys:
             self.__dict__[key] = value
         else:
@@ -53,22 +59,25 @@ class DummyConfig:
             config_widget.set(str(value))
 
     def __getattr__(self, key):
+        """__getattr__."""
         return self._get_child_by_name(key)
 
     __setitem__ = __setattr__
     __getitem__ = __getattr__
 
     def get_tree(self):
+        """Return the underlying tree."""
         return self._tree
 
 
 # TODO Bad Coding, bad oop
 def external_dummy_calibrate_func():
+    """Dummy calibrate function, should be removed."""
     print('Calibrate!')
 
 
 class DummyCam(AbstractCamera):
-    """ Serves as a fake camera for testing purposes."""
+    """Serves as a fake camera for testing purposes."""
 
     cameras = [CameraSpec(name="Dummy Cam", model=None) for i in range(3)]
 
@@ -76,6 +85,7 @@ class DummyCam(AbstractCamera):
 
     @staticmethod
     def configure(cameras):
+        """Configue."""
         DummyCam.cameras = cameras
 
     @staticmethod
@@ -87,6 +97,7 @@ class DummyCam(AbstractCamera):
         return [(cam.name, index) for index, cam in enumerate(DummyCam.cameras)]
 
     def __init__(self, address, settings=None):
+        """Construct."""
         super().__init__(address, settings)
         if settings is None:
             settings = {}
@@ -117,6 +128,7 @@ class DummyCam(AbstractCamera):
 
     @property
     def config(self):
+        """Return the private config attribute."""
         return self._config
     #
     # def reset(self, settings=None):
@@ -201,21 +213,26 @@ class DummyShell():
 
     @property
     def config(self):
+        """Config property."""
         return self._camera.config
 
     @property
     def data(self):
+        """Data property."""
         return self._camera.data
 
     @property
     def serial_num(self):
+        """Return the serial number of the underlying camera object."""
         return self._camera.serial_num
 
     def get_cam_image_count(self):
+        """Return the image count for the underlying camera."""
         return self._camera.get_cam_image_count()
 
     @property
     def state(self):
+        """Return the state of the underlying camera."""
         return self._camera.state
 
     # Node('main', label='Camera and Driver Configuration', type=<CamConfigType.Window: 0>)

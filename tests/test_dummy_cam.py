@@ -35,6 +35,8 @@ class TestDummyCam(TestCase):
 
         self.cam.generation_period = 0.1
 
+        self.cam.fetch_state = True
+
         thread = threading.Thread(target=self.cam.capture, daemon=True,
                                   kwargs={"continuous": True,
                                           "stop_event": kill_pill})
@@ -45,13 +47,13 @@ class TestDummyCam(TestCase):
         self.assertEqual(self.cam.get_state_as_string(), 'CAPTURING')
 
         # check that a new image is "released" and that the camera keeps track of access
-        sleep(self.cam.generation_period*2)
+        sleep(self.cam.generation_period*10)
         self.assertEqual(self.cam.is_cam_image_fresh(), True)
         self.assertNotEqual(self.cam.data, None)
         self.assertEqual(self.cam.is_cam_image_fresh(), False)
 
         # check that a new image is refereshed
-        sleep(self.cam.generation_period*2)
+        sleep(self.cam.generation_period*10)
         self.assertEqual(self.cam.is_cam_image_fresh(), True)
 
         # coverage maxing

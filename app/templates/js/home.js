@@ -13,6 +13,7 @@ var stateRefreshRate = {{python_data.refresh_rate}};
 var timeOutPeriod = {{python_data.timeout_period}};
 var altiTarget = {{python_data.alti_target}};
 var altiRange = {{python_data.alti_range}};
+var altiConvertToFeet = "{{python_data.alti_convert_to_feet}}"
 var vibrate = "{{python_data.vibrate}}";
 var defaultSessionDescription = "{{python_data.default_session_description}}"
 // Code here will be ignored by JSHint.
@@ -141,7 +142,6 @@ function changeMainStatus(colour, msg) {
 // hoisted as var a = undefined. So watch out.
 
 var buttonClick = function(buttonCode){
-
     if (buttonCode === tricap.BUTTON_CODES.START || buttonCode === tricap.BUTTON_CODES.STOP ||
         buttonCode === tricap.BUTTON_CODES.STARTSTOP){
         // If we are starting a new session, get a new description
@@ -221,7 +221,12 @@ var refreshCamImages = function(){
 };
 
 var updateAlti = function(data){
-    $('#h_alti').html('Altitude: ' + data.measurement + ' m');
+
+    if (altiConvertToFeet === 'True'){
+        $('#h_alti').html('Altitude: ' + Math.round(data.measurement*3.28084) + ' ft');
+    } else {
+        $('#h_alti').html('Altitude: ' + Math.round(data.measurement) + ' m');
+    }
 
     changeElementColour('#alt_alti', data.state_colour);
     changeElementColour('#alt_alti_inner', data.state_colour);

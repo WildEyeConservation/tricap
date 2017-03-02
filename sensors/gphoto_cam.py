@@ -240,9 +240,6 @@ class GPhotoCam(AbstractCamera):
                 except gp.GPhoto2Error:
                     pass
 
-            # if (datetime.now() - before_capture_ts).total_seconds() > 1.5:
-            #     file_path = None
-
             # Timing point
             self.update_message = 'before preview fetch'
             self.notify()

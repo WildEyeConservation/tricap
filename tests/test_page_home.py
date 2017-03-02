@@ -1,7 +1,11 @@
 """Behaviour tests for the home page."""
 
 import threading
+import json
+import unittest
+
 from time import sleep
+from flask import url_for
 
 from .tricap_flask_test_case import TriCapBehaviourTestCase, TriCapAppTestCase
 
@@ -9,18 +13,14 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as ec
 from selenium.webdriver.common.by import By
 
-from app import tricap_manager, altimeter, talkbox, session_logger, stop_all_threads
-
-import unittest
-
-from flask import url_for
-
 from support.configure import TricapConfig
+
+from support.talkbox import TALK_REPLY
+
+from app import tricap_manager, altimeter, talkbox, session_logger, stop_all_threads
 
 from config import CAMERA_STATES, CAM_MANAGER_STATES, ALTIMETER_STATE, BUTTON_CODE
 from app.views.home import CAM_STATE_COLOURS, CAM_MAN_STATE_COLOURS, ALTI_STATE_COLOURS
-
-from support.talkbox import TALK_REPLY
 
 
 class TestHome(unittest.TestCase):
@@ -215,7 +215,8 @@ class TestBehaviourHome(TriCapBehaviourTestCase):
         """Test that all threads can be stopped by the stop_all_threads() function.
 
         Not a great test, can only test that we have reduced the number of threads, as we have no
-        idea what other modules are creating threads."""
+        idea what other modules are creating threads.
+        """
         with self.client:  # access the web page through a 'client', as if a browser
             self.open_page('home.index', 'btn_menu')
 
@@ -243,14 +244,98 @@ class TestBehaviourHome(TriCapBehaviourTestCase):
 
             self.assertLess(len(after_stop_threads), len(before_stop_threads))
             # TODO Check that all the monitors have been stopped and the sensors as well
-    # 
-    # def test_gps_check(self):
-    #     """Test that the gps check button doesn't fall over."""
-    #     with self.client:  # access the web page through a 'client', as if a browser
-    #         self.open_page('home.index', 'btn_menu')
-    #
-    #         # open the menu and click the button
-    #         self.driver.find_element_by_css_selector('#btn_menu').click()
-    #         self.driver.find_element_by_css_selector('#a_check_gps').click()
-    #
-    #         sleep(5)
+
+    def test_alti_convert_to_feet(self):
+        """Test that the conversion to feet happens and is correct."""
+        with self.client:  # access the web page through a 'client', as if a browser
+            triconfig = TricapConfig()
+            web_settings = triconfig.get_section_dict(TricapConfig.WEB_SECTION_HEADER)
+            web_settings['alti_required'] = 'dummy'
+            web_settings['alti_convert_to_feet'] = 'True'
+            triconfig.set_section(web_settings, TricapConfig.WEB_SECTION_HEADER)
+            triconfig.save_to_file()
+
+            self.open_page('home.index', 'btn_menu')
+
+            # make the modal appear
+            self.driver.find_element_by_css_selector('[name="btn_startstop"]').click()
+
+            # wait for the modal to appear
+            wait = WebDriverWait(self.driver, 5)
+            wait.until(ec.visibility_of_element_located((By.ID, 'modal_session_description')))
+
+            # make the modal go away
+            self.driver.find_element_by_css_selector('#btn_modal_session_description_submit').click()
+
+            # start capture to create the session
+            self.send_ajax_request('/_button_click', {'buttonCode': str(BUTTON_CODE.STARTSTOP.value)})
+
+            # get the update data
+            update_response = self.send_ajax_request('/_get_state_data')
+            update_dict = json.loads(update_response.data.decode())
+            alti_measurement_in_meters = float(update_dict['alti']['measurement'])
+            alti_measurement_in_feet = round(alti_measurement_in_meters*3.28084)
+
+            # update the data on the screen
+            self.driver.execute_script('return updatePage('+update_response.data.decode()+');')
+
+            displayed_str = self.driver.find_element_by_id('h_alti').get_property('innerHTML')
+
+            self.assertEqual(displayed_str, 'Altitude: ' + str(alti_measurement_in_feet) + ' ft')
+
+    def test_alti_convert_to_meter(self):
+        """Test that the conversion to feet happens and is correct."""
+        with self.client:  # access the web page through a 'client', as if a browser
+            triconfig = TricapConfig()
+            web_settings = triconfig.get_section_dict(TricapConfig.WEB_SECTION_HEADER)
+            web_settings['alti_required'] = 'dummy'
+            web_settings['alti_convert_to_feet'] = 'False'
+            triconfig.set_section(web_settings, TricapConfig.WEB_SECTION_HEADER)
+            triconfig.save_to_file()
+
+            self.open_page('home.index', 'btn_menu')
+
+            # make the modal appear
+            self.driver.find_element_by_css_selector('[name="btn_startstop"]').click()
+
+            # wait for the modal to appear
+            wait = WebDriverWait(self.driver, 5)
+            wait.until(ec.visibility_of_element_located((By.ID, 'modal_session_description')))
+
+            # make the modal go away
+            self.driver.find_element_by_css_selector('#btn_modal_session_description_submit').click()
+
+            # start capture to create the session
+            self.send_ajax_request('/_button_click', {'buttonCode': str(BUTTON_CODE.STARTSTOP.value)})
+
+            # get the update data
+            update_response = self.send_ajax_request('/_get_state_data')
+            update_dict = json.loads(update_response.data.decode())
+            alti_measurement_in_meters = int(float(update_dict['alti']['measurement']))
+
+            # update the data on the screen
+            self.driver.execute_script('return updatePage('+update_response.data.decode()+');')
+
+            displayed_str = self.driver.find_element_by_id('h_alti').get_property('innerHTML')
+
+            self.assertEqual(displayed_str, 'Altitude: ' + str(alti_measurement_in_meters) + ' m')
+
+    def test_gps_check(self):
+        """Test that the gps check button doesn't fall over.
+
+        Not really a proper behaviour test, just checks that the ajax response is correct.
+        At least it checks if the button is there.
+        """
+        with self.client:  # access the web page through a 'client', as if a browser
+            self.open_page('home.index', 'btn_menu')
+
+            # open the menu and click the button
+            self.driver.find_element_by_css_selector('#btn_menu').click()
+            self.driver.find_element_by_css_selector('#a_check_gps').click()
+
+            # send the ajax
+            ajax_response = self.send_ajax_request('/_check_gps')
+            ajax_dict = json.loads(ajax_response.data.decode())
+            gps_check_results = ajax_dict['gps_status_of_cams']
+
+            self.assertEqual(gps_check_results, ['False', 'False', 'False'])

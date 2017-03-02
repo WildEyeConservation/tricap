@@ -57,6 +57,7 @@ class TriCapCamsManager:
     _logger = logging.getLogger(__name__)
 
     def __init__(self, man_settings: dict, cam_settings: dict, use_dummy_cams=False):
+        """Construct."""
         self.state = CAM_MANAGER_STATES.STOPPED
 
         self._capture_thread = None

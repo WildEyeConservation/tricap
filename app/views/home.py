@@ -42,6 +42,7 @@ def index():
         'timeout_period': config.get('timeout_period', TricapConfig.WEB_SECTION_HEADER),
         'alti_target': config.get('alti_target', TricapConfig.WEB_SECTION_HEADER),
         'alti_range': config.get('alti_range', TricapConfig.WEB_SECTION_HEADER),
+        'alti_convert_to_feet': config.get('alti_convert_to_feet', TricapConfig.WEB_SECTION_HEADER),
         'vibrate': config.get('vibrate', TricapConfig.WEB_SECTION_HEADER),
         'default_session_description': session_logger.get_description()
     }
@@ -49,9 +50,7 @@ def index():
     cams_start_display = config.get('cams_start_display', TricapConfig.WEB_SECTION_HEADER)
     alti_start_display = config.get('alti_start_display', TricapConfig.WEB_SECTION_HEADER)
 
-    # TODO Do a check to see if cams_start_display is True, to setup fetch requesting
     if cams_start_display.lower() == 'open':
-        print('Cams should be started with requesting active.')
         for cam in tricap_manager.get_cameras_as_list():
             cam._camera.fetch_state = True
 
@@ -139,7 +138,6 @@ def provide_state_data():
 
 @home_bp.route('/_check_gps')
 def _check_gps():
-    print('checking gps')
     gps_status_of_cams = tricap_manager.check_camera_gps_status()
     data = {}
     list_of_status = []

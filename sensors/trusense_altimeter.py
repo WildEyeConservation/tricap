@@ -137,7 +137,7 @@ class TrusenseAltimeter(Subject):
         reply = self._ser.readline()
         check_count = 0
         while reply != b'$OK\r\n' and check_count < 3:
-            if reply[1:3] == 'DM':
+            if reply[1:3] == b'DM':
                 check_count += 1
                 self._logger.warning('Alti - Received a measurement when checking ok. Retrying.')
                 reply = self._ser.readline()
@@ -145,9 +145,9 @@ class TrusenseAltimeter(Subject):
                 # An error message has been received, raise an exception
                 self._check_for_known_error(reply)
                 raise AltiError(error_msg + ' : ' + reply.decode(encoding='ascii'))
-
-        # if we reach this point, no ok has been received only distance measurements
-        raise AltiError(' No OK has been received, only distance measurements have been received.')
+        
+        if check_count >= 3:
+            raise AltiError(' No OK has been received, only distance measurements have been received.')
 
     def _write(self, command_str, command_error_str):
         message = '$' + command_str + '\r\n'

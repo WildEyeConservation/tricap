@@ -175,8 +175,8 @@ class TrusenseAltimeter(Subject):
             msg = self._ser.readline()
             if len(msg) > 0:
                 consecutive_timeouts = 0
-                code_str = msg[1:2]
-                if code_str != 'DM':
+                code_str = msg[1:3]
+                if code_str != b'DM':
                     log_str = 'Alti - Non-measurement received: %s' % msg
                     self._logger.warning(log_str)
                 else:

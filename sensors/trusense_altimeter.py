@@ -175,15 +175,21 @@ class TrusenseAltimeter(Subject):
             msg = self._ser.readline()
             if len(msg) > 0:
                 consecutive_timeouts = 0
-                dist_str = msg[4:].split(b',')[0]
-                self._measurement = float(dist_str)
-                # let any observers know that the measurement has been updated
-                self.notify()
+                code_str = msg[1:2]
+                if code_str != 'DM':
+                    log_str = 'Alti - Non-measurement received: %s' % msg
+                    self._logger.warning(log_str)
+                else:
+                    dist_str = msg[4:].split(b',')[0]
+                    self._measurement = float(dist_str)
+                    # let any observers know that the measurement has been updated
+                    self.notify()
             else:
                 consecutive_timeouts += 1
-                self._logger.error('Empty message read from alti port, indicates a timeout')
+                self._logger.warning('Empty message read from alti port, indicates a timeout')
             if consecutive_timeouts >= 5:
                 self.state = ALTIMETER_STATE.ERROR
+                self._logger.error('Alti Error: Too many timeouts, communications have been lost.')
                 raise AltiError('Communications with altimeter was lost. 5 Consecutive timeouts ocurred')
         self._write('ST', 'Error stopping measuring mode')
         self.state = ALTIMETER_STATE.CONNECTED

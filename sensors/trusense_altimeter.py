@@ -135,9 +135,19 @@ class TrusenseAltimeter(Subject):
 
     def _check_ok(self, error_msg):
         reply = self._ser.readline()
-        if reply != b'$OK\r\n':
-            self._check_for_known_error(reply)
-            raise AltiError(error_msg + ' : ' + reply.decode(encoding='ascii'))
+        check_count = 0
+        while reply != b'$OK\r\n' and check_count < 3:
+            if reply[1:3] == 'DM':
+                check_count += 1
+                self._logger.warning('Alti - Received a measurement when checking ok. Retrying.')
+                reply = self._ser.readline()
+            else:
+                # An error message has been received, raise an exception
+                self._check_for_known_error(reply)
+                raise AltiError(error_msg + ' : ' + reply.decode(encoding='ascii'))
+
+        # if we reach this point, no ok has been received only distance measurements
+        raise AltiError(' No OK has been received, only distance measurements have been received.')
 
     def _write(self, command_str, command_error_str):
         message = '$' + command_str + '\r\n'
@@ -195,6 +205,7 @@ class TrusenseAltimeter(Subject):
         self.state = ALTIMETER_STATE.CONNECTED
 
     def start_measuring(self):
+        """Start the measuring thread."""
         self._write('GO', 'Error starting measuring mode')
         self._kill_pill = threading.Event()
         self._read_thread = threading.Thread(target=self._read,

@@ -218,7 +218,7 @@ class GPhotoCam(AbstractCamera):
         Return True if succesful, or False if too many exceptions were caused.
         """
         trigger_attempts = 0
-        while not triggered and trigger_attempts < MAX_TRIGGER_ATTEMPTS:
+        while trigger_attempts < MAX_TRIGGER_ATTEMPTS:
             try:
                 # file_path = self._gp_camera.capture(gp.GP_CAPTURE_IMAGE, GPhotoCam._context)
                 self._gp_camera.trigger_capture(GPhotoCam._context)
@@ -237,8 +237,6 @@ class GPhotoCam(AbstractCamera):
             self.state = CAMERA_STATES.CAPTURING
             if barrier:
                 barrier.wait()
-
-            triggered = False
 
             self.update_message = 'before capture'
             self.notify()

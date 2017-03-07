@@ -14,6 +14,11 @@ from config import CAMERA_STATES
 from .abstract_cam import AbstractCamera, CamConfigType
 from .base_setting import BaseSetting
 
+# A maximum number of attempts can be made to trigger a photo during the capture process
+MAX_TRIGGER_ATTEMPTS = 5
+IMAGE_COUNT_DELTA_FOR_WAIT_FOR_PATH = 10
+IMAGE_COUNT_DELTA_FOR_FETCH = 5
+
 
 class GPhotoSetting(BaseSetting):
     """Setting handler for gphoto cameras."""
@@ -110,7 +115,7 @@ class GPhotoCam(AbstractCamera):
 
         self._image_count = 0
 
-        self._old_image_path = None
+        self._image_path = None
         self._old_image_count = 0
 
         self._setup_camera(settings)
@@ -205,52 +210,72 @@ class GPhotoCam(AbstractCamera):
 
         return target_fp
 
+    def _trigger_capture(self):
+        """Make the camera capture an image but don't wait for it to return.
+
+        If a gphoto2 exception is triggered, try up to MAX_TRIGGER_ATTEMPTS again.
+
+        Return True if succesful, or False if too many exceptions were caused.
+        """
+        trigger_attempts = 0
+        while not triggered and trigger_attempts < MAX_TRIGGER_ATTEMPTS:
+            try:
+                # file_path = self._gp_camera.capture(gp.GP_CAPTURE_IMAGE, GPhotoCam._context)
+                self._gp_camera.trigger_capture(GPhotoCam._context)
+                return True
+            except gp.GPhoto2Error as ex:
+                self._logger.warning('Exception when trying to trigger a capture: %s', ex)
+                trigger_attempts += 1
+
+        return False
+
     def capture(self, continuous=False, barrier: threading.Barrier = None, stop_event=None):
         """Start capturing photos, typically called by a thread."""
         while True:
             if stop_event and stop_event.is_set():
                     return
-
             self.state = CAMERA_STATES.CAPTURING
             if barrier:
                 barrier.wait()
 
-            # print('fetch state: ', self.fetch_state)
-
             triggered = False
 
-            # timing point
             self.update_message = 'before capture'
             self.notify()
             before_capture_ts = datetime.now()
-            while not triggered:
-                try:
-                    # file_path = self._gp_camera.capture(gp.GP_CAPTURE_IMAGE, GPhotoCam._context)
-                    self._gp_camera.trigger_capture(GPhotoCam._context)
-                    self._image_count += 1
 
-                    if self.fetch_state and (self._old_image_path is None or self._image_count - self._old_image_count >= 10):
-                        self._old_image_path = self._wait_for_image_path(before_capture_ts)
+            if self._trigger_capture():
+                self._image_count += 1
+            else:
+                self._logger.error('Could not succesfully trigger a capture.')
+
+            if self.fetch_state:
+                # check if we need to get a new image path
+                if self._image_path is None or self._image_count - self._old_image_count >= IMAGE_COUNT_DELTA_FOR_WAIT_FOR_PATH:
+                    self._image_path = self._wait_for_image_path(before_capture_ts)
+                    if self._image_path:
                         self._old_image_count = self._image_count
 
-                    triggered = True
-                except gp.GPhoto2Error:
-                    pass
+                self.update_message = 'before preview fetch'
+                self.notify()
 
-            # Timing point
-            self.update_message = 'before preview fetch'
-            self.notify()
+                # check if we need to fetch the image from the camera
+                camera_file = None
+                if self._image_path and self._image_count - self._old_image_count == IMAGE_COUNT_DELTA_FOR_FETCH:
+                    camera_file = self._fetch_preview_camera_file(self._image_path)
 
-            camera_file = None
-            if self.fetch_state and self._old_image_path and self._image_count - self._old_image_count == 5:
-                camera_file = self._fetch_preview_camera_file(self._old_image_path)
+                self.update_message = 'after preview fetch'
+                self.notify()
 
-            self.update_message = 'after preview fetch'
-            self.notify()
-
-            if camera_file:
-                self._update_image(camera_file)
-                del camera_file
+                if camera_file:
+                    self._update_image(camera_file)
+                    del camera_file
+            else:
+                # update the timing info
+                self.update_message = 'before preview fetch'
+                self.notify()
+                self.update_message = 'after preview fetch'
+                self.notify()
 
             self.state = CAMERA_STATES.INITIALISED
 

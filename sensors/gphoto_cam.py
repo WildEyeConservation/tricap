@@ -1,12 +1,14 @@
 # coding=utf-8
 import logging
 import threading
+import os
 
 import gphoto2 as gp
 from anytree import Node, PreOrderIter, RenderTree
+from datetime import datetime
 
-from config import CAMERA_STATES
-from .abstract_cam import CamConfigType
+from config import CAMERA_STATES, SERVER_LOG_DIR
+from .abstract_cam import AbstractCamera, CamConfigType
 from .base_setting import BaseSetting
 
 
@@ -73,8 +75,8 @@ class GPhotoConfig:
 
 
 # noinspection PyUnresolvedReferences
-class GPhotoCam:
-    """ Handler for the Canon EOS 6D Camera. Uses gphoto2 to handle the actual communication. """
+class GPhotoCam(AbstractCamera):
+    """Handler for a generic gphoto2 based cameras. Uses this library to handle communication."""
 
     _port_info_list = gp.PortInfoList()
     _port_info_list.load()
@@ -82,12 +84,16 @@ class GPhotoCam:
     _logger = logging.getLogger(__name__)
 
     def __init__(self, address, settings: dict):
+        """Constructor, requires address and camera settings dict."""
+        super().__init__(address, settings)
 
         self._gp_camera = None
         self.data = None
         self._fresh_capture = False
         self.state = CAMERA_STATES.INITIALISED
         self._address = address
+
+        self._image_count = 0
 
         self._setup_camera(settings)
 
@@ -117,28 +123,52 @@ class GPhotoCam:
         return GPhotoConfig(self._gp_camera, self._context)
 
     def capture(self, continuous=False, barrier: threading.Barrier = None, stop_event=None):
+        """Start capturing photos, typically called by a thread."""
         while True:
             if stop_event:
                 if stop_event.is_set():
                     return
+
             self.state = CAMERA_STATES.CAPTURING
             if barrier:
                 barrier.wait()
             success = False
+
+            # timing point
+            self.update_message = 'before capture'
+            self.notify()
             while not success:
                 try:
                     file_path = self._gp_camera.capture(gp.GP_CAPTURE_IMAGE, GPhotoCam._context)
                     success = True
                 except gp.GPhoto2Error:
                     pass
-            camera_file = self._gp_camera.file_get(file_path.folder, file_path.name, gp.GP_FILE_TYPE_PREVIEW,
-                                                   GPhotoCam._context)
+
+            # Timing point
+            self.update_message = 'before preview fetch'
+            self.notify()
+            try:
+                camera_file = self._gp_camera.file_get(file_path.folder, file_path.name, gp.GP_FILE_TYPE_PREVIEW,
+                                                       GPhotoCam._context)
+            except gp.GPhoto2Error:
+                self._logger.error('Error retrieving preview, is the capturetarget correctly set?')
+                raise
+
+            self.update_message = 'after preview fetch'
+            self.notify()
             file_data = camera_file.get_data_and_size()
             # # Make a copy, so that we can release the file_data object
             self.data = memoryview(file_data).tobytes()
             self._fresh_capture = True
+            self._image_count += 1
             del camera_file
             self.state = CAMERA_STATES.INITIALISED
+
+            if self.calibrate_func is not None:
+                if self.calibrate_step > 0:
+                    if self._image_count % self.calibrate_step == 0:
+                        self.calibrate_func()
+
             if not continuous:
                 return self.data
 
@@ -148,3 +178,6 @@ class GPhotoCam:
 
     def get_state_as_string(self):
         return self.state.name
+
+    def get_cam_image_count(self):
+        return self._image_count

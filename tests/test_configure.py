@@ -1,18 +1,18 @@
-""" D Joubert - 18 November 2016 - Unittest for the TriCap configure class """
+"""Unittest for the TriCap configure class."""
 
 import logging
 import os
-import shutil
-import tempfile
-import unittest
-import pdb
 import configparser
 
 from config import CONFIG_FP, SERVER_LOG_DIR
-from sensors.configure import TricapConfig, TricapConfigError
+from support.configure import TricapConfig, TricapConfigError
+
+from .tempfile_test_case import TricapTempFilerTestCase
 
 
-class TestBaseConfigure(unittest.TestCase):
+class TestConfigure(TricapTempFilerTestCase):
+    """Child of TricapTempFilerTestCase, with logging of only the configure module."""
+
     format_str = "%(asctime)s | %(pathname)s:%(lineno)d | %(funcName)s | %(levelname)s | %(message)s "
     handler = logging.FileHandler(filename=os.path.join(SERVER_LOG_DIR, 'test_configure.log'))
     handler.setLevel(logging.DEBUG)
@@ -22,31 +22,13 @@ class TestBaseConfigure(unittest.TestCase):
     rootLogger.addHandler(handler)
     rootLogger.setLevel(logging.DEBUG)
 
-    def setUp(self):
-        # backup the actual initial.cfg
-        self.tempdir = tempfile.mkdtemp()
-        self.bk_config_fp = os.path.join(self.tempdir, 'initial.cfg_bk')
-        shutil.copyfile(CONFIG_FP, self.bk_config_fp)
-
-    def tearDown(self):
-        # copy back the initial.cfg
-        shutil.copyfile(self.bk_config_fp, CONFIG_FP)
-
-        for root, _, filenames in os.walk(self.tempdir):
-            for filename in filenames:
-                os.remove(os.path.join(root, filename))
-
-        shutil.rmtree(self.tempdir)
-
-
-class TestConfigure(TestBaseConfigure):
     def test_init(self):
+        """Test if the config can read from file, instantiate itself correctly."""
         config = TricapConfig()
         self.assertEqual(config.is_ready(), True)
 
     def test_bad_config_fp(self):
-        """ Tests whether the correct error behaviour is obtained when something goes wrong with
-            reading the config file. Which in this case, is to throw an exception."""
+        """Test whether an exception is thrown when file reading/writing error occurs."""
         with self.assertRaises(Exception):
             TricapConfig(config_fp_to_read='/I/Dont/Exist.cfg')
 
@@ -55,7 +37,7 @@ class TestConfigure(TestBaseConfigure):
             config.save_to_file(config_fp='/I/Dont/Exist.cfg')
 
     def test_bad_section_header(self):
-        """ Check response on using a non-existent header. """
+        """Check response on using a non-existent header."""
         config = TricapConfig()
         with self.assertRaises(configparser.Error):
             config.get_section_dict('BadHeader')
@@ -68,7 +50,7 @@ class TestConfigure(TestBaseConfigure):
             config.set_section(camera_dict, 'BadHeader')
 
     def test_setting_non_existent_setting(self):
-        """ If a setting is not in the original config file, it should be rejected """
+        """If a setting is not in the original config file, it should be rejected."""
         config = TricapConfig()
         camera_dict = config.get_section_dict(TricapConfig.CAMERA_SECTION_HEADER)
         camera_dict['NotPreExisting'] = 42
@@ -76,6 +58,7 @@ class TestConfigure(TestBaseConfigure):
             config.set_section(camera_dict, TricapConfig.CAMERA_SECTION_HEADER)
 
     def test_value_getting(self):
+        """Test if we get a correct value."""
         config = TricapConfig()
 
         # get the values manually
@@ -108,6 +91,7 @@ class TestConfigure(TestBaseConfigure):
                        type_str=config.TYPE_INT)
 
     def test_value_setting(self):
+        """Test if we set a value correctly."""
         config = TricapConfig()
 
         section_dict = config.get_section_dict(TricapConfig.CAMERA_SECTION_HEADER)

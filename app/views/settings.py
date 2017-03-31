@@ -1,14 +1,19 @@
-""" The settings page is built on the following assumptions:
-    - The are only three types of settings: camera, alti, miscellaneous.
-    - If a setting is not in the initial.cfg file, it is not displayed or made modifiable
+"""The settings page is built on the following assumptions.
+
+The are only three types of settings: camera, alti, miscellaneous.
+If a setting is not in the initial.cfg file, it is not displayed or made modifiable
 """
+
+import pdb
 
 from flask import Blueprint, current_app, redirect, url_for, render_template, request
 
 from app import forms, tricap_manager, altimeter, session_logger
-from config import DEFAULT_CONFIG_FP, CONFIG_FP, RET_OK, RET_ERROR
-from sensors.configure import TricapConfig
+from config import DEFAULT_CONFIG_FP, CONFIG_FP
+from support.configure import TricapConfig
 from collections import namedtuple
+
+from app import rootlogger
 
 settings_bp = Blueprint('settings', __name__)
 
@@ -19,7 +24,9 @@ class MiscSettingConfig:
     _settings = {'session_description': Accessors(getter=session_logger.get_description,
                                                   setter=session_logger.set_description),
                  'image_capture_interval': Accessors(getter=tricap_manager.get_image_capture_interval,
-                                                     setter=tricap_manager.set_image_capture_interval)}
+                                                     setter=tricap_manager.set_image_capture_interval),
+                 'calibrate_step': Accessors(getter=tricap_manager.get_calibrate_step,
+                                             setter=tricap_manager.set_calibrate_step)}
 
     def __repr__(self):
         return str(self._settings.keys())
@@ -47,6 +54,13 @@ class MiscSettingHandler:
     @property
     def config(self):
         return MiscSettingConfig()
+
+
+class WebSettingHandler:
+    """Handlers all settings to do with the web interface. Currently, just a dict."""
+    def __init__(self, config):
+        """Constructor."""
+        self.config = config
 
 
 def populate_form_section(sdict, handler, form_selects, form_strings, set_data=True):
@@ -92,12 +106,17 @@ def get_form_for_display(config_fp=CONFIG_FP, set_data=True):
     cam_dict = config.get_section_dict(TricapConfig.CAMERA_SECTION_HEADER)
     populate_form_section(cam_dict, tricap_manager, form.cam_selects, form.cam_strings, set_data)
 
-    # alti_dict = config.get_section_dict(TricapConfig.ALTI_SECTION_HEADER)
-    # populate_form_section(alti_dict, altimeter, form.alti_selects, form.alti_strings, set_data)
+    alti_dict = config.get_section_dict(TricapConfig.ALTI_SECTION_HEADER)
+    populate_form_section(alti_dict, altimeter, form.alti_selects, form.alti_strings, set_data)
 
     misc_setting_handler = MiscSettingHandler()
     misc_dict = config.get_section_dict(TricapConfig.MISC_SECTION_HEADER)
     populate_form_section(misc_dict, misc_setting_handler, form.misc_selects, form.misc_strings,
+                          set_data)
+
+    web_dict = config.get_section_dict(TricapConfig.WEB_SECTION_HEADER)
+    web_setting_handler = WebSettingHandler(web_dict)
+    populate_form_section(web_dict, web_setting_handler, form.web_selects, form.web_strings,
                           set_data)
 
     return form
@@ -124,6 +143,9 @@ def populate_pushed_form(pushed_form):
 
     populate_pushed_form_section(pushed_form.misc_strings, pushed_form.misc_selects,
                                  display_form.misc_strings, display_form.misc_selects)
+
+    populate_pushed_form_section(pushed_form.web_strings, pushed_form.web_selects,
+                                 display_form.web_strings, display_form.web_selects)
 
     return pushed_form
 
@@ -154,11 +176,14 @@ def convert_populated_form_to_dict(form):
     extract_dict_info_from_form_section(form_dict[TricapConfig.MISC_SECTION_HEADER],
                                         form.misc_strings, form.misc_selects)
 
+    form_dict[TricapConfig.WEB_SECTION_HEADER] = {}
+    extract_dict_info_from_form_section(form_dict[TricapConfig.WEB_SECTION_HEADER],
+                                        form.web_strings, form.web_selects)
+
     return form_dict
 
 
 def set_setting_handler_with_dict(handler, sdict):
-    # TODO Should we do this here, how should we handle the returns? Figure it out on merging
     for key, value in sdict.items():
         handler.config[key] = value
 
@@ -171,6 +196,11 @@ def change_settings(form):
 
     misc_setting_handler = MiscSettingHandler()
     set_setting_handler_with_dict(misc_setting_handler, form_dict[TricapConfig.MISC_SECTION_HEADER])
+
+    config = TricapConfig()
+    web_dict = config.get_section_dict(TricapConfig.WEB_SECTION_HEADER)
+    web_setting_handler = WebSettingHandler(web_dict)
+    set_setting_handler_with_dict(web_setting_handler, form_dict[TricapConfig.WEB_SECTION_HEADER])
 
 
 def save_settings(form, config_fp=CONFIG_FP):
@@ -186,11 +216,8 @@ def save_settings(form, config_fp=CONFIG_FP):
     config.save_to_file()
 
 
-def revert_to_default_settings(save_to_fp=CONFIG_FP, logger=None):
-    # arguments are only supposed to be used during unittesting
-    if logger is None:
-        logger = current_app.logger
-
+def revert_to_default_settings(save_to_fp=CONFIG_FP):
+    """Copy the default settings file over the current used one."""
     default_config = TricapConfig(config_fp_to_read=DEFAULT_CONFIG_FP)
     config = TricapConfig(config_fp_to_read=save_to_fp)
 
@@ -202,6 +229,7 @@ def revert_to_default_settings(save_to_fp=CONFIG_FP, logger=None):
 
 @settings_bp.route('/settings', methods=['GET', 'POST'])
 def settings():
+    rootlogger.info('Settings Page Requested.')
     if request.method == 'GET':
         # When the user initially opens the page, we need to setup the choices and labels for the
         #  forms
@@ -218,9 +246,9 @@ def settings():
         tricap_manager.stop_capturing()
         altimeter.stop_measuring()
 
-        if form.test.data is True:
-            change_settings(form)
-        elif form.save.data is True:
+        # if form.test.data is True:
+        #     change_settings(form)
+        if form.save.data is True:
             change_settings(form)
             save_settings(form)
         elif form.revert.data is True:

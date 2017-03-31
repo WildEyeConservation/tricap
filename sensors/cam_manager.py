@@ -5,20 +5,23 @@
 
 import logging
 import threading
-import time
-import pdb
+import os
 
-from config import CAM_MANAGER_STATES
-from config import RET_OK, RET_ERROR
+from config import CAM_MANAGER_STATES, SERVER_LOG_DIR
 
 # TODO : Create a camera factory that will import cameras according to its config and make them available via its own
 # autodetect function
-from .canon_6D import Canon6DCam
 
 try:
+    from .canon_6D import Canon6DCam
     from .gphoto_cam import GPhotoCam as Camera
 except ImportError:
-    from .dummy_cam import DummyCam as Camera
+    logging.getLogger(__name__).warning('Could not import gphoto based libs.')
+
+from .dummy_cam import DummyCam
+from .dummy_cam import DummyShell, external_dummy_calibrate_func
+
+from support.basic import RepeatingBarrierPasser
 
 
 class MultiConfig:
@@ -49,10 +52,11 @@ class MultiConfig:
 
 class TriCapCamsManager:
     """TriCapCamsManager manages TriCap camera objects"""
+
     supportedCameras = {"Canon EOS 6D", "Dummy Cam"}
     _logger = logging.getLogger(__name__)
 
-    def __init__(self, man_settings: dict, cam_settings: dict):
+    def __init__(self, man_settings: dict, cam_settings: dict, use_dummy_cams=False):
         self.state = CAM_MANAGER_STATES.STOPPED
 
         self._capture_thread = None
@@ -61,10 +65,11 @@ class TriCapCamsManager:
         self._cameras = None
         self._cam_threads = None
         self._capture_thread = None
+        self._rate_timer = None
         self._kill_pill = None
         self._cam_settings = cam_settings
         self._man_settings = man_settings
-
+        self.use_dummy_cams = use_dummy_cams
         self._initialise()
 
     def _initialise(self):
@@ -92,11 +97,25 @@ class TriCapCamsManager:
         self._cameras = []
         # Do not catch exceptions here. If any detected camera fails to instantiate, it is a critical error and we want
         # to halt and catch fire.
-        for name, address in Camera.autodetect():
-            if name in TriCapCamsManager.supportedCameras:
-                self._logger.info('Adding camera %s at address %s ' % (name, address))
-                tricap_cam = Canon6DCam(Camera(address, self._cam_settings))
-                self._cameras.append(tricap_cam)
+
+        if self.use_dummy_cams:
+            for name, address in DummyCam.autodetect():
+                if name in TriCapCamsManager.supportedCameras:
+                    self._logger.info('Adding camera %s at address %s ' % (name, address))
+                    tricap_cam = DummyShell(DummyCam(address, self._cam_settings))
+                    tricap_cam._camera.calibrate_func = external_dummy_calibrate_func
+                    tricap_cam._camera.calibrate_step = int(self._man_settings['calibrate_step'])
+                    self._cameras.append(tricap_cam)
+        else:
+            for name, address in Camera.autodetect():
+                if name in TriCapCamsManager.supportedCameras:
+                    self._logger.info('Adding camera %s at address %s ' % (name, address))
+                    tricap_cam = Canon6DCam(Camera(address, self._cam_settings))
+                    tricap_cam._camera.rate_fp = os.path.join(SERVER_LOG_DIR,
+                                                      'canon6dcam_%s_rates.txt' % tricap_cam.serial_num)
+                    tricap_cam._camera.calibrate_func = tricap_cam.focus_infinity
+                    tricap_cam._camera.calibrate_step = int(self._man_settings['calibrate_step'])
+                    self._cameras.append(tricap_cam)
 
     def reset(self, man_settings: dict, cam_settings: dict):
         self._man_settings = man_settings
@@ -110,26 +129,43 @@ class TriCapCamsManager:
     def start_capturing(self):
         if len(self._cameras) == 0:
             self.state = CAM_MANAGER_STATES.ERROR_NO_CAMS
+            self._logger.debug('Tried to start capture threads with no cameras connected.')
         elif self.state == CAM_MANAGER_STATES.STOPPED:
-            barrier = threading.Barrier(len(self._cameras))
             self._kill_pill = threading.Event()
+
+            if self._image_capture_interval != 0:
+                barrier = threading.Barrier(len(self._cameras)+1)  # add one for the timer
+                self._rate_timer = RepeatingBarrierPasser(self._image_capture_interval,
+                                                          self._kill_pill, barrier, daemon=True)
+                self._rate_timer.start()
+            else:
+                barrier = threading.Barrier(len(self._cameras))
+
             for cam in self._cameras:
                 thread = threading.Thread(target=cam.capture, daemon=True,
                                           kwargs={"continuous": True, "barrier": barrier,
                                                   "stop_event": self._kill_pill})
                 thread.start()
             self.state = CAM_MANAGER_STATES.STARTED
+            self._logger.debug('Cam manager - capture threads started.')
 
     def stop_capturing(self):
         if self.state == CAM_MANAGER_STATES.STARTED:
             self._kill_pill.set()
             self.state = CAM_MANAGER_STATES.STOPPED
+            self._logger.debug('Cam manager - capture threads stopped.')
 
     def get_image_capture_interval(self):
         return self._man_settings['image_capture_interval']
 
     def set_image_capture_interval(self, value):
         self._man_settings['image_capture_interval'] = value
+
+    def get_calibrate_step(self):
+        return self._man_settings['calibrate_step']
+
+    def set_calibrate_step(self, value):
+        self._man_settings['calibrate_step'] = value
 
     def get_num_cams(self):
         return len(self._cameras)

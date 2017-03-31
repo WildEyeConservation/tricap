@@ -2,6 +2,8 @@ import os
 
 from flask import Blueprint, render_template, request, jsonify
 
+from app import rootlogger
+
 from config import SERVER_LOG_DIR
 
 showlog_bp = Blueprint('showlog', __name__)
@@ -39,10 +41,9 @@ class LogFormatter:
         return log
 
 
-# TODO Set time correctly on overall logger
-
 @showlog_bp.route('/showlog', methods=['GET'])
 def showlog():
+    rootlogger.info('ShowLog Page Requested.')
     return render_template('/showlog/showlog.html')
 
 
@@ -50,7 +51,7 @@ def showlog():
 def provide_log():
     log_code = request.args.get('logCode', 0, type=int)
 
-    log_formatter = LogFormatter(os.path.join(SERVER_LOG_DIR, 'tricap_server.log'))
+    log_formatter = LogFormatter(os.path.join(SERVER_LOG_DIR, 'tricap_master.log'))
     log = log_formatter.format_log(log_code)
 
     data = {'log': log}

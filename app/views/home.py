@@ -1,93 +1,237 @@
-# D Joubert 27 October 2016 Innoventix Consulting
+"""The 'controller' code for the landing page, which is currently the default Pilot view."""
 
 import os
-
-from flask import Blueprint, render_template, send_from_directory, current_app, request, jsonify
-from flask import send_file
-
-from app import tricap_manager, tricap_cameras, image_manager, altimeter, session_logger
-
-from config import BUTTON_CODE
 import io
 
+from flask import Blueprint, render_template, send_from_directory, current_app, request, jsonify
+from flask import send_file, redirect, url_for
+
+from app import tricap_manager, altimeter, session_logger, talkbox, log_list, stop_all_threads
+from app import rootlogger
+
+from support.configure import TricapConfig
+
+from config import BUTTON_CODE, CAM_MANAGER_STATES, ALTIMETER_STATE
+
 home_bp = Blueprint('home', __name__)
+
+# Using a dummy colour entry because Enum starts indexing from 1, and not from zero
+# CAMERA_STATES = Enum("CamState", ["UNINITIALISED", "INITIALISED", "CAPTURING", "ERROR_CONFIG", "ERROR_CAPTURE"])
+CAM_STATE_COLOURS = ['dummy', 'red', 'orange', 'green', 'red', 'red']
+# CAM_MANAGER_STATES = Enum("CamManagerState", ["STOPPED", "STARTED", "ERROR_NO_CAMS", "ERROR_CONFIG"])
+CAM_MAN_STATE_COLOURS = ['dummy', 'orange', 'green', 'red', 'red']
+# ALTIMETER_STATE = Enum("AltiState", ["NOT_CONNECTED", "CONNECTED", "MEASURING", "ERROR"])
+ALTI_STATE_COLOURS = ['dummy', 'red', 'orange', 'green', 'red']
 
 
 @home_bp.route('/', methods=['GET'])
 def index_slash():
+    """Redirect request to the proper index page."""
     return index()
 
 
 @home_bp.route('/index', methods=['GET'])
 def index():
-    """The home page. Handles the login form and redirects to the verification page after a
-    successfull login."""
-    if tricap_manager.get_num_cams() == 0:
-        col_size_cam_img = 4
-    else:
-        col_size_cam_img = 12 / tricap_manager.get_num_cams()
+    """The Main GUI interface page."""
+    rootlogger.info('Home Page Requested.')
 
-    if col_size_cam_img < 2:
-        col_size_cam_img = 2
+    config = TricapConfig()
+    js_data = {
+        'refresh_rate': config.get('refresh_rate', TricapConfig.WEB_SECTION_HEADER),
+        'img_too_old_count': config.get('img_too_old_count', TricapConfig.WEB_SECTION_HEADER),
+        'timeout_period': config.get('timeout_period', TricapConfig.WEB_SECTION_HEADER),
+        'alti_target': config.get('alti_target', TricapConfig.WEB_SECTION_HEADER),
+        'alti_range': config.get('alti_range', TricapConfig.WEB_SECTION_HEADER),
+        'vibrate': config.get('vibrate', TricapConfig.WEB_SECTION_HEADER),
+        'default_session_description': session_logger.get_description()
+    }
 
-    cam_ids = tricap_manager.get_cam_ids()
-
-    cam_states = [cam.get_state_as_string() for cam in tricap_cameras]
+    cams_start_display = config.get('cams_start_display', TricapConfig.WEB_SECTION_HEADER)
+    alti_start_display = config.get('alti_start_display', TricapConfig.WEB_SECTION_HEADER)
 
     return render_template('/home/index.html', num_cams=tricap_manager.get_num_cams(),
-                           col_size_cam_img=col_size_cam_img,
-                           alti_state=altimeter.get_state_as_string(),
-                           system_state='All Good',
-                           cam_ids=cam_ids, cam_states=cam_states)
+                           cams_start_display=cams_start_display,
+                           alti_start_display=alti_start_display, python_data=js_data)
 
 
-def reset_device_objects():
-    tricap_manager.reset()
-    altimeter.reset()
+def _determine_overall_cam_state_colour():
+    config = TricapConfig()
+
+    cams_required = config.get('cams_required', TricapConfig.WEB_SECTION_HEADER)
+
+    cams = tricap_manager.get_cameras_as_list()
+    cam_state_colours = [CAM_STATE_COLOURS[cam.state.value] for cam in cams]
+
+    # check if all the colours are the same
+    if len(set(cam_state_colours)) == 1:
+        return cam_state_colours[0]
+
+    # if any of them are red, return red
+    if 'red' in cam_state_colours:
+        if cams_required == 'yes':
+            return 'red'
+        else:
+            return 'orange'
+    elif 'orange' in cam_state_colours:
+        return 'orange'
+    else:
+        return 'green'
 
 
-@home_bp.route('/_check_cam_image<cam_num_str>')
-def is_cam_image_fresh(cam_num_str):
-    data = {'new_image': image_manager.is_cam_image_fresh(int(cam_num_str)),
-            'cam_num': int(cam_num_str),
-            'cam_state': tricap_cameras[int(cam_num_str)].get_state_as_string()
-            }
+def _determine_alti_state_colour():
+    config = TricapConfig()
+    alti_required = config.get('alti_required', TricapConfig.WEB_SECTION_HEADER)
+
+    alti_state_colour = ALTI_STATE_COLOURS[altimeter.state.value]
+    if alti_state_colour == 'red' and alti_required != 'yes':
+        return 'orange'
+
+    return alti_state_colour
+
+
+@home_bp.route('/_get_state_data')
+def provide_state_data():
+    """Jsonify all the data pertaining to the state of the system."""
+    alti_data = {'state_colour': _determine_alti_state_colour(),
+                 'measurement': str(altimeter.measurement)}
+
+    cam_image_counts = [cam.get_cam_image_count() for cam in tricap_manager.get_cameras_as_list()]
+    cam_data = {'image_counts': cam_image_counts,
+                'overall_cam_state_colour': _determine_overall_cam_state_colour(),
+                'capture_started': _has_capture_started()}
+
+    talk_msgs_strs = [talk_msg.msg for talk_msg in talkbox.talk_msgs]
+    talk_msgs_reply_codes = [talk_msg.reply.value for talk_msg in talkbox.talk_msgs]
+    talk_data = {'msgs': talk_msgs_strs,
+                 'reply_codes': talk_msgs_reply_codes}
+
+    sys_msgs = log_list.get_msgs()
+    sys_data = {'msgs': sys_msgs}
+
+    data = {'alti': alti_data,
+            'cams': cam_data,
+            'talk': talk_data,
+            'sys': sys_data}
+
     return jsonify(data)
 
 
-@home_bp.route('/_get_alti_data')
-def provide_alti_data():
-    data = {'alti_state': altimeter.get_state_as_string(),
-            'alti_measurement': altimeter.get_measurement_as_string()}
-    return jsonify(data)
+@home_bp.route('/_submit_talkbox_msg')
+def _receive_talkbox_msg():
+    msg = request.args.get('msg', '', type=str)
+    talkbox.add_message(msg)
+    return jsonify()
 
 
-@home_bp.route('/cam_img<cam_num_str>')
-def serve_cam_img(cam_num_str):
-    # cam_img_fp = image_manager.get_cam_image_fp(int(cam_num_str))
-    #
-    # if cam_img_fp is None:
-    #     cam_img_fp = os.path.join(current_app.root_path, 'static', 'img', 'default.jpg')
+@home_bp.route('/_submit_session_description')
+def _receive_session_description():
+    description = request.args.get('sessionDescription', type=str)
+    session_logger.set_description(description)
+    return jsonify()
 
-    return send_file(io.BytesIO(tricap_manager.get_data(int(cam_num_str))), attachment_filename='image.jpg',
+
+@home_bp.route('/_change_message_reply')
+def _change_message_reply():
+    msg = request.args.get('msg', type=str)
+    reply_code = request.args.get('reply_code', type=int)
+    talkbox.change_reply(msg, reply_code)
+    return jsonify()
+
+
+@home_bp.route('/cam_img<img_str>')
+def serve_cam_img(img_str):
+    """Serve the image as described by the img_str = camera id + image id."""
+    cam_num = int(img_str[0])
+    img_num = int(img_str[1:])
+
+    return send_file(io.BytesIO(tricap_manager.get_data(cam_num)), attachment_filename='image.jpg',
                      as_attachment=True)
 
 
-@home_bp.route('/_button_click')
+def _has_capture_started():
+    # if we are in the stop state and want to get started
+
+    config = TricapConfig()
+
+    cams_started = tricap_manager.state == CAM_MANAGER_STATES.STARTED
+    alti_started = altimeter.state == ALTIMETER_STATE.MEASURING
+
+    cams_a_must = False
+    if config.get('cams_required', TricapConfig.WEB_SECTION_HEADER) == 'yes':
+        cams_a_must = True
+
+    alti_a_must = False
+    if (config.get('alti_required', TricapConfig.WEB_SECTION_HEADER) == 'yes'):
+        alti_a_must = True
+
+    # if non of the sensors are required, then at least one has had to have started
+    if not(alti_a_must or cams_a_must):
+        if (cams_started or alti_started):
+            return True
+        else:
+            return False
+
+    # if a sensor is required, then capture has not started
+
+    if (alti_a_must and not alti_started):
+        return False
+
+    if (cams_a_must and not cams_started):
+        return False
+
+    return True
+
+
+@home_bp.route('/_reset')
+def reset():
+    """Stop the server."""
+    flask_reset_func = request.environ.get('werkzeug.server.shutdown')
+    if flask_reset_func is None:
+        raise RuntimeError('Not running with the Werkzeug Server')
+
+    stop_all_threads()
+
+    flask_reset_func()
+    return redirect(url_for('home.index'))
+
+
+@home_bp.route('/_button_click', methods=['GET', 'POST'])
 def handle_button_click():
-    button_code = request.args.get('buttonCode', 0, type=int)
+    button_code = int(request.args.get('buttonCode'))
 
     if button_code == BUTTON_CODE.START:
+        rootlogger.info('User requested capture to start.')
         session_logger.create_new_session()
         tricap_manager.start_capturing()
         altimeter.start_measuring()
+        return jsonify(capture_started=_has_capture_started())
     elif button_code == BUTTON_CODE.STOP:
-        print('stopping - view')
+        rootlogger.info('User requested capture to stop.')
         tricap_manager.stop_capturing()
         altimeter.stop_measuring()
-        print('stopping - view - stopped')
+        return jsonify(capture_started=_has_capture_started())
     elif button_code == BUTTON_CODE.RESET:
-        reset_device_objects()
+        rootlogger.info('User requested server reset.')
+        # reset_device_objects()
+        reset()
+    elif button_code == BUTTON_CODE.STARTSTOP:
+        # get current state
+        started = _has_capture_started()
+        if started:
+            # we want to stop
+            rootlogger.info('User requested capture to stop.')
+            tricap_manager.stop_capturing()
+            altimeter.stop_measuring()
+        else:  # we want to start
+            rootlogger.info('User requested capture to start.')
+            session_logger.create_new_session()
+            config = TricapConfig()
+            if (config.get('cams_required', TricapConfig.WEB_SECTION_HEADER) != 'no'):
+                tricap_manager.start_capturing()
+            if (config.get('alti_required', TricapConfig.WEB_SECTION_HEADER) != 'no'):
+                altimeter.start_measuring()
+        # send back the real state of the system
+        return jsonify(capture_started=_has_capture_started())
 
     return jsonify()
 

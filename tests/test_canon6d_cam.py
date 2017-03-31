@@ -11,7 +11,7 @@ from anytree import RenderTree
 from config import CAMERA_STATES, SERVER_LOG_DIR, RET_OK, RET_ERROR
 from sensors.gphoto_cam import GPhotoCam
 # from sensors.dummy_cam import DummyCam as GPhotoCam
-from sensors.configure import TricapConfig
+from support.configure import TricapConfig
 
 
 class TestBaseCanon6DCam(unittest.TestCase):

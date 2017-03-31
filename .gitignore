@@ -2,6 +2,7 @@
 /notes
 /downloads
 /tmp
+/logs
 /.idea
 /.coverage
 /htmlcov
@@ -20,6 +21,8 @@ node_modules
 *.log
 *.log.*
 *.bak
+*.swp
+*.save
 *~
 
 # specific files

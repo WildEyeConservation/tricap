@@ -1,18 +1,20 @@
+"""TruSense S100 Altimeter handler."""
 # coding=utf-8
-""" D Joubert 2 November 2016 - TruSense S100 Altimeter handler."""
 
 import logging
 import threading
 from time import sleep
 
+from abc import ABCMeta
+
 import serial
 import serial.tools.list_ports
 
-from config import ALTIMETER_STATE, RET_OK, RET_ERROR
-from .configure import TricapConfig
+from config import ALTIMETER_STATE
 from functools import partial
 from collections import namedtuple
 from sensors.base_setting import BaseSetting, SettingSpec
+from support.basic import Subject
 
 
 # TODO How to deal with disconnect?
@@ -45,8 +47,9 @@ class MiscSettingConfig:
     __getitem__ = __getattr__
 
 
-class TrusenseAltimeter(object):
-    """Handles serial communication with the TruSense S100 Laser Altimeter"""
+class TrusenseAltimeter(Subject):
+    """Handles serial communication with the TruSense S100 Laser Altimeter."""
+
     _logger = logging.getLogger(__name__)
     errorCodes = {'00': 'S100 Error 00: Invalid Command',
                   '01': 'S100 Error 01: No Target',
@@ -65,9 +68,10 @@ class TrusenseAltimeter(object):
                   '30': 'S100 Error 30: Temperature too High',
                   '31': 'S100 Error 31: Temperature too Low'}
 
-    def __init__(self, data_logger, supported_devices={(1659, 8963)}):
+    def __init__(self, settings, supported_devices={(1659, 8963)}):
         # SETTINGS
         # default values
+        super().__init__()
         self._setting_strings = ['measurement_timeout', 'num_frames_to_avg']
         self._config = MiscSettingConfig(
             {'measurement_timeout': SettingSpec(choices=None,
@@ -77,13 +81,8 @@ class TrusenseAltimeter(object):
                                               get_value=partial(self._get_setting, "num_frames_to_avg"),
                                               set_value=partial(self._set_setting, "num_frames_to_avg"))})
 
-        # Read the alti values from the initial.cfg file
-        init_configs = TricapConfig()
-        section_dict = init_configs.get_section_dict(TricapConfig.ALTI_SECTION_HEADER)
-        # TODO Check that all keys in section_dict are known
-        self._settings = section_dict
+        self._settings = settings
 
-        self._data_logger = data_logger
         self.state = ALTIMETER_STATE.NOT_CONNECTED
         self._kill_pill = None
         self._read_thread = None
@@ -154,12 +153,12 @@ class TrusenseAltimeter(object):
         self._write('CA,%d' % int(self._settings['num_frames_to_avg']), 'Error setting continous mode frame averaging')
         self._write('FA,%d' % int(self._settings['num_frames_to_avg']), 'Error setting fast mode frame averaging')
 
-    def reset(self):
+    def reset(self, settings):
         """Get the altimeter object to re-initialise, establishing comms again, etc"""
         if self.state == ALTIMETER_STATE.MEASURING:
             self.stop_measuring()
 
-        self.__init__(self._data_logger)
+        self.__init__(settings)
 
     def get_state_as_string(self):
         return self.state.name
@@ -178,7 +177,8 @@ class TrusenseAltimeter(object):
                 consecutive_timeouts = 0
                 dist_str = msg[4:].split(b',')[0]
                 self._measurement = float(dist_str)
-                self._data_logger.log("Alti measure: %s" % dist_str)
+                # let any observers know that the measurement has been updated
+                self.notify()
             else:
                 consecutive_timeouts += 1
                 self._logger.error('Empty message read from alti port, indicates a timeout')
@@ -190,16 +190,17 @@ class TrusenseAltimeter(object):
 
     def start_measuring(self):
         self._write('GO', 'Error starting measuring mode')
-        # TODO Are there exceptions when starting a thread?
         self._kill_pill = threading.Event()
         self._read_thread = threading.Thread(target=self._read,
                                              args=(self._kill_pill,), daemon=True)
         self._read_thread.start()
         self.state = ALTIMETER_STATE.MEASURING
+        self._logger.debug("Alti - started measuring.")
 
     def stop_measuring(self):
         # Not using asserts, need to have this not fall over when testing the GUI
-        if self._read_thread.is_alive():
+        if self._read_thread and self._read_thread.is_alive():
             self._kill_pill.set()
             self._read_thread.join()
+            self._logger.debug("Alti - stopped measuring.")
         self.state = ALTIMETER_STATE.CONNECTED

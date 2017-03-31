@@ -1,9 +1,10 @@
 <!DOCTYPE html>
 
-<script src="{{ url_for('static', filename='js/jquery-3.0.0.min.js') }}" type="text/javascript"></script>
+<script src="{{ url_for('static', filename='js/jquery-2.0.3.min.js') }}" type="text/javascript"></script>
 <script src="{{ url_for('static', filename='js/bootstrap.js') }}" type="text/javascript"></script>
-
-<link rel="stylesheet" href="{{ url_for('static', filename='css/bootstrap.css') }}" type="text/css">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/font-awesome.min.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/bootstrap.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/tricap.css') }}">
 
 <script type="text/javascript">
   var $SCRIPT_ROOT = {{ request.script_root|tojson|safe }};
@@ -22,31 +23,40 @@
 </header>
 
 <body>
-    <nav class="navbar navbar-default" id="base-navbar">
-        <div class="container-fluid" id="base-navbar-div">
-            <!-- Brand and toggle get grouped for better mobile display -->
-            <div class="navbar-header">
-                <a id='nav_a_home' class="navbar-brand" href="{{ url_for('home.index') }}">TriCap</a>
+    <div class="section">
+      <div class="container">
+        <div class="row">
+          <div class="col-xs-11">
+            <div class="alert alert-success" id="alt_main_status">
+              <h1 id="h_main_status">TriCap</h1>
             </div>
-            <div class="collapse navbar-collapse" id="navbar-collapse-1">
-                <ul class="nav navbar-nav" id='navbar-list'>
-                    <li><a id='nav_log' href="{{ url_for('showlog.showlog')}}">Show Log</a></li>
-                    <li><a id='nav_settings' href="{{ url_for('settings.settings')}}">Settings</a></li>
-                </ul>
+          </div>
+          <div class="col-xs-1">
+            <div class="btn-group btn-group-sm">
+              <a class="btn btn-block btn-lg btn-primary dropdown-toggle" data-toggle="dropdown" id="btn_menu"><i class="fa fa-2x fa-bars fa-fw"></i></a>
+              <ul class="dropdown-menu dropdown-menu-right" role="menu">
+                <li>
+                  <a href="{{ url_for('home.index')}}">Home</a>
+                </li>
+                <li>
+                  <a href="{{ url_for('settings.settings')}}" id="a_settings">Settings</a>
+                </li>
+                <li>
+                  <a href="{{ url_for('showlog.showlog')}}" id='a_showlog'>Log</a>
+                </li>
+                <li class="divider"></li>
+                <li>
+                  <a href="{{ url_for('home.index')}}" id="a_test">Test</a>
+                </li>
+                <li>
+                  <a href="{{ url_for('home.reset')}}" id="a_reset">Reset</a>
+                </li>
+              </ul>
             </div>
-            </div><!-- /.container-fluid -->
-    </nav>
-    {% with messages = get_flashed_messages() %}
-    {% if messages %}
-    <hr />
-        <ul class="flashes">
-            {%for message in messages %}
-                <li> {{message}} </li>
-            {% endfor %}
-        </ul>
-    {% endif %}
-    <hr>
-    {% endwith %}
+          </div>
+        </div>
+      </div>
+    </div>
 
     {% block content %}{% endblock %}
 

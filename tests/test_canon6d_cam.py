@@ -65,6 +65,8 @@ class TestDeviceCanon6DCam(TestBaseCanon6DCam):
 
     def test_setting_iso(self):
         cam = GPhotoCam(self._address, self.cam_settings)
+        cam.config.eosviewfinder = 1
+        cam.config.eosviewfinder = '0'
         cam.config.iso = '100'
         self.assertEqual(str(cam.config), str(RenderTree(cam.config.get_tree())))
         self.assertEqual(str(cam.config.iso), '100')

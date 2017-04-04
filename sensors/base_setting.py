@@ -45,7 +45,8 @@ class BaseSetting:
         return self._widget.get_value().__ge__(str(other))
 
     def set(self, value):
-        value = str(value)
+        datatype = type(self._widget.get_value())
+        value = datatype(value)
         if self.choices and value not in self.choices:
             raise BaseSetting.SettingException(
                 "%s is not a valid value for %s. Valid choices are : %s" % (value, self._widget.name, self.choices))

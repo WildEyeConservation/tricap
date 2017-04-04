@@ -9,6 +9,7 @@ Nice=-15
 Restart=always
 ExecStartPre=/home/rpi3/Projects/tricap/tricap/get_time_from_camera.sh
 ExecStart=/home/rpi3/Projects/tricap/tricap/tricap_launcher.sh
+# ExecStart=/usr/local/bin/uwsgi --ini /home/rpi3/Projects/tricap/tricap/tricap.ini
 PermissionsStartOnly=True
 
 [Install]

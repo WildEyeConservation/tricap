@@ -203,7 +203,7 @@ class DummyShell():
     def __init__(self, camera_driver):
         """Constructor."""
         self._camera = camera_driver
-        self.config.output = 'Undefined'  # Do not be in live mode
+        # self.config.output = 'Undefined'  # Do not be in live mode
         self.config.drivemode = 'Single'
         self.config.reviewtime = 'None'
         self.capture = self._camera.capture

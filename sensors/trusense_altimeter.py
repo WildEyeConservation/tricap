@@ -88,6 +88,11 @@ class TrusenseAltimeter(Subject):
         self._read_thread = None
         self._measurement = None
 
+        # bring the alti in line with the other monitors
+        self.type_id = 'Altitude'
+        self.value = 0
+        self.unit = 'm'
+
         self._ser = None  # set this to None if something goes wrong with getting the Serial object
 
         self._ser = serial.Serial(port=self._get_correct_port_name(supported_devices),
@@ -135,9 +140,19 @@ class TrusenseAltimeter(Subject):
 
     def _check_ok(self, error_msg):
         reply = self._ser.readline()
-        if reply != b'$OK\r\n':
-            self._check_for_known_error(reply)
-            raise AltiError(error_msg + ' : ' + reply.decode(encoding='ascii'))
+        check_count = 0
+        while reply != b'$OK\r\n' and check_count < 3:
+            if reply[1:3] == b'DM':
+                check_count += 1
+                self._logger.warning('Alti - Received a measurement when checking ok. Retrying.')
+                reply = self._ser.readline()
+            else:
+                # An error message has been received, raise an exception
+                self._check_for_known_error(reply)
+                raise AltiError(error_msg + ' : ' + reply.decode(encoding='ascii'))
+
+        if check_count >= 3:
+            raise AltiError(' No OK has been received, only distance measurements have been received.')
 
     def _write(self, command_str, command_error_str):
         message = '$' + command_str + '\r\n'
@@ -175,20 +190,28 @@ class TrusenseAltimeter(Subject):
             msg = self._ser.readline()
             if len(msg) > 0:
                 consecutive_timeouts = 0
-                dist_str = msg[4:].split(b',')[0]
-                self._measurement = float(dist_str)
-                # let any observers know that the measurement has been updated
-                self.notify()
+                code_str = msg[1:3]
+                if code_str != b'DM':
+                    log_str = 'Alti - Non-measurement received: %s' % msg
+                    self._logger.warning(log_str)
+                else:
+                    dist_str = msg[4:].split(b',')[0]
+                    self._measurement = float(dist_str)
+                    self.value = self._measurement
+                    # let any observers know that the measurement has been updated
+                    self.notify()
             else:
                 consecutive_timeouts += 1
-                self._logger.error('Empty message read from alti port, indicates a timeout')
+                self._logger.warning('Empty message read from alti port, indicates a timeout')
             if consecutive_timeouts >= 5:
                 self.state = ALTIMETER_STATE.ERROR
+                self._logger.error('Alti Error: Too many timeouts, communications have been lost.')
                 raise AltiError('Communications with altimeter was lost. 5 Consecutive timeouts ocurred')
         self._write('ST', 'Error stopping measuring mode')
         self.state = ALTIMETER_STATE.CONNECTED
 
     def start_measuring(self):
+        """Start the measuring thread."""
         self._write('GO', 'Error starting measuring mode')
         self._kill_pill = threading.Event()
         self._read_thread = threading.Thread(target=self._read,

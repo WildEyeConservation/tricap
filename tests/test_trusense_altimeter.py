@@ -7,12 +7,12 @@ from sensors.trusense_altimeter import TrusenseAltimeter, AltiError
 from support.session_logger import SessionLogger
 from support.configure import TricapConfig
 
-from .tricap_tempfile_test_case import TricapTempFilerTestCase
+from .tricap_tempfile_test_case import TriCapTempFilerTestCase
 
 from config import ALTIMETER_STATE
 
 
-class TestDeviceTruSense(TricapTempFilerTestCase):
+class TestDeviceTruSense(TriCapTempFilerTestCase):
     """Test the altimeter."""
 
     def setUp(self):
@@ -95,7 +95,8 @@ class TestDeviceTruSense(TricapTempFilerTestCase):
 
         init_config = TricapConfig()
         alti_settings = init_config.get_section_dict(TricapConfig.ALTI_SECTION_HEADER)
-        self.alti.reset(alti_settings)
+        #self.alti.reset(alti_settings)
+        self.alti.__init__(alti_settings)
         sleep(2)
         self.assertEqual(self.alti.state, ALTIMETER_STATE.CONNECTED)
         self.assertEqual(self.alti.get_state_as_string(), "CONNECTED")

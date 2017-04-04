@@ -2,7 +2,7 @@
 
 import os
 import io
-
+from urllib.request import urlopen
 from flask import Blueprint, render_template, send_from_directory, current_app, request, jsonify
 from flask import send_file, redirect, url_for
 
@@ -10,6 +10,7 @@ from app import tricap_manager, altimeter, session_logger, talkbox, log_list, st
 from app import rootlogger, fetch_stopper
 
 from support.configure import TricapConfig
+from support.sms_sender import SMSSender
 
 from config import BUTTON_CODE, CAM_MANAGER_STATES, ALTIMETER_STATE
 
@@ -147,6 +148,20 @@ def _check_gps():
         else:
             list_of_status.append('False')
     data['gps_status_of_cams'] = list_of_status
+    return jsonify(data)
+
+
+@home_bp.route('/_send_sms')
+def _send_sms():
+    sms_sender = SMSSender()
+    flag = sms_sender.send('Test Message from TriCap.')
+    data = {}
+    data['success'] = flag
+    if flag:
+        data['message'] = "Test message sent to %s through %s" % (sms_sender.number, sms_sender.ip)
+    else:
+        data['message'] = 'Error sending message'
+
     return jsonify(data)
 
 

@@ -2,6 +2,7 @@
 
 import threading
 import logging
+import datetime
 
 from abc import ABCMeta, abstractmethod
 
@@ -185,3 +186,19 @@ class ThreadedLogger(object):
                     self._logger.info(message)
                 self._messages.clear()
                 log_event.clear()
+
+
+class TimeMonitor(PeriodicMonitor):
+    """Monitor the time and date on the system, updates whatever observer is listening."""
+
+    def __init__(self, period: float):
+        """Constructor."""
+        super(TimeMonitor, self).__init__(period)
+
+        self.type_id = 'Time'
+        self.value = 0
+        self.unit = 'Time'
+
+    def monitor_step(self):
+        """Update the value with the current time as a string."""
+        self.value = datetime.datetime.now().strftime("%I:%M%p on %B %d, %Y")

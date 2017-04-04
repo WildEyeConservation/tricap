@@ -5,7 +5,6 @@
 $(function(){
 
     $('#a_check_gps').on('click', function(event){
-        console.log('check gps got clicked.');
         $.getJSON($SCRIPT_ROOT + '/_check_gps',
                   {},
                   function(data){
@@ -44,6 +43,33 @@ $(function(){
                   }
             );
         return true;
+    });
+
+    $('#a_check_sms').on('click', function(event){
+        $.getJSON($SCRIPT_ROOT + '/_send_sms',
+
+        function(data){
+            // remove any existing GPS information pieces
+            if ($('#alt_sms').length > 0){
+                $('#alt_sms').remove();
+            }
+
+            var alertColour;
+            var outputStr = data.message;
+            if (data.success === true){
+                alertColour = 'alert-success';
+
+            } else {
+                alertColour = 'alert-danger';
+            }
+
+            var alertHtmlString = '<div class="alert ' + alertColour + ' alert-dismissable" id="alt_sms">' +
+                                outputStr +
+                                '<a href="#" class="close" data-dismiss="alert" aria-label="close">&times;</a>' +
+                                '</div>';
+
+            $('#base_container').append(alertHtmlString);
+        });
     });
 
 });

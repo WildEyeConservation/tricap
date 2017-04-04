@@ -39,15 +39,6 @@ class TestHome(unittest.TestCase):
 class TestAppHome(TriCapAppTestCase):
     """TestAppHome."""
 
-    def _setup_dummies(self):
-        triconfig = TricapConfig()
-
-        web_settings = triconfig.get_section_dict(TricapConfig.WEB_SECTION_HEADER)
-        web_settings['alti_required'] = 'dummy'
-        web_settings['cams_required'] = 'dummy'
-        triconfig.set_section(web_settings, TricapConfig.WEB_SECTION_HEADER)
-        triconfig.save_to_file()
-
     def test_talkbox_messaging(self):
         """Test talkbox message."""
         self._setup_dummies()
@@ -326,6 +317,8 @@ class TestBehaviourHome(TriCapBehaviourTestCase):
         Not really a proper behaviour test, just checks that the ajax response is correct.
         At least it checks if the button is there.
         """
+        self._setup_dummies()
+
         with self.client:  # access the web page through a 'client', as if a browser
             self.open_page('home.index', 'btn_menu')
 

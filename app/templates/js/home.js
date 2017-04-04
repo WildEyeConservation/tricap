@@ -215,6 +215,7 @@ var refreshCamImages = function(){
         if (timeColourCode === 'blue'){
             var cam_img_url = $SCRIPT_ROOT + '/cam_img'+index+camImgControllers[index].imgId;
             $('#img_cam'+index).attr('src', cam_img_url);
+            console.log('Getting image from ' + cam_img_url)
         }
     }
     return false;

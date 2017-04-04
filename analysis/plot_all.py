@@ -153,9 +153,6 @@ if __name__ == '__main__':
 
     axarr[0].set_title('Inter-frame deltas')
 
-
-
-
     # sys vals
     values, times = get_sys_vals_and_timestamps(target_fp=target_fp, type_id='Linux RAM')
     axarr[1].plot(times, values)

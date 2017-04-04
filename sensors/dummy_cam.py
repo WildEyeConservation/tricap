@@ -39,7 +39,9 @@ class DummyConfig:
     def _get_child_by_name(self, key):
         config_widget = [widget for widget in PreOrderIter(self._tree)
                          if widget.name == key and widget.is_leaf]
-        if len(config_widget) != 1:
+        if len(config_widget) == 0:            
+            raise CameraException("%s does not have an entry!" % key)
+        elif len(config_widget) != 1:
             raise CameraException("%s does not uniquely identify a single item" % key)
 
         def set_value(value):
@@ -105,7 +107,7 @@ class DummyCam(AbstractCamera):
         # TODO : Check if this camera has already been claimed and raise an exception.
         self._camera = DummyCam.cameras[address]
         cam_file = os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                                '../camModels/Canon 6D - 023052000180.pkl')
+                                '../camModels/Canon 6D - 413051000325.pkl')
         with open(cam_file, 'rb') as f:
             self._model = pickle.load(f)
         self._config = DummyConfig(self._model)
@@ -203,7 +205,7 @@ class DummyShell():
     def __init__(self, camera_driver):
         """Constructor."""
         self._camera = camera_driver
-        self.config.output = 'Undefined'  # Do not be in live mode
+        # self.config.output = 'Undefined'  # Do not be in live mode
         self.config.drivemode = 'Single'
         self.config.reviewtime = 'None'
         self.capture = self._camera.capture

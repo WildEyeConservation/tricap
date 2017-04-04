@@ -3,9 +3,12 @@
 import unittest
 
 from tests.test_trusense_altimeter import TestDeviceTruSense
-from tests.test_canon6d_cam import TestDeviceCanon6DCam
-#except ImportError:
-#    print('Not testing GPhoto2 related testcases due to GPhoto2 not being installed.')
+from tests.test_sms_sender import SMSSenderDeviceTests, SMSObserverDeviceTests
+
+try:
+    from tests.test_canon6d_cam import TestDeviceCanon6DCam
+except ImportError:
+   print('Not testing GPhoto2 related testcases due to GPhoto2 not being installed.')
 
 
 if __name__ == '__main__':

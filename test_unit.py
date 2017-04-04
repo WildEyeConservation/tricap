@@ -2,6 +2,7 @@
 
 import unittest
 
+from tests.test_basic import TimeMonitorTests
 from tests.test_log_list import TestLogList
 from tests.test_talkbox import TestTalkBox
 from tests.test_configure import TestConfigure

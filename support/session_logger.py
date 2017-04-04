@@ -55,9 +55,6 @@ class SessionLogger(ThreadedLogger):
 
     def __del__(self):
         """Destructor, have to explicitly remove the handlers from the log file."""
-
-        # import pdb; pdb.set_trace()
-
         self._stop_event.set()
         self.thread.join()
         self._remove_handlers()

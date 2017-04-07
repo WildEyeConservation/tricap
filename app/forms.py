@@ -16,6 +16,8 @@ class SettingsForm(FlaskForm):
     alti_selects = FieldList(SelectField(), min_entries=0)
     web_strings = FieldList(StringField(), min_entries=0)
     web_selects = FieldList(SelectField(), min_entries=0)
+    sms_strings = FieldList(StringField(), min_entries=0)
+    sms_selects = FieldList(SelectField(), min_entries=0)
 
     # set = SubmitField(label='Set')
     save = SubmitField(label='Save')

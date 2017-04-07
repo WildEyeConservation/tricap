@@ -4,18 +4,25 @@
 /tmp
 /logs
 /.idea
-/.coverage
+/.coveragerc
 /htmlcov
 /__pycache__
 /app/__pycache__
 /*/__pycache__
-/.coverage
+/.coveragerc
 /htmlcov
 node_modules
 
+*
+!.gitignore
+
 # File Types
 *.pyc
+*.dot
+*.png
 *.orig
+*.dot
+*.png
 *.zip
 *.tern-project
 *.log
@@ -30,6 +37,7 @@ node_modules
 local_paths.py
 init_config.txt
 initial.cfg
+.pylintrc
 pylintrc
 test_local.py
 delete_log_files.py

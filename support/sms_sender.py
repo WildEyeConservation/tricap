@@ -24,6 +24,8 @@ class SMSSender(object):
         self.ip = config.get('ip', TricapConfig.SMS_SECTION_HEADER)
         self.number = config.get('number', TricapConfig.SMS_SECTION_HEADER)
         self.pwd = config.get('pwd', TricapConfig.SMS_SECTION_HEADER)
+        self.timeout = config.get('timeout', TricapConfig.SMS_SECTION_HEADER,
+                                  type_str=TricapConfig.TYPE_FLOAT)
 
     def check_response(self, response):
         """Return true if the response is good, false if the reponse is bad."""
@@ -40,7 +42,10 @@ class SMSSender(object):
         args = urlencode({'phone': self.number, 'text': msg, 'password': self.pwd})
         sms_url = 'http://%s:9090/sendsms?%s' % (self.ip, args)
         try:
-            return self.check_response(urlopen(sms_url))
+            # TODO: The use of a timeout is a short term fix. SMSSender should use a separate
+            # thread to send sms, to prevent the system from hanging if it struggles to send the
+            # message.
+            return self.check_response(urlopen(sms_url, timeout=self.timeout))
         except HTTPError:
             logging.getLogger('').warning("SMS not sent, http error (bad arguments?).")
             return False
@@ -50,7 +55,7 @@ class SMSSender(object):
 
 
 class SMSObserver():
-    """An observer which send an sms on the primary PeriodicMonitors update.
+    """An observer which sends an sms on the primary PeriodicMonitors update.
 
     Hooks up to a primary periodic monitor and optionally other secondary monitors.
     On each of the updates of the secondary monitors, a msg is filled with the desired values.

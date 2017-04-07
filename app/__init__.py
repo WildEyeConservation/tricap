@@ -147,11 +147,12 @@ app.logger.info('Initiated flask logger for new instance of the TriCap app.')
 # Instantiate the system log message tracker
 log_list = LogListAccessor(3)
 
-# Instantiate the sensors
+# Instantiate the config setting management
 init_config = TricapConfig()
 misc_settings = init_config.get_section_dict(TricapConfig.MISC_SECTION_HEADER)
 cam_settings = init_config.get_section_dict(TricapConfig.CAMERA_SECTION_HEADER)
 
+# Instantiate the sensors
 if init_config.get('cams_required', TricapConfig.WEB_SECTION_HEADER) == 'dummy':
     use_dummy_cams = True
     rootlogger.debug('Dummy cams will be, in acccordance to configuration.')

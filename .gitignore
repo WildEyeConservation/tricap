@@ -23,6 +23,7 @@ node_modules
 *.bak
 *.swp
 *.save
+*.tags
 *~
 
 # specific files

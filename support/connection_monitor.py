@@ -9,7 +9,7 @@ from support.basic import PeriodicMonitor, UnknownOperatingSystem
 
 
 class NetworkMonitor(PeriodicMonitor):
-    """NetworkMonitor, abstract observable for checking network statuses."""
+    """NetworkMonitor, abstract observable/subject for checking network statuses."""
 
     __metaclass__ = ABCMeta
 

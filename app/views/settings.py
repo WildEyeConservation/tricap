@@ -4,9 +4,7 @@ The are only three types of settings: camera, alti, miscellaneous.
 If a setting is not in the initial.cfg file, it is not displayed or made modifiable
 """
 
-import pdb
-
-from flask import Blueprint, current_app, redirect, url_for, render_template, request
+from flask import Blueprint, redirect, url_for, render_template, request
 
 from app import forms, tricap_manager, altimeter, session_logger
 from config import DEFAULT_CONFIG_FP, CONFIG_FP
@@ -62,8 +60,15 @@ class WebSettingHandler:
         """Constructor."""
         self.config = config
 
+# TODO SMS Settings Handler should get its settings from the actual sms objects
+class SMSSettingHandler:
+    """Handles all settings to do with the SMS interface (just a dictionary at the moment)."""
+    def __init__(self, config):
+        """Constructor."""
+        self.config = config
 
 def populate_form_section(sdict, handler, form_selects, form_strings, set_data=True):
+    """Populate the settings section of the form."""
     for key in sdict.keys():
         # check if its a select
         try:
@@ -119,10 +124,16 @@ def get_form_for_display(config_fp=CONFIG_FP, set_data=True):
     populate_form_section(web_dict, web_setting_handler, form.web_selects, form.web_strings,
                           set_data)
 
+    sms_dict = config.get_section_dict(TricapConfig.SMS_SECTION_HEADER)
+    sms_setting_handler = SMSSettingHandler(sms_dict)
+    populate_form_section(sms_dict, sms_setting_handler, form.sms_selects, form.sms_strings,
+                          set_data)
+
     return form
 
 
 def populate_pushed_form_section(pf_strings, pf_selects, df_strings, df_selects):
+    """Populate the form."""
     for index in range(len(df_strings)):
         pf_strings[index].label = df_strings[index].label
 
@@ -146,6 +157,9 @@ def populate_pushed_form(pushed_form):
 
     populate_pushed_form_section(pushed_form.web_strings, pushed_form.web_selects,
                                  display_form.web_strings, display_form.web_selects)
+
+    populate_pushed_form_section(pushed_form.sms_strings, pushed_form.sms_selects,
+                                 display_form.sms_strings, display_form.sms_selects)
 
     return pushed_form
 
@@ -206,6 +220,11 @@ def change_settings(form):
     web_dict = config.get_section_dict(TricapConfig.WEB_SECTION_HEADER)
     web_setting_handler = WebSettingHandler(web_dict)
     set_setting_handler_with_dict(web_setting_handler, form_dict[TricapConfig.WEB_SECTION_HEADER])
+
+    config = TricapConfig()
+    sms_dict = config.get_section_dict(TricapConfig.SMS_SECTION_HEADER)
+    sms_setting_handler = SMSSettingHandler(sms_dict)
+    set_setting_handler_with_dict(sms_setting_handler, form_dict[TricapConfig.SMS_SECTION_HEADER])
 
 
 def save_settings(form, config_fp=CONFIG_FP):

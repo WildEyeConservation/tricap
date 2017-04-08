@@ -13,8 +13,8 @@
 /htmlcov
 node_modules
 
-*
-!.gitignore
+
+# !.gitignore
 
 # File Types
 *.pyc
@@ -41,3 +41,4 @@ initial.cfg
 pylintrc
 test_local.py
 delete_log_files.py
+*.coverage

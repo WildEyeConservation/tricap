@@ -120,7 +120,7 @@ class TestBehaviourSettings(TriCapBehaviourTestCase):
     def test_page(self):
         """Test that the settings page has the correct number of fields."""
         with self.client:  # access the web page through a 'client', as if a browser
-            self.open_page('settings.settings', 'btn_save')
+            self.open_page('settings.settings', 'btn_save')            
 
             # Check that all the config fields have been created
             new_config = TricapConfig()

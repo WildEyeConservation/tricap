@@ -39,8 +39,8 @@ class DummyConfig:
     def _get_child_by_name(self, key):
         config_widget = [widget for widget in PreOrderIter(self._tree)
                          if widget.name == key and widget.is_leaf]
-        if len(config_widget) != 0:
-            raise CameraException("%s does not have an entry!")
+        if len(config_widget) == 0:            
+            raise CameraException("%s does not have an entry!" % key)
         elif len(config_widget) != 1:
             raise CameraException("%s does not uniquely identify a single item" % key)
 

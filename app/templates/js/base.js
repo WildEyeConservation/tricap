@@ -46,8 +46,30 @@ $(function(){
     });
 
     $('#a_check_sms').on('click', function(event){
-        var smsLink = "http://192.168.88.162:9090/sendsms?phone=0835500996&text=super cool&password=ivx"
-        $(location).attr('href', smsLink);
+        $.getJSON($SCRIPT_ROOT + '/_send_sms',
+
+        function(data){
+            // remove any existing GPS information pieces
+            if ($('#alt_sms').length > 0){
+                $('#alt_sms').remove();
+            }
+
+            var alertColour;
+            var outputStr = data.message;
+            if (data.success === true){
+                alertColour = 'alert-success';
+
+            } else {
+                alertColour = 'alert-danger';
+            }
+
+            var alertHtmlString = '<div class="alert ' + alertColour + ' alert-dismissable" id="alt_sms">' +
+                                outputStr +
+                                '<a href="#" class="close" data-dismiss="alert" aria-label="close">&times;</a>' +
+                                '</div>';
+
+            $('#base_container').append(alertHtmlString);
+        });
     });
 
 });

@@ -107,7 +107,7 @@ class DummyCam(AbstractCamera):
         # TODO : Check if this camera has already been claimed and raise an exception.
         self._camera = DummyCam.cameras[address]
         cam_file = os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                                '../camModels/Canon 6D - 023052000180.pkl')
+                                '../camModels/Canon 6D - 413051000325.pkl')
         with open(cam_file, 'rb') as f:
             self._model = pickle.load(f)
         self._config = DummyConfig(self._model)
@@ -205,7 +205,7 @@ class DummyShell():
     def __init__(self, camera_driver):
         """Constructor."""
         self._camera = camera_driver
-        self.config.output = 'Undefined'  # Do not be in live mode
+        # self.config.output = 'Undefined'  # Do not be in live mode
         self.config.drivemode = 'Single'
         self.config.reviewtime = 'None'
         self.capture = self._camera.capture

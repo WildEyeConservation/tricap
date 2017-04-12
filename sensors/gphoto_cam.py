@@ -137,6 +137,7 @@ class GPhotoCam(AbstractCamera):
         port_info = GPhotoCam._port_info_list[GPhotoCam._port_info_list.lookup_path(self._address)]
         self._gp_camera.set_port_info(port_info)
         self._gp_camera.init(GPhotoCam._context)
+        #import pdb; pdb.set_trace()
         # Do not catch exceptions here. Camera init is mission critical. If camera initialisation fails, we want top
         # level code to know about it.
         for key, value in settings.items():

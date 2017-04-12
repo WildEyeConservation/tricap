@@ -47,10 +47,13 @@ class BaseSetting:
     def set(self, value):
         datatype = type(self._widget.get_value())
         value = datatype(value)
+        # value = str(value)
         if self.choices and value not in self.choices:
             raise BaseSetting.SettingException(
                 "%s is not a valid value for %s. Valid choices are : %s" % (value, self._widget.name, self.choices))
         self._widget.set_value(value)
+        # print('Setting %s to %s', self._widget.name, str(value))
+        # print(self._widget.name, ' is ', self._widget.get_value())
 
     @property
     def choices(self):

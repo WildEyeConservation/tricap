@@ -62,7 +62,10 @@ def get_target_timestamps(fp: str, target_string: str):
                 continue
 
             if parts[2] == target_string:
-                timestamps.append(datetime.strptime(parts[0].split(' : ')[0], '%Y-%m-%d %H:%M:%S,%f'))
+                try:
+                    timestamps.append(datetime.strptime(parts[0].split(' : ')[0], '%Y-%m-%d %H:%M:%S,%f'))
+                except ValueError as e:
+                    timestamps.append(datetime.strptime(parts[0].split(' : ')[0], '%Y-%m-%d %H:%M:%S'))
                 if image_count == 0:
                     image_count = int(parts[1])
                 else:
@@ -104,7 +107,7 @@ def get_deltas_and_timestamps(target_folder, target_string):
     capture_fps = []
     for filename_with_ext in os.listdir(target_folder):
         filename, ext = os.path.splitext(filename_with_ext)
-        if ext == '.txt' and filename != 'readme' and filename != 'launch_test' and filename != 'python_launch_test':
+        if ext == '.txt' and filename != 'readme' and filename != 'ReadMe' and filename != 'launch_test' and filename != 'python_launch_test':
             capture_fps.append(os.path.join(target_folder, filename_with_ext))
 
     if len(capture_fps) == 0:

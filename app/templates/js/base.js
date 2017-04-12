@@ -5,7 +5,6 @@
 $(function(){
 
     $('#a_check_gps').on('click', function(event){
-        console.log('check gps got clicked.');
         $.getJSON($SCRIPT_ROOT + '/_check_gps',
                   {},
                   function(data){
@@ -44,6 +43,11 @@ $(function(){
                   }
             );
         return true;
+    });
+
+    $('#a_check_sms').on('click', function(event){
+        var smsLink = "http://192.168.88.162:9090/sendsms?phone=0835500996&text=super cool&password=ivx"
+        $(location).attr('href', smsLink);
     });
 
 });

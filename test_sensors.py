@@ -3,7 +3,7 @@
 import unittest
 
 from tests.test_trusense_altimeter import TestDeviceTruSense
-from tests.test_sms_sender import SMSSenderDeviceTests
+from tests.test_sms_sender import SMSSenderDeviceTests, SMSObserverDeviceTests
 
 try:
     from tests.test_canon6d_cam import TestDeviceCanon6DCam

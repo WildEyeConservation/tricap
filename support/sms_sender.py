@@ -7,9 +7,11 @@ import logging
 
 from urllib.request import urlopen
 from urllib.parse import urlencode
-from urllib.error import HTTPError
+from urllib.error import HTTPError, URLError
 
 from support.configure import TricapConfig
+
+from .basic import PeriodicMonitor
 
 
 class SMSSender(object):
@@ -40,15 +42,49 @@ class SMSSender(object):
         try:
             return self.check_response(urlopen(sms_url))
         except HTTPError:
-            logging.getLogger('').warning("SMS not sent, bad request.")
+            logging.getLogger('').warning("SMS not sent, http error (bad arguments?).")
+            return False
+        except URLError:
+            logging.getLogger('').warning("SMS not sent, url error (is SMS gateway running?)")
             return False
 
 
-class SMSPeriodicSender():
-    """Send sms via http request at a constant rate.
+class SMSObserver():
+    """An observer which send an sms on the primary PeriodicMonitors update.
 
-    At its most simplest it should send the current time.
-    Should subscribe to various loggers and send additional info?
+    Hooks up to a primary periodic monitor and optionally other secondary monitors.
+    On each of the updates of the secondary monitors, a msg is filled with the desired values.
+    When the primary monitor updates, it sends the sms.
     """
 
-    pass
+    def __init__(self, prime_monitor, sec_monitors=None):
+        """Constructor."""
+        self.sender = SMSSender()
+
+        self.prime_monitor = prime_monitor
+
+        self.msg = ''
+
+        prime_monitor.attach(self)
+
+        if sec_monitors:
+            if type(sec_monitors) is not list:
+                sec_monitors = [sec_monitors]
+
+            for mon in sec_monitors:
+                if mon is not None:
+                    mon.attach(self)
+
+    def update(self, monitor):
+        """Update method called by monitor subject."""
+        val = str(monitor.value)
+
+        if monitor == self.prime_monitor:
+            self.msg = monitor.type_id + ' : ' + val + ', ' + self.msg
+            if self.sender.send(self.msg):
+                logging.getLogger('').debug('Sent sms : %s', self.msg)
+            else:
+                logging.getLogger('').warning('Failed to send sms : %s', self.msg)
+            self.msg = ''
+        else:
+            self.msg = self.msg + monitor.type_id + ' : ' + val + ', ' + self.msg

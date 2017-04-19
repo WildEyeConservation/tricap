@@ -57,7 +57,7 @@ class SMSObserver():
     When the primary monitor updates, it sends the sms.
     """
 
-    def __init__(self, prime_monitor, sec_monitors=None):
+    def __init__(self, prime_monitor, sec_monitors=None, send_on_start=False):
         """Constructor."""
         self.sender = SMSSender()
 
@@ -74,6 +74,9 @@ class SMSObserver():
             for mon in sec_monitors:
                 if mon is not None:
                     mon.attach(self)
+
+        if send_on_start:
+            self.sender.send('TriCap SMS Sender Activated.')
 
     def update(self, monitor):
         """Update method called by monitor subject."""

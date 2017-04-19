@@ -88,6 +88,11 @@ class TrusenseAltimeter(Subject):
         self._read_thread = None
         self._measurement = None
 
+        # bring the alti in line with the other monitors
+        self.type_id = 'Altitude'
+        self.value = 0
+        self.unit = 'm'
+
         self._ser = None  # set this to None if something goes wrong with getting the Serial object
 
         self._ser = serial.Serial(port=self._get_correct_port_name(supported_devices),
@@ -145,7 +150,7 @@ class TrusenseAltimeter(Subject):
                 # An error message has been received, raise an exception
                 self._check_for_known_error(reply)
                 raise AltiError(error_msg + ' : ' + reply.decode(encoding='ascii'))
-        
+
         if check_count >= 3:
             raise AltiError(' No OK has been received, only distance measurements have been received.')
 
@@ -192,6 +197,7 @@ class TrusenseAltimeter(Subject):
                 else:
                     dist_str = msg[4:].split(b',')[0]
                     self._measurement = float(dist_str)
+                    self.value = self._measurement
                     # let any observers know that the measurement has been updated
                     self.notify()
             else:

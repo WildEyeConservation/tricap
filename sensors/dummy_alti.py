@@ -11,7 +11,7 @@ from config import ALTIMETER_STATE, RET_OK, RET_ERROR
 from functools import partial
 from collections import namedtuple
 from sensors.base_setting import BaseSetting, SettingSpec
-from support.basic import Subject
+from support.basic import Subject, PeriodicMonitor
 
 class MiscSettingConfig:
     dict_keys = {'_settings'}
@@ -68,6 +68,11 @@ class DummyAlti(Subject):
         self._logger.info('Dummy Alti Port Opened')
         self.state = ALTIMETER_STATE.CONNECTED
 
+        # bring the alti in line with the other monitors
+        self.type_id = 'Altitude'
+        self.value = 0
+        self.unit = 'm'
+
         self.generation_period = 1
 
     @property
@@ -103,6 +108,7 @@ class DummyAlti(Subject):
                 if self._measurement < 0:
                     self._mchange_dir = 'up'
 
+            self.value = self._measurement
             self.notify()
             sleep(self.generation_period)
 

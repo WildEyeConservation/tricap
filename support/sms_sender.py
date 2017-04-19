@@ -80,11 +80,11 @@ class SMSObserver():
         val = str(monitor.value)
 
         if monitor == self.prime_monitor:
-            self.msg = monitor.type_id + ' : ' + val + ', ' + self.msg
+            self.msg = monitor.type_id + ' : ' + val + self.msg
             if self.sender.send(self.msg):
                 logging.getLogger('').debug('Sent sms : %s', self.msg)
             else:
                 logging.getLogger('').warning('Failed to send sms : %s', self.msg)
             self.msg = ''
         else:
-            self.msg = self.msg + monitor.type_id + ' : ' + val + ', ' + self.msg
+            self.msg = self.msg + ', ' + monitor.type_id + ' : ' + val

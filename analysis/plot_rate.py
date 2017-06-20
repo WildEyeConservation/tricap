@@ -131,8 +131,9 @@ if __name__ == '__main__':
         sys.argv.pop()
         sys.argv.pop()
     else:
-        target_string = 'before capture \n'
-        target_folder = 'C:/Projects/IndlovuCode/tricap/Results/prelim_test5'
+        print("target folder not found!")
+        # target_string = 'before capture \n'
+        # target_folder = 'C:/Projects/IndlovuCode/tricap/Results/prelim_test5'
 
     # setup variables
     _, test_name = os.path.split(target_folder)

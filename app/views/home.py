@@ -6,11 +6,13 @@ from urllib.request import urlopen
 from flask import Blueprint, render_template, send_from_directory, current_app, request, jsonify
 from flask import send_file, redirect, url_for
 
-from app import tricap_manager, altimeter, session_logger, talkbox, log_list, stop_all_threads
+from app import tricap_manager, altimeter, altimeter_switch, session_logger, talkbox, log_list, stop_all_threads
 from app import rootlogger, fetch_stopper
 
 from support.configure import TricapConfig
 from support.sms_sender import SMSSender
+from sensors.altitude_switch import AltiSwitch
+import winsound
 
 from config import BUTTON_CODE, CAM_MANAGER_STATES, ALTIMETER_STATE
 
@@ -26,11 +28,9 @@ ALTI_STATE_COLOURS = ['dummy', 'red', 'orange', 'green', 'red']
 
 
 @home_bp.route('/', methods=['GET'])
-def index_slash():
-    """Redirect request to the proper index page."""
-    return index()
-
-
+# def index_slash():
+#     """Redirect request to the proper index page."""
+#     return index()
 @home_bp.route('/index', methods=['GET'])
 def index():
     """The Main GUI interface page."""
@@ -50,6 +50,9 @@ def index():
 
     cams_start_display = config.get('cams_start_display', TricapConfig.WEB_SECTION_HEADER)
     alti_start_display = config.get('alti_start_display', TricapConfig.WEB_SECTION_HEADER)
+
+    altimeter.start_measuring()  # start measuring altitude from the start
+    session_logger.create_new_session()
 
     if cams_start_display.lower() == 'open':
         for cam in tricap_manager.get_cameras_as_list():
@@ -97,6 +100,7 @@ def _determine_alti_state_colour():
 
 @home_bp.route('/_set_image_fetching_state')
 def _set_image_fetching_state():
+    winsound.Beep(2000, 300)
     image_fetch_state_str = str(request.args.get('image_fetching_state'))
     # TODO Do something with the new image fetch state
     if image_fetch_state_str == 'True':
@@ -113,8 +117,11 @@ def _set_image_fetching_state():
 @home_bp.route('/_get_state_data')
 def provide_state_data():
     """Jsonify all the data pertaining to the state of the system."""
+    #winsound.Beep(2000, 300)
+
     alti_data = {'state_colour': _determine_alti_state_colour(),
-                 'measurement': str(altimeter.measurement)}
+                 'measurement': str(altimeter.measurement),
+                 'switch_state': str(altimeter_switch.get_alti_switch_state())}
 
     cam_image_counts = [cam.get_cam_image_count() for cam in tricap_manager.get_cameras_as_list()]
     cam_data = {'image_counts': cam_image_counts,
@@ -205,6 +212,11 @@ def _has_capture_started():
 
     config = TricapConfig()
 
+    # Include here the function to return false if switch is off
+    if altimeter_switch.get_alti_switch_state() == False:
+        tricap_manager.stop_capturing()
+        return False
+
     cams_started = tricap_manager.state == CAM_MANAGER_STATES.STARTED
     alti_started = altimeter.state == ALTIMETER_STATE.MEASURING
 
@@ -215,6 +227,8 @@ def _has_capture_started():
     alti_a_must = False
     if (config.get('alti_required', TricapConfig.WEB_SECTION_HEADER) == 'yes'):
         alti_a_must = True
+
+    tricap_manager.start_capturing()
 
     # if non of the sensors are required, then at least one has had to have started
     if not(alti_a_must or cams_a_must):
@@ -253,14 +267,14 @@ def handle_button_click():
 
     if button_code == BUTTON_CODE.START:
         rootlogger.info('User requested capture to start.')
-        session_logger.create_new_session()
+        #session_logger.create_new_session()
         tricap_manager.start_capturing()
-        altimeter.start_measuring()
+        #altimeter.start_measuring()
         return jsonify(capture_started=_has_capture_started())
     elif button_code == BUTTON_CODE.STOP:
         rootlogger.info('User requested capture to stop.')
         tricap_manager.stop_capturing()
-        altimeter.stop_measuring()
+        #altimeter.stop_measuring()
         return jsonify(capture_started=_has_capture_started())
     elif button_code == BUTTON_CODE.RESET:
         rootlogger.info('User requested server reset.')
@@ -273,15 +287,15 @@ def handle_button_click():
             # we want to stop
             rootlogger.info('User requested capture to stop.')
             tricap_manager.stop_capturing()
-            altimeter.stop_measuring()
+            #altimeter.stop_measuring()
         else:  # we want to start
             rootlogger.info('User requested capture to start.')
             session_logger.create_new_session()
             config = TricapConfig()
             if (config.get('cams_required', TricapConfig.WEB_SECTION_HEADER) != 'no'):
                 tricap_manager.start_capturing()
-            if (config.get('alti_required', TricapConfig.WEB_SECTION_HEADER) != 'no'):
-                altimeter.start_measuring()
+            # if (config.get('alti_required', TricapConfig.WEB_SECTION_HEADER) != 'no'):
+            #     #altimeter.start_measuring()
         # send back the real state of the system
         return jsonify(capture_started=_has_capture_started())
 

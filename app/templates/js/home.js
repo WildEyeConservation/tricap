@@ -181,6 +181,7 @@ var startStopFollowUp = function (data) {
         camRefreshTimer.stopTimer();
         $('[name="btn_startstop"]').html('Start');
     }
+    //$('[name="btn_startstop"]').html('Stop');
     return false;
 };
 
@@ -227,6 +228,14 @@ var updateAlti = function(data){
         $('#h_alti').html('Altitude: ' + Math.round(data.measurement*3.28084) + ' ft');
     } else {
         $('#h_alti').html('Altitude: ' + Math.round(data.measurement) + ' m');
+    }
+
+    if(data.switch_state == 'True'){ //See switch state to determine if the camera should capture
+        changeMainStatus('green', 'TriCap: Capturing data of cameras');
+    } else if(data.measurement > 20){
+        changeMainStatus('orange', 'TriCap: Fly higher or Land ');
+    } else {
+        changeMainStatus('orange', 'TriCap');
     }
 
     changeElementColour('#alt_alti', data.state_colour);
@@ -387,10 +396,14 @@ var updatePage = function(data){
      return false;
 };
 
+// Get data from the python scripts in intervals and then update the page
 var requestStateData = function(data){
     $.getJSON($SCRIPT_ROOT + '/_get_state_data', {}, updatePage);
     return false;
 };
+
+
+
 
 // All of the following code will only run when the page is ready
 //  (the $() is short for $(document).ready())

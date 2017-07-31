@@ -13,8 +13,10 @@ from flask import Flask
 
 from sensors.cam_manager import TriCapCamsManager
 from sensors.trusense_altimeter import TrusenseAltimeter
-from sensors.dummy_alti import DummyAlti
+#from sensors.dummy_alti import DummyAlti
+from sensors.alti_simulator import SimulatorAlti
 from sensors.camera_logger import cameraLoggingObserver
+from sensors.altitude_switch import AltiSwitch
 
 from support.session_logger import SessionLogger
 from support.configure import TricapConfig
@@ -85,7 +87,7 @@ class GateCloser():
 
     def __init__(self, delay: float, close_function):
         """Construct."""
-        """Delay - time to wait untill the close_function action is called."""
+        """Delay - time to wait until the close_function action is called."""
         self.delay = delay
         self.close_function = close_function
 
@@ -155,7 +157,7 @@ cam_settings = init_config.get_section_dict(TricapConfig.CAMERA_SECTION_HEADER)
 # Instantiate the sensors
 if init_config.get('cams_required', TricapConfig.WEB_SECTION_HEADER) == 'dummy':
     use_dummy_cams = True
-    rootlogger.debug('Dummy cams will be, in acccordance to configuration.')
+    rootlogger.debug('Dummy cams will be, in accordance to configuration.')
 else:
     use_dummy_cams = False
     rootlogger.debug('Real cams will be used, in accordance to configuration')
@@ -179,13 +181,20 @@ image_manager = tricap_manager
 rootlogger.debug('Cameras have been configured.')
 
 alti_settings = init_config.get_section_dict(TricapConfig.ALTI_SECTION_HEADER)
+web_settings = init_config.get_section_dict(TricapConfig.WEB_SECTION_HEADER)
 
 if init_config.get('alti_required', TricapConfig.WEB_SECTION_HEADER) == 'dummy':
     rootlogger.debug('Using a dummy altimeter.')
-    altimeter = DummyAlti(alti_settings)
+    altimeter = SimulatorAlti(alti_settings)#DummyAlti(alti_settings)
 else:
     rootlogger.debug('Using a real altimeter.')
     altimeter = TrusenseAltimeter(alti_settings)
+
+altimeter_switch = AltiSwitch(altimeter)
+
+# Configure the hysteresis bounds from settings
+
+altimeter.attach(altimeter_switch)
 
 rootlogger.debug('Altimeter has been configured.')
 

@@ -9,12 +9,14 @@
 /__pycache__
 /app/__pycache__
 /*/__pycache__
-/.coverage
+/.coveragerc
 /htmlcov
 node_modules
 
 # File Types
 *.pyc
+*.dot
+*.png
 *.orig
 *.zip
 *.tern-project

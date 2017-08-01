@@ -7,7 +7,7 @@ from flask import Blueprint, render_template, send_from_directory, current_app, 
 from flask import send_file, redirect, url_for
 
 from app import tricap_manager, altimeter, altimeter_switch, session_logger, talkbox, log_list, stop_all_threads
-from app import rootlogger, fetch_stopper
+from app import rootlogger, fetch_stopper, manual_override
 
 from support.configure import TricapConfig
 from support.sms_sender import SMSSender
@@ -52,7 +52,6 @@ def index():
     alti_start_display = config.get('alti_start_display', TricapConfig.WEB_SECTION_HEADER)
 
     altimeter.start_measuring()  # start measuring altitude from the start
-    session_logger.create_new_session()
 
     if cams_start_display.lower() == 'open':
         for cam in tricap_manager.get_cameras_as_list():
@@ -121,7 +120,8 @@ def provide_state_data():
 
     alti_data = {'state_colour': _determine_alti_state_colour(),
                  'measurement': str(altimeter.measurement),
-                 'switch_state': str(altimeter_switch.get_alti_switch_state())}
+                 'switch_state': str(altimeter_switch.get_alti_switch_state(override = manual_override)),
+                 'override': str(manual_override)}
 
     cam_image_counts = [cam.get_cam_image_count() for cam in tricap_manager.get_cameras_as_list()]
     cam_data = {'image_counts': cam_image_counts,
@@ -213,7 +213,7 @@ def _has_capture_started():
     config = TricapConfig()
 
     # Include here the function to return false if switch is off
-    if altimeter_switch.get_alti_switch_state() == False:
+    if altimeter_switch.get_alti_switch_state(manual_override) == False or manual_override == 1:
         tricap_manager.stop_capturing()
         return False
 
@@ -228,7 +228,8 @@ def _has_capture_started():
     if (config.get('alti_required', TricapConfig.WEB_SECTION_HEADER) == 'yes'):
         alti_a_must = True
 
-    tricap_manager.start_capturing()
+    if manual_override != 1:
+        tricap_manager.start_capturing()
 
     # if non of the sensors are required, then at least one has had to have started
     if not(alti_a_must or cams_a_must):
@@ -264,16 +265,19 @@ def reset():
 @home_bp.route('/_button_click', methods=['GET', 'POST'])
 def handle_button_click():
     button_code = int(request.args.get('buttonCode'))
+    global manual_override
 
     if button_code == BUTTON_CODE.START:
         rootlogger.info('User requested capture to start.')
-        #session_logger.create_new_session()
+        session_logger.create_new_session()
         tricap_manager.start_capturing()
+        manual_override = 0
         #altimeter.start_measuring()
         return jsonify(capture_started=_has_capture_started())
     elif button_code == BUTTON_CODE.STOP:
         rootlogger.info('User requested capture to stop.')
         tricap_manager.stop_capturing()
+        manual_override = 1
         #altimeter.stop_measuring()
         return jsonify(capture_started=_has_capture_started())
     elif button_code == BUTTON_CODE.RESET:
@@ -288,14 +292,21 @@ def handle_button_click():
             rootlogger.info('User requested capture to stop.')
             tricap_manager.stop_capturing()
             #altimeter.stop_measuring()
+            manual_override = 1  # stop caturing data
         else:  # we want to start
             rootlogger.info('User requested capture to start.')
             session_logger.create_new_session()
             config = TricapConfig()
             if (config.get('cams_required', TricapConfig.WEB_SECTION_HEADER) != 'no'):
                 tricap_manager.start_capturing()
+                if manual_override == 0:
+                    manual_override = 2  # Other state for start override
+                    print("Manual override start")
+                else:
+                    manual_override = 0  # Other state for start override
+                    print("Altitude switch active")
             # if (config.get('alti_required', TricapConfig.WEB_SECTION_HEADER) != 'no'):
-            #     #altimeter.start_measuring()
+            #      altimeter.start_measuring()
         # send back the real state of the system
         return jsonify(capture_started=_has_capture_started())
 

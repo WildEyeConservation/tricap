@@ -196,6 +196,8 @@ altimeter_switch = AltiSwitch(altimeter)
 
 altimeter.attach(altimeter_switch)
 
+manual_override = False
+
 rootlogger.debug('Altimeter has been configured.')
 
 talkbox = TalkBox(Lock(), 3)

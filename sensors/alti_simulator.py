@@ -42,7 +42,7 @@ class MiscSettingConfig:
 class SimulatorAlti(Subject):
     """Handles serial communication with the TruSense S100 Laser Altimeter"""
     _logger = logging.getLogger(__name__)#start the logger
-    i = 0
+    i = 0 # static variable used for flight path
 
     def __init__(self, settings, supported_devices={(1659, 8963)}):
         super().__init__()# get variables from parent class
@@ -79,7 +79,8 @@ class SimulatorAlti(Subject):
         self.altitude_start_upper = 150
         self.altitude_stop_lower = 120
 
-        self.flight_points = [160,140,150,200,119,151,121,161,50] # heights of the flight plan
+        self.flight_points = [160, 140, 150, 30, 119, 151, 121, 161, 0]
+        #self.flight_points = [160,100,20,80,0]  # heights of the flight plan
 
         self.generation_period = 1
 
@@ -132,7 +133,7 @@ class SimulatorAlti(Subject):
 
     def _read(self, stop_event):
         while not stop_event.is_set():
-            self.flight_path(10, self.flight_points, True) #Repeat flight points at tempo of 10m/s
+            self.flight_path(5, self.flight_points, True)  # Repeat flight points at tempo of 5 m/s
             self.value = self._measurement
             self.notify()
             sleep(self.generation_period)
@@ -157,11 +158,11 @@ class SimulatorAlti(Subject):
     # if value is higher than hysteresis start value then start the capturing process,
     # else if the value returns below the hysteresis value then the camera stops
 
-    def altitude_switch(self):
-        if self._measurement > self.altitude_start_upper:
-            self.start_measuring()
-        elif self._measurement < self.altitude_stop_lower:
-            self.stop_measuring()
+    # def altitude_switch(self):
+    #     if self._measurement > self.altitude_start_upper:
+    #         self.start_measuring()
+    #     elif self._measurement < self.altitude_stop_lower:
+    #         self.stop_measuring()
 
 
 

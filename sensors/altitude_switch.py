@@ -1,12 +1,7 @@
 # Observer for automated switch. The switch uses the altimeter to start taking pictures.
-
-#from sensors.alti_simulator import SimulatorAlti
 from support.basic import Observer
-from sensors.base_setting import BaseSetting, SettingSpec
 from configparser import ConfigParser
 import logging
-from functools import partial
-from support.configure import TricapConfig
 
 
 class AltiSwitch(Observer):
@@ -23,19 +18,22 @@ class AltiSwitch(Observer):
         self.alti_switch_boundry()
 
 
-    def altitude_switch(self):
-        if self.measured_height >= self.altitude_start_upper:
-            #self.alti.start_measuring()
-            self.alti_switch = True
-            self._logger.debug('AltiSwitch - capturing')
-        elif self.measured_height <= self.altitude_stop_lower:
-            #self.alti.stop_measuring()
+    def altitude_switch(self, override = 0):
+        if override == 0:
+            if self.measured_height >= self.altitude_start_upper:
+                self.alti_switch = True
+                self._logger.debug('AltiSwitch - capturing')
+            elif self.measured_height < self.altitude_stop_lower:
+                self.alti_switch = False
+                self._logger.debug('AltiSwitch - not capturing')
+        elif override == 1:  # If switch is overwritten, then the system stops capturing
             self.alti_switch = False
-            self._logger.debug('AltiSwitch - not capturing')
+        else:  # override with start button
+            self.alti_switch = True
 
 
-    def get_alti_switch_state(self): # True shows the switch is ON and vice versa
-        self.altitude_switch()
+    def get_alti_switch_state(self, override = 0): # True shows the switch is ON and vice versa
+        self.altitude_switch(override)
         return self.alti_switch
 
     def update(self, subject):

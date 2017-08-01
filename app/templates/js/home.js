@@ -181,8 +181,6 @@ var startStopFollowUp = function (data) {
         camRefreshTimer.stopTimer();
         $('[name="btn_startstop"]').html('Start');
     }
-    //$('[name="btn_startstop"]').html('Stop');
-    return false;
 };
 
 var getTimeColourForCamImage = function(index){
@@ -224,18 +222,31 @@ var refreshCamImages = function(){
 
 var updateAlti = function(data){
 
+    var methodOfCapture = "Tricap altitude switch: ";
+    var captureFlag = "Capturing data of camera";
+
+
     if (altiConvertToFeet === 'True'){
         $('#h_alti').html('Altitude: ' + Math.round(data.measurement*3.28084) + ' ft');
     } else {
         $('#h_alti').html('Altitude: ' + Math.round(data.measurement) + ' m');
     }
 
+    if (data.override == '0'){
+        methodOfCapture = "Tricap altitude switch: ";
+    } else if (data.override == '2') {
+        methodOfCapture = "Tricap manual override: ";
+    } else if (data.override == '1') {
+        methodOfCapture = "Tricap stopped: ";
+    }
+
     if(data.switch_state == 'True'){ //See switch state to determine if the camera should capture
-        changeMainStatus('green', 'TriCap: Capturing data of cameras');
-    } else if(data.measurement > 20){
-        changeMainStatus('orange', 'TriCap: Fly higher or Land ');
+        //changeMainStatus('green', 'TriCap: Capturing data of cameras');
+        changeMainStatus('green', methodOfCapture.concat(captureFlag));
+    } else if(data.measurement > 10){
+        changeMainStatus('orange', methodOfCapture.concat('Currently not capturing data'));
     } else {
-        changeMainStatus('orange', 'TriCap');
+        changeMainStatus('green', 'TriCap');
     }
 
     changeElementColour('#alt_alti', data.state_colour);

@@ -243,8 +243,8 @@ def settings():
         form = populate_pushed_form(forms.SettingsForm())
 
     if form.validate_on_submit():
-        tricap_manager.stop_capturing()
-        altimeter.stop_measuring()
+        #tricap_manager.stop_capturing()
+        #altimeter.stop_measuring()
 
         # if form.test.data is True:
         #     change_settings(form)

@@ -292,7 +292,7 @@ def handle_button_click():
             rootlogger.info('User requested capture to stop.')
             tricap_manager.stop_capturing()
             #altimeter.stop_measuring()
-            manual_override = 1  # stop caturing data
+            manual_override = 1  # stop capturing data
         else:  # we want to start
             rootlogger.info('User requested capture to start.')
             session_logger.create_new_session()

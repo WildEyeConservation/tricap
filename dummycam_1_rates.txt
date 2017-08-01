@@ -45950,3 +45950,466 @@ Rate Logging Started
 2017-08-01 11:01:11,693302 : 27 : before capture 
 2017-08-01 11:01:11,693302 : 27 : before preview fetch 
 2017-08-01 11:01:11,693302 : 27 : after preview fetch 
+Rate Logging Started 
+2017-08-01 11:11:57,038367 : 1 : before capture 
+2017-08-01 11:11:57,038367 : 1 : before preview fetch 
+2017-08-01 11:11:57,038367 : 1 : after preview fetch 
+2017-08-01 11:11:59,038628 : 2 : before capture 
+2017-08-01 11:11:59,038628 : 2 : before preview fetch 
+2017-08-01 11:11:59,038628 : 2 : after preview fetch 
+2017-08-01 11:12:01,038305 : 3 : before capture 
+2017-08-01 11:12:01,038305 : 3 : before preview fetch 
+2017-08-01 11:12:01,038305 : 3 : after preview fetch 
+2017-08-01 11:12:03,040067 : 4 : before capture 
+2017-08-01 11:12:03,040067 : 4 : before preview fetch 
+2017-08-01 11:12:03,040067 : 4 : after preview fetch 
+2017-08-01 11:12:05,039662 : 5 : before capture 
+2017-08-01 11:12:05,039662 : 5 : before preview fetch 
+2017-08-01 11:12:05,039662 : 5 : after preview fetch 
+2017-08-01 11:12:07,039969 : 6 : before capture 
+2017-08-01 11:12:07,039969 : 6 : before preview fetch 
+2017-08-01 11:12:07,039969 : 6 : after preview fetch 
+2017-08-01 11:12:09,041876 : 7 : before capture 
+2017-08-01 11:12:09,041876 : 7 : before preview fetch 
+2017-08-01 11:12:09,041876 : 7 : after preview fetch 
+2017-08-01 11:12:11,040940 : 8 : before capture 
+2017-08-01 11:12:11,040940 : 8 : before preview fetch 
+2017-08-01 11:12:11,040940 : 8 : after preview fetch 
+2017-08-01 11:12:13,042121 : 9 : before capture 
+2017-08-01 11:12:13,042121 : 9 : before preview fetch 
+2017-08-01 11:12:13,042121 : 9 : after preview fetch 
+2017-08-01 11:12:19,042250 : 10 : before capture 
+2017-08-01 11:12:19,042250 : 10 : before preview fetch 
+2017-08-01 11:12:19,042250 : 10 : after preview fetch 
+2017-08-01 11:12:57,040621 : 11 : before capture 
+2017-08-01 11:12:57,040621 : 11 : before preview fetch 
+2017-08-01 11:12:57,040621 : 11 : after preview fetch 
+2017-08-01 11:12:59,040667 : 12 : before capture 
+2017-08-01 11:12:59,040667 : 12 : before preview fetch 
+2017-08-01 11:12:59,040667 : 12 : after preview fetch 
+2017-08-01 11:13:01,040878 : 13 : before capture 
+2017-08-01 11:13:01,040878 : 13 : before preview fetch 
+2017-08-01 11:13:01,040878 : 13 : after preview fetch 
+2017-08-01 11:13:03,041710 : 14 : before capture 
+2017-08-01 11:13:03,041710 : 14 : before preview fetch 
+2017-08-01 11:13:03,041710 : 14 : after preview fetch 
+2017-08-01 11:13:05,042164 : 15 : before capture 
+2017-08-01 11:13:05,042164 : 15 : before preview fetch 
+2017-08-01 11:13:05,042164 : 15 : after preview fetch 
+2017-08-01 11:13:07,042605 : 16 : before capture 
+2017-08-01 11:13:07,042605 : 16 : before preview fetch 
+2017-08-01 11:13:07,042605 : 16 : after preview fetch 
+2017-08-01 11:13:09,042809 : 17 : before capture 
+2017-08-01 11:13:09,042809 : 17 : before preview fetch 
+2017-08-01 11:13:09,042809 : 17 : after preview fetch 
+2017-08-01 11:13:11,043181 : 18 : before capture 
+2017-08-01 11:13:11,043181 : 18 : before preview fetch 
+2017-08-01 11:13:11,043181 : 18 : after preview fetch 
+2017-08-01 11:13:13,043363 : 19 : before capture 
+2017-08-01 11:13:13,043363 : 19 : before preview fetch 
+2017-08-01 11:13:13,043363 : 19 : after preview fetch 
+2017-08-01 11:13:15,043447 : 20 : before capture 
+2017-08-01 11:13:15,043447 : 20 : before preview fetch 
+2017-08-01 11:13:15,043447 : 20 : after preview fetch 
+2017-08-01 11:13:17,044240 : 21 : before capture 
+2017-08-01 11:13:17,044240 : 21 : before preview fetch 
+2017-08-01 11:13:17,044240 : 21 : after preview fetch 
+2017-08-01 11:13:19,044893 : 22 : before capture 
+2017-08-01 11:13:19,044893 : 22 : before preview fetch 
+2017-08-01 11:13:19,044893 : 22 : after preview fetch 
+2017-08-01 11:13:21,045419 : 23 : before capture 
+2017-08-01 11:13:21,045419 : 23 : before preview fetch 
+2017-08-01 11:13:21,045419 : 23 : after preview fetch 
+Rate Logging Started 
+2017-08-01 11:15:18,487923 : 1 : before capture 
+2017-08-01 11:15:18,487923 : 1 : before preview fetch 
+2017-08-01 11:15:18,487923 : 1 : after preview fetch 
+2017-08-01 11:15:20,488385 : 2 : before capture 
+2017-08-01 11:15:20,488385 : 2 : before preview fetch 
+2017-08-01 11:15:20,488385 : 2 : after preview fetch 
+2017-08-01 11:15:22,488895 : 3 : before capture 
+2017-08-01 11:15:22,488895 : 3 : before preview fetch 
+2017-08-01 11:15:22,488895 : 3 : after preview fetch 
+2017-08-01 11:15:24,490599 : 4 : before capture 
+2017-08-01 11:15:24,490599 : 4 : before preview fetch 
+2017-08-01 11:15:24,490599 : 4 : after preview fetch 
+2017-08-01 11:15:26,490169 : 5 : before capture 
+2017-08-01 11:15:26,490169 : 5 : before preview fetch 
+2017-08-01 11:15:26,490169 : 5 : after preview fetch 
+2017-08-01 11:15:28,491175 : 6 : before capture 
+2017-08-01 11:15:28,491175 : 6 : before preview fetch 
+2017-08-01 11:15:28,491175 : 6 : after preview fetch 
+2017-08-01 11:15:30,492416 : 7 : before capture 
+2017-08-01 11:15:30,492416 : 7 : before preview fetch 
+2017-08-01 11:15:30,492416 : 7 : after preview fetch 
+2017-08-01 11:15:32,492242 : 8 : before capture 
+2017-08-01 11:15:32,492242 : 8 : before preview fetch 
+2017-08-01 11:15:32,492242 : 8 : after preview fetch 
+2017-08-01 11:15:39,504812 : 9 : before capture 
+2017-08-01 11:15:39,504812 : 9 : before preview fetch 
+2017-08-01 11:15:39,504812 : 9 : after preview fetch 
+2017-08-01 11:15:41,504293 : 10 : before capture 
+2017-08-01 11:15:41,504293 : 10 : before preview fetch 
+2017-08-01 11:15:41,504293 : 10 : after preview fetch 
+2017-08-01 11:15:43,504910 : 11 : before capture 
+2017-08-01 11:15:43,504910 : 11 : before preview fetch 
+2017-08-01 11:15:43,504910 : 11 : after preview fetch 
+2017-08-01 11:15:45,505527 : 12 : before capture 
+2017-08-01 11:15:45,505527 : 12 : before preview fetch 
+2017-08-01 11:15:45,505527 : 12 : after preview fetch 
+2017-08-01 11:15:47,506052 : 13 : before capture 
+2017-08-01 11:15:47,506052 : 13 : before preview fetch 
+2017-08-01 11:15:47,506052 : 13 : after preview fetch 
+2017-08-01 11:15:49,506391 : 14 : before capture 
+2017-08-01 11:15:49,506391 : 14 : before preview fetch 
+2017-08-01 11:15:49,506391 : 14 : after preview fetch 
+2017-08-01 11:15:51,506578 : 15 : before capture 
+2017-08-01 11:15:51,506578 : 15 : before preview fetch 
+2017-08-01 11:15:51,506578 : 15 : after preview fetch 
+Rate Logging Started 
+2017-08-01 11:16:41,429393 : 1 : before capture 
+2017-08-01 11:16:41,429393 : 1 : before preview fetch 
+2017-08-01 11:16:41,429393 : 1 : after preview fetch 
+2017-08-01 11:19:02,273541 : 2 : before capture 
+2017-08-01 11:19:02,273541 : 2 : before preview fetch 
+2017-08-01 11:19:02,273541 : 2 : after preview fetch 
+2017-08-01 11:19:24,184930 : 3 : before capture 
+2017-08-01 11:19:24,184930 : 3 : before preview fetch 
+2017-08-01 11:19:24,184930 : 3 : after preview fetch 
+2017-08-01 11:19:26,185945 : 4 : before capture 
+2017-08-01 11:19:26,185945 : 4 : before preview fetch 
+2017-08-01 11:19:26,185945 : 4 : after preview fetch 
+2017-08-01 11:19:28,186918 : 5 : before capture 
+2017-08-01 11:19:28,186918 : 5 : before preview fetch 
+2017-08-01 11:19:28,186918 : 5 : after preview fetch 
+2017-08-01 11:19:30,187278 : 6 : before capture 
+2017-08-01 11:19:30,187278 : 6 : before preview fetch 
+2017-08-01 11:19:30,187278 : 6 : after preview fetch 
+2017-08-01 11:19:32,187288 : 7 : before capture 
+2017-08-01 11:19:32,187288 : 7 : before preview fetch 
+2017-08-01 11:19:32,187288 : 7 : after preview fetch 
+2017-08-01 11:19:34,187313 : 8 : before capture 
+2017-08-01 11:19:34,187313 : 8 : before preview fetch 
+2017-08-01 11:19:34,187313 : 8 : after preview fetch 
+2017-08-01 11:19:36,187580 : 9 : before capture 
+2017-08-01 11:19:36,187580 : 9 : before preview fetch 
+2017-08-01 11:19:36,187580 : 9 : after preview fetch 
+2017-08-01 11:19:38,188145 : 10 : before capture 
+2017-08-01 11:19:38,188145 : 10 : before preview fetch 
+2017-08-01 11:19:38,188145 : 10 : after preview fetch 
+2017-08-01 11:19:40,188969 : 11 : before capture 
+2017-08-01 11:19:40,188969 : 11 : before preview fetch 
+2017-08-01 11:19:40,188969 : 11 : after preview fetch 
+2017-08-01 11:20:24,184429 : 12 : before capture 
+2017-08-01 11:20:24,184429 : 12 : before preview fetch 
+2017-08-01 11:20:24,184429 : 12 : after preview fetch 
+2017-08-01 11:20:26,185033 : 13 : before capture 
+2017-08-01 11:20:26,185033 : 13 : before preview fetch 
+2017-08-01 11:20:26,185033 : 13 : after preview fetch 
+2017-08-01 11:20:28,185748 : 14 : before capture 
+2017-08-01 11:20:28,185748 : 14 : before preview fetch 
+2017-08-01 11:20:28,185748 : 14 : after preview fetch 
+2017-08-01 11:20:30,186415 : 15 : before capture 
+2017-08-01 11:20:30,186415 : 15 : before preview fetch 
+2017-08-01 11:20:30,186415 : 15 : after preview fetch 
+2017-08-01 11:20:32,187245 : 16 : before capture 
+2017-08-01 11:20:32,187245 : 16 : before preview fetch 
+2017-08-01 11:20:32,187245 : 16 : after preview fetch 
+2017-08-01 11:20:34,188551 : 17 : before capture 
+2017-08-01 11:20:34,188551 : 17 : before preview fetch 
+2017-08-01 11:20:34,188551 : 17 : after preview fetch 
+2017-08-01 11:20:36,188091 : 18 : before capture 
+2017-08-01 11:20:36,188091 : 18 : before preview fetch 
+2017-08-01 11:20:36,188091 : 18 : after preview fetch 
+2017-08-01 11:20:38,188372 : 19 : before capture 
+2017-08-01 11:20:38,188372 : 19 : before preview fetch 
+2017-08-01 11:20:38,188372 : 19 : after preview fetch 
+2017-08-01 11:20:40,189016 : 20 : before capture 
+2017-08-01 11:20:40,189016 : 20 : before preview fetch 
+2017-08-01 11:20:40,189016 : 20 : after preview fetch 
+2017-08-01 11:20:42,189438 : 21 : before capture 
+2017-08-01 11:20:42,189438 : 21 : before preview fetch 
+2017-08-01 11:20:42,189438 : 21 : after preview fetch 
+2017-08-01 11:20:44,189873 : 22 : before capture 
+2017-08-01 11:20:44,189873 : 22 : before preview fetch 
+2017-08-01 11:20:44,189873 : 22 : after preview fetch 
+2017-08-01 11:20:46,191696 : 23 : before capture 
+2017-08-01 11:20:46,191696 : 23 : before preview fetch 
+2017-08-01 11:20:46,191696 : 23 : after preview fetch 
+2017-08-01 11:20:48,190784 : 24 : before capture 
+2017-08-01 11:20:48,190784 : 24 : before preview fetch 
+2017-08-01 11:20:48,190784 : 24 : after preview fetch 
+2017-08-01 11:21:44,183628 : 25 : before capture 
+2017-08-01 11:21:44,183628 : 25 : before preview fetch 
+2017-08-01 11:21:44,183628 : 25 : after preview fetch 
+2017-08-01 11:21:46,184585 : 26 : before capture 
+2017-08-01 11:21:46,184585 : 26 : before preview fetch 
+2017-08-01 11:21:46,184585 : 26 : after preview fetch 
+2017-08-01 11:21:48,186031 : 27 : before capture 
+2017-08-01 11:21:48,186031 : 27 : before preview fetch 
+2017-08-01 11:21:48,186031 : 27 : after preview fetch 
+2017-08-01 11:21:50,185553 : 28 : before capture 
+2017-08-01 11:21:50,185553 : 28 : before preview fetch 
+2017-08-01 11:21:50,185553 : 28 : after preview fetch 
+2017-08-01 11:21:52,186392 : 29 : before capture 
+2017-08-01 11:21:52,186392 : 29 : before preview fetch 
+2017-08-01 11:21:52,186392 : 29 : after preview fetch 
+2017-08-01 11:21:54,186619 : 30 : before capture 
+2017-08-01 11:21:54,186619 : 30 : before preview fetch 
+2017-08-01 11:21:54,186619 : 30 : after preview fetch 
+2017-08-01 11:21:56,186694 : 31 : before capture 
+2017-08-01 11:21:56,186694 : 31 : before preview fetch 
+2017-08-01 11:21:56,186694 : 31 : after preview fetch 
+2017-08-01 11:21:58,187663 : 32 : before capture 
+2017-08-01 11:21:58,187663 : 32 : before preview fetch 
+2017-08-01 11:21:58,187663 : 32 : after preview fetch 
+2017-08-01 11:22:00,188237 : 33 : before capture 
+2017-08-01 11:22:00,188237 : 33 : before preview fetch 
+2017-08-01 11:22:00,188237 : 33 : after preview fetch 
+2017-08-01 11:22:44,184606 : 34 : before capture 
+2017-08-01 11:22:44,184606 : 34 : before preview fetch 
+2017-08-01 11:22:44,184606 : 34 : after preview fetch 
+2017-08-01 11:22:46,185393 : 35 : before capture 
+2017-08-01 11:22:46,185393 : 35 : before preview fetch 
+2017-08-01 11:22:46,185393 : 35 : after preview fetch 
+2017-08-01 11:22:48,185549 : 36 : before capture 
+2017-08-01 11:22:48,185549 : 36 : before preview fetch 
+2017-08-01 11:22:48,185549 : 36 : after preview fetch 
+2017-08-01 11:22:50,185902 : 37 : before capture 
+2017-08-01 11:22:50,185902 : 37 : before preview fetch 
+2017-08-01 11:22:50,185902 : 37 : after preview fetch 
+2017-08-01 11:22:52,186384 : 38 : before capture 
+2017-08-01 11:22:52,186384 : 38 : before preview fetch 
+2017-08-01 11:22:52,186384 : 38 : after preview fetch 
+2017-08-01 11:22:54,186744 : 39 : before capture 
+2017-08-01 11:22:54,186744 : 39 : before preview fetch 
+2017-08-01 11:22:54,186744 : 39 : after preview fetch 
+2017-08-01 11:22:56,186787 : 40 : before capture 
+2017-08-01 11:22:56,186787 : 40 : before preview fetch 
+2017-08-01 11:22:56,186787 : 40 : after preview fetch 
+2017-08-01 11:22:58,187484 : 41 : before capture 
+2017-08-01 11:22:58,187484 : 41 : before preview fetch 
+2017-08-01 11:22:58,187484 : 41 : after preview fetch 
+2017-08-01 11:23:00,188402 : 42 : before capture 
+2017-08-01 11:23:00,188402 : 42 : before preview fetch 
+2017-08-01 11:23:00,188402 : 42 : after preview fetch 
+2017-08-01 11:23:02,188738 : 43 : before capture 
+2017-08-01 11:23:02,188738 : 43 : before preview fetch 
+2017-08-01 11:23:02,188738 : 43 : after preview fetch 
+2017-08-01 11:23:04,189691 : 44 : before capture 
+2017-08-01 11:23:04,189691 : 44 : before preview fetch 
+2017-08-01 11:23:04,189691 : 44 : after preview fetch 
+2017-08-01 11:23:06,189817 : 45 : before capture 
+2017-08-01 11:23:06,190770 : 45 : before preview fetch 
+2017-08-01 11:23:06,190770 : 45 : after preview fetch 
+2017-08-01 11:23:08,190005 : 46 : before capture 
+2017-08-01 11:23:08,190005 : 46 : before preview fetch 
+2017-08-01 11:23:08,190005 : 46 : after preview fetch 
+2017-08-01 11:24:04,181251 : 47 : before capture 
+2017-08-01 11:24:04,181251 : 47 : before preview fetch 
+2017-08-01 11:24:04,181251 : 47 : after preview fetch 
+2017-08-01 11:24:06,181699 : 48 : before capture 
+2017-08-01 11:24:06,181699 : 48 : before preview fetch 
+2017-08-01 11:24:06,181699 : 48 : after preview fetch 
+2017-08-01 11:24:08,182470 : 49 : before capture 
+2017-08-01 11:24:08,182470 : 49 : before preview fetch 
+2017-08-01 11:24:08,182470 : 49 : after preview fetch 
+2017-08-01 11:24:10,182618 : 50 : before capture 
+2017-08-01 11:24:10,183621 : 50 : before preview fetch 
+2017-08-01 11:24:10,183621 : 50 : after preview fetch 
+2017-08-01 11:24:12,183442 : 51 : before capture 
+2017-08-01 11:24:12,183442 : 51 : before preview fetch 
+2017-08-01 11:24:12,183442 : 51 : after preview fetch 
+2017-08-01 11:24:14,185280 : 52 : before capture 
+2017-08-01 11:24:14,185280 : 52 : before preview fetch 
+2017-08-01 11:24:14,185280 : 52 : after preview fetch 
+2017-08-01 11:24:16,185063 : 53 : before capture 
+2017-08-01 11:24:16,185063 : 53 : before preview fetch 
+2017-08-01 11:24:16,185063 : 53 : after preview fetch 
+2017-08-01 11:24:18,185635 : 54 : before capture 
+2017-08-01 11:24:18,185635 : 54 : before preview fetch 
+2017-08-01 11:24:18,185635 : 54 : after preview fetch 
+2017-08-01 11:24:20,186504 : 55 : before capture 
+2017-08-01 11:24:20,186504 : 55 : before preview fetch 
+2017-08-01 11:24:20,186504 : 55 : after preview fetch 
+2017-08-01 11:25:04,186547 : 56 : before capture 
+2017-08-01 11:25:04,186547 : 56 : before preview fetch 
+2017-08-01 11:25:04,186547 : 56 : after preview fetch 
+2017-08-01 11:25:06,187250 : 57 : before capture 
+2017-08-01 11:25:06,187250 : 57 : before preview fetch 
+2017-08-01 11:25:06,187250 : 57 : after preview fetch 
+2017-08-01 11:25:08,187291 : 58 : before capture 
+2017-08-01 11:25:08,187291 : 58 : before preview fetch 
+2017-08-01 11:25:08,187291 : 58 : after preview fetch 
+2017-08-01 11:25:10,188079 : 59 : before capture 
+2017-08-01 11:25:10,188079 : 59 : before preview fetch 
+2017-08-01 11:25:10,188079 : 59 : after preview fetch 
+2017-08-01 11:25:12,188814 : 60 : before capture 
+2017-08-01 11:25:12,188814 : 60 : before preview fetch 
+2017-08-01 11:25:12,188814 : 60 : after preview fetch 
+2017-08-01 11:25:14,189165 : 61 : before capture 
+2017-08-01 11:25:14,189165 : 61 : before preview fetch 
+2017-08-01 11:25:14,189165 : 61 : after preview fetch 
+2017-08-01 11:25:16,189928 : 62 : before capture 
+2017-08-01 11:25:16,189928 : 62 : before preview fetch 
+2017-08-01 11:25:16,189928 : 62 : after preview fetch 
+2017-08-01 11:25:18,191448 : 63 : before capture 
+2017-08-01 11:25:18,191448 : 63 : before preview fetch 
+2017-08-01 11:25:18,191448 : 63 : after preview fetch 
+2017-08-01 11:25:20,191176 : 64 : before capture 
+2017-08-01 11:25:20,191176 : 64 : before preview fetch 
+2017-08-01 11:25:20,192103 : 64 : after preview fetch 
+2017-08-01 11:25:34,570335 : 65 : before capture 
+2017-08-01 11:25:34,570335 : 65 : before preview fetch 
+2017-08-01 11:25:34,570335 : 65 : after preview fetch 
+2017-08-01 11:25:36,570632 : 66 : before capture 
+2017-08-01 11:25:36,570632 : 66 : before preview fetch 
+2017-08-01 11:25:36,570632 : 66 : after preview fetch 
+Rate Logging Started 
+2017-08-01 11:26:31,024638 : 1 : before capture 
+2017-08-01 11:26:31,024638 : 1 : before preview fetch 
+2017-08-01 11:26:31,024638 : 1 : after preview fetch 
+2017-08-01 11:26:33,023676 : 2 : before capture 
+2017-08-01 11:26:33,023676 : 2 : before preview fetch 
+2017-08-01 11:26:33,023676 : 2 : after preview fetch 
+2017-08-01 11:26:35,024501 : 3 : before capture 
+2017-08-01 11:26:35,024501 : 3 : before preview fetch 
+2017-08-01 11:26:35,024501 : 3 : after preview fetch 
+2017-08-01 11:26:37,023856 : 4 : before capture 
+2017-08-01 11:26:37,023856 : 4 : before preview fetch 
+2017-08-01 11:26:37,023856 : 4 : after preview fetch 
+2017-08-01 11:26:39,024058 : 5 : before capture 
+2017-08-01 11:26:39,024058 : 5 : before preview fetch 
+2017-08-01 11:26:39,024058 : 5 : after preview fetch 
+2017-08-01 11:26:41,024363 : 6 : before capture 
+2017-08-01 11:26:41,024363 : 6 : before preview fetch 
+2017-08-01 11:26:41,024363 : 6 : after preview fetch 
+2017-08-01 11:26:43,024773 : 7 : before capture 
+2017-08-01 11:26:43,024773 : 7 : before preview fetch 
+2017-08-01 11:26:43,024773 : 7 : after preview fetch 
+2017-08-01 11:26:45,024933 : 8 : before capture 
+2017-08-01 11:26:45,024933 : 8 : before preview fetch 
+2017-08-01 11:26:45,024933 : 8 : after preview fetch 
+2017-08-01 11:26:47,025067 : 9 : before capture 
+2017-08-01 11:26:47,025067 : 9 : before preview fetch 
+2017-08-01 11:26:47,025067 : 9 : after preview fetch 
+2017-08-01 11:26:49,025397 : 10 : before capture 
+2017-08-01 11:26:49,025397 : 10 : before preview fetch 
+2017-08-01 11:26:49,025397 : 10 : after preview fetch 
+2017-08-01 11:26:51,025751 : 11 : before capture 
+2017-08-01 11:26:51,025751 : 11 : before preview fetch 
+2017-08-01 11:26:51,025751 : 11 : after preview fetch 
+2017-08-01 11:26:53,026441 : 12 : before capture 
+2017-08-01 11:26:53,026441 : 12 : before preview fetch 
+2017-08-01 11:26:53,026441 : 12 : after preview fetch 
+2017-08-01 11:26:55,027415 : 13 : before capture 
+2017-08-01 11:26:55,027415 : 13 : before preview fetch 
+2017-08-01 11:26:55,027415 : 13 : after preview fetch 
+2017-08-01 11:27:40,292237 : 14 : before capture 
+2017-08-01 11:27:40,292237 : 14 : before preview fetch 
+2017-08-01 11:27:40,292237 : 14 : after preview fetch 
+2017-08-01 11:27:42,292828 : 15 : before capture 
+2017-08-01 11:27:42,292828 : 15 : before preview fetch 
+2017-08-01 11:27:42,292828 : 15 : after preview fetch 
+2017-08-01 11:27:44,292895 : 16 : before capture 
+2017-08-01 11:27:44,292895 : 16 : before preview fetch 
+2017-08-01 11:27:44,292895 : 16 : after preview fetch 
+2017-08-01 11:27:46,295110 : 17 : before capture 
+2017-08-01 11:27:46,295110 : 17 : before preview fetch 
+2017-08-01 11:27:46,295110 : 17 : after preview fetch 
+2017-08-01 11:27:48,293875 : 18 : before capture 
+2017-08-01 11:27:48,293875 : 18 : before preview fetch 
+2017-08-01 11:27:48,293875 : 18 : after preview fetch 
+2017-08-01 11:27:50,293976 : 19 : before capture 
+2017-08-01 11:27:50,293976 : 19 : before preview fetch 
+2017-08-01 11:27:50,293976 : 19 : after preview fetch 
+2017-08-01 11:27:52,295454 : 20 : before capture 
+2017-08-01 11:27:52,295454 : 20 : before preview fetch 
+2017-08-01 11:27:52,295454 : 20 : after preview fetch 
+2017-08-01 11:27:54,295010 : 21 : before capture 
+2017-08-01 11:27:54,295010 : 21 : before preview fetch 
+2017-08-01 11:27:54,295010 : 21 : after preview fetch 
+2017-08-01 11:27:56,295060 : 22 : before capture 
+2017-08-01 11:27:56,295060 : 22 : before preview fetch 
+2017-08-01 11:27:56,295060 : 22 : after preview fetch 
+2017-08-01 11:27:58,295953 : 23 : before capture 
+2017-08-01 11:27:58,295953 : 23 : before preview fetch 
+2017-08-01 11:27:58,295953 : 23 : after preview fetch 
+2017-08-01 11:28:00,296855 : 24 : before capture 
+2017-08-01 11:28:00,296855 : 24 : before preview fetch 
+2017-08-01 11:28:00,296855 : 24 : after preview fetch 
+2017-08-01 11:28:02,297219 : 25 : before capture 
+2017-08-01 11:28:02,297219 : 25 : before preview fetch 
+2017-08-01 11:28:02,297219 : 25 : after preview fetch 
+2017-08-01 11:28:04,298635 : 26 : before capture 
+2017-08-01 11:28:04,298635 : 26 : before preview fetch 
+2017-08-01 11:28:04,298635 : 26 : after preview fetch 
+2017-08-01 11:28:06,298881 : 27 : before capture 
+2017-08-01 11:28:06,298881 : 27 : before preview fetch 
+2017-08-01 11:28:06,298881 : 27 : after preview fetch 
+2017-08-01 11:29:01,299995 : 28 : before capture 
+2017-08-01 11:29:01,299995 : 28 : before preview fetch 
+2017-08-01 11:29:01,299995 : 28 : after preview fetch 
+2017-08-01 11:29:03,299753 : 29 : before capture 
+2017-08-01 11:29:03,299753 : 29 : before preview fetch 
+2017-08-01 11:29:03,299753 : 29 : after preview fetch 
+2017-08-01 11:29:05,299839 : 30 : before capture 
+2017-08-01 11:29:05,299839 : 30 : before preview fetch 
+2017-08-01 11:29:05,299839 : 30 : after preview fetch 
+2017-08-01 11:29:07,302237 : 31 : before capture 
+2017-08-01 11:29:07,302237 : 31 : before preview fetch 
+2017-08-01 11:29:07,302237 : 31 : after preview fetch 
+2017-08-01 11:29:09,300425 : 32 : before capture 
+2017-08-01 11:29:09,300425 : 32 : before preview fetch 
+2017-08-01 11:29:09,300425 : 32 : after preview fetch 
+2017-08-01 11:29:11,301369 : 33 : before capture 
+2017-08-01 11:29:11,301369 : 33 : before preview fetch 
+2017-08-01 11:29:11,301369 : 33 : after preview fetch 
+2017-08-01 11:29:13,302059 : 34 : before capture 
+2017-08-01 11:29:13,302059 : 34 : before preview fetch 
+2017-08-01 11:29:13,302059 : 34 : after preview fetch 
+2017-08-01 11:29:15,302587 : 35 : before capture 
+2017-08-01 11:29:15,302587 : 35 : before preview fetch 
+2017-08-01 11:29:15,302587 : 35 : after preview fetch 
+2017-08-01 11:29:17,302767 : 36 : before capture 
+2017-08-01 11:29:17,302767 : 36 : before preview fetch 
+2017-08-01 11:29:17,302767 : 36 : after preview fetch 
+2017-08-01 11:30:01,297721 : 37 : before capture 
+2017-08-01 11:30:01,297721 : 37 : before preview fetch 
+2017-08-01 11:30:01,297721 : 37 : after preview fetch 
+2017-08-01 11:30:03,296939 : 38 : before capture 
+2017-08-01 11:30:03,296939 : 38 : before preview fetch 
+2017-08-01 11:30:03,296939 : 38 : after preview fetch 
+2017-08-01 11:30:05,297010 : 39 : before capture 
+2017-08-01 11:30:05,297010 : 39 : before preview fetch 
+2017-08-01 11:30:05,297010 : 39 : after preview fetch 
+2017-08-01 11:30:07,298993 : 40 : before capture 
+2017-08-01 11:30:07,298993 : 40 : before preview fetch 
+2017-08-01 11:30:07,298993 : 40 : after preview fetch 
+2017-08-01 11:30:09,299084 : 41 : before capture 
+2017-08-01 11:30:09,299084 : 41 : before preview fetch 
+2017-08-01 11:30:09,299084 : 41 : after preview fetch 
+2017-08-01 11:30:11,298272 : 42 : before capture 
+2017-08-01 11:30:11,298272 : 42 : before preview fetch 
+2017-08-01 11:30:11,298272 : 42 : after preview fetch 
+2017-08-01 11:30:13,299739 : 43 : before capture 
+2017-08-01 11:30:13,299739 : 43 : before preview fetch 
+2017-08-01 11:30:13,299739 : 43 : after preview fetch 
+2017-08-01 11:30:15,299386 : 44 : before capture 
+2017-08-01 11:30:15,300359 : 44 : before preview fetch 
+2017-08-01 11:30:15,300359 : 44 : after preview fetch 
+2017-08-01 11:30:17,300241 : 45 : before capture 
+2017-08-01 11:30:17,300241 : 45 : before preview fetch 
+2017-08-01 11:30:17,300241 : 45 : after preview fetch 
+2017-08-01 11:30:19,300782 : 46 : before capture 
+2017-08-01 11:30:19,300782 : 46 : before preview fetch 
+2017-08-01 11:30:19,300782 : 46 : after preview fetch 
+2017-08-01 11:30:21,301565 : 47 : before capture 
+2017-08-01 11:30:21,301565 : 47 : before preview fetch 
+2017-08-01 11:30:21,301565 : 47 : after preview fetch 
+2017-08-01 11:30:23,302395 : 48 : before capture 
+2017-08-01 11:30:23,302395 : 48 : before preview fetch 
+2017-08-01 11:30:23,302395 : 48 : after preview fetch 
+2017-08-01 11:30:25,302535 : 49 : before capture 
+2017-08-01 11:30:25,302535 : 49 : before preview fetch 
+2017-08-01 11:30:25,302535 : 49 : after preview fetch 

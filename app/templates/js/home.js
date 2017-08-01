@@ -168,6 +168,13 @@ var buttonClick = function(buttonCode){
 };
 
 var startStopFollowUp = function (data) {
+
+//    if(data.override == '1'){
+//        $('[name="btn_startstop"]').html('Start other');
+//    } else {
+//        $('[name="btn_startstop"]').html('Start else');
+//    }
+
     if (data.capture_started === true){
         if ($('#con_cam').hasClass('collapse in') === true){
             //i.e. the container is visible
@@ -179,7 +186,8 @@ var startStopFollowUp = function (data) {
         $('[name="btn_startstop"]').html('Stop');
     } else {
         camRefreshTimer.stopTimer();
-        $('[name="btn_startstop"]').html('Start');
+        $('[name="btn_startstop"]').html('Start'); //TODO automated and manual displayed with start
+
     }
 };
 
@@ -223,8 +231,6 @@ var refreshCamImages = function(){
 var updateAlti = function(data){
 
     var methodOfCapture = "Tricap altitude switch: ";
-    var captureFlag = "Capturing data of camera";
-
 
     if (altiConvertToFeet === 'True'){
         $('#h_alti').html('Altitude: ' + Math.round(data.measurement*3.28084) + ' ft');
@@ -233,16 +239,16 @@ var updateAlti = function(data){
     }
 
     if (data.override == '0'){
-        methodOfCapture = "Tricap altitude switch: ";
+        methodOfCapture = "Tricap altitude switch active: ";
     } else if (data.override == '2') {
-        methodOfCapture = "Tricap manual override: ";
+        methodOfCapture = "Tricap manual override active: ";
     } else if (data.override == '1') {
-        methodOfCapture = "Tricap stopped: ";
+        methodOfCapture = "Tricap stopped capturing: ";
     }
 
     if(data.switch_state == 'True'){ //See switch state to determine if the camera should capture
         //changeMainStatus('green', 'TriCap: Capturing data of cameras');
-        changeMainStatus('green', methodOfCapture.concat(captureFlag));
+        changeMainStatus('green', methodOfCapture.concat("Capturing data of camera"));
     } else if(data.measurement > 10){
         changeMainStatus('orange', methodOfCapture.concat('Currently not capturing data'));
     } else {

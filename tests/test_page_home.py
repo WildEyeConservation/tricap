@@ -8,6 +8,7 @@ from time import sleep
 from flask import url_for
 
 from .tricap_flask_test_case import TriCapBehaviourTestCase, TriCapAppTestCase
+from .tricap_flask_test_case import TriCapLiveServerTestCase
 
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as ec
@@ -95,6 +96,30 @@ class TestAppHome(TriCapAppTestCase):
 
             self.assertEqual(tricap_manager.state == CAM_MANAGER_STATES.STARTED, False)
             self.assertEqual(altimeter.state == ALTIMETER_STATE.MEASURING, False)
+
+
+class TestLiveServerHome(TriCapLiveServerTestCase):
+    """Live server testing of the home page."""
+
+    run_headless = False
+
+    def test_no_error_msg(self):
+        """If not error messages have been loggend, then the page should say so."""
+        triconfig = TricapConfig()
+        web_settings = triconfig.get_section_dict(TricapConfig.WEB_SECTION_HEADER)
+        web_settings['alti_required'] = 'dummy'
+        web_settings['cams_required'] = 'dummy'
+        triconfig.set_section(web_settings, TricapConfig.WEB_SECTION_HEADER)
+        triconfig.save_to_file()
+
+        self.start_server()
+
+        self.open_page(self.get_server_url(), wait_for_element_id='btn_startstop_m')
+        sleep(5)
+
+        sys_msgs = self.driver.find_elements_by_css_selector('#alt_msgs_sys input')
+        self.assertEqual(len(sys_msgs), 1)
+        self.assertEqual(sys_msgs[0].get_attribute('value'), 'No errors to report')
 
 
 class TestBehaviourHome(TriCapBehaviourTestCase):

@@ -163,7 +163,8 @@ def extract_dict_info_from_form_section(section_dict, form_strings, form_selects
 
 def convert_populated_form_to_dict(form):
     form_dict = {TricapConfig.CAMERA_SECTION_HEADER: {}, TricapConfig.ALTI_SECTION_HEADER: {},
-                 TricapConfig.MISC_SECTION_HEADER: {}}
+                 TricapConfig.MISC_SECTION_HEADER: {}, TricapConfig.WEB_SECTION_HEADER: {},
+                 TricapConfig.SMS_SECTION_HEADER: {}}
 
     extract_dict_info_from_form_section(form_dict[TricapConfig.CAMERA_SECTION_HEADER],
                                         form.cam_strings, form.cam_selects)
@@ -179,6 +180,10 @@ def convert_populated_form_to_dict(form):
     form_dict[TricapConfig.WEB_SECTION_HEADER] = {}
     extract_dict_info_from_form_section(form_dict[TricapConfig.WEB_SECTION_HEADER],
                                         form.web_strings, form.web_selects)
+
+    form_dict[TricapConfig.SMS_SECTION_HEADER] = {}
+    extract_dict_info_from_form_section(form_dict[TricapConfig.SMS_SECTION_HEADER],
+                                        form.sms_strings, form.sms_selects)
 
     return form_dict
 

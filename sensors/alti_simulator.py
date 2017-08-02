@@ -1,18 +1,13 @@
-"""Dummy Alti - to be used only when testing the GUI."""
+"""Simulator Alti - to be used only when testing the GUI."""
 
 import logging
 import threading
 from time import sleep
 
-import serial
-import serial.tools.list_ports
-
 from config import ALTIMETER_STATE, RET_OK, RET_ERROR
 from functools import partial
-from collections import namedtuple
 from sensors.base_setting import BaseSetting, SettingSpec
-from sensors.altitude_switch import AltiSwitch
-from support.basic import Subject, PeriodicMonitor
+from support.basic import Subject
 
 class MiscSettingConfig:
     dict_keys = {'_settings'}
@@ -40,9 +35,9 @@ class MiscSettingConfig:
 
 
 class SimulatorAlti(Subject):
-    """Handles serial communication with the TruSense S100 Laser Altimeter"""
+    """Creates a flight path to simulate and test the function of the altimeter, switch and GUI"""
     _logger = logging.getLogger(__name__)#start the logger
-    i = 0 # static variable used for flight path
+    flight_path_points_index = 0 # static variable used for flight path
 
     def __init__(self, settings, supported_devices={(1659, 8963)}):
         super().__init__()# get variables from parent class
@@ -62,12 +57,9 @@ class SimulatorAlti(Subject):
         self._read_thread = None
         self._kill_pill = None
 
-        self._mchange_dir = 'up'
-
         self.state = ALTIMETER_STATE.NOT_CONNECTED
         self._measurement = 0
 
-        self._logger.info('Simulator Alti Port Opened')
         self.state = ALTIMETER_STATE.CONNECTED
 
         # bring the alti in line with the other monitors
@@ -75,10 +67,10 @@ class SimulatorAlti(Subject):
         self.value = 0
         self.unit = 'm'
 
-        self.test_var = 0 # simulator test variables
         self.altitude_start_upper = 150
         self.altitude_stop_lower = 120
 
+        self.flight_tempo = 5
         self.flight_points = [160, 140, 150, 30, 119, 151, 121, 161, 0]
         #self.flight_points = [160,100,20,80,0]  # heights of the flight plan
 
@@ -98,42 +90,37 @@ class SimulatorAlti(Subject):
     def _set_setting(self, key, value):
         self._settings[key] = value
 
-    # def reset(self):
-    #     """Get the altimeter object to re-initialise, establishing comms again, etc"""
-    #     if self.state == ALTIMETER_STATE.MEASURING:
-    #         self.stop_measuring()
-
     def get_state_as_string(self):
         return self.state.name
 
-    def set_state_string(self,state):
+    def set_state_string(self, state):
         self.state.name = state
 
         # Tempo is the increase in the height read by altimeter in m/s
         # points are in meters, set repeat to true to repeat sequence
 
-    def flight_path(self, tempo, points, repeat = True):
-        if (len(points)) <= SimulatorAlti.i:  # restart flight pattern once finished if true
+    def simulate_flight_path(self, tempo, points, repeat = True):
+        if len(points) <= SimulatorAlti.flight_path_points_index:  # restart flight pattern once finished if true
             if repeat:
-                SimulatorAlti.i = 0
+                SimulatorAlti.flight_path_points_index = 0
             else:
                 self._measurement -= tempo
                 if self._measurement < 0:
                     self._measurement = 0
                 return
 
-        if self._measurement <= points[SimulatorAlti.i]:  # SimulatorAlti.i is  a static variable used
+        if self._measurement <= points[SimulatorAlti.flight_path_points_index]:  # SimulatorAlti.flightTrackPosition is  a static variable used
             self._measurement += tempo
-            if self._measurement > points[SimulatorAlti.i]:
-                SimulatorAlti.i += 1
-        else:
+            if self._measurement >= points[SimulatorAlti.flight_path_points_index]:
+                SimulatorAlti.flight_path_points_index += 1
+        elif self._measurement >= points[SimulatorAlti.flight_path_points_index]:
             self._measurement -= tempo
-            if self._measurement < points[SimulatorAlti.i]:
-                SimulatorAlti.i += 1
+            if self._measurement <= points[SimulatorAlti.flight_path_points_index]:
+                SimulatorAlti.flight_path_points_index += 1
 
     def _read(self, stop_event):
         while not stop_event.is_set():
-            self.flight_path(5, self.flight_points, True)  # Repeat flight points at tempo of 5 m/s
+            self.simulate_flight_path(self.flight_tempo, self.flight_points, True)  # Repeat flight points at tempo of 5 m/s
             self.value = self._measurement
             self.notify()
             sleep(self.generation_period)
@@ -157,33 +144,9 @@ class SimulatorAlti(Subject):
 
     # if value is higher than hysteresis start value then start the capturing process,
     # else if the value returns below the hysteresis value then the camera stops
-
     # def altitude_switch(self):
     #     if self._measurement > self.altitude_start_upper:
     #         self.start_measuring()
     #     elif self._measurement < self.altitude_stop_lower:
     #         self.stop_measuring()
 
-
-
-        #     if self._mchange_dir == 'up':
-        #         self._measurement += 20
-        #         if self._measurement > 200 and self.test_var <= 10:
-        #             self._measurement = 200
-        #             self.test_var += 1
-        #         elif self.test_var > 10:
-        #             self._mchange_dir = 'down'
-        #     else:
-        #         self._measurement -= 10
-        #         if self._measurement < 100:
-        #             self._mchange_dir = 'up'
-        #             self.test_var = 0
-
-            # if self._mchange_dir == 'up':
-            #     self._measurement += 20
-            #     if self._measurement > 200:
-            #         self._mchange_dir = 'down'
-            # else:
-            #     self._measurement -= 20
-            #     if self._measurement < 0:
-            #         self._mchange_dir = 'up'

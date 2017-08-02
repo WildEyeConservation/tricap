@@ -9,8 +9,8 @@ from support.configure import TricapConfig
 # from config import ALTIMETER_STATE
 
 
-class TestDummyAlti(TestCase):
-    """Test the dummy alti."""
+class TestAltiSimulator(TestCase):
+    """Test the dummy alti simulator."""
 
     def create_alti(self, settings=None):
         """Create an alti."""
@@ -35,30 +35,46 @@ class TestDummyAlti(TestCase):
         self.alti.stop_measuring()
         self.assertEqual(self.alti.get_state_as_string(), 'CONNECTED')
 
-    def test_altitude_switch(self):
-        """Test the state when different readings are taken from the altimeter"""
-        self.create_alti()
-        self.alti._measurement = 160
-        self.alti.altitude_switch()
-        self.assertEqual(self.alti.get_state_as_string(), 'MEASURING')
-
-        self.alti._measurement = 130
-        self.alti.altitude_switch()
-        self.assertEqual(self.alti.get_state_as_string(), 'MEASURING')
-
-        self.alti._measurement = 100
-        self.alti.altitude_switch()
-        self.assertEqual(self.alti.get_state_as_string(), 'CONNECTED')
-
-        self.alti._measurement = 130
-        self.alti.altitude_switch()
-        self.assertEqual(self.alti.get_state_as_string(), 'CONNECTED')
-
 
     def test_measuring_sequence(self):
-        """Test that the sequence can be run through with no errors."""
+        """Test that the flight plan is followed and can points can be altered"""
         self.create_alti()
-        self.alti.generation_period = 0.01
-        self.alti.start_measuring()
-        sleep(self.alti.generation_period*100)
-        self.alti.stop_measuring()
+
+        self.alti.flight_points = [160, 100, 0]
+        while self.alti.flight_path_points_index == 0:
+            self.alti.simulate_flight_path(self.alti.flight_tempo, self.alti.flight_points, True)
+        self.assertTrue(self.alti.measurement >= self.alti.flight_points[0])
+        while self.alti.flight_path_points_index == 1:
+            self.alti.simulate_flight_path(self.alti.flight_tempo, self.alti.flight_points, True)
+        self.assertTrue(self.alti.measurement <= self.alti.flight_points[1])
+        # override the flight plan and determine the outcome (Goes higher or lower)
+        self.alti.flight_points = [160, 100, 190]
+        while self.alti.flight_path_points_index == 2:
+            self.alti.simulate_flight_path(self.alti.flight_tempo, self.alti.flight_points, True)
+        self.assertTrue(self.alti.measurement >= self.alti.flight_points[2])
+
+
+        # self.alti.generation_period = 0.01
+        # self.alti.start_measuring()
+        # sleep(self.alti.generation_period*100)
+        # self.alti.stop_measuring()
+
+    # def test_altitude_switch(self):
+    #     """Test the state when different readings are taken from the altimeter"""
+    #     self.create_alti()
+    #
+    #     self.alti._measurement = 160
+    #     self.alti.altitude_switch()
+    #     self.assertEqual(self.alti.get_state_as_string(), 'MEASURING')
+    #
+    #     self.alti._measurement = 130
+    #     self.alti.altitude_switch()
+    #     self.assertEqual(self.alti.get_state_as_string(), 'MEASURING')
+    #
+    #     self.alti._measurement = 100
+    #     self.alti.altitude_switch()
+    #     self.assertEqual(self.alti.get_state_as_string(), 'CONNECTED')
+    #
+    #     self.alti._measurement = 130
+    #     self.alti.altitude_switch()
+    #     self.assertEqual(self.alti.get_state_as_string(), 'CONNECTED')

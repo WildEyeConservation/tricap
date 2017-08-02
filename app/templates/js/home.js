@@ -145,7 +145,7 @@ var buttonClick = function(buttonCode){
     if (buttonCode === tricap.BUTTON_CODES.START || buttonCode === tricap.BUTTON_CODES.STOP ||
         buttonCode === tricap.BUTTON_CODES.STARTSTOP){
         // If we are starting a new session, get a new description
-        if ($('[name="btn_startstop"]').html() === 'Start'){
+        if ($('[name="btn_startstop"]').html() === 'Start Manual'){ // Add modal for manual start
             $('#input_modal_session_description').val(defaultSessionDescription);
             $('#modal_session_description').modal();
         } else {
@@ -169,12 +169,6 @@ var buttonClick = function(buttonCode){
 
 var startStopFollowUp = function (data) {
 
-//    if(data.override == '1'){
-//        $('[name="btn_startstop"]').html('Start other');
-//    } else {
-//        $('[name="btn_startstop"]').html('Start else');
-//    }
-
     if (data.capture_started === true){
         if ($('#con_cam').hasClass('collapse in') === true){
             //i.e. the container is visible
@@ -184,10 +178,14 @@ var startStopFollowUp = function (data) {
             camRefreshTimer.stopTimer();
         }
         $('[name="btn_startstop"]').html('Stop');
-    } else {
+    } else { // Data capture has not started
         camRefreshTimer.stopTimer();
-        $('[name="btn_startstop"]').html('Start'); //TODO automated and manual displayed with start
-
+//        if(data.override == "1"){
+//            $('[name="btn_startstop"]').html('Start Automatic');
+//        } else {
+//            //$('[name="btn_startstop"]').html('Start');
+//        }
+        //$('[name="btn_startstop"]').html('Start'); //TODO automated and manual displayed with start
     }
 };
 
@@ -230,7 +228,7 @@ var refreshCamImages = function(){
 
 var updateAlti = function(data){
 
-    var methodOfCapture = "Tricap altitude switch: ";
+    var methodOfCapture = "Tricap switch: ";
 
     if (altiConvertToFeet === 'True'){
         $('#h_alti').html('Altitude: ' + Math.round(data.measurement*3.28084) + ' ft');
@@ -239,18 +237,29 @@ var updateAlti = function(data){
     }
 
     if (data.override == '0'){
-        methodOfCapture = "Tricap altitude switch active: ";
+        methodOfCapture = "Tricap switch: ";
     } else if (data.override == '2') {
-        methodOfCapture = "Tricap manual override active: ";
+        methodOfCapture = "Tricap manual: ";
     } else if (data.override == '1') {
-        methodOfCapture = "Tricap stopped capturing: ";
+        methodOfCapture = "Tricap: ";
     }
 
-    if(data.switch_state == 'True'){ //See switch state to determine if the camera should capture
+    if (data.capture_started === true){
+        $('[name="btn_startstop"]').html('Stop');
+    } else { // Data capture has not started
+        if(data.override == "1"){
+            $('[name="btn_startstop"]').html('Start Auto');
+        } else {
+            $('[name="btn_startstop"]').html('Start Manual');
+        }
+    }
+
+
+    if(data.switch_state == 'True') { //See switch state to determine if the camera should capture
         //changeMainStatus('green', 'TriCap: Capturing data of cameras');
-        changeMainStatus('green', methodOfCapture.concat("Capturing data of camera"));
-    } else if(data.measurement > 10){
-        changeMainStatus('orange', methodOfCapture.concat('Currently not capturing data'));
+        changeMainStatus('green', methodOfCapture.concat("Capturing"));
+    } else if(data.measurement > 10) {
+        changeMainStatus('orange', methodOfCapture.concat('NOT capturing'));
     } else {
         changeMainStatus('green', 'TriCap');
     }

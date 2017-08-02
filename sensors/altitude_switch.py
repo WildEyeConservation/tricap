@@ -1,8 +1,16 @@
-# Observer for automated switch. The switch uses the altimeter to start taking pictures.
+"""Observer for automated switch. The switch uses the altimeter to start taking pictures."""
+
 from support.basic import Observer
 from configparser import ConfigParser
 import logging
+import local_paths
+from enum import Enum
+from support.configure import TricapConfig
 
+class OverrideState(Enum):
+    ALTISWITCH = 0  # OverrideState.ALTISWITCH.value = 0
+    STOPOVERRIDE = 1
+    MANUALSTART = 2
 
 class AltiSwitch(Observer):
     _logger = logging.getLogger(__name__)  # start the logger
@@ -10,38 +18,47 @@ class AltiSwitch(Observer):
     def __init__(self, sensor_class): #Constructor for alti switch
         super().__init__()  # get variables from parent class
         self.alti = sensor_class  # SimulatorAlti(settings)
-        self.alti_switch = False  # start with altimeter switch as off
-        self.altitude_start_upper = 0
-        self.altitude_stop_lower = 0
+        self.alti_switch_state = False  # start with altimeter switch as off
+        self.turn_on_altitude = 0
+        self.turn_off_altitude = 0
         self.measured_height = 0
 
-        self.alti_switch_boundry()
+        self.get_alti_switch_boundary()
 
 
-    def altitude_switch(self, override = 0):
-        if override == 0:
-            if self.measured_height >= self.altitude_start_upper:
-                self.alti_switch = True
+    def set_altitude_switch(self, override = OverrideState.ALTISWITCH.value):
+        if override == OverrideState.ALTISWITCH.value:
+            if self.measured_height >= self.turn_on_altitude:
+                self.alti_switch_state = True  # Turn on the altitude switch
                 self._logger.debug('AltiSwitch - capturing')
-            elif self.measured_height < self.altitude_stop_lower:
-                self.alti_switch = False
+            elif self.measured_height < self.turn_off_altitude:
+                self.alti_switch_state = False  # Turn off altitude switch
                 self._logger.debug('AltiSwitch - not capturing')
-        elif override == 1:  # If switch is overwritten, then the system stops capturing
-            self.alti_switch = False
-        else:  # override with start button
-            self.alti_switch = True
+        elif override == OverrideState.STOPOVERRIDE.value:  # If switch is overwritten, then the system stops capturing
+            self.alti_switch_state = False
+            self._logger.debug('AltiSwitch = stopped - not capturing')
+        else:  # override with start button with manual on switch
+            self.alti_switch_state = True
+            self._logger.debug('AltiSwitch = manual - capturing')
 
 
-    def get_alti_switch_state(self, override = 0): # True shows the switch is ON and vice versa
-        self.altitude_switch(override)
-        return self.alti_switch
+    def get_altitude_switch_state(self, override = OverrideState.ALTISWITCH.value): # True shows the switch is ON and vice versa
+        #self.set_altitude_switch(override)
+        return self.alti_switch_state
+
+    def set_altitude_switch_state(self, override = OverrideState.ALTISWITCH.value):
+        self.set_altitude_switch(override)
 
     def update(self, subject):
         self.measured_height = self.alti.measurement
-        #self.alti_switch_boundry() # Put this function in here if not placed anywhere else
+        self.get_alti_switch_boundary() # Put this function in here if not placed anywhere else
 
-    def alti_switch_boundry(self):
+    def get_alti_switch_boundary(self):
+
+        #config = TricapConfig()
+        #self.turn_on_altitude = config.get
+
         setting_config = ConfigParser()
-        setting_config.read('initial.cfg')
-        self.altitude_start_upper = int(setting_config['Web']['upper_bound_switch_height'])
-        self.altitude_stop_lower = int(setting_config['Web']['lower_bound_switch_height'])
+        setting_config.read(local_paths.CONFIG_FP)
+        self.turn_on_altitude = int(setting_config['Web']['upper_bound_switch_height'])
+        self.turn_off_altitude = int(setting_config['Web']['lower_bound_switch_height'])

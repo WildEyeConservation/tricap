@@ -191,12 +191,9 @@ else:
     altimeter = TrusenseAltimeter(alti_settings)
 
 altimeter_switch = AltiSwitch(altimeter)
-
-# Configure the hysteresis bounds from settings
-
 altimeter.attach(altimeter_switch)
-
 manual_override = False
+alti_startup = 0
 
 rootlogger.debug('Altimeter has been configured.')
 

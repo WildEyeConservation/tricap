@@ -7,8 +7,12 @@ from sensors.alti_simulator import SimulatorAlti
 from sensors.altitude_switch import AltiSwitch
 from support.configure import TricapConfig
 
-# from config import ALTIMETER_STATE
+from enum import Enum
 
+class OverrideState(Enum):
+    ALTISWITCH = 0  # OverrideState.ALTISWITCH.value = 0
+    STOPOVERRIDE = 1
+    MANUALSTART = 2
 
 class TestAltiSwitch(TestCase):
     """Test the dummy alti."""
@@ -26,48 +30,47 @@ class TestAltiSwitch(TestCase):
         init_config = TricapConfig()
         return init_config.get_section_dict(TricapConfig.ALTI_SECTION_HEADER)
 
-
-    def test_state_as_string(self):
-        """Test that we can retrieve the state of the alti as a string."""
-        self.create_alti()
-        self.assertEqual(self.alti.get_state_as_string(), 'CONNECTED')
-
-        self.alti.start_measuring()
-        self.assertEqual(self.alti.get_state_as_string(), 'MEASURING')
-
-        self.alti.stop_measuring()
-        self.assertEqual(self.alti.get_state_as_string(), 'CONNECTED')
-
-
     def test_altitude_switch(self):
         """Test the state when different readings are taken from the altimeter"""
         self.create_alti()
 
         self.alti._measurement = 160
-        self.switch.update()
-        self.switch.altitude_switch()
-        self.assertTrue(self.switch.get_alti_switch_state() == True)
+        self.switch.update(self)
+        self.switch.set_altitude_switch()
+        self.assertTrue(self.switch.get_altitude_switch_state() == True)
 
         self.alti._measurement = 130
-        self.switch.update()
-        self.switch.altitude_switch()
-        self.assertTrue(self.switch.get_alti_switch_state() == True)
+        self.switch.update(self)
+        self.switch.set_altitude_switch()
+        self.assertTrue(self.switch.get_altitude_switch_state() == True)
 
         self.alti._measurement = 100
-        self.switch.update()
-        self.switch.altitude_switch()
-        self.assertTrue(self.switch.get_alti_switch_state() == False)
+        self.switch.update(self)
+        self.switch.set_altitude_switch()
+        self.assertTrue(self.switch.get_altitude_switch_state() == False)
 
         self.alti._measurement = 130
-        self.switch.update()
-        self.switch.altitude_switch()
-        self.assertTrue(self.switch.get_alti_switch_state() == False)
+        self.switch.update(self)
+        self.switch.set_altitude_switch()
+        self.assertTrue(self.switch.get_altitude_switch_state() == False)
 
-
-    def test_measuring_sequence(self):
-        """Test that the sequence can be run through with no errors."""
+    def test_override_state(self):
+        """ Test the override functionality of the altitude switch"""
         self.create_alti()
-        self.alti.generation_period = 0.01
-        self.alti.start_measuring()
-        sleep(self.alti.generation_period*100)
-        self.alti.stop_measuring()
+
+        self.alti._measurement = 130
+        self.switch.update(self)
+        self.switch.set_altitude_switch_state(OverrideState.ALTISWITCH.value)
+        self.assertTrue(self.switch.get_altitude_switch_state(OverrideState.ALTISWITCH.value) == False)
+
+        self.alti._measurement = 160
+        self.switch.update(self)
+        self.switch.set_altitude_switch_state(OverrideState.ALTISWITCH.value)
+        self.assertTrue(self.switch.get_altitude_switch_state(OverrideState.ALTISWITCH.value) == True)
+
+        self.switch.set_altitude_switch_state(OverrideState.STOPOVERRIDE.value)
+        self.assertTrue(self.switch.get_altitude_switch_state(OverrideState.STOPOVERRIDE.value) == False)
+
+        self.switch.set_altitude_switch_state(OverrideState.MANUALSTART.value)
+        self.assertTrue(self.switch.get_altitude_switch_state(OverrideState.MANUALSTART.value) == True)
+

@@ -4,7 +4,7 @@
 /tmp
 /logs
 /.idea
-/.coverage
+/.coveragerc
 /htmlcov
 /__pycache__
 /app/__pycache__
@@ -13,9 +13,14 @@
 /htmlcov
 node_modules
 
+*
+!.gitignore
+
 # File Types
 *.pyc
 *.orig
+*.dot
+*.png
 *.zip
 *.tern-project
 *.log

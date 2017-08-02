@@ -41,13 +41,14 @@ class MiscSettingConfig:
 
 class SimulatorAlti(Subject):
     """Handles serial communication with the TruSense S100 Laser Altimeter"""
-    _logger = logging.getLogger(__name__)#start the logger
+    _logger = logging.getLogger(__name__)  # start the logger
+
     i = 0 # static variable used for flight path
 
     def __init__(self, settings, supported_devices={(1659, 8963)}):
         super().__init__()# get variables from parent class
         # SETTINGS
-        # default values
+        # default values        
         self._setting_strings = ['measurement_timeout', 'num_frames_to_avg']
         self._config = MiscSettingConfig(
             {'measurement_timeout': SettingSpec(choices=None,

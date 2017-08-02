@@ -32,6 +32,7 @@ node_modules
 local_paths.py
 init_config.txt
 initial.cfg
+.pylintrc
 pylintrc
 test_local.py
 delete_log_files.py

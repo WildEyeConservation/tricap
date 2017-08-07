@@ -72,7 +72,7 @@ class SimulatorAlti(Subject):
 
         self.flight_tempo = 5
         self.flight_points = [160, 140, 150, 30, 119, 151, 121, 161, 0]
-        #self.flight_points = [160,100,20,80,0]  # heights of the flight plan
+        # self.flight_points = [160,100,20,80,0]  # heights of the flight plan
 
         self.generation_period = 1
 

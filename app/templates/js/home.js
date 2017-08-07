@@ -228,7 +228,7 @@ var refreshCamImages = function(){
 
 var updateAlti = function(data){
 
-    var methodOfCapture = "Tricap switch: ";
+    var methodOfCapture = "TriCap Automatic: ";
 
     if (altiConvertToFeet === 'True'){
         $('#h_alti').html('Altitude: ' + Math.round(data.measurement*3.28084) + ' ft');
@@ -237,11 +237,11 @@ var updateAlti = function(data){
     }
 
     if (data.override == '0'){
-        methodOfCapture = "Tricap switch: ";
+        methodOfCapture = "TriCap Automatic: ";
     } else if (data.override == '2') {
-        methodOfCapture = "Tricap manual: ";
+        methodOfCapture = "TriCap Manual: ";
     } else if (data.override == '1') {
-        methodOfCapture = "Tricap: ";
+        methodOfCapture = "TriCap: ";
     }
 
     if (data.capture_started === true){

@@ -34,9 +34,10 @@ class OverrideState(Enum):
     MANUALSTART = 2
 
 @home_bp.route('/', methods=['GET'])
-# def index_slash():
-#     """Redirect request to the proper index page."""
-#     return index()
+def index_slash():
+    """Redirect request to the proper index page."""
+    return index()
+
 @home_bp.route('/index', methods=['GET'])
 def index():
     """The Main GUI interface page."""

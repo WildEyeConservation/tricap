@@ -35,12 +35,12 @@ class TestAltiSimulator(TestCase):
         self.alti.stop_measuring()
         self.assertEqual(self.alti.get_state_as_string(), 'CONNECTED')
 
-
     def test_measuring_sequence(self):
-        """Test that the flight plan is followed and can points can be altered"""
+        """Test that the flight plan is followed and points can be altered"""
+
         self.create_alti()
 
-        self.alti.flight_points = [160, 100, 0]
+        self.alti.flight_points = [100, 50, 0]
         while self.alti.flight_path_points_index == 0:
             self.alti.simulate_flight_path(self.alti.flight_tempo, self.alti.flight_points, True)
         self.assertTrue(self.alti.measurement >= self.alti.flight_points[0])
@@ -53,28 +53,23 @@ class TestAltiSimulator(TestCase):
             self.alti.simulate_flight_path(self.alti.flight_tempo, self.alti.flight_points, True)
         self.assertTrue(self.alti.measurement >= self.alti.flight_points[2])
 
+    def test_path_repeat(self):
+        """Test the repeat sequence of the flight path function"""
 
-        # self.alti.generation_period = 0.01
-        # self.alti.start_measuring()
-        # sleep(self.alti.generation_period*100)
-        # self.alti.stop_measuring()
+        self.create_alti()
 
-    # def test_altitude_switch(self):
-    #     """Test the state when different readings are taken from the altimeter"""
-    #     self.create_alti()
-    #
-    #     self.alti._measurement = 160
-    #     self.alti.altitude_switch()
-    #     self.assertEqual(self.alti.get_state_as_string(), 'MEASURING')
-    #
-    #     self.alti._measurement = 130
-    #     self.alti.altitude_switch()
-    #     self.assertEqual(self.alti.get_state_as_string(), 'MEASURING')
-    #
-    #     self.alti._measurement = 100
-    #     self.alti.altitude_switch()
-    #     self.assertEqual(self.alti.get_state_as_string(), 'CONNECTED')
-    #
-    #     self.alti._measurement = 130
-    #     self.alti.altitude_switch()
-    #     self.assertEqual(self.alti.get_state_as_string(), 'CONNECTED')
+        self.alti.flight_points = [160, 100, 130]
+
+        self.alti.set_flight_path_point_index(2)
+        while self.alti.flight_path_points_index != 0:
+            self.alti.simulate_flight_path(5, self.alti.flight_points, True)  # self.alti.flight_tempo
+        self.assertEqual(self.alti.flight_path_points_index, 0)
+        self.alti._measurement = 100
+        while self.alti._measurement != 0:
+            self.alti.simulate_flight_path(self.alti.flight_tempo, self.alti.flight_points, False)
+        self.assertEqual(self.alti._measurement, 0)
+
+
+
+
+

@@ -63,7 +63,7 @@ class TriCapLiveServerTestCase(FlaskBehaviourTestCase, TriCapAppTestCase):
     """Base class for all LiveServer Tests."""
 
     def setUp(self):
-        """Set up for all tests - instantiate process cotrol members to none."""
+        """Set up for all tests - instantiate process control members to none."""
         self._process = None
         self._stop_event = False
 
@@ -115,7 +115,7 @@ class TriCapLiveServerTestCase(FlaskBehaviourTestCase, TriCapAppTestCase):
             wait.until(ec.visibility_of_element_located((By.ID, wait_for_element_id)))
 
     def wait_for(self, element_id, driver=None):
-        """Wait untill the element has been loaded."""
+        """Wait until the element has been loaded."""
         if driver is None:
             driver = self.driver
         wait = WebDriverWait(driver, 10)

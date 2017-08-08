@@ -42,7 +42,7 @@ def index_slash():
 def index():
     """The Main GUI interface page."""
     rootlogger.info('Home Page Requested.')
-    global alti_startup
+    global alti_startup  # static variable
 
     config = TricapConfig()
     js_data = {

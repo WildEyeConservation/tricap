@@ -101,7 +101,7 @@ class TestAppHome(TriCapAppTestCase):
 class TestLiveServerHome(TriCapLiveServerTestCase):
     """Live server testing of the home page."""
 
-    run_headless = False  # Without
+    run_headless = False  # Without the screens appearing when true
 
     def test_no_error_msg(self):
         """If no error messages have been logged, then the page should say so."""
@@ -175,7 +175,7 @@ class TestLiveServerHome(TriCapLiveServerTestCase):
         h_main_status = self.driver.find_element_by_id('h_main_status')
         self.assertEqual(h_main_status.get_attribute('innerHTML'), 'TriCap')
 
-        sleep(2)
+        sleep(1)
         self.assertEqual(h_main_status.get_attribute('innerHTML'), 'TriCap Automatic: NOT capturing')
 
         self.driver.find_element_by_name('btn_startstop').click()  # First click for manual start
@@ -217,7 +217,7 @@ class TestLiveServerHome(TriCapLiveServerTestCase):
         btn_startstop_m = self.driver.find_element_by_id('btn_startstop_m')
         self.assertEqual(btn_startstop_m.get_attribute('innerHTML'), 'Start Manual')
 
-        sleep(2)
+        sleep(1)
         self.assertEqual(btn_startstop_m.get_attribute('innerHTML'), 'Start Manual')
 
         self.driver.find_element_by_name('btn_startstop').click()  # First click for manual start

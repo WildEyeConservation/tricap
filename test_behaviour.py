@@ -3,7 +3,7 @@
 import unittest
 
 from tests.test_settings import TestBehaviourSettings
-from tests.test_page_home import TestBehaviourHome, TestLiveServerHome
+from tests.test_page_home import TestBehaviourHome
 
 if __name__ == '__main__':
     unittest.main()

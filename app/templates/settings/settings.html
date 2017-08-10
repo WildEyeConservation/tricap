@@ -119,6 +119,28 @@
             </div>
         {% endfor %}
 
+        {% for string_setting in form.sms_strings %}
+            <div class="row lead">
+                <div class="col-md-12">
+                    {{string_setting.label}}
+                    {{string_setting(class='form-control',
+                                     id=string_setting.id+'_'+string_setting.label)}}
+                    {{render_errors(string_setting)}}
+                </div>
+            </div>
+        {% endfor %}
+
+        {% for select_setting in form.sms_selects %}
+            <div class="row lead">
+                <div class="col-md-12">
+                    {{select_setting.label}}
+                    {{select_setting(class='form-control',
+                                     id=select_setting.id+'_'+select_setting.label)}}
+                    {{render_errors(select_setting)}}
+                </div>
+            </div>
+        {% endfor %}
+
         <div class="row lead">
             <div class="col-md-6">
                 {{ form.save(class='btn btn-block btn-primary', id='btn_save') }}

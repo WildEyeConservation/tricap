@@ -15,6 +15,6 @@ from tests.test_dummy_alti import TestDummyAlti
 from tests.test_dummy_cam import TestDummyCam
 from tests.test_alti_simulator import TestAltiSimulator
 from tests.test_altitude_switch import TestAltiSwitch
-
+from tests.test_page_home import TestHome
 if __name__ == '__main__':
     unittest.main()

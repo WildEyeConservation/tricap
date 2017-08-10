@@ -15,7 +15,7 @@ class OverrideState(Enum):
     MANUALSTART = 2
 
 class TestAltiSwitch(TestCase):
-    """Test the dummy alti."""
+    """Test the altitude switch with switch state and override status."""
 
     def create_alti(self, settings=None):
         """Create an alti."""

@@ -206,7 +206,7 @@ class TrusenseAltimeter(Subject):
             if consecutive_timeouts >= 5:
                 self.state = ALTIMETER_STATE.ERROR
                 self._logger.error('Alti Error: Too many timeouts, communications have been lost.')
-                raise AltiError('Communications with altimeter was lost. 5 Consecutive timeouts ocurred')
+                raise AltiError('Communications with altimeter was lost. 5 Consecutive timeouts occurred')
         self._write('ST', 'Error stopping measuring mode')
         self.state = ALTIMETER_STATE.CONNECTED
 

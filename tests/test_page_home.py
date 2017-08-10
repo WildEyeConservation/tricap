@@ -7,9 +7,6 @@ import unittest
 from time import sleep
 from flask import url_for
 
-from .tricap_flask_test_case import TriCapBehaviourTestCase, TriCapAppTestCase
-from .tricap_flask_test_case import TriCapLiveServerTestCase
-
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as ec
 from selenium.webdriver.common.by import By
@@ -18,10 +15,12 @@ from support.configure import TricapConfig
 
 from support.talkbox import TALK_REPLY
 
-from app import tricap_manager, altimeter, talkbox, session_logger, stop_all_threads
+from app import talkbox, session_logger, stop_all_threads
+from app.views.home import CAM_STATE_COLOURS, CAM_MAN_STATE_COLOURS, ALTI_STATE_COLOURS
 
 from config import CAMERA_STATES, CAM_MANAGER_STATES, ALTIMETER_STATE, BUTTON_CODE
-from app.views.home import CAM_STATE_COLOURS, CAM_MAN_STATE_COLOURS, ALTI_STATE_COLOURS
+
+from .tricap_flask_test_case import TriCapBehaviourTestCase, TriCapAppTestCase
 
 
 class TestHome(unittest.TestCase):
@@ -98,154 +97,8 @@ class TestAppHome(TriCapAppTestCase):
     #         #self.assertEqual(altimeter.state == ALTIMETER_STATE.MEASURING, False)
 
 
-class TestLiveServerHome(TriCapLiveServerTestCase):
-    """Live server testing of the home page."""
-
-    run_headless = False  # Without
-
-    def test_no_error_msg(self):
-        """If no error messages have been logged, then the page should say so."""
-
-        triconfig = TricapConfig()
-        web_settings = triconfig.get_section_dict(TricapConfig.WEB_SECTION_HEADER)
-        web_settings['alti_required'] = 'dummy'
-        web_settings['cams_required'] = 'dummy'
-        triconfig.set_section(web_settings, TricapConfig.WEB_SECTION_HEADER)
-        triconfig.save_to_file()
-
-        self.start_server()
-        # Get local server page and test for no error messages
-        self.open_page(self.get_server_url(), wait_for_element_id='btn_startstop_m')
-
-        sleep(5)  # Wait for 5 seconds
-
-        sys_msgs = self.driver.find_elements_by_css_selector('#alt_msgs_sys input')
-        self.assertEqual(len(sys_msgs), 1)
-        self.assertEqual(sys_msgs[0].get_attribute('value'), 'No errors to report')
-
-    def test_start_stop_button(self):
-        """Test the state of the camera when button is pressed from the start"""
-
-        triconfig = TricapConfig()  # Change settings in config for testing
-        web_settings = triconfig.get_section_dict(TricapConfig.WEB_SECTION_HEADER)
-        web_settings['alti_required'] = 'dummy'
-        web_settings['cams_required'] = 'dummy'
-        triconfig.set_section(web_settings, TricapConfig.WEB_SECTION_HEADER)
-        triconfig.save_to_file()
-
-        self.start_server()  # Start the live server
-
-        self.open_page(self.get_server_url(), wait_for_element_id='btn_startstop_m')
-        self.driver.find_element_by_name('btn_startstop').click()  # First click for manual start
-        sleep(1)
-        self.driver.find_element_by_id('btn_modal_session_description_submit').click()
-        sleep(1)
-        self.assertEqual(tricap_manager.state == CAM_MANAGER_STATES.STARTED, True)
-
-        self.driver.find_element_by_name('btn_startstop').click()  # Stop manual start
-        sleep(1)
-        self.assertEqual(tricap_manager.state == CAM_MANAGER_STATES.STARTED, False)
-
-        self.driver.find_element_by_name('btn_startstop').click()  # Start automatic switching
-        sleep(1)
-        self.assertEqual(tricap_manager.state == CAM_MANAGER_STATES.STARTED, False)
-
-        while altimeter._measurement <= 150:
-            sleep(1)
-        self.assertEqual(tricap_manager.state == CAM_MANAGER_STATES.STARTED, True)
-
-        sleep(1)
-        self.driver.find_element_by_name('btn_startstop').click()  # Stop automatic start
-        sleep(1)
-        self.assertEqual(tricap_manager.state == CAM_MANAGER_STATES.STARTED, False)
-
-    def test_title(self):
-        """Test the title and that it shows the correct name in all the states with button clicks"""
-
-        triconfig = TricapConfig()  # Change settings in config for testing
-        web_settings = triconfig.get_section_dict(TricapConfig.WEB_SECTION_HEADER)
-        web_settings['alti_required'] = 'dummy'
-        web_settings['cams_required'] = 'dummy'
-        triconfig.set_section(web_settings, TricapConfig.WEB_SECTION_HEADER)
-        triconfig.save_to_file()
-
-        self.start_server()  # Start the live server
-        self.open_page(self.get_server_url(), wait_for_element_id='btn_startstop_m')
-
-        h_main_status = self.driver.find_element_by_id('h_main_status')
-        self.assertEqual(h_main_status.get_attribute('innerHTML'), 'TriCap')
-
-        sleep(2)
-        self.assertEqual(h_main_status.get_attribute('innerHTML'), 'TriCap Automatic: NOT capturing')
-
-        self.driver.find_element_by_name('btn_startstop').click()  # First click for manual start
-        sleep(1)
-        self.driver.find_element_by_id('btn_modal_session_description_submit').click()
-        sleep(1)
-        self.assertEqual(h_main_status.get_attribute('innerHTML'), 'TriCap Manual: Capturing')
-
-        self.driver.find_element_by_name('btn_startstop').click()  # Stop manual start
-        sleep(1)
-        self.assertEqual(h_main_status.get_attribute('innerHTML'), 'TriCap: NOT capturing')
-
-        self.driver.find_element_by_name('btn_startstop').click()  # Start automatic switching
-        sleep(1)
-        self.assertEqual(h_main_status.get_attribute('innerHTML'), 'TriCap Automatic: NOT capturing')
-
-        while altimeter._measurement <= 150:
-            sleep(1)
-        self.assertEqual(h_main_status.get_attribute('innerHTML'), 'TriCap Automatic: Capturing')
-
-        sleep(1)
-        self.driver.find_element_by_name('btn_startstop').click()  # Stop automatic start
-        sleep(1)
-        self.assertEqual(h_main_status.get_attribute('innerHTML'), 'TriCap: NOT capturing')
-
-    def test_start_stop_button_title(self):
-        """Test the start/stop button to have the correct title at the correct state"""
-
-        triconfig = TricapConfig()  # Change settings in config for testing
-        web_settings = triconfig.get_section_dict(TricapConfig.WEB_SECTION_HEADER)
-        web_settings['alti_required'] = 'dummy'
-        web_settings['cams_required'] = 'dummy'
-        triconfig.set_section(web_settings, TricapConfig.WEB_SECTION_HEADER)
-        triconfig.save_to_file()
-
-        self.start_server()  # Start the live server
-        self.open_page(self.get_server_url(), wait_for_element_id='btn_startstop_m')
-
-        btn_startstop_m = self.driver.find_element_by_id('btn_startstop_m')
-        self.assertEqual(btn_startstop_m.get_attribute('innerHTML'), 'Start Manual')
-
-        sleep(2)
-        self.assertEqual(btn_startstop_m.get_attribute('innerHTML'), 'Start Manual')
-
-        self.driver.find_element_by_name('btn_startstop').click()  # First click for manual start
-        sleep(1)
-        self.driver.find_element_by_id('btn_modal_session_description_submit').click()
-        sleep(1)
-        self.assertEqual(btn_startstop_m.get_attribute('innerHTML'), 'Stop')
-
-        self.driver.find_element_by_name('btn_startstop').click()  # Stop manual start
-        sleep(1)
-        self.assertEqual(btn_startstop_m.get_attribute('innerHTML'), 'Start Auto')
-
-        self.driver.find_element_by_name('btn_startstop').click()  # Start automatic switching
-        sleep(1)
-        self.assertEqual(btn_startstop_m.get_attribute('innerHTML'), 'Start Manual')
-
-        while altimeter._measurement <= 150:
-            sleep(1)
-        self.assertEqual(btn_startstop_m.get_attribute('innerHTML'), 'Stop')
-
-        sleep(1)
-        self.driver.find_element_by_name('btn_startstop').click()  # Stop automatic start
-        sleep(1)
-        self.assertEqual(btn_startstop_m.get_attribute('innerHTML'), 'Start Auto')
-
-
 class TestBehaviourHome(TriCapBehaviourTestCase):
-    """docstring for TestBehaviourHome."""
+    """Behaviour tests for TriCap home page."""
 
     def test_no_error_msg(self):
         """If no error messages have been logged, then the page should say so."""

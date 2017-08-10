@@ -7,10 +7,12 @@ import local_paths
 from enum import Enum
 from support.configure import TricapConfig
 
+
 class OverrideState(Enum):
     ALTISWITCH = 0  # OverrideState.ALTISWITCH.value = 0
     STOPOVERRIDE = 1
     MANUALSTART = 2
+
 
 class AltiSwitch(Observer):
     _logger = logging.getLogger(__name__)  # start the logger
@@ -25,29 +27,20 @@ class AltiSwitch(Observer):
 
         self.get_alti_switch_boundary()
 
-
     def set_altitude_switch(self, override=OverrideState.ALTISWITCH.value):
         if override == OverrideState.ALTISWITCH.value:
             if self.measured_height >= self.turn_on_altitude:
                 self.alti_switch_state = True  # Turn on the altitude switch
-<<<<<<< .merge_file_a05508
                 self._logger.debug('Altitude Switch - capturing')
             elif self.measured_height < self.turn_off_altitude:
                 # self.alti_switch_state = False  # Turn off altitude switch
                 self._logger.debug('Altitude Switch - not capturing')
-=======
-                self._logger.debug('AltiSwitch - capturing')
-            elif self.measured_height < self.turn_off_altitude:
-                self.alti_switch_state = False  # Turn off altitude switch
-                self._logger.debug('AltiSwitch - not capturing')
->>>>>>> .merge_file_a09480
         elif override == OverrideState.STOPOVERRIDE.value:  # If switch is overwritten, then the system stops capturing
             self.alti_switch_state = False
-            self._logger.debug('AltiSwitch = stopped - not capturing')
+            self._logger.debug('Altitude Switch = stopped - not capturing')
         else:  # override with start button with manual on switch
             self.alti_switch_state = True
-            self._logger.debug('AltiSwitch = manual - capturing')
-
+            self._logger.debug('Altitude Switch = manual - capturing')
 
     def get_altitude_switch_state(self, override = OverrideState.ALTISWITCH.value):  # True shows the switch is ON and vice versa
         # self.set_altitude_switch(override)

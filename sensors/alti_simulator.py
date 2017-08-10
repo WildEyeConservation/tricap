@@ -70,7 +70,7 @@ class SimulatorAlti(Subject):
         self.altitude_start_upper = 150
         self.altitude_stop_lower = 120
 
-        self.flight_tempo = 20
+        self.flight_tempo = 5
         self.flight_points = [160, 140, 150, 30, 119, 151, 121, 161, 0]
         # self.flight_points = [160,100,20,80,0]  # heights of the flight plan
 
@@ -95,6 +95,9 @@ class SimulatorAlti(Subject):
 
     def set_state_string(self, state):
         self.state.name = state
+
+    def set_flight_path_point_index(self, index):
+        SimulatorAlti.flight_path_points_index = index
 
         # Tempo is the increase in the height read by altimeter in m/s
         # points are in meters, set repeat to true to repeat sequence

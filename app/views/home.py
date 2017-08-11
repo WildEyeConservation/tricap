@@ -11,7 +11,7 @@ from app import rootlogger, fetch_stopper, manual_override, alti_startup
 
 from support.configure import TricapConfig
 from support.sms_sender import SMSSender
-import winsound
+#import winsound
 from enum import Enum
 
 from config import BUTTON_CODE, CAM_MANAGER_STATES, ALTIMETER_STATE
@@ -32,6 +32,7 @@ class OverrideState(Enum):
     ALTISWITCH = 0  # OverrideState.ALTISWITCH.value = 0
     STOPOVERRIDE = 1
     MANUALSTART = 2
+
 
 @home_bp.route('/', methods=['GET'])
 def index_slash():
@@ -109,7 +110,7 @@ def _determine_alti_state_colour():
 
 @home_bp.route('/_set_image_fetching_state')
 def _set_image_fetching_state():
-    winsound.Beep(2000, 300)
+    #winsound.Beep(2000, 300)
     image_fetch_state_str = str(request.args.get('image_fetching_state'))
     # TODO Do something with the new image fetch state
     if image_fetch_state_str == 'True':

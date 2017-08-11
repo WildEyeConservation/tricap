@@ -75,8 +75,7 @@ class TriCapLiveServerTestCase(TriCapTempFilerTestCase):
             # chrome_options.binary_location = 'C:/Projects/System/chromedriver.exe'
             if self.run_headless:
                 chrome_options.add_argument('headless')
-            driver = webdriver.Chrome('C:/Projects/System/chromedriver.exe',
-                                      chrome_options=chrome_options)
+            driver = webdriver.Chrome(chrome_options=chrome_options)
 
         self._all_drivers.append(driver)
 

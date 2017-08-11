@@ -34,7 +34,7 @@ class AltiSwitch(Observer):
                 self._logger.debug('Altitude Switch - capturing')
             elif self.measured_height < self.turn_off_altitude:
                 # self.alti_switch_state = False  # Turn off altitude switch
-                self._logger.debug('Altitude Switch - not capturing')
+                self._logger.debug('Altitude Switch - Would have stopped capturing')
         elif override == OverrideState.STOPOVERRIDE.value:  # If switch is overwritten, then the system stops capturing
             self.alti_switch_state = False
             self._logger.debug('Altitude Switch = stopped - not capturing')

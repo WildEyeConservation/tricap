@@ -254,7 +254,6 @@ var updateAlti = function(data){
         }
     }
 
-
     if(data.switch_state == 'True') { //See switch state to determine if the camera should capture
         //changeMainStatus('green', 'TriCap: Capturing data of cameras');
         changeMainStatus('green', methodOfCapture.concat("Capturing"));
@@ -281,6 +280,11 @@ var updateAlti = function(data){
     } else {
         changeElementColour('#alt_alti_target', 'blue');
         $('#h_alti_target').html('Within target range');
+    }
+
+    if (data.error != "") { // == "01"
+        changeElementColour('#alt_alti_target', 'orange');
+        $('#h_alti_target').html('Above altimeter range');
     }
 
     return false;

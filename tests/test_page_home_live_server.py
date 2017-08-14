@@ -7,7 +7,7 @@ from .tricap_flask_live_server_test_case import TriCapLiveServerTestCase
 class TestLiveServerHome(TriCapLiveServerTestCase):
     """Live server testing of the home page."""
 
-    run_headless = True  # Without
+    run_headless = True  # Without opening chrome
 
     def get_altitude(self):
         """Get the altitude from the page."""

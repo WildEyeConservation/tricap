@@ -6,12 +6,7 @@ import logging
 import local_paths
 from enum import Enum
 from support.configure import TricapConfig
-
-
-class OverrideState(Enum):
-    ALTISWITCH = 0  # OverrideState.ALTISWITCH.value = 0
-    STOPOVERRIDE = 1
-    MANUALSTART = 2
+from config import OverrideState
 
 
 class AltiSwitch(Observer):
@@ -42,7 +37,7 @@ class AltiSwitch(Observer):
             self.alti_switch_state = True
             self._logger.debug('Altitude Switch = manual - capturing')
 
-    def get_altitude_switch_state(self, override = OverrideState.ALTISWITCH.value):  # True shows the switch is ON and vice versa
+    def get_altitude_switch_state(self):  # True shows the switch is ON and vice versa
         # self.set_altitude_switch(override)
         return self.alti_switch_state
 

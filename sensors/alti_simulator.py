@@ -37,7 +37,7 @@ class MiscSettingConfig:
 class SimulatorAlti(Subject):
     """Creates a flight path to simulate and test the function of the altimeter, switch and GUI"""
     _logger = logging.getLogger(__name__)#start the logger
-    flight_path_points_index = 0 # static variable used for flight path
+    # flight_path_points_index = 0 # static variable used for flight path
 
     def __init__(self, settings, supported_devices={(1659, 8963)}):
         super().__init__()# get variables from parent class
@@ -67,14 +67,13 @@ class SimulatorAlti(Subject):
         self.value = 0
         self.unit = 'm'
 
-        self.altitude_start_upper = 150
-        self.altitude_stop_lower = 120
+        self.flight_path_points_index = 0
 
         self.flight_tempo = 5
         self.flight_points = [160, 140, 150, 30, 119, 151, 121, 161, 0]
         # self.flight_points = [160,100,20,80,0]  # heights of the flight plan
 
-        self.generation_period = 1
+        self.generation_period = 0.5
 
     @property
     def config(self):
@@ -93,33 +92,36 @@ class SimulatorAlti(Subject):
     def get_state_as_string(self):
         return self.state.name
 
+    def get_error(self):
+        return ""
+
     def set_state_string(self, state):
         self.state.name = state
 
     def set_flight_path_point_index(self, index):
-        SimulatorAlti.flight_path_points_index = index
+        self.flight_path_points_index = index
 
         # Tempo is the increase in the height read by altimeter in m/s
         # points are in meters, set repeat to true to repeat sequence
 
     def simulate_flight_path(self, tempo, points, repeat = True):
-        if len(points) <= SimulatorAlti.flight_path_points_index:  # restart flight pattern once finished if true
+        if len(points) <= self.flight_path_points_index:  # restart flight pattern once finished if true
             if repeat:
-                SimulatorAlti.flight_path_points_index = 0
+                self.flight_path_points_index = 0
             else:
                 self._measurement -= tempo
                 if self._measurement < 0:
                     self._measurement = 0
                 return
 
-        if self._measurement <= points[SimulatorAlti.flight_path_points_index]:  # SimulatorAlti.flightTrackPosition is  a static variable used
+        if self._measurement <= points[self.flight_path_points_index]:  # SimulatorAlti.flightTrackPosition is  a static variable used
             self._measurement += tempo
-            if self._measurement >= points[SimulatorAlti.flight_path_points_index]:
-                SimulatorAlti.flight_path_points_index += 1
-        elif self._measurement >= points[SimulatorAlti.flight_path_points_index]:
+            if self._measurement >= points[self.flight_path_points_index]:
+                self.flight_path_points_index += 1
+        elif self._measurement >= points[self.flight_path_points_index]:
             self._measurement -= tempo
-            if self._measurement <= points[SimulatorAlti.flight_path_points_index]:
-                SimulatorAlti.flight_path_points_index += 1
+            if self._measurement <= points[self.flight_path_points_index]:
+                self.flight_path_points_index += 1
 
     def _read(self, stop_event):
         while not stop_event.is_set():

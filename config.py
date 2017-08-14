@@ -34,3 +34,10 @@ CAM_MANAGER_STATES = Enum("CamManagerState", ["STOPPED", "STARTED", "ERROR_NO_CA
 ALTIMETER_STATE = Enum("AltiState", ["NOT_CONNECTED", "CONNECTED", "MEASURING", "ERROR"])
 BUTTON_CODE = IntEnum("ButtonCode", {"START": 0, "STOP": 1, "TEST": 2, "RESET": 3, "STARTSTOP": 4})
 LOG_CODES = Enum("LogCode", "ALL")
+
+
+class OverrideState(Enum):
+    ALTISWITCH = 0  # OverrideState.ALTISWITCH.value = 0
+    STOPOVERRIDE = 1
+    MANUALSTART = 2
+

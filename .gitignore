@@ -14,7 +14,8 @@
 /coverage_html
 node_modules
 
-!.gitignore
+
+# !.gitignore
 
 # File Types
 *.pyc

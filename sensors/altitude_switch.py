@@ -13,6 +13,8 @@ class OverrideState(Enum):
     STOPOVERRIDE = 1
     MANUALSTART = 2
 
+# CAMERA_STATES = Enum("CamState", ["UNINITIALISED", "INITIALISED", "CAPTURING", "ERROR_CONFIG", "ERROR_CAPTURE"])
+
 
 class AltiSwitch(Observer):
     _logger = logging.getLogger(__name__)  # start the logger
@@ -54,7 +56,6 @@ class AltiSwitch(Observer):
         self.get_alti_switch_boundary()  # Put this function in here if not placed anywhere else
 
     def get_alti_switch_boundary(self):
-
         triconfig = TricapConfig()
         web_settings = triconfig.get_section_dict(TricapConfig.WEB_SECTION_HEADER)
         self.turn_on_altitude = int(web_settings['automatic_turn_on_height'])

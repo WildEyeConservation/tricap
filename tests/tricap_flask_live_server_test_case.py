@@ -11,6 +11,12 @@ from selenium.webdriver.support import expected_conditions as ec
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.options import Options
 
+try:
+    from pyvirtualdisplay import Display
+    VIRTUAL_DISPLAY = True
+except ImportError:
+    VIRTUAL_DISPLAY = False
+
 from .tricap_tempfile_test_case import TriCapTempFilerTestCase
 
 def run_app():
@@ -31,6 +37,11 @@ class TriCapLiveServerTestCase(TriCapTempFilerTestCase):
     def setUp(self):
         self._process = multiprocessing.Process(target=run_app)
         self._all_drivers = []
+
+        if VIRTUAL_DISPLAY:
+            self.display = Display(visible=0, size=(800, 600))
+            self.display.start()
+
         self.driver = self.create_driver()
 
     def tearDown(self):
@@ -38,6 +49,9 @@ class TriCapLiveServerTestCase(TriCapTempFilerTestCase):
 
         for driver in self._all_drivers:
             driver.quit()
+
+        if VIRTUAL_DISPLAY:
+            self.display.stop()
 
     def start_server(self):
         """Start the server in separate process."""
@@ -75,7 +89,8 @@ class TriCapLiveServerTestCase(TriCapTempFilerTestCase):
             # chrome_options.binary_location = 'C:/Projects/System/chromedriver.exe'
             if self.run_headless:
                 chrome_options.add_argument('headless')
-            driver = webdriver.Chrome(chrome_options=chrome_options)
+            driver = webdriver.Chrome('C:/Projects/System/chromedriver.exe',
+                                      chrome_options=chrome_options)
 
         self._all_drivers.append(driver)
 

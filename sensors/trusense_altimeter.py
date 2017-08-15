@@ -158,7 +158,7 @@ class TrusenseAltimeter(Subject):
             else:
                 # An error message has been received, raise an exception
                 self._check_for_known_error(reply)
-                raise AltiError(error_msg + ' : ' + reply.decode(encoding='ascii'))
+                #raise AltiError(error_msg + ' : ' + reply.decode(encoding='ascii'))
 
         if check_count >= 3:
             raise AltiError(' No OK has been received, only distance measurements have been received.')

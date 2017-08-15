@@ -30,7 +30,7 @@ from support.connection_monitor import generate_ip_monitor, IPMonitorLogger
 
 from support.system_monitor import generate_system_monitor, SystemMonitorLogger
 
-from config import SERVER_LOG_DIR
+from config import SERVER_LOG_DIR, ALTIMETER_STATE
 from enum import Enum
 
 
@@ -194,8 +194,10 @@ else:
 altimeter_switch = AltiSwitch(altimeter)
 altimeter.attach(altimeter_switch)
 manual_override = False
-altimeter.start_measuring()
 # alti_startup = 0
+
+if altimeter.state != ALTIMETER_STATE.MEASURING:
+    altimeter.start_measuring()
 
 rootlogger.debug('Altimeter has been configured.')
 

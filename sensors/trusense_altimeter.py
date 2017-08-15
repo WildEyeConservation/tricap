@@ -145,7 +145,6 @@ class TrusenseAltimeter(Subject):
         if reply[0:3] == b'$ER':
             err_code = reply[4:6].decode(encoding='ascii')
             self.set_error(err_code)
-            print("error occurred")  # test print statement (take out when done testing)
             self._logger.error(TrusenseAltimeter.errorCodes[err_code])
 
     def _check_ok(self, error_msg):
@@ -201,6 +200,7 @@ class TrusenseAltimeter(Subject):
             if len(msg) > 0:
                 consecutive_timeouts = 0
                 code_str = msg[1:3]
+                self.set_error("")
                 if code_str != b'DM':
                     self._check_for_known_error(msg)  # check for alti error when reading
                     log_str = 'Alti - Non-measurement received: %s' % msg
@@ -209,13 +209,11 @@ class TrusenseAltimeter(Subject):
                     dist_str = msg[4:].split(b',')[0]
                     self._measurement = float(dist_str)
                     self.value = self._measurement
-                    # self.set_error()  # No error
                     # let any observers know that the measurement has been updated
                     self.notify()
             else:
                 consecutive_timeouts += 1
                 self._logger.warning('Empty message read from alti port, indicates a timeout')
-                # self.set_error("01")  # example error
             if consecutive_timeouts >= 5:
                 self.state = ALTIMETER_STATE.ERROR
                 self._logger.error('Alti Error: Too many timeouts, communications have been lost.')

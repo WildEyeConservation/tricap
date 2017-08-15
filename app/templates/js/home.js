@@ -282,7 +282,7 @@ var updateAlti = function(data){
         $('#h_alti_target').html('Within target range');
     }
 
-    if (data.error != "") { // == "01"
+    if (data.error == "01") { // Error message for no target
         changeElementColour('#alt_alti_target', 'orange');
         $('#h_alti_target').html('Above altimeter range');
     }

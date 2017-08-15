@@ -132,7 +132,7 @@ class TrusenseAltimeter(Subject):
 
     def _set_setting(self, key, value):
         self._settings[key] = value
-        self._configure()
+        # self._configure() # do not have to reconfigure the altimeter when the settings are changed
 
     def set_error(self, error_code = ""):
         self.error = error_code
@@ -142,6 +142,7 @@ class TrusenseAltimeter(Subject):
         return self.error
 
     def _check_for_known_error(self, reply):
+        print("error occurred")  # test print statement
         if reply[0:3] == b'$ER':
             err_code = reply[4:6].decode(encoding='ascii')
             self.set_error(err_code)

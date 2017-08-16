@@ -158,7 +158,7 @@ cam_settings = init_config.get_section_dict(TricapConfig.CAMERA_SECTION_HEADER)
 # Instantiate the sensors
 if init_config.get('cams_required', TricapConfig.WEB_SECTION_HEADER) == 'dummy':
     use_dummy_cams = True
-    rootlogger.debug('Dummy cams will be, in accordance to configuration.')
+    rootlogger.debug('Dummy cams will be used, in accordance to configuration.')
 else:
     use_dummy_cams = False
     rootlogger.debug('Real cams will be used, in accordance to configuration')
@@ -193,8 +193,6 @@ else:
 
 altimeter_switch = AltiSwitch(altimeter)
 altimeter.attach(altimeter_switch)
-manual_override = False
-# alti_startup = 0
 
 if altimeter.state != ALTIMETER_STATE.MEASURING:
     altimeter.start_measuring()

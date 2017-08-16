@@ -6,7 +6,7 @@ from time import sleep
 from sensors.alti_simulator import SimulatorAlti
 from sensors.altitude_switch import AltiSwitch
 from support.configure import TricapConfig
-from config import OverrideState
+from config import OVERRIDESTATE
 
 
 class TestAltiSwitch(TestCase):
@@ -32,12 +32,12 @@ class TestAltiSwitch(TestCase):
         self.alti._measurement = 160
         self.switch.update(self)
         self.switch.set_altitude_switch()
-        self.assertTrue(self.switch.get_altitude_switch_state() == True)
+        self.assertTrue(self.switch.state() == True)
 
         self.alti._measurement = 130
         self.switch.update(self)
         self.switch.set_altitude_switch()
-        self.assertTrue(self.switch.get_altitude_switch_state() == True)
+        self.assertTrue(self.switch.state() == True)
 
         # self.alti._measurement = 100
         # self.switch.update(self)
@@ -55,17 +55,17 @@ class TestAltiSwitch(TestCase):
 
         self.alti._measurement = 130
         self.switch.update(self)
-        self.switch.set_altitude_switch_state(OverrideState.ALTISWITCH.value)
-        self.assertTrue(self.switch.get_altitude_switch_state() == False)
+        self.switch.set_state(OVERRIDESTATE.ALTISWITCH.value)
+        self.assertTrue(self.switch.state() == False)
 
         self.alti._measurement = 160
         self.switch.update(self)
-        self.switch.set_altitude_switch_state(OverrideState.ALTISWITCH.value)
-        self.assertTrue(self.switch.get_altitude_switch_state() == True)
+        self.switch.set_state(OVERRIDESTATE.ALTISWITCH.value)
+        self.assertTrue(self.switch.state() == True)
 
-        self.switch.set_altitude_switch_state(OverrideState.STOPOVERRIDE.value)
-        self.assertTrue(self.switch.get_altitude_switch_state() == False)
+        self.switch.set_state(OVERRIDESTATE.STOPOVERRIDE.value)
+        self.assertTrue(self.switch.state() == False)
 
-        self.switch.set_altitude_switch_state(OverrideState.MANUALSTART.value)
-        self.assertTrue(self.switch.get_altitude_switch_state() == True)
+        self.switch.set_state(OVERRIDESTATE.MANUALSTART.value)
+        self.assertTrue(self.switch.state() == True)
 

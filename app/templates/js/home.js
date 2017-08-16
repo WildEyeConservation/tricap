@@ -463,9 +463,11 @@ $(function(){
     $('#btn_modal_session_description_submit').on('click', function(event){
         $.getJSON($SCRIPT_ROOT + '/_submit_session_description',
                   {sessionDescription: $('#input_modal_session_description').val()},
-                  function(){
+                  function(){ // Added safety measure for ensuring capture is done at the correct state
+                    if ($('[name="btn_startstop"]').html() === 'Start Manual'){
                       $.getJSON($SCRIPT_ROOT + '/_button_click', {buttonCode: tricap.BUTTON_CODES.STARTSTOP },
                                 startStopFollowUp);
+                      }
                   }
             );
         return true;

@@ -10,10 +10,12 @@ from app import forms, tricap_manager, altimeter, session_logger
 from config import DEFAULT_CONFIG_FP, CONFIG_FP
 from support.configure import TricapConfig
 from collections import namedtuple
+from sensors.altitude_switch import AltiSwitch
 
 from app import rootlogger
 
 settings_bp = Blueprint('settings', __name__)
+altitude_switch = AltiSwitch(altimeter)
 
 
 class MiscSettingConfig:
@@ -238,6 +240,7 @@ def save_settings(form, config_fp=CONFIG_FP):
         config.set_section(form_dict[section_header], section_header)
 
     config.save_to_file()
+    altitude_switch.update_boundaries()  # Read new boundaries from saved file
 
 
 def revert_to_default_settings(save_to_fp=CONFIG_FP):
@@ -263,12 +266,12 @@ def settings():
         #  populated with the data from the request.form (i.e. from the browser). However, this form
         #  does not contain the labels and choices of the FieldLists, so we need to populate those
         #  attributes.
-        # TODO Find out why the lables and choices are missing from the FieldLists
+        # TODO Find out why the labels and choices are missing from the FieldLists
         form = populate_pushed_form(forms.SettingsForm())
 
     if form.validate_on_submit():
-        #tricap_manager.stop_capturing()
-        #altimeter.stop_measuring()
+        # tricap_manager.stop_capturing()
+        # altimeter.stop_measuring()
 
         # if form.test.data is True:
         #     change_settings(form)
@@ -278,6 +281,6 @@ def settings():
         elif form.revert.data is True:
             revert_to_default_settings()
 
-        return redirect(url_for('home.index'))
+        return redirect(url_for('home.index'))  # return back to home once settinsg are changed
 
     return render_template('/settings/settings.html', form=form)

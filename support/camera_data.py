@@ -50,20 +50,26 @@ camera_list.sort(key=lambda x: x[0])
 # ask user to choose one
 for index, (name, addr) in enumerate(camera_list):
     print('{:d}:  {:s}  {:s}'.format(index, addr, name))
-choice = input('Please input number of chosen camera: ')
-if choice < 0 or choice >= len(camera_list):
-    print('Number out of range')
+# choice = input('Please input number of chosen camera: ')
+# choice = int(choice)
+# if choice < 0 or choice >= len(camera_list):
+#     print('Number out of range')
 
     # initialise chosen camera
-name, addr = camera_list[choice]
-camera = gp.Camera()
-    # search ports for camera port name
-port_info_list = gp.PortInfoList()
-port_info_list.load()
-idx = port_info_list.lookup_path(addr)
-camera.set_port_info(port_info_list[idx])
-camera.init(context)
-text = camera.get_summary(context)
-print('Summary')
-print('=======')
-print(str(text))
+cameraNumber = 0
+
+for cameraNumber in range(3):
+    name, addr = camera_list[cameraNumber]  # choice
+    camera = gp.Camera()
+        # search ports for camera port name
+    port_info_list = gp.PortInfoList()
+    port_info_list.load()
+    idx = port_info_list.lookup_path(addr)
+    camera.set_port_info(port_info_list[idx])
+    camera.init(context)
+    text = camera.get_summary(context)
+    print('Summary')
+    print('=======')
+    print(str(text))
+
+

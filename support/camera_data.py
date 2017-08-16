@@ -33,8 +33,37 @@ class ParseCamera():
         return self.serial_number.strip("%")
 
 # Pi test code
-camera_data = ParseCamera()
-print(camera_data.parse_available_space())
-print(camera_data.parse_serial_number())
-print(camera_data.parse_battery_level())
+# camera_data = ParseCamera()
+# print(camera_data.parse_available_space())
+# print(camera_data.parse_serial_number())
+# print(camera_data.parse_battery_level())
 
+context = gp.Context()
+# make a list of all available cameras
+camera_list = []
+for name, addr in context.camera_autodetect():
+    camera_list.append((name, addr))
+if not camera_list:
+    print('No camera detected')
+
+camera_list.sort(key=lambda x: x[0])
+# ask user to choose one
+for index, (name, addr) in enumerate(camera_list):
+    print('{:d}:  {:s}  {:s}'.format(index, addr, name))
+choice = input('Please input number of chosen camera: ')
+if choice < 0 or choice >= len(camera_list):
+    print('Number out of range')
+
+    # initialise chosen camera
+name, addr = camera_list[choice]
+camera = gp.Camera()
+    # search ports for camera port name
+port_info_list = gp.PortInfoList()
+port_info_list.load()
+idx = port_info_list.lookup_path(addr)
+camera.set_port_info(port_info_list[idx])
+camera.init(context)
+text = camera.get_summary(context)
+print('Summary')
+print('=======')
+print(str(text))

@@ -145,7 +145,7 @@ class TrusenseAltimeter(Subject):
         if reply[0:3] == b'$ER':
             err_code = reply[4:6].decode(encoding='ascii')
             self.set_error(err_code)
-            self._logger.error(TrusenseAltimeter.errorCodes[err_code])
+            self._logger.warning(TrusenseAltimeter.errorCodes[err_code])
 
     def _check_ok(self, error_msg):
         reply = self._ser.readline()

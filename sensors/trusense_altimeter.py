@@ -136,7 +136,7 @@ class TrusenseAltimeter(Subject):
 
     def set_error(self, error_code = ""):
         self.error = error_code
-        print(error_code)
+        # print(error_code)
 
     def get_error(self):
         return self.error

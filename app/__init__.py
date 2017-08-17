@@ -272,9 +272,11 @@ def stop_all_threads():
 from .views.home import home_bp
 from .views.showlog import showlog_bp
 from .views.settings import settings_bp
+from .views.camera import camera_bp
 
 app.register_blueprint(home_bp)
 app.register_blueprint(showlog_bp)
 app.register_blueprint(settings_bp)
+app.register_blueprint(camera_bp)
 
 rootlogger.info('New instance of TriCap app has been initiated.')

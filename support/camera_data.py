@@ -49,8 +49,46 @@ class ParseData():
         self.serial_number = self.parse_data("value: ", number)
         return self.serial_number.strip("%")
 
+    def parse_camera(self, number):
+        self.name, self.addr = self.camera_list[number]  # choice
+        self.camera = gp.Camera()
+        # search ports for camera port name
+        self.port_info_list = gp.PortInfoList()
+        self.port_info_list.load()
+        self.idx = self.port_info_list.lookup_path(self.addr)
+        self.camera.set_port_info(self.port_info_list[self.idx])
+        self.camera.init(self.context)
+        self.text = self.camera.get_summary(self.context)
+
+        self.tex = str(self.text)
+        self.parse[number] = ""
+        self.index = self.tex.find("Serial Number: ") + len("Serial Number: ")
+        while self.tex[self.index] != ' ' and self.tex[self.index] != '\n':
+            self.parse[0] += str(self.tex[self.index])
+            self.index += 1
+        self.index = self.tex.find("Free Space (Bytes): ") + len("Free Space (Bytes): ")
+        while self.tex[self.index] != ' ' and self.tex[self.index] != '\n':
+            self.parse[1] += str(self.tex[self.index])
+            self.index += 1
+        self.index = self.tex.find("value: ") + len("value: ")
+        while self.tex[self.index] != ' ' and self.tex[self.index] != '\n':
+            self.parse[2] += str(self.tex[self.index])
+            self.index += 1
+
+        return self.parse[0], self.parse[1], self.parse[2]
+
+
 camera_data = ParseData()
+serNum = ""
+freeSpace = ""
+batt = ""
 for nums in range(3):
-    print(camera_data.parse_available_space(nums))
-    print(camera_data.parse_serial_number(nums))
-    print(camera_data.parse_battery_level(nums))
+    serNum, freeSpace, batt = ParseData.parse_camera(nums)
+    print(serNum)
+    print(freeSpace)
+    print(batt)
+
+
+    # print(camera_data.parse_available_space(nums))
+    # print(camera_data.parse_serial_number(nums))
+    # print(camera_data.parse_battery_level(nums))

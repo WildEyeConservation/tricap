@@ -78,15 +78,15 @@ class ParseData():
         return self.parse[0], str(int(self.parse[1])/(1024*1024)) + " Mb", self.parse[2].strip("%")
 
 
-camera_data = ParseData()
-serNum = ""
-freeSpace = ""
-batt = ""
-for nums in range(3):
-    serNum, freeSpace, batt = camera_data.parse_camera(nums)
-    print(serNum)
-    print(freeSpace)
-    print(batt)
+# camera_data = ParseData()
+# serNum = ""
+# freeSpace = ""
+# batt = ""
+# for nums in range(3):
+#     serNum, freeSpace, batt = camera_data.parse_camera(nums)
+#     print(serNum)
+#     print(freeSpace)
+#     print(batt)
 
 
     # print(camera_data.parse_available_space(nums))

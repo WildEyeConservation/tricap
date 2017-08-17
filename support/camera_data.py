@@ -13,9 +13,9 @@ class ParseData():
 
         self.camera_list.sort(key=lambda x: x[0])
         # ask user to choose one
-        for self.index, (self.name, self.addr) in enumerate(self.camera_list):
-            print('{:d}:  {:s}  {:s}'.format(self.index, self.addr, self.name))
-        self.parse = [None]*3
+        # for self.index, (self.name, self.addr) in enumerate(self.camera_list):
+        #     print('{:d}:  {:s}  {:s}'.format(self.index, self.addr, self.name))
+        self.parse = [""]*3
 
     def parse_data(self, data, number):
         self.name, self.addr = self.camera_list[number]  # choice
@@ -61,7 +61,7 @@ class ParseData():
         self.text = self.camera.get_summary(self.context)
 
         self.tex = str(self.text)
-        self.parse[number] = ""
+        self.parse = [""]*3
         self.index = self.tex.find("Serial Number: ") + len("Serial Number: ")
         while self.tex[self.index] != ' ' and self.tex[self.index] != '\n':
             self.parse[0] += str(self.tex[self.index])
@@ -75,7 +75,7 @@ class ParseData():
             self.parse[2] += str(self.tex[self.index])
             self.index += 1
 
-        return self.parse[0], self.parse[1], self.parse[2]
+        return self.parse[0], str(int(self.parse[1])/(1024*1024)) + " Mb", self.parse[2].strip("%")
 
 
 camera_data = ParseData()
@@ -83,7 +83,7 @@ serNum = ""
 freeSpace = ""
 batt = ""
 for nums in range(3):
-    serNum, freeSpace, batt = ParseData.parse_camera(nums)
+    serNum, freeSpace, batt = camera_data.parse_camera(nums)
     print(serNum)
     print(freeSpace)
     print(batt)

@@ -25,7 +25,8 @@ def camera():
         from support.camera_data import ParseData
         camera_data = ParseData()
         for camera_number in range(3):
-            serial_number[camera_number], free_space[camera_number], battery[camera_number] = camera_data.parse_camera(camera_number)
+            serial_number[camera_number], free_space[camera_number], battery[camera_number] =\
+                camera_data.parse_camera(camera_number)
     else:
         for camera_number in range(3):
             serial_number[camera_number], free_space[camera_number], battery[camera_number] = 1*(camera_number+1), \

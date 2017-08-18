@@ -18,8 +18,8 @@ class ParseData():
         return self.parse[number]
 
     def parse_serial_number(self, number):
-        self.serial_number = self.parse_data("Serial Number: ", number)
-        return self.serial_number
+        #self.serial_number = self.parse_data("Serial Number: ", number)
+        return tricap_cameras[number].serial_num
 
     def parse_available_space(self, number):
         self.available_space = self.parse_data("Free Space (Bytes): ", number)
@@ -52,3 +52,5 @@ class ParseData():
 
         return self.parse[0], str(int(self.parse[1])/(1024*1024)) + " Mb", self.parse[2]
 
+camera_data = ParseData()
+print(camera_data.parse_serial_number(0))

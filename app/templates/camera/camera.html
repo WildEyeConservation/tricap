@@ -2,34 +2,39 @@
 {% block content %}
 
 <div class='container'>
-    <div class="col-md-12">
+    <div class="col-sm-12">
         <div class="alert alert-warning" id="alt_main_status">
           <h2 id="h_main_status">Camera Data</h2>
         </div>
     </div>
 
-    <div class="col-md-4">
+    <div class="col-sm-4">
         <div class="alert alert-info">
             <h3>Camera 1</h3>
-            <h4>Serial number:<br>{{serial_number[0]}}</h4>
-            <h4>Battery level: {{battery[0]}}</h4>
-            <h4>Free space:    {{free_space[0]}}</h4>
+            <h5>Serial number:<br>{{serial_number[0]}}</h5>
+            <h5>Battery level: {{battery[0]}}</h5>
+            <h5>Free space:    {{free_space[0]}}</h5>
         </div>
     </div>
-    <div class="col-md-4">
+    <div class="col-sm-4">
         <div class="alert alert-info">
             <h3>Camera 2</h3>
-            <h4>Serial number:<br>{{serial_number[1]}}</h4>
-            <h4>Battery level: {{battery[1]}}</h4>
-            <h4>Free space:    {{free_space[1]}}</h4>
+            <h5>Serial number:<br>{{serial_number[1]}}</h5>
+            <h5>Battery level: {{battery[1]}}</h5>
+            <h5>Free space:    {{free_space[1]}}</h5>
         </div>
     </div>
-    <div class="col-md-4">
+    <div class="col-sm-4">
         <div class="alert alert-info">
             <h3>Camera 3</h3>
-            <h4>Serial number:<br>{{serial_number[2]}}</h4>
-            <h4>Battery level: {{battery[2]}}</h4>
-            <h4>Free space:    {{free_space[2]}}</h4>
+            <h5>Serial number:<br>{{serial_number[2]}}</h5>
+            <h5>Battery level: {{battery[2]}}</h5>
+            <h5>Free space:    {{free_space[2]}}</h5>
+        </div>
+    </div>
+    <div class="col-sm-4">
+        <div class="alert alert-warning">
+            <a href="{{ url_for('home.index')}}">Home</a>
         </div>
     </div>
 </div>

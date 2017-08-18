@@ -4,7 +4,7 @@
 <div class='container'>
     <div class="col-sm-12">
         <div class="alert alert-warning" id="alt_main_status">
-          <h2 id="h_main_status">Camera Data</h2>
+          <h2 id="h_main_status" style="text-align:center;">Camera Data</h2>
         </div>
     </div>
 
@@ -32,9 +32,10 @@
             <h5>Free space:    {{free_space[2]}}</h5>
         </div>
     </div>
-    <div class="col-sm-4">
-        <div class="alert alert-warning">
-            <a href="{{ url_for('home.index')}}">Home</a>
+    <div class="col-sm-5"></div>
+    <div class="col-sm-2">
+        <div class="alert alert-warning" style="text-align:center;">
+            <a href="{{ url_for('home.index')}}" class="btn" style="color: white;">Return Home</a>
         </div>
     </div>
 </div>

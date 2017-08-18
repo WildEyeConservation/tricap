@@ -2,8 +2,8 @@
 // All of the following code will only run when the page is ready
 //  (the $() is short for $(document).ready())
 
-var batteryWarning = 50
-var spaceWarning = 145000
+var batteryWarning = 50 // Below 50 percent
+var spaceWarning = 145000 // Below +-145Gb
 //var battery0 = parseInt({{battery[0]}})
 
 $(function(){
@@ -32,7 +32,7 @@ $(function(){
         $('#back_camera').addClass('alert-info');
     }
 
-        if({{free_space[0]}} < spaceWarning){
+    if({{free_space[0]}} < spaceWarning){
         $('#middle_camera').removeClass('alert-info');
         $('#middle_camera').addClass('alert-danger');
     } else {
@@ -55,4 +55,14 @@ $(function(){
         $('#back_camera').removeClass('alert-danger');
         $('#back_camera').addClass('alert-info');
     }
+
+//    $('#home_button').click(function{
+//        $('#home_button').css("color", "yellow");
+//    });
+
+    $("#home_button").hover(function(){
+        $(this).css("background-color", "yellow");
+        }, function(){
+        $(this).css("background-color", "orange");
+    });
 });

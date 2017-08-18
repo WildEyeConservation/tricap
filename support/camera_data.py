@@ -4,7 +4,7 @@ from app import tricap_cameras
 
 
 class ParseData():
-    def __init__(self):
+    #def __init__(self):
 
         # self.context = gp.Context()
         # self.camera_list = []  # make a list of all available cameras
@@ -51,7 +51,7 @@ class ParseData():
 
     def parse_battery_level(self, number):
         self.serial_number = self.parse_data("value: ", number)
-        return self.serial_number.strip("%")
+        return self.serial_number
 
     def parse_camera(self, number):
         # self.name, self.addr = self.camera_list[number]  # choice
@@ -81,7 +81,7 @@ class ParseData():
             self.parse[2] += str(self.tex[self.index])
             self.index += 1
 
-        return self.parse[0], str(int(self.parse[1])/(1024*1024)) + " Mb", self.parse[2].strip("%")
+        return self.parse[0], str(int(self.parse[1])/(1024*1024)) + " Mb", self.parse[2]
 
 
 # camera_data = ParseData()

@@ -36,10 +36,11 @@ class ParseData():
 
         self.tex = str(self.text)
         self.parse = [""]*3
-        self.index = self.tex.find("Serial Number: ") + len("Serial Number: ")
-        while self.tex[self.index] != ' ' and self.tex[self.index] != '\n':
-            self.parse[0] += str(self.tex[self.index])
-            self.index += 1
+        # self.index = self.tex.find("Serial Number: ") + len("Serial Number: ")
+        # while self.tex[self.index] != ' ' and self.tex[self.index] != '\n':
+        #     self.parse[0] += str(self.tex[self.index])
+        #     self.index += 1
+        self.parse[0] = tricap_cameras[number].serial_num
         self.index = self.tex.find("Free Space (Bytes): ") + len("Free Space (Bytes): ")
         while self.tex[self.index] != ' ' and self.tex[self.index] != '\n':
             self.parse[1] += str(self.tex[self.index])

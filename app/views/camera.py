@@ -31,7 +31,7 @@ def camera():
         for camera_number in range(3):
             serial_number[camera_number], free_space[camera_number], battery[camera_number] = 1*(camera_number+1), \
                                                                                               2*(camera_number+1), \
-                                                                                              3*(camera_number+1)
+                                                                                              str(3*(camera_number+1))
 
     return render_template('/camera/camera.html', serial_number = serial_number, free_space = free_space,
                            battery = battery)

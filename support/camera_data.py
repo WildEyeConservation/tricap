@@ -50,7 +50,7 @@ class ParseData():
             self.parse[2] += str(self.tex[self.index])
             self.index += 1
 
-        return self.parse[0], str(int(self.parse[1])/(1024*1024)) + " Mb", self.parse[2]
+        return self.parse[0], str(int(self.parse[1])/(1024*1024)), self.parse[2].strip('%')
 
 camera_data = ParseData()
 print(camera_data.parse_serial_number(0))

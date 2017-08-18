@@ -295,3 +295,9 @@ class GPhotoCam(AbstractCamera):
     def get_cam_image_count(self):
         """Return the number of images captured by the camera, as tracked by this object."""
         return self._image_count
+
+    def get_cam_context(self):
+        return GPhotoCam._context
+
+    def get_cam(self):
+        return self._gp_camera

@@ -30,10 +30,16 @@
                     <h5>Free space: {{free_space[2]}} Mb</h5>
                 </div>
             </div>
-            <div class="col-sm-5"></div>
-            <div class="col-sm-2">
+        </div>
+        <div class="row">
+            <div class="col-sm-6">
+                <div class="alert alert-info" style="text-align:center;" id="refresh_button">
+                    <a href="{{ url_for('camera.camera')}}" class="btn btn-sm" style="color: white;" >Refresh</a>
+                </div>
+            </div>
+            <div class="col-sm-6">
                 <div class="alert alert-warning" style="text-align:center;" id="home_button">
-                    <a href="{{ url_for('home.index')}}" class="btn" style="color: white;" >Return Home</a>
+                    <a href="{{ url_for('home.index')}}" class="btn btn-sm" style="color: white;" >Return Home</a>
                 </div>
             </div>
         </div>

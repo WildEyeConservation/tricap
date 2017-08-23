@@ -95,15 +95,16 @@ class TriCapCamsManager:
         self.camera_list = self._cameras
         for camera_number in range(3):
             print("ordering list")
+            print(self.camera_list[camera_number].config.eosserialnumber)
             if self.camera_list[camera_number].config.eosserialnumber == "032024003117":
                 self._cameras[0] = self.camera_list[camera_number]
-                print(1)
+                print(camera_number+'0')
             elif self.camera_list[camera_number].config.eosserialnumber == "023052000180":
                 self._cameras[1] = self.camera_list[camera_number]
-                print(2)
+                print(camera_number+'1')
             elif self.camera_list[camera_number].config.eosserialnumber == "413051000325":
                 self._cameras[2] = self.camera_list[camera_number]
-                print(3)
+                print(camera_number+'2')
 
     def get_cameras_as_list(self):  # Sort this list
         return self._cameras

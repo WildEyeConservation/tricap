@@ -248,9 +248,10 @@ time_mon.start()
 def stop_fetching():
     """Turn off fetching for all cameras."""
     for cam in tricap_manager.get_cameras_as_list():
-        cam._camera.fetch_state = False
+        pass  # cam._camera.fetch_state = False
 
 
+# fetch_stopper = GateCloser(20.0, stop_fetching)  # 20.0
 fetch_stopper = GateCloser(20.0, stop_fetching)
 
 

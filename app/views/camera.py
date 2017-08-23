@@ -34,15 +34,15 @@ def camera():
                 camera_data.parse_camera(camera_number)
             # Ensure cameras are always in the correct slot
             if serial_number_parse[camera_number] == "032024003117":  # Middle camera/Left
-                serial_number[0] = "Left"
+                serial_number[0] = serial_number_parse[camera_number]
                 free_space[0] = free_space_parse[camera_number]
                 battery[0] = battery_parse[camera_number]
             elif serial_number_parse[camera_number] == "023052000180":  # Front camera/Centre
-                serial_number[1] = "Centre"
+                serial_number[1] = serial_number_parse[camera_number]
                 free_space[1] = free_space_parse[camera_number]
                 battery[1] = battery_parse[camera_number]
             elif serial_number_parse[camera_number] == "413051000325":  # Back camera/Right
-                serial_number[2] = "Right"
+                serial_number[2] = serial_number_parse[camera_number]
                 free_space[2] = free_space_parse[camera_number]
                 battery[2] = battery_parse[camera_number]
     else:

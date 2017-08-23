@@ -91,7 +91,17 @@ class TriCapCamsManager:
     def get_cam_image_fp(self, cam_num):
         return self._cameras[cam_num].get_cam_image_fp()
 
-    def get_cameras_as_list(self):
+    def order_cameras_list(self):
+        self.camera_list = self._cameras
+        for camera_number in range(3):
+            if self.camera_list[camera_number].config.eosserialnumber == "032024003117":
+                self._cameras[0] = self.camera_list[camera_number]
+            elif self.camera_list[camera_number].config.eosserialnumber == "023052000180":
+                self._cameras[1] = self.camera_list[camera_number]
+            elif self.camera_list[camera_number].config.eosserialnumber == "413051000325":
+                self._cameras[2] = self.camera_list[camera_number]
+
+    def get_cameras_as_list(self):  # Sort this list
         return self._cameras
 
     def get_state(self):
@@ -120,6 +130,7 @@ class TriCapCamsManager:
                     tricap_cam._camera.calibrate_func = tricap_cam.focus_infinity
                     tricap_cam._camera.calibrate_step = int(self._man_settings['calibrate_step'])
                     self._cameras.append(tricap_cam)
+            self.order_cameras_list()
 
     # def reset(self, man_settings: dict, cam_settings: dict):
     #     self._man_settings = man_settings

@@ -51,17 +51,16 @@ def index():
 
     cams_start_display = config.get('cams_start_display', TricapConfig.WEB_SECTION_HEADER)
     alti_start_display = config.get('alti_start_display', TricapConfig.WEB_SECTION_HEADER)
-    camera_serial_numbers = [""]*3
-
+    camera_serial_numbers = ["Left", "Centre", "Right"]
     if cams_start_display.lower() == 'open':
         for cam in tricap_manager.get_cameras_as_list():
             cam._camera.fetch_state = True
 
     # for cameraNumber in range(3):
     #     camera_serial_numbers[cameraNumber] = ParseData.parse_serial_number(cameraNumber)
-    camera_serial_numbers[0] = "Left"
-    camera_serial_numbers[1] = "Centre"
-    camera_serial_numbers[2] = "Right"
+    # camera_serial_numbers[0] = "Left"
+    # camera_serial_numbers[1] = "Centre"
+    # camera_serial_numbers[2] = "Right"
 
     return render_template('/home/index.html', num_cams=tricap_manager.get_num_cams(),
                            cams_start_display=cams_start_display,

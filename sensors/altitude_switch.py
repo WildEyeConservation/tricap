@@ -8,8 +8,6 @@ from enum import Enum
 from support.configure import TricapConfig
 from config import OVERRIDESTATE
 
-# CAMERA_STATES = Enum("CamState", ["UNINITIALISED", "INITIALISED", "CAPTURING", "ERROR_CONFIG", "ERROR_CAPTURE"])
-
 
 class AltiSwitch(Observer):
     _logger = logging.getLogger(__name__)  # start the logger

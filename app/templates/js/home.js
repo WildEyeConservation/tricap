@@ -180,12 +180,6 @@ var startStopFollowUp = function (data) {
         $('[name="btn_startstop"]').html('Stop');
     } else { // Data capture has not started
         camRefreshTimer.stopTimer();
-//        if(data.override == "1"){
-//            $('[name="btn_startstop"]').html('Start Automatic');
-//        } else {
-//            //$('[name="btn_startstop"]').html('Start');
-//        }
-        //$('[name="btn_startstop"]').html('Start'); //TODO automated and manual displayed with start
     }
 };
 

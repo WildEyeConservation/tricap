@@ -1,6 +1,8 @@
 from flask import Blueprint, redirect, url_for, render_template, request
 
 from support.configure import TricapConfig
+from app import tricap_manager
+from config import CAM_MANAGER_STATES
 
 camera_bp = Blueprint('camera', __name__)
 
@@ -32,13 +34,13 @@ def camera():
                 camera_data.parse_camera(camera_number)
             # Ensure cameras are always in the correct slot
             if serial_number_parse[camera_number] == "032024003117":  # Middle camera
-                serial_number[0] = serial_number_parse[camera_number]
-                free_space[0] = free_space_parse[camera_number]
-                battery[0] = battery_parse[camera_number]
-            elif serial_number_parse[camera_number] == "023052000180":  # Front camera
                 serial_number[1] = serial_number_parse[camera_number]
                 free_space[1] = free_space_parse[camera_number]
                 battery[1] = battery_parse[camera_number]
+            elif serial_number_parse[camera_number] == "023052000180":  # Front camera
+                serial_number[0] = serial_number_parse[camera_number]
+                free_space[0] = free_space_parse[camera_number]
+                battery[0] = battery_parse[camera_number]
             elif serial_number_parse[camera_number] == "413051000325":  # Back camera
                 serial_number[2] = serial_number_parse[camera_number]
                 free_space[2] = free_space_parse[camera_number]
@@ -48,6 +50,8 @@ def camera():
             serial_number[camera_number], free_space[camera_number], battery[camera_number] = 1*(camera_number+1), \
                                                                                               str(100000*(camera_number+1)), \
                                                                                               str(30*(4-(camera_number+1)))
-
-    return render_template('/camera/camera.html', serial_number = serial_number, free_space = free_space,
-                           battery = battery)
+    if tricap_manager.get_state() == CAM_MANAGER_STATES.STARTED:
+        return render_template('/camera/wait.html')  # Adds robustness to not cause any errors
+    else:
+        return render_template('/camera/camera.html', serial_number=serial_number, free_space=free_space,
+                               battery=battery)

@@ -94,6 +94,9 @@ class TriCapCamsManager:
     def get_cameras_as_list(self):
         return self._cameras
 
+    def get_state(self):
+        return self.state
+
     def _find_cameras(self):
         self._cameras = []
         # Do not catch exceptions here. If any detected camera fails to instantiate, it is a critical error and we want

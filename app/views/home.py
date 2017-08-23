@@ -11,6 +11,7 @@ from app import rootlogger, fetch_stopper
 
 from support.configure import TricapConfig
 from support.sms_sender import SMSSender
+from support.camera_data import ParseData
 
 from config import BUTTON_CODE, CAM_MANAGER_STATES, ALTIMETER_STATE
 from config import OVERRIDESTATE
@@ -50,14 +51,19 @@ def index():
 
     cams_start_display = config.get('cams_start_display', TricapConfig.WEB_SECTION_HEADER)
     alti_start_display = config.get('alti_start_display', TricapConfig.WEB_SECTION_HEADER)
+    camera_serial_numbers = [""]*3
 
     if cams_start_display.lower() == 'open':
         for cam in tricap_manager.get_cameras_as_list():
             cam._camera.fetch_state = True
 
+    for cameraNumber in range(3):
+        camera_serial_numbers[cameraNumber] = ParseData.parse_serial_number(cameraNumber)
+
     return render_template('/home/index.html', num_cams=tricap_manager.get_num_cams(),
                            cams_start_display=cams_start_display,
-                           alti_start_display=alti_start_display, python_data=js_data)
+                           alti_start_display=alti_start_display, python_data=js_data,
+                           serial_numbers=camera_serial_numbers)
 
 
 def _determine_overall_cam_state_colour():

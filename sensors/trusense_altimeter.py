@@ -213,7 +213,7 @@ class TrusenseAltimeter(Subject):
                     self.notify()
             else:
                 consecutive_timeouts += 1
-                self._logger.warning('Empty message read from alti port, indicates a timeout')
+                # self._logger.warning('Empty message read from alti port, indicates a timeout')
             if consecutive_timeouts >= 5:
                 self.state = ALTIMETER_STATE.ERROR
                 self._logger.error('Alti Error: Too many timeouts, communications have been lost.')

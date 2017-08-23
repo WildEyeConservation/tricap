@@ -22,7 +22,7 @@ class AltiSwitch(Observer):
         self.turn_off_altitude = 0
         self.measured_height = 0
         self.manual_override = 0
-
+        self._logger.debug('Altitude Switch started - Automatic switch enabled')
         self.update_boundaries()
 
     # Altitude switch is not in update, because of the outside use of the function
@@ -30,16 +30,16 @@ class AltiSwitch(Observer):
         if override == OVERRIDESTATE.ALTISWITCH.value:
             if self.measured_height >= self.turn_on_altitude:
                 self.alti_switch_state = True  # Turn on the altitude switch
-                self._logger.debug('Altitude Switch - capturing')
-            elif self.measured_height < self.turn_off_altitude:
+                #self._logger.debug('Altitude Switch - capturing')
+            #elif self.measured_height < self.turn_off_altitude:
                 # self.alti_switch_state = False  # Turn off altitude switch
-                self._logger.debug('Altitude Switch - Would have stopped capturing')
+                #self._logger.debug('Altitude Switch - Would have stopped capturing')
         elif override == OVERRIDESTATE.STOPOVERRIDE.value:  # If switch is overwritten, then the system stops capturing
             self.alti_switch_state = False
-            self._logger.debug('Altitude Switch = stopped - not capturing')
+            #self._logger.debug('Altitude Switch = stopped - not capturing')
         else:  # override with start button with manual on switch
             self.alti_switch_state = True
-            self._logger.debug('Altitude Switch = manual - capturing')
+            #self._logger.debug('Altitude Switch = manual - capturing')
 
     def state(self):  # True shows the switch is ON and vice versa
         return self.alti_switch_state

@@ -20,13 +20,29 @@ def camera():
     serial_number = [""]*3
     free_space = [""]*3
     battery = [""]*3
+    serial_number_parse = [""] * 3
+    free_space_parse = [""] * 3
+    battery_parse = [""] * 3
 
     if using_dummy_camera() == False:
         from support.camera_data import ParseData
         camera_data = ParseData()
         for camera_number in range(3):
-            serial_number[camera_number], free_space[camera_number], battery[camera_number] =\
+            serial_number_parse[camera_number], free_space_parse[camera_number], battery_parse[camera_number] =\
                 camera_data.parse_camera(camera_number)
+            # Ensure cameras are always in the correct slot
+            if serial_number_parse[camera_number] == "032024003117":  # Middle camera
+                serial_number[0] = serial_number_parse[camera_number]
+                free_space[0] = free_space_parse[camera_number]
+                battery[0] = battery_parse[camera_number]
+            elif serial_number_parse[camera_number] == "023052000180":  # Front camera
+                serial_number[1] = serial_number_parse[camera_number]
+                free_space[1] = free_space_parse[camera_number]
+                battery[1] = battery_parse[camera_number]
+            elif serial_number_parse[camera_number] == "413051000325":  # Back camera
+                serial_number[2] = serial_number_parse[camera_number]
+                free_space[2] = free_space_parse[camera_number]
+                battery[2] = battery_parse[camera_number]
     else:
         for camera_number in range(3):
             serial_number[camera_number], free_space[camera_number], battery[camera_number] = 1*(camera_number+1), \

@@ -272,8 +272,11 @@ def reset():
 
 @home_bp.route('/_shutdown')
 def shutdown():
-    # Shut down the pi
-    os.system("sudo shutdown -h now")
+    """Shut down the RPi server from the gui"""
+    rootlogger.log("User requested a shutdown of TriCap")
+    while True:
+        os.system("sudo shutdown -h now")
+    return "Shutting down server"
 
 
 @home_bp.route('/_button_click', methods=['GET', 'POST'])

@@ -7,6 +7,7 @@ import logging
 import threading
 import os
 import exifread
+import copy
 
 from config import CAM_MANAGER_STATES, SERVER_LOG_DIR, SESSION_ROOT_DIR
 
@@ -71,6 +72,7 @@ class TriCapCamsManager:
         self._cam_settings = cam_settings
         self._man_settings = man_settings
         self.use_dummy_cams = use_dummy_cams
+        self.camera_list = ""
         self._initialise()
 
     def _initialise(self):
@@ -92,19 +94,21 @@ class TriCapCamsManager:
         return self._cameras[cam_num].get_cam_image_fp()
 
     def order_cameras_list(self):
-        self.camera_list = self._cameras
-        for camera_number in range(3):
+        self.camera_list = copy.deepcopy(self._cameras)
+        for camera_nb in range(3):
+            print(self.camera_list[camera_nb].config.eosserialnumber)
+        for camera_nb in range(3):
             print("ordering list")
-            print(self.camera_list[camera_number].config.eosserialnumber)
-            if self.camera_list[camera_number].config.eosserialnumber == "032024003117":
-                self._cameras[0] = self.camera_list[camera_number]
-                print(camera_number+'0')
-            elif self.camera_list[camera_number].config.eosserialnumber == "023052000180":
-                self._cameras[1] = self.camera_list[camera_number]
-                print(camera_number+'1')
-            elif self.camera_list[camera_number].config.eosserialnumber == "413051000325":
-                self._cameras[2] = self.camera_list[camera_number]
-                print(camera_number+'2')
+            print(self.camera_list[camera_nb].config.eosserialnumber)
+            if self.camera_list[camera_nb].config.eosserialnumber == "032024003117":
+                self._cameras[0] = self.camera_list[camera_nb]
+                print(str(camera_nb)+'0')
+            elif self.camera_list[camera_nb].config.eosserialnumber == "023052000180":
+                self._cameras[1] = self.camera_list[camera_nb]
+                print(str(camera_nb)+'1')
+            elif self.camera_list[camera_nb].config.eosserialnumber == "413051000325":
+                self._cameras[2] = self.camera_list[camera_nb]
+                print(str(camera_nb)+'2')
 
     def get_cameras_as_list(self):  # Sort this list
         return self._cameras

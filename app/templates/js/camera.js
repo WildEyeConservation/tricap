@@ -3,7 +3,7 @@
 //  (the $() is short for $(document).ready())
 
 var batteryWarning = 50; // Below 50 percent
-var spaceWarning = 145000; // Below +-145Gb
+var spaceWarning = 100000; // Below +-145Gb
 //var battery0 = parseInt({{battery[0]}})
 
 $(function(){

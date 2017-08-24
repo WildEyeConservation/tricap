@@ -270,6 +270,12 @@ def reset():
     return redirect(url_for('home.index'))
 
 
+@home_bp.route('/_shutdown')
+def shutdown():
+    # Shut down the pi
+    os.system("sudo shutdown -h now")
+
+
 @home_bp.route('/_button_click', methods=['GET', 'POST'])
 def handle_button_click():
     button_code = int(request.args.get('buttonCode'))

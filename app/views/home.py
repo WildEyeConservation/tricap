@@ -274,8 +274,8 @@ def reset():
 @home_bp.route('/_shutdown')
 def shutdown():
     """Shut down the RPi server from the gui"""
-    rootlogger.log("User requested a shutdown of TriCap")
-    command = "/usr/bin/sudo /sbin/shutdown -r now"
+    rootlogger.info("User requested a shutdown of TriCap")
+    command = "/usr/bin/sudo /sbin/poweroff"# "/usr/bin/sudo /sbin/shutdown -r now"
     import subprocess
 
     while True:

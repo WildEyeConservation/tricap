@@ -2,6 +2,7 @@
 
 import os
 import io
+import subprocess
 from urllib.request import urlopen
 from flask import Blueprint, render_template, send_from_directory, current_app, request, jsonify
 from flask import send_file, redirect, url_for
@@ -274,8 +275,14 @@ def reset():
 def shutdown():
     """Shut down the RPi server from the gui"""
     rootlogger.log("User requested a shutdown of TriCap")
+    command = "/usr/bin/sudo /sbin/shutdown -r now"
+    import subprocess
+
     while True:
-        os.system("sudo shutdown -h now")
+        process = subprocess.Popen(command.split(), stdout=subprocess.PIPE)
+        output = process.communicate()[0]
+        print(output)
+        #os.system("sudo poweroff")
     return "Shutting down server"
 
 

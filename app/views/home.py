@@ -274,16 +274,19 @@ def reset():
 @home_bp.route('/_shutdown')
 def shutdown():
     """Shut down the RPi server from the gui"""
-    rootlogger.info("User requested a shutdown of TriCap")
-    command = "/usr/bin/sudo /sbin/poweroff"# "/usr/bin/sudo /sbin/shutdown -r now"
-    import subprocess
+    if tricap_manager.state != CAM_MANAGER_STATES.STARTED:
+        rootlogger.info("User requested a shutdown of TriCap")
+        command = "/usr/bin/sudo /sbin/poweroff"# "/usr/bin/sudo /sbin/shutdown -r now"
+        import subprocess
 
-    while True:
-        process = subprocess.Popen(command.split(), stdout=subprocess.PIPE)
-        output = process.communicate()[0]
-        print(output)
-        #os.system("sudo poweroff")
-    return "Shutting down server"
+        while True:
+            process = subprocess.Popen(command.split(), stdout=subprocess.PIPE)
+            output = process.communicate()[0]
+            print(output)
+            #os.system("sudo poweroff")
+        return "Shutting down server"
+    else:
+        return render_template("/camera/wait.html")
 
 
 @home_bp.route('/_button_click', methods=['GET', 'POST'])

@@ -94,12 +94,11 @@ class TriCapCamsManager:
         return self._cameras[cam_num].get_cam_image_fp()
 
     def order_cameras_list(self):
-        self.camera_list = copy.deepcopy(self._cameras)
+        self.camera_list = self._cameras
         for camera_nb in range(3):
             print(self.camera_list[camera_nb].config.eosserialnumber)
         for camera_nb in range(3):
             print("ordering list")
-            print(self.camera_list[camera_nb].config.eosserialnumber)
             if self.camera_list[camera_nb].config.eosserialnumber == "032024003117":
                 self._cameras[0] = self.camera_list[camera_nb]
                 print(str(camera_nb)+'0')
@@ -109,6 +108,11 @@ class TriCapCamsManager:
             elif self.camera_list[camera_nb].config.eosserialnumber == "413051000325":
                 self._cameras[2] = self.camera_list[camera_nb]
                 print(str(camera_nb)+'2')
+            print(self.camera_list[camera_nb].config.eosserialnumber)
+
+    def show_cameras_list(self):
+        for camera_nb in range(3):
+            print(self._cameras[camera_nb].config.eosserialnumber)
 
     def get_cameras_as_list(self):  # Sort this list
         return self._cameras
@@ -140,6 +144,7 @@ class TriCapCamsManager:
                     tricap_cam._camera.calibrate_step = int(self._man_settings['calibrate_step'])
                     self._cameras.append(tricap_cam)
             self.order_cameras_list()
+            self.show_cameras_list()
 
     # def reset(self, man_settings: dict, cam_settings: dict):
     #     self._man_settings = man_settings

@@ -49,8 +49,8 @@ def camera():
                 serial_number[2] = serial_number_parse[camera_number]
                 free_space[2] = free_space_parse[camera_number]
                 battery[2] = battery_parse[camera_number]
-        code_id = code_inf.parse_id()
-        code_date = code_inf.parse_date()
+        code_id = code_inf.code_id()
+        code_date = code_inf.code_date()
     else:
         for camera_number in range(3):
             serial_number[camera_number], free_space[camera_number], battery[camera_number] = 1*(camera_number+1), \

@@ -1,6 +1,7 @@
 from subprocess import PIPE, Popen
 
-class Git():
+
+class GitData():
     def __init__(self):
         self.index = 0
         self.git_parse = ""

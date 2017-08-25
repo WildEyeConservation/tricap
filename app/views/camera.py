@@ -1,6 +1,7 @@
 from flask import Blueprint, redirect, url_for, render_template, request
 
 from support.configure import TricapConfig
+from support.git_info import Git
 from app import tricap_manager
 from config import CAM_MANAGER_STATES
 
@@ -25,10 +26,14 @@ def camera():
     serial_number_parse = [""] * 3
     free_space_parse = [""] * 3
     battery_parse = [""] * 3
+    id = ""
+    date = ""
+
 
     if using_dummy_camera() == False:
         from support.camera_data import ParseData
         camera_data = ParseData()
+        code_info = Git()
         for camera_number in range(3):
             serial_number_parse[camera_number], free_space_parse[camera_number], battery_parse[camera_number] =\
                 camera_data.parse_camera(camera_number)
@@ -45,13 +50,17 @@ def camera():
                 serial_number[2] = serial_number_parse[camera_number]
                 free_space[2] = free_space_parse[camera_number]
                 battery[2] = battery_parse[camera_number]
+        id = code_info.parse_id()
+        date = code_info.parse_date()
     else:
         for camera_number in range(3):
             serial_number[camera_number], free_space[camera_number], battery[camera_number] = 1*(camera_number+1), \
                                                                                               str(100000*(camera_number+1)), \
                                                                                               str(30*(4-(camera_number+1)))
+        id = "1.6180339887"
+        date = "8 June 1994"
     if tricap_manager.get_state() == CAM_MANAGER_STATES.STARTED:
-        return render_template('/camera/wait.html')  # Adds robustness to not cause any errors
+        return render_template('/camera/wait.html')  # Adds robustness to not cause any error when cameras are capturing
     else:
         return render_template('/camera/camera.html', serial_number=serial_number, free_space=free_space,
-                               battery=battery)
+                               battery=battery, id=id, date=date)

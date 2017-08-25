@@ -12,27 +12,23 @@ class Git():
 
     def code_id(self):
         self.index = self.log.find("commit ") + len("commit ")
-        while self.log[self.index] != ' ' and self.log[self.index] != '\n':
+        while self.log[self.index] != ' ' and self.log[self.index] != '\\':
             self.parse_id += str(self.log[self.index])
             self.index += 1
         print(self.parse_id)
         return self.parse_id
 
-        # for i in range(2, 42):
-        #     self.parse_id += self.log[i]
-        # print(self.parse_id)
-
     def code_date(self):
-        self.index = self.log.find("Date:  ") + len("Date:  ")
-        while self.log[self.index] != ' ' and self.log[self.index] != '\n':
+        self.index = self.log.find("Date:   ") + len("Date:   ")
+        while self.log[self.index] != '\\':
             self.parse_date += str(self.log[self.index])
             self.index += 1
         print(self.parse_date)
         return self.parse_date
 
-parser = Git()
-parser.code_id()
-parser.code_date()
+# parser = Git()
+# parser.code_id()
+# parser.code_date()
 
 
 

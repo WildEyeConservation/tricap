@@ -23,7 +23,6 @@ node_modules
 *.png
 *.orig
 *.dot
-*.png
 *.zip
 *.tern-project
 *.log

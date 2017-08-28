@@ -5,7 +5,7 @@
         <div class="row">
             <div class="col-md-12">
                 <div class="alert alert-warning" id="alt_main_status" style="text-align:center;">
-                  <h2 id="h_main_status">Camera Rig Information</h2>
+                  <h2 id="h_camera_status">Camera Rig Information</h2>
                 </div>
             </div>
 
@@ -42,13 +42,13 @@
         </div>
         <div class="row">
             <div class="col-sm-6">
-                <div class="alert alert-info" style="text-align:center;" id="refresh_button">
-                    <a href="{{ url_for('camera.camera')}}" class="btn btn-sm" style="color: white;" >Refresh</a>
+                <div class="alert alert-warning" style="text-align:center;" id="refresh_button">
+                    <a href="{{ url_for('camera.camera')}}" class="btn btn-lg btn-warning" style="color: white;" id="refresh">Refresh</a>
                 </div>
             </div>
             <div class="col-sm-6">
                 <div class="alert alert-warning" style="text-align:center;" id="home_button">
-                    <a href="{{ url_for('home.index')}}" class="btn btn-sm" style="color: white;" >Return Home</a>
+                    <a href="{{ url_for('home.index')}}" class="btn btn-lg btn-warning" style="color: white;" id="home_cam">Return Home</a>
                 </div>
             </div>
         </div>

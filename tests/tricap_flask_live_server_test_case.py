@@ -87,9 +87,12 @@ class TriCapLiveServerTestCase(TriCapTempFilerTestCase):
             # add the windows option of running headlessly (need the latest chrome (59) and
             # chromedriver installed for this to work.)
             # chrome_options.binary_location = 'C:/Projects/System/chromedriver.exe'
+            #chrome_options.binary_location = 'C:/Program Files (x86)/Google/Chrome/Application/chromedriver.exe'
             if self.run_headless:
                 chrome_options.add_argument('headless')
-            driver = webdriver.Chrome('C:/Projects/System/chromedriver.exe',
+            # driver = webdriver.Chrome('C:/Projects/System/chromedriver.exe',
+            #                           chrome_options=chrome_options)
+            driver = webdriver.Chrome('C:/Program Files (x86)/Google/Chrome/Application/chromedriver.exe',
                                       chrome_options=chrome_options)
 
         self._all_drivers.append(driver)

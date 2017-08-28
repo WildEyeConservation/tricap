@@ -26,8 +26,6 @@ def camera():
     serial_number_parse = [""] * 3
     free_space_parse = [""] * 3
     battery_parse = [""] * 3
-    # code_id = ""
-    # code_date = ""
 
     if using_dummy_camera() == False:
         from support.camera_data import ParseData

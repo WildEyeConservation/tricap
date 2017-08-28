@@ -8,7 +8,7 @@ from flask import Blueprint, render_template, send_from_directory, current_app, 
 from flask import send_file, redirect, url_for
 
 from app import tricap_manager, altimeter, altimeter_switch, session_logger, talkbox, log_list, stop_all_threads
-from app import rootlogger, fetch_stopper
+from app import rootlogger, fetch_stopper, use_dummy_cams
 
 from support.configure import TricapConfig
 from support.sms_sender import SMSSender
@@ -275,16 +275,19 @@ def reset():
 def shutdown():
     """Shut down the RPi server from the gui"""
     if tricap_manager.state != CAM_MANAGER_STATES.STARTED:
-        rootlogger.info("User requested a shutdown of TriCap")
-        command = "/usr/bin/sudo /sbin/poweroff"# "/usr/bin/sudo /sbin/shutdown -r now"
-        import subprocess
+        if use_dummy_cams:
+            return '<h1 id="shutdown">Shutting down server</h1>'
+        else:
+            rootlogger.info("User requested a shutdown of TriCap")
+            command = "/usr/bin/sudo /sbin/poweroff"# "/usr/bin/sudo /sbin/shutdown -r now"
+            import subprocess
 
-        while True:
-            process = subprocess.Popen(command.split(), stdout=subprocess.PIPE)
-            output = process.communicate()[0]
-            print(output)
-            #os.system("sudo poweroff")
-        return "Shutting down server"
+            while True:
+                process = subprocess.Popen(command.split(), stdout=subprocess.PIPE)
+                output = process.communicate()[0]
+                print(output)
+                #os.system("sudo poweroff")
+            return "Shutting down server"
     else:
         return render_template("/camera/wait.html")
 

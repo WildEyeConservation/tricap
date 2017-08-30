@@ -285,8 +285,6 @@ def shutdown():
             while True:
                 process = subprocess.Popen(command.split(), stdout=subprocess.PIPE)
                 output = process.communicate()[0]
-                print(output)
-                #os.system("sudo poweroff")
             return "Shutting down server"
     else:
         return render_template("/camera/wait.html")

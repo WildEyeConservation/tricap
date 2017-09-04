@@ -24,7 +24,8 @@ def copy_directory(source, destination):
 
 def copy_thread(drive, camera_num):
     print(drive)
-    copy_directory(os.path.join(sd_card_list[camera_num], 'DCIM'), os.path.join(drive, str(datetime.date.today()), Sortie, 'images', 'Camera' + str(camera_num)))
+    copy_directory(os.path.join(sd_card_list[camera_num], 'DCIM'),
+                   os.path.join(drive, str(datetime.date.today()), Sortie, 'images', 'Camera' + str(camera_num)))
 
 
 def count_number_of_files(path):

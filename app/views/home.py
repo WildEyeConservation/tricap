@@ -5,13 +5,14 @@ import io
 import subprocess
 from urllib.request import urlopen
 from flask import Blueprint, render_template, send_from_directory, current_app, request, jsonify
-from flask import send_file, redirect, url_for
+from flask import send_file, redirect, url_for, send_from_directory
 
 from app import tricap_manager, altimeter, altimeter_switch, session_logger, talkbox, log_list, stop_all_threads
 from app import rootlogger, fetch_stopper, use_dummy_cams
 
 from support.configure import TricapConfig
 from support.sms_sender import SMSSender
+import shutil, platform
 from support.camera_data import ParseData
 
 from config import BUTTON_CODE, CAM_MANAGER_STATES, ALTIMETER_STATE
@@ -32,6 +33,7 @@ ALTI_STATE_COLOURS = ['dummy', 'red', 'orange', 'green', 'red']
 def index_slash():
     """Redirect request to the proper index page."""
     return index()
+
 
 @home_bp.route('/index', methods=['GET'])
 def index():
@@ -270,6 +272,16 @@ def reset():
     flask_reset_func()
     return redirect(url_for('home.index'))
 
+
+@home_bp.route('/logs', methods=['GET', 'POST'])
+def download():
+    uploads = os.path.join(os.getcwd(), "logs")
+    if platform.system() == 'Windows':
+        shutil.make_archive("logs", 'zip', uploads)
+        return send_from_directory(directory=os.getcwd(), filename="logs.zip")
+    else:
+        shutil.make_archive("logs", 'gztar', uploads)
+        return send_from_directory(directory=os.getcwd(), filename="logs.tar.gz")
 
 @home_bp.route('/_shutdown')
 def shutdown():

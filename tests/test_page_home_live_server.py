@@ -37,7 +37,7 @@ class TestLiveServerHome(TriCapLiveServerTestCase):
         self.assertEqual(sys_msgs[0].get_attribute('value'), 'No errors to report')
 
     def test_camera_msg(self):
-        """If camera page is requested then 1 of two pages can be shown"""
+        """If camera page is requested then one of two pages can be shown. Either camera detail or wait page is shown"""
 
         triconfig = TricapConfig()
         web_settings = triconfig.get_section_dict(TricapConfig.WEB_SECTION_HEADER)
@@ -73,7 +73,6 @@ class TestLiveServerHome(TriCapLiveServerTestCase):
 
         h_main_status = self.driver.find_element_by_id('wait_mes')
         self.assertEqual(h_main_status.get_attribute('innerHTML'), 'Please wait until cameras has stopped capturing')
-
 
     def test_shutdown(self):
         """Test to see if shutdown is pressed and signal is received"""

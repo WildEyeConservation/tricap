@@ -1,3 +1,4 @@
+"""Script to create a .exe of the SD_card_reader.py script"""
 from cx_Freeze import setup, Executable
 
 base = None

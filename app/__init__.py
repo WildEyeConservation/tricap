@@ -24,6 +24,7 @@ from support.talkbox import TalkBox
 from support.log_list import LogListAccessor
 from support.basic import TimeMonitor, PeriodicMonitor
 from support.sms_sender import SMSObserver
+from support.git_info import GitData
 
 from support.connection_monitor import generate_net_monitor, NetworkMonitorLogger
 from support.connection_monitor import generate_ip_monitor, IPMonitorLogger
@@ -162,6 +163,7 @@ if init_config.get('cams_required', TricapConfig.WEB_SECTION_HEADER) == 'dummy':
 else:
     use_dummy_cams = False
     rootlogger.debug('Real cams will be used, in accordance to configuration')
+    code_inf = GitData()
 
 tricap_manager = TriCapCamsManager(misc_settings, cam_settings, use_dummy_cams)
 tricap_cameras = tricap_manager.get_cameras_as_list()
@@ -240,6 +242,11 @@ sms_observer = SMSObserver(time_mon, [cam_img_num_mon, alti_mon], send_on_start=
 cam_img_num_mon.start()
 alti_mon.start()
 time_mon.start()
+
+if use_dummy_cams == False:
+    rootlogger.info("Git version: " + code_inf.code_id())
+else:
+    rootlogger.info("Git version: " + "DummyGit1234")
 
 
 # some glue functions, which use the module level functions

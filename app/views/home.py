@@ -13,7 +13,6 @@ from app import rootlogger, fetch_stopper, use_dummy_cams
 from support.configure import TricapConfig
 from support.sms_sender import SMSSender
 import shutil, platform
-from support.camera_data import ParseData
 
 from config import BUTTON_CODE, CAM_MANAGER_STATES, ALTIMETER_STATE
 from config import OVERRIDESTATE
@@ -58,12 +57,6 @@ def index():
     if cams_start_display.lower() == 'open':
         for cam in tricap_manager.get_cameras_as_list():
             cam._camera.fetch_state = True
-
-    # for cameraNumber in range(3):
-    #     camera_serial_numbers[cameraNumber] = ParseData.parse_serial_number(cameraNumber)
-    # camera_serial_numbers[0] = "Left"
-    # camera_serial_numbers[1] = "Centre"
-    # camera_serial_numbers[2] = "Right"
 
     return render_template('/home/index.html', num_cams=tricap_manager.get_num_cams(),
                            cams_start_display=cams_start_display,
@@ -273,7 +266,7 @@ def reset():
     return redirect(url_for('home.index'))
 
 
-@home_bp.route('/logs', methods=['GET', 'POST'])
+@home_bp.route('/logs', methods=['GET'])
 def download():
     uploads = os.path.join(os.getcwd(), "logs")
     if platform.system() == 'Windows':
@@ -288,15 +281,16 @@ def shutdown():
     """Shut down the RPi server from the gui"""
     if tricap_manager.state != CAM_MANAGER_STATES.STARTED:
         if use_dummy_cams:
+            # Used only for testing purposes
             return '<h1 id="shutdown">Shutting down server</h1>'
         else:
             rootlogger.info("User requested a shutdown of TriCap")
-            command = "/usr/bin/sudo /sbin/poweroff"# "/usr/bin/sudo /sbin/shutdown -r now"
+            command = "/usr/bin/sudo /sbin/poweroff"
             import subprocess
 
             while True:
                 process = subprocess.Popen(command.split(), stdout=subprocess.PIPE)
-                output = process.communicate()[0]
+                output = process.communicate()[0]  # Execute the command
             return "Shutting down server"
     else:
         return render_template("/camera/wait.html")

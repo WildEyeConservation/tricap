@@ -2,20 +2,10 @@ from flask import Blueprint, redirect, url_for, render_template, request
 
 from support.configure import TricapConfig
 from support.git_info import GitData
-from app import tricap_manager
+from app import tricap_manager, use_dummy_cams
 from config import CAM_MANAGER_STATES
 
 camera_bp = Blueprint('camera', __name__)
-
-
-def using_dummy_camera():
-    triconfig = TricapConfig()
-    web_settings = triconfig.get_section_dict(TricapConfig.WEB_SECTION_HEADER)
-    dummy = web_settings['cams_required']
-    if dummy == "dummy":
-        return True
-    else:
-        return False
 
 
 @camera_bp.route('/camera')
@@ -27,7 +17,7 @@ def camera():
     free_space_parse = [""] * 3
     battery_parse = [""] * 3
 
-    if using_dummy_camera() == False:
+    if not use_dummy_cams:
         from support.camera_data import ParseData
         camera_data = ParseData()
         code_inf = GitData()

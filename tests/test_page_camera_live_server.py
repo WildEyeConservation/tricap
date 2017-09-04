@@ -23,7 +23,6 @@ class TestLiveServerCamera(TriCapLiveServerTestCase):
         triconfig.save_to_file()
 
         self.start_server()
-        # Get local server page and test for no error messages
         self.open_page(self.get_camera_url(), wait_for_element_id='rig_info')
         sleep(1)
         h_main_status = self.driver.find_element_by_id('h_camera_status')

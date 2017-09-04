@@ -3,9 +3,9 @@
 //  (the $() is short for $(document).ready())
 
 var batteryWarning = 50; // Below 50 percent
-var spaceWarning = 100000; // Below +-145Gb
-//var battery0 = parseInt({{battery[0]}})
+var spaceWarning = 100000; // Below +-100Gb
 
+//Jquery code to determine the state of the camera
 $(function(){
     // Check for low battery
     if({{battery[0]}} < batteryWarning || {{free_space[0]}} < spaceWarning){
@@ -31,14 +31,4 @@ $(function(){
         $('#back_camera').removeClass('alert-danger');
         $('#back_camera').addClass('alert-info');
     }
-
-//    $('#home_button').click(function{
-//        $('#home_button').css("color", "yellow");
-//    });
-//
-//    $("#home_button").hover(function(){
-//        $(this).css("background-color", "yellow");
-//        }, function(){
-//        $(this).css("background-color", "orange");
-//    });
 });

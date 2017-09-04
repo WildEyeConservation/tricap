@@ -1,3 +1,5 @@
+"""Script used to copy all the data from the SD cards to an internal drive and external drive"""
+
 import psutil, shutil, datetime, progressbar, threading, os.path
 import time, exifread, platform
 from math import ceil
@@ -11,6 +13,7 @@ path_count = 0
 path_common = ['100CANON', '101CANON', '102CANON', '103CANON', '104CANON']
 
 
+# Copy directory from source to destination
 def copy_directory(source, destination):
     try:
         shutil.copytree(source, destination)
@@ -22,19 +25,21 @@ def copy_directory(source, destination):
         print('Directory not copied. Error: %s' % e)
 
 
+# Thread used to copy directories at the same time
 def copy_thread(drive, camera_num):
-    print(drive)
+    # print(drive)
     copy_directory(os.path.join(sd_card_list[camera_num], 'DCIM'),
                    os.path.join(drive, str(datetime.date.today()), Sortie, 'images', 'Camera' + str(camera_num)))
 
 
+# Count the number of files in a folder at a certain moment
 def count_number_of_files(path):
     total_number_of_files = len([f for f in os.listdir(path)
                                  if os.path.isfile(os.path.join(path, f))])
     return total_number_of_files
 
 # ******************************************************************************************************************** #
-# Start the program
+# Start the program and show partitions to the user
 print("Starting")
 storage_drives = psutil.disk_partitions()
 for k in range(storage_drives.__len__()):
@@ -43,6 +48,7 @@ for k in range(storage_drives.__len__()):
     else:
         print(str(k) + ": " + str(storage_drives[k].mountpoint) + "\n")
 
+# Get input from the user for the internal, external and SD cards
 internal = int(input("Choose internal drive from list above and enter number: "))
 storage_drives[0], storage_drives[internal] = storage_drives[internal], storage_drives[0]
 external = int(input("Choose external drive from list above and enter number: "))
@@ -63,7 +69,7 @@ for n in range(sd_card_list.__len__()):
     for m in range(5):
         if os.path.isdir(os.path.join(sd_card_list[n], "DCIM", "10" + str(m) + "CANON")):
             path_list.append(os.path.join(sd_card_list[n], "DCIM", "10" + str(m) + "CANON"))
-print(path_list)
+# print(path_list)
 
 for j in range(sd_card_list.__len__()):
     first_file = os.listdir(os.path.join(sd_card_list[j], 'DCIM', '100CANON'))[0]  # Put in threads area
@@ -87,22 +93,25 @@ if sd_card_list.__len__() == 3:
             sd_card_list[2], sd_card_list[j] = sd_card_list[j], sd_card_list[2]
 print(camera_serial_number)
 
+# Count the total amount of files to be transferred
 for path_number in range(path_list.__len__()):
     path = os.path.join(path_list[path_number])
     temp_num_files = len([f for f in os.listdir(path)
                           if os.path.isfile(os.path.join(path, f))])
     num_files += temp_num_files
 
+# Determine the Sortie of the day
 Sortie = "Sortie0"
 nums = 0
 if os.path.isdir(os.path.join(storage_drives[1].mountpoint, str(datetime.date.today()), 'Sortie0')):
     while os.path.isdir(os.path.join(storage_drives[1].mountpoint, str(datetime.date.today()), Sortie)):
         nums += 1
         Sortie = "Sortie" + str(nums)
-print(Sortie)
+# print(Sortie)
 
+# Start the multi-threads to copy the data
 for j in range(sd_card_list.__len__()):  # starts two threads per drive_list
-    print("Copying " + sd_card_list[j] + " to:")
+    # print("Copying " + sd_card_list[j] + " to:")
     threads0 = threading.Thread(target=copy_thread, args=(storage_drives[0].mountpoint, j,))  # Internal drive
     threads0.start()
     threads1 = threading.Thread(target=copy_thread, args=(storage_drives[1].mountpoint, j,))  # External drive
@@ -111,7 +120,7 @@ for j in range(sd_card_list.__len__()):  # starts two threads per drive_list
 print("File copy started.")
 time.sleep(2)
 
-# Progressbar time is calculated on external time
+# Show the progress of the copy. Progressbar time is calculated on external drive copy time
 bar = progressbar.ProgressBar(maxval=num_files)
 try:
     for copied in bar(range(num_files)):
@@ -142,4 +151,4 @@ for drive_num in range(2):
         os.rename(os.path.join(storage_drives[drive_num].mountpoint, str(datetime.date.today()), Sortie, 'images', 'Camera2'),
                   os.path.join(storage_drives[drive_num].mountpoint, str(datetime.date.today()), Sortie, 'images', 'Camera Right'))
 
-print("\n\nFinished")
+print("\n\nFinished Copying")

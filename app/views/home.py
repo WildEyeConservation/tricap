@@ -276,6 +276,8 @@ def download():
         shutil.make_archive("logs", 'zip', uploads)
         return send_from_directory(directory=os.getcwd(), filename="logs.zip")
     else:
+        os.chdir("/home/rpi3/Projects/tricap/tricap/")
+        uploads = os.path.join(os.getcwd(), "logs")
         shutil.make_archive("logs", 'gztar', uploads)
         return send_from_directory(directory=os.getcwd(), filename="logs.tar.gz")
 

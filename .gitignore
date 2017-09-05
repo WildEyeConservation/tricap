@@ -43,4 +43,5 @@ pylintrc
 test_local.py
 delete_log_files.py
 SD_card_reader.spec
+setup.py
 *.coverage

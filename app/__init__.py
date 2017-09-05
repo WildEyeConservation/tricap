@@ -163,7 +163,7 @@ if init_config.get('cams_required', TricapConfig.WEB_SECTION_HEADER) == 'dummy':
 else:
     use_dummy_cams = False
     rootlogger.debug('Real cams will be used, in accordance to configuration')
-    code_inf = GitData()
+    # code_inf = GitData()
 
 tricap_manager = TriCapCamsManager(misc_settings, cam_settings, use_dummy_cams)
 tricap_cameras = tricap_manager.get_cameras_as_list()
@@ -243,10 +243,10 @@ cam_img_num_mon.start()
 alti_mon.start()
 time_mon.start()
 
-if use_dummy_cams == False:
-    rootlogger.info("Git version: " + code_inf.code_id())
-else:
-    rootlogger.info("Git version: " + "DummyGit1234")
+# if use_dummy_cams == False:
+#     rootlogger.info("Git version: " + code_inf.code_id())
+# else:
+#     rootlogger.info("Git version: " + "DummyGit1234")
 
 
 # some glue functions, which use the module level functions

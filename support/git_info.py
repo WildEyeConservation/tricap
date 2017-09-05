@@ -16,7 +16,6 @@ class GitData():
         while self.log[self.index] != ' ' and self.log[self.index] != '\\':
             self.parse_id += str(self.log[self.index])
             self.index += 1
-        print(self.parse_id)
         return self.parse_id
 
     def code_date(self):
@@ -24,7 +23,6 @@ class GitData():
         while self.log[self.index] != '\\':
             self.parse_date += str(self.log[self.index])
             self.index += 1
-        print(self.parse_date)
         return self.parse_date
 
 # parser = Git()

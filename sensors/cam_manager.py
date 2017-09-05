@@ -186,13 +186,16 @@ class TriCapCamsManager:
             else:
                 barrier = threading.Barrier(len(self._cameras))
 
-            for cam in self._cameras:
-                thread = threading.Thread(target=cam.capture, daemon=True,
+            for cam in self._cameras:  # self.thread was thread
+                self.thread = threading.Thread(target=cam.capture, daemon=True,
                                           kwargs={"continuous": True, "barrier": barrier,
                                                   "stop_event": self._kill_pill})
-                thread.start()
+                self.thread.start()
             self.state = CAM_MANAGER_STATES.STARTED
             self._logger.debug('Cam manager - capture threads started.')
+
+    def check_thread_status(self):
+        return self.thread.isAlive()
 
     def stop_capturing(self):
         if self.state == CAM_MANAGER_STATES.STARTED:

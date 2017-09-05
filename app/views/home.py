@@ -138,6 +138,9 @@ def provide_state_data():
     sys_msgs = log_list.get_msgs()
     sys_data = {'msgs': sys_msgs}
 
+    if tricap_manager.get_state() == CAM_MANAGER_STATES.STARTED:
+        print(tricap_manager.check_thread_status())
+
     data = {'alti': alti_data,
             'cams': cam_data,
             'talk': talk_data,
@@ -243,7 +246,6 @@ def _has_capture_started():
             return False
 
     # if a sensor is required, then capture has not started
-
     if (alti_a_must and not alti_started):
         return False
 

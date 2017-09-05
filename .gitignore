@@ -13,6 +13,7 @@
 /htmlcov
 /coverage_html
 node_modules
+/build
 
 
 # !.gitignore
@@ -41,4 +42,5 @@ initial.cfg
 pylintrc
 test_local.py
 delete_log_files.py
+SD_card_reader.spec
 *.coverage

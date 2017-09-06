@@ -34,7 +34,7 @@ class SMSSender(object):
             return True
         else:
             # Not sure if we can ever reach this
-            logging.getLogger('').warning("SMSGateway did not succesfully send sms: %s", lines)
+            logging.getLogger('').warning("SMSGateway did not successfully send sms: %s", lines)
             return False
 
     def send(self, msg):

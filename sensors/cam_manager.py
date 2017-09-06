@@ -157,7 +157,7 @@ class TriCapCamsManager:
         for index, cam in enumerate(self._cameras):
             fp = cam.capture_and_download(target_folder=SESSION_ROOT_DIR, target_name=str(index)+'.CR2')
             with open(fp, 'rb') as im_f:
-                tags = exifread.process_file(im_f)
+                tags = exifread.process_file(im_f, stop_tag="GPS GPSLongitude")  # Reduce time of execution by adding a stop tag
                 if 'GPS GPSLongitude' in tags.keys():
                     gps_status_of_cams.append(True)
                 else:

@@ -62,12 +62,14 @@ class WebSettingHandler:
         """Constructor."""
         self.config = config
 
+
 # TODO SMS Settings Handler should get its settings from the actual sms objects
 class SMSSettingHandler:
     """Handles all settings to do with the SMS interface (just a dictionary at the moment)."""
     def __init__(self, config):
         """Constructor."""
         self.config = config
+
 
 def populate_form_section(sdict, handler, form_selects, form_strings, set_data=True):
     """Populate the settings section of the form."""
@@ -111,22 +113,27 @@ def get_form_for_display(config_fp=CONFIG_FP, set_data=True):
 
     # Populate the form
     cam_dict = config.get_section_dict(TricapConfig.CAMERA_SECTION_HEADER)
+    cam_dict = dict(sorted(cam_dict.items()))
     populate_form_section(cam_dict, tricap_manager, form.cam_selects, form.cam_strings, set_data)
 
     alti_dict = config.get_section_dict(TricapConfig.ALTI_SECTION_HEADER)
+    alti_dict = dict(sorted(alti_dict.items()))
     populate_form_section(alti_dict, altimeter, form.alti_selects, form.alti_strings, set_data)
 
     misc_setting_handler = MiscSettingHandler()
     misc_dict = config.get_section_dict(TricapConfig.MISC_SECTION_HEADER)
+    misc_dict = dict(sorted(misc_dict.items()))
     populate_form_section(misc_dict, misc_setting_handler, form.misc_selects, form.misc_strings,
                           set_data)
 
     web_dict = config.get_section_dict(TricapConfig.WEB_SECTION_HEADER)
+    web_dict = dict(sorted(web_dict.items()))
     web_setting_handler = WebSettingHandler(web_dict)
     populate_form_section(web_dict, web_setting_handler, form.web_selects, form.web_strings,
                           set_data)
 
     sms_dict = config.get_section_dict(TricapConfig.SMS_SECTION_HEADER)
+    sms_dict = dict(sorted(sms_dict.items()))
     sms_setting_handler = SMSSettingHandler(sms_dict)
     populate_form_section(sms_dict, sms_setting_handler, form.sms_selects, form.sms_strings,
                           set_data)

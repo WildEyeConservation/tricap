@@ -291,7 +291,6 @@ def shutdown():
         else:
             rootlogger.info("User requested a shutdown of TriCap")
             command = "/usr/bin/sudo /sbin/poweroff"
-            import subprocess
 
             while True:
                 process = subprocess.Popen(command.split(), stdout=subprocess.PIPE)

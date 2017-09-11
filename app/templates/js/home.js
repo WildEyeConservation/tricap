@@ -251,7 +251,7 @@ var updateAlti = function(data){
     if(data.switch_state == 'True') { //See switch state to determine if the camera should capture
         //changeMainStatus('green', 'TriCap: Capturing data of cameras');
         changeMainStatus('green', methodOfCapture.concat("Capturing"));
-    } else if(data.measurement > 10) {
+    } else if(data.measurement > 0) {
         changeMainStatus('orange', methodOfCapture.concat('NOT capturing'));
     } else {
         changeMainStatus('green', 'TriCap');

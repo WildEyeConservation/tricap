@@ -228,7 +228,7 @@ def _has_capture_started():
         if str(altimeter.get_error()) == "01":
             tricap_manager.start_capturing()
         else:
-            str(altimeter.get_error())
+            print(str(altimeter.get_error()))
 
     # Include here the function to return false if switch is off
     altimeter_switch.set_state(altimeter_switch.get_override_state())

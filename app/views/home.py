@@ -224,6 +224,12 @@ def _has_capture_started():
 
     config = TricapConfig()
 
+    if str(altimeter.get_error()) != "":
+        if str(altimeter.get_error()) == "01":
+            tricap_manager.start_capturing()
+        else:
+            str(altimeter.get_error())
+
     # Include here the function to return false if switch is off
     altimeter_switch.set_state(altimeter_switch.get_override_state())
     if altimeter_switch.state() == False \
@@ -243,7 +249,9 @@ def _has_capture_started():
     if (config.get('alti_required', TricapConfig.WEB_SECTION_HEADER) == 'yes'):
         alti_a_must = True
 
-    if altimeter_switch.get_override_state() != OVERRIDESTATE.STOPOVERRIDE.value or str(altimeter.get_error()) == "01":  # = 1
+
+# or str(altimeter.get_error()) == "10"
+    if altimeter_switch.get_override_state() != OVERRIDESTATE.STOPOVERRIDE.value:  # = 1
         tricap_manager.start_capturing()
 
     # if non of the sensors are required, then at least one has had to have started

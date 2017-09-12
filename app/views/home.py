@@ -13,6 +13,8 @@ from app import rootlogger, fetch_stopper, use_dummy_cams
 from support.configure import TricapConfig
 from support.sms_sender import SMSSender
 import shutil, platform
+import local_paths
+import datetime
 
 from config import BUTTON_CODE, CAM_MANAGER_STATES, ALTIMETER_STATE
 from config import OVERRIDESTATE
@@ -37,6 +39,7 @@ def index_slash():
 @home_bp.route('/index', methods=['GET'])
 def index():
     """The Main GUI interface page."""
+    session_logger.create_new_session()
     rootlogger.info('Home Page Requested.')
 
     config = TricapConfig()
@@ -129,6 +132,9 @@ def provide_state_data():
     cam_data = {'image_counts': cam_image_counts,
                 'overall_cam_state_colour': _determine_overall_cam_state_colour(),
                 'capture_started': _has_capture_started()}
+
+    # if cam_data['capture_started'] == True:
+    #     session_logger.create_new_session()
 
     talk_msgs_strs = [talk_msg.msg for talk_msg in talkbox.talk_msgs]
     talk_msgs_reply_codes = [talk_msg.reply.value for talk_msg in talkbox.talk_msgs]
@@ -269,17 +275,43 @@ def reset():
     return redirect(url_for('home.index'))
 
 
-@home_bp.route('/logs', methods=['GET'])
-def download():
-    uploads = os.path.join(os.getcwd(), "logs")
+@home_bp.route('/logs/<string:date>', methods=['GET', 'POST'])
+def downloads(date):
+    # Use variable to access the date of the log
+    uploads = os.path.join(local_paths.SESSION_ROOT_DIR, date)
     if platform.system() == 'Windows':
         shutil.make_archive("logs", 'zip', uploads)
         return send_from_directory(directory=os.getcwd(), filename="logs.zip")
     else:
-        os.chdir("/home/rpi3/Projects/tricap/tricap/")
-        uploads = os.path.join(os.getcwd(), "logs")
+        os.chdir(local_paths.SESSION_ROOT_DIR)
+        #uploads = os.path.join(os.getcwd(), "logs")
         shutil.make_archive("logs", 'gztar', uploads)
-        return send_from_directory(directory=os.getcwd(), filename="logs.tar.gz")
+        return send_from_directory(directory=local_paths.SESSION_ROOT_DIR, filename="logs.tar.gz")
+
+
+# url_for does not work with variable to access different logs
+@home_bp.route('/logs/', methods=['GET', 'POST'])
+def download():
+    date = str(datetime.date.today())
+    uploads = os.path.join(local_paths.SESSION_ROOT_DIR, date)
+    if platform.system() == 'Windows':
+        shutil.make_archive("logs", 'zip', uploads)
+        return send_from_directory(directory=os.getcwd(), filename="logs.zip")
+    else:
+        os.chdir(local_paths.SESSION_ROOT_DIR)
+        # uploads = os.path.join(os.getcwd(), "logs")
+        shutil.make_archive("logs", 'gztar', uploads)
+        return send_from_directory(directory=local_paths.SESSION_ROOT_DIR, filename="logs.tar.gz")
+
+    # uploads = os.path.join(os.getcwd(), "logs")
+    # if platform.system() == 'Windows':
+    #     shutil.make_archive("logs", 'zip', uploads)
+    #     return send_from_directory(directory=os.getcwd(), filename="logs.zip")
+    # else:
+    #     os.chdir("/home/rpi3/Projects/tricap/tricap/")
+    #     uploads = os.path.join(os.getcwd(), "logs")
+    #     shutil.make_archive("logs", 'gztar', uploads)
+    #     return send_from_directory(directory=os.getcwd(), filename="logs.tar.gz")
 
 @home_bp.route('/_shutdown')
 def shutdown():
@@ -306,7 +338,7 @@ def handle_button_click():
 
     if button_code == BUTTON_CODE.START:
         rootlogger.info('User requested capture to start.')
-        session_logger.create_new_session()
+        # session_logger.create_new_session()
         tricap_manager.start_capturing()
         altimeter_switch.set_override_state(OVERRIDESTATE.ALTISWITCH.value)
         #altimeter.start_measuring()
@@ -332,7 +364,7 @@ def handle_button_click():
             altimeter_switch.set_override_state(OVERRIDESTATE.STOPOVERRIDE.value)# stop capturing data
         else:  # we want to start
             rootlogger.info('User requested capture to start.')
-            session_logger.create_new_session()
+            # session_logger.create_new_session()
             config = TricapConfig()
             if (config.get('cams_required', TricapConfig.WEB_SECTION_HEADER) != 'no'):
                 tricap_manager.start_capturing()

@@ -11,6 +11,7 @@ import platform
 from math import ceil
 import logging
 
+# Variables accessible throughout the whole program
 sd_card_list = []
 Sortie = "Sortie0"
 
@@ -28,10 +29,15 @@ def copy_directory(source, destination):
 
 
 # Thread used to copy directories at the same time
-def copy_thread(drive, camera_num):
+def copy_thread(drive, camera_num, lock):
     # print(drive)
-    copy_directory(os.path.join(sd_card_list[camera_num], 'DCIM'),
-                   os.path.join(drive, str(datetime.date.today()), Sortie, 'images', 'Camera' + str(camera_num)))
+
+    lock.acquire()
+    try:
+        copy_directory(os.path.join(sd_card_list[camera_num], 'DCIM'),
+                       os.path.join(drive, str(datetime.date.today()), Sortie, 'images', 'Camera' + str(camera_num)))
+    finally:
+        lock.release()
 
 
 # Count the number of files in a folder at a certain moment
@@ -144,36 +150,44 @@ def main():
             Sortie = "Sortie" + str(nums)
     print("sortie: " + Sortie)
 
-    # Start the multi-threads to copy the data
-    #for j in range(sd_card_list.__len__()):  # starts two threads per drive_list
-    # print("Copying " + sd_card_list[j] + " to:")
-    # threads0 = threading.Thread(target=copy_thread, args=(storage_drives[0].mountpoint, j,))
-    # threads1 = threading.Thread(target=copy_thread, args=(storage_drives[1].mountpoint, j,))
-    threads0 = threading.Thread(target=copy_thread, args=(storage_drives[0].mountpoint, 0,))  # Internal drive
+# Locks are added to ensure only the necessary processes are running to increase the efficiency as much as possible
+# Only two copy threads are running at a time between the drives and the SD cards
+    lock0 = threading.Lock()
+    lock1 = threading.Lock()
+
+    threads0 = threading.Thread(target=copy_thread, args=(storage_drives[0].mountpoint, 0, lock0,))  # Internal drive
     threads0.start()
+    if len(sd_card_list) == 1:
+        threads1 = threading.Thread(target=copy_thread, args=(storage_drives[1].mountpoint, 0, lock1,))  # External drive
+        threads1.start()
     #print("SD: " + str(len(sd_card_list)))
     if len(sd_card_list) == 2:
-        threads1 = threading.Thread(target=copy_thread, args=(storage_drives[1].mountpoint, 1,))  # External drive
-        threads2 = threading.Thread(target=copy_thread, args=(storage_drives[0].mountpoint, 1,))
-        threads3 = threading.Thread(target=copy_thread, args=(storage_drives[1].mountpoint, 0,))
+        threads1 = threading.Thread(target=copy_thread, args=(storage_drives[1].mountpoint, 1, lock1,))  # External drive
+        threads2 = threading.Thread(target=copy_thread, args=(storage_drives[0].mountpoint, 1, lock0,))
+        threads3 = threading.Thread(target=copy_thread, args=(storage_drives[1].mountpoint, 0, lock1,))
         threads1.start()
+        threads2.start()
+        threads3.start()
     if len(sd_card_list) == 3:
-        threads1 = threading.Thread(target=copy_thread, args=(storage_drives[1].mountpoint, 1,))  # External drive
-        threads2 = threading.Thread(target=copy_thread, args=(storage_drives[0].mountpoint, 2,))
-        threads3 = threading.Thread(target=copy_thread, args=(storage_drives[1].mountpoint, 0,))
-        threads4 = threading.Thread(target=copy_thread, args=(storage_drives[0].mountpoint, 1,))
-        threads5 = threading.Thread(target=copy_thread, args=(storage_drives[1].mountpoint, 2,))
+        threads1 = threading.Thread(target=copy_thread, args=(storage_drives[1].mountpoint, 1, lock1,))  # External drive
+        threads2 = threading.Thread(target=copy_thread, args=(storage_drives[0].mountpoint, 2, lock0,))
+        threads3 = threading.Thread(target=copy_thread, args=(storage_drives[1].mountpoint, 0, lock1,))
+        threads4 = threading.Thread(target=copy_thread, args=(storage_drives[0].mountpoint, 1, lock0,))
+        threads5 = threading.Thread(target=copy_thread, args=(storage_drives[1].mountpoint, 2, lock1,))
         threads1.start()
+        threads2.start()
+        threads3.start()
+        threads4.start()
+        threads5.start()
 
     print("File copy started.")
-    # print(threading.active_count())
+    print("Active: " + str(threading.active_count()))
     time.sleep(2)
-    token = 4*[False]
 
     # Show the progress of the copy. Progressbar time is calculated on external drive copy time
-    bar = progressbar.ProgressBar(maxval=num_files)
+    bar = progressbar.ProgressBar(maxval=2*num_files)
     try:
-        for copied in bar(range(num_files)):
+        for copied in bar(range(2*num_files)):
             copied = 0
             for index in range(ceil(len(path_list)/len(sd_card_list))):
                 if os.path.isdir(os.path.join(storage_drives[1].mountpoint, str(datetime.date.today()), Sortie, 'images', 'Camera0', path_common[index])):
@@ -183,26 +197,13 @@ def main():
                 if os.path.isdir(os.path.join(storage_drives[1].mountpoint, str(datetime.date.today()), Sortie, 'images', 'Camera2', path_common[index])):
                     copied += count_number_of_files(os.path.join(storage_drives[1].mountpoint, str(datetime.date.today()), Sortie, 'images', 'Camera2', path_common[index]))
 
-    # Start new threads when old threads has stopped
-            if len(sd_card_list) > 1:
-                if not threads0.isAlive() and not threads2.isAlive() and not token[0]:
-                    threads2.start()
-                    token[0] = True
-                if not threads1.isAlive() and not threads3.isAlive() and not token[1]:
-                    threads3.start()
-                    token[1] = True
-            if len(sd_card_list) > 2:
-                if not threads0.isAlive() and not threads2.isAlive() and not threads4.isAlive() and not token[2]:
-                    threads4.start()
-                    token[2] = True
-                if not threads1.isAlive() and not threads3.isAlive() and not threads5.isAlive() and not token[3]:
-                    threads5.start()
-                    token[3] = True
-            elif len(sd_card_list) == 1:
-                if not token[0]:
-                    threads1 = threading.Thread(target=copy_thread, args=(storage_drives[1].mountpoint, 0,))  # Internal drive
-                    threads1.start()
-                    token[0] = True
+            for index in range(ceil(len(path_list)/len(sd_card_list))):
+                if os.path.isdir(os.path.join(storage_drives[0].mountpoint, str(datetime.date.today()), Sortie, 'images', 'Camera0', path_common[index])):
+                    copied += count_number_of_files(os.path.join(storage_drives[0].mountpoint, str(datetime.date.today()), Sortie, 'images', 'Camera0', path_common[index]))
+                if os.path.isdir(os.path.join(storage_drives[0].mountpoint, str(datetime.date.today()), Sortie, 'images', 'Camera1', path_common[index])):
+                    copied += count_number_of_files(os.path.join(storage_drives[0].mountpoint, str(datetime.date.today()), Sortie, 'images', 'Camera1', path_common[index]))
+                if os.path.isdir(os.path.join(storage_drives[0].mountpoint, str(datetime.date.today()), Sortie, 'images', 'Camera2', path_common[index])):
+                    copied += count_number_of_files(os.path.join(storage_drives[0].mountpoint, str(datetime.date.today()), Sortie, 'images', 'Camera2', path_common[index]))
 
             bar.update(copied)
             logging.info("Copied: " + str(copied) + " images at " + str(datetime.datetime.now().strftime("%H:%M:%S")))
@@ -211,15 +212,6 @@ def main():
         pass
 
     # Rename folder to make more sense for the user
-    while threads0.isAlive() or threads1.isAlive():
-        pass
-    if len(sd_card_list) > 1:
-        while threads2.isAlive() or threads3.isAlive():
-            pass
-    if len(sd_card_list) > 2:
-        while threads4.isAlive() or threads5.isAlive():
-            pass
-
     for drive_num in range(2):
         if os.path.isdir(os.path.join(storage_drives[drive_num].mountpoint, str(datetime.date.today()), Sortie, 'images', 'Camera0')):
             os.rename(os.path.join(storage_drives[drive_num].mountpoint, str(datetime.date.today()), Sortie, 'images', 'Camera0'),
@@ -232,7 +224,7 @@ def main():
                       os.path.join(storage_drives[drive_num].mountpoint, str(datetime.date.today()), Sortie, 'images', 'Camera Right'))
 
     logging.info("Copying program ended at: " + str(datetime.datetime.now()))
-    print("\n\nFinished Copying")
+    print("\nFinished Copying")
 
 # Start main program
 if __name__ == '__main__':

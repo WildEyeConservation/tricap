@@ -234,6 +234,7 @@ def _has_capture_started():
     cams_started = tricap_manager.state == CAM_MANAGER_STATES.STARTED
     alti_started = altimeter.state == ALTIMETER_STATE.MEASURING
 
+
     cams_a_must = False
     if config.get('cams_required', TricapConfig.WEB_SECTION_HEADER) == 'yes':
         cams_a_must = True
@@ -242,7 +243,7 @@ def _has_capture_started():
     if (config.get('alti_required', TricapConfig.WEB_SECTION_HEADER) == 'yes'):
         alti_a_must = True
 
-    if altimeter_switch.get_override_state() != OVERRIDESTATE.STOPOVERRIDE.value:  # = 1
+    if altimeter_switch.get_override_state() != OVERRIDESTATE.STOPOVERRIDE.value or str(altimeter.get_error()) == "01":  # = 1
         tricap_manager.start_capturing()
 
     # if non of the sensors are required, then at least one has had to have started
@@ -281,12 +282,12 @@ def downloads(date):
     uploads = os.path.join(local_paths.SESSION_ROOT_DIR, date)
     if platform.system() == 'Windows':
         shutil.make_archive("logs", 'zip', uploads)
-        return send_from_directory(directory=os.getcwd(), filename="logs.zip")
+        return send_from_directory(directory=os.getcwd(), filename="logs.zip", as_attachment=True)
     else:
         os.chdir(local_paths.SESSION_ROOT_DIR)
         #uploads = os.path.join(os.getcwd(), "logs")
         shutil.make_archive("logs", 'gztar', uploads)
-        return send_from_directory(directory=local_paths.SESSION_ROOT_DIR, filename="logs.tar.gz")
+        return send_from_directory(directory=local_paths.SESSION_ROOT_DIR, filename="logs.tar.gz", as_attachment=True)
 
 
 # url_for does not work with variable to access different logs
@@ -296,12 +297,12 @@ def download():
     uploads = os.path.join(local_paths.SESSION_ROOT_DIR, date)
     if platform.system() == 'Windows':
         shutil.make_archive("logs", 'zip', uploads)
-        return send_from_directory(directory=os.getcwd(), filename="logs.zip")
+        return send_from_directory(directory=os.getcwd(), filename="logs.zip", as_attachment=True)
     else:
         os.chdir(local_paths.SESSION_ROOT_DIR)
         # uploads = os.path.join(os.getcwd(), "logs")
         shutil.make_archive("logs", 'gztar', uploads)
-        return send_from_directory(directory=local_paths.SESSION_ROOT_DIR, filename="logs.tar.gz")
+        return send_from_directory(directory=local_paths.SESSION_ROOT_DIR, filename="logs.tar.gz", as_attachment=True)
 
     # uploads = os.path.join(os.getcwd(), "logs")
     # if platform.system() == 'Windows':

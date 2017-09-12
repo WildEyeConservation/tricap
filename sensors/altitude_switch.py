@@ -12,7 +12,7 @@ from config import OVERRIDESTATE
 class AltiSwitch(Observer):
     _logger = logging.getLogger(__name__)  # start the logger
 
-    def __init__(self, sensor_class): #Constructor for alti switch
+    def __init__(self, sensor_class):  # Constructor for alti switch
         super().__init__()  # get variables from parent class
         self.alti = sensor_class  # SimulatorAlti(settings)
         self.alti_switch_state = False  # start with altimeter switch as off

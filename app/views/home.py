@@ -173,7 +173,7 @@ def _check_gps():
 @home_bp.route('/_send_sms')
 def _send_sms():
     sms_sender = SMSSender()
-    flag = sms_sender.send('Test Message from TriCap.')
+    flag = sms_sender.send('Test Message from TriCap.') # Mesage?
     data = {}
     data['success'] = flag
     if flag:
@@ -226,13 +226,11 @@ def _has_capture_started():
 
     if altimeter.get_error_start() == True:
         tricap_manager.start_capturing()
-        print("Started")
         return True
 
     if str(altimeter.get_error()) != "":
         if str(altimeter.get_error()) == "01":
             tricap_manager.start_capturing()
-            print("Start")  # Debug code
             return True
         else:
             print(str(altimeter.get_error()))

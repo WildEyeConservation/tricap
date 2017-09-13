@@ -93,6 +93,7 @@ class TrusenseAltimeter(Subject):
         self.value = 0
         self.unit = 'm'
         self.error = ""
+        self.error_start = False
 
         self._ser = None  # set this to None if something goes wrong with getting the Serial object
 
@@ -136,10 +137,15 @@ class TrusenseAltimeter(Subject):
 
     def set_error(self, error_code = ""):
         self.error = error_code
+        if str(error_code) == "01":
+            self.error_start = True
         #print("Error: " + str(error_code))
 
     def get_error(self):
         return self.error
+
+    def get_error_start(self):
+        return self.error_start
 
     def _check_for_known_error(self, reply):
         if reply[0:3] == b'$ER':

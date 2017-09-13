@@ -224,6 +224,11 @@ def _has_capture_started():
 
     config = TricapConfig()
 
+    if altimeter.error_start == True:
+        tricap_manager.start_capturing()
+        print("Started")
+        return True
+
     if str(altimeter.get_error()) != "":
         if str(altimeter.get_error()) == "01":
             tricap_manager.start_capturing()

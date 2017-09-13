@@ -147,6 +147,9 @@ class TrusenseAltimeter(Subject):
     def get_error_start(self):
         return self.error_start
 
+    def set_error_start(self, error_code):
+        self.error_start = error_code
+
     def _check_for_known_error(self, reply):
         if reply[0:3] == b'$ER':
             err_code = reply[4:6].decode(encoding='ascii')

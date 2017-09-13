@@ -224,7 +224,7 @@ def _has_capture_started():
 
     config = TricapConfig()
 
-    if altimeter.error_start == True:
+    if altimeter.get_error_start() == True:
         tricap_manager.start_capturing()
         print("Started")
         return True
@@ -363,7 +363,7 @@ def handle_button_click():
         rootlogger.info('User requested capture to stop.')
         tricap_manager.stop_capturing()
         altimeter_switch.set_override_state(OVERRIDESTATE.STOPOVERRIDE.value)
-        #altimeter.stop_measuring()
+        altimeter.set_error_start(False)
         return jsonify(capture_started=_has_capture_started())
     elif button_code == BUTTON_CODE.RESET:
         rootlogger.info('User requested server reset.')
@@ -376,6 +376,7 @@ def handle_button_click():
             # we want to stop
             rootlogger.info('User requested capture to stop.')
             tricap_manager.stop_capturing()
+            altimeter.set_error_start(False)
             #altimeter.stop_measuring()
             altimeter_switch.set_override_state(OVERRIDESTATE.STOPOVERRIDE.value)# stop capturing data
         else:  # we want to start

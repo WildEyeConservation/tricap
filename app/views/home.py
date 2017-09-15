@@ -39,7 +39,6 @@ def index_slash():
 @home_bp.route('/index', methods=['GET'])
 def index():
     """The Main GUI interface page."""
-    session_logger.create_new_session()
     rootlogger.info('Home Page Requested.')
 
     config = TricapConfig()
@@ -224,16 +223,17 @@ def _has_capture_started():
 
     config = TricapConfig()
 
-    if altimeter.get_error_start() == True:
-        tricap_manager.start_capturing()
-        return True
-
-    if str(altimeter.get_error()) != "":
-        if str(altimeter.get_error()) == "01":
+    if not use_dummy_cams:
+        if altimeter.get_error_start() == True and tricap_manager.get_state() != CAM_MANAGER_STATES.STARTED:
             tricap_manager.start_capturing()
             return True
-        else:
-            print(str(altimeter.get_error()))
+
+        if str(altimeter.get_error()) != "":
+            if str(altimeter.get_error()) == "01" and tricap_manager.get_state() != CAM_MANAGER_STATES.STARTED:
+                tricap_manager.start_capturing()
+                return True
+            else:
+                print(str(altimeter.get_error()))
 
     # Include here the function to return false if switch is off
     altimeter_switch.set_state(altimeter_switch.get_override_state())
@@ -352,7 +352,7 @@ def handle_button_click():
 
     if button_code == BUTTON_CODE.START:
         rootlogger.info('User requested capture to start.')
-        # session_logger.create_new_session()
+        session_logger.create_new_session()
         tricap_manager.start_capturing()
         altimeter_switch.set_override_state(OVERRIDESTATE.ALTISWITCH.value)
         #altimeter.start_measuring()
@@ -361,7 +361,9 @@ def handle_button_click():
         rootlogger.info('User requested capture to stop.')
         tricap_manager.stop_capturing()
         altimeter_switch.set_override_state(OVERRIDESTATE.STOPOVERRIDE.value)
-        altimeter.set_error_start(False)
+        if not use_dummy_cams:
+            altimeter.set_error_start(False)
+        altimeter_switch.session_started = False
         return jsonify(capture_started=_has_capture_started())
     elif button_code == BUTTON_CODE.RESET:
         rootlogger.info('User requested server reset.')
@@ -374,17 +376,19 @@ def handle_button_click():
             # we want to stop
             rootlogger.info('User requested capture to stop.')
             tricap_manager.stop_capturing()
-            altimeter.set_error_start(False)
+            if not use_dummy_cams:
+                altimeter.set_error_start(False)
+            altimeter_switch.session_started = False
             #altimeter.stop_measuring()
             altimeter_switch.set_override_state(OVERRIDESTATE.STOPOVERRIDE.value)# stop capturing data
         else:  # we want to start
             rootlogger.info('User requested capture to start.')
-            # session_logger.create_new_session()
             config = TricapConfig()
             if (config.get('cams_required', TricapConfig.WEB_SECTION_HEADER) != 'no'):
                 tricap_manager.start_capturing()
                 if altimeter_switch.get_override_state() == OVERRIDESTATE.ALTISWITCH.value:
                     altimeter_switch.set_override_state(OVERRIDESTATE.MANUALSTART.value)  # "2" Other state for start override
+                    session_logger.create_new_session()
                     rootlogger.info('User requested manual capture to start with override.')
                     print("Manual override start")
                 else:

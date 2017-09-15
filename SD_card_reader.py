@@ -10,6 +10,10 @@ import exifread
 import platform
 from math import ceil
 import logging
+from checksumdir import dirhash  # checksumdir 1.1.4
+import filecmp
+import glob
+import hashlib
 
 # Variables accessible throughout the whole program
 sd_card_list = []
@@ -46,6 +50,43 @@ def count_number_of_files(path):
                                  if os.path.isfile(os.path.join(path, f))])
     return total_number_of_files
 
+
+def print_diff_files(dcmp):
+    for name in dcmp.diff_files:
+        print("diff_file %s found in %s and %s" % (name, dcmp.left,
+                                                   dcmp.right))
+    for sub_dcmp in dcmp.subdirs.values():
+        print_diff_files(sub_dcmp)
+
+
+def are_dir_trees_equal(dir1, dir2):
+    """
+    Compare two directories recursively. Files in each directory are
+    assumed to be equal if their names and contents are equal.
+
+    @param dir1: First directory path
+    @param dir2: Second directory path
+
+    @return: True if the directory trees are the same and 
+        there were no errors while accessing the directories or files, 
+        False otherwise.
+   """
+
+    dirs_cmp = filecmp.dircmp(dir1, dir2)
+    if len(dirs_cmp.left_only) > 0 or len(dirs_cmp.right_only) > 0 or \
+                    len(dirs_cmp.funny_files) > 0:
+        return False
+    (_, mismatch, errors) = filecmp.cmpfiles(
+        dir1, dir2, dirs_cmp.common_files, shallow=False)
+    if len(mismatch) > 0 or len(errors) > 0:
+        return False
+    for common_dir in dirs_cmp.common_dirs:
+        new_dir1 = os.path.join(dir1, common_dir)
+        new_dir2 = os.path.join(dir2, common_dir)
+        if not are_dir_trees_equal(new_dir1, new_dir2):
+            return False
+    return True
+
 # ******************************************************************************************************************** #
 
 
@@ -69,10 +110,17 @@ def main():
             print(str(index) + ": " + str(storage_drives[index].mountpoint) + "\n")
 
     # Get input from the user for the internal, external and SD cards
-    internal = int(input("Choose internal drive from list above and enter number: "))
-    external = int(input("Choose external drive from list above and enter number: "))
-    storage_drives[0], storage_drives[internal] = storage_drives[internal], storage_drives[0]
-    storage_drives[1], storage_drives[external] = storage_drives[external], storage_drives[1]
+    drive_count = int(input("Are you copying to 1 or 2 drives?:"))
+    if drive_count == 1:
+        internal = int(input("Choose drive from list above and enter number: "))
+        storage_drives[0], storage_drives[internal] = storage_drives[internal], storage_drives[0]
+    elif drive_count == 2:
+        internal = int(input("Choose internal drive from list above and enter number: "))
+        external = int(input("Choose external drive from list above and enter number: "))
+        storage_drives[0], storage_drives[internal] = storage_drives[internal], storage_drives[0]
+        storage_drives[1], storage_drives[external] = storage_drives[external], storage_drives[1]
+    else:
+        print("Incorrect option. Please restart program.")
     # storage_drives[1], storage_drives[external], storage_drives[0], storage_drives[internal] = \
     #     storage_drives[external], storage_drives[1], storage_drives[internal], storage_drives[0]
 
@@ -83,22 +131,28 @@ def main():
         except ValueError:
             continue
     for cards in range(len(sd_card_list)):
-        print("Copying " + sd_card_list[cards] + " to " + str(storage_drives[0].mountpoint) + " and "
-              + str(storage_drives[1].mountpoint))
+        if drive_count == 2:
+            print("Copying " + sd_card_list[cards] + " to " + str(storage_drives[0].mountpoint) + " and "
+                  + str(storage_drives[1].mountpoint))
+        elif drive_count == 1:
+            print("Copying " + sd_card_list[cards] + " to " + str(storage_drives[0].mountpoint))
 
     user_input = str(input("Proceed (y/n): "))
     # Get final confirmation from user
     if user_input == "y" or user_input == "Y":
         for cards in range(len(sd_card_list)):
-            logging.info("Copying " + sd_card_list[cards] + " to " + str(storage_drives[0].mountpoint) + " and "
-                         + str(storage_drives[1].mountpoint))
-            time_start = datetime.datetime.now()
+            if drive_count == 2:
+                logging.info("Copying " + sd_card_list[cards] + " to " + str(storage_drives[0].mountpoint) + " and "
+                             + str(storage_drives[1].mountpoint))
+            elif drive_count == 1:
+                logging.info("Copying " + sd_card_list[cards] + " to " + str(storage_drives[0].mountpoint))
     else:
         return -1
 
     # Change the drive_list based on the exif data serial number
     # Read exif data to determine which camera is used
     print("Arranging data.")
+    time_start = datetime.datetime.now()
 
     for index_outer in range(len(sd_card_list)):
         for index_inner in range(5):
@@ -114,7 +168,7 @@ def main():
 
             if 'EXIF BodySerialNumber' in tags.keys():
                 if len(sd_card_list) == 3:
-                    temp_serial_number[index] = tags['EXIF BodySerialNumber']
+                    camera_serial_number[index] = tags['EXIF BodySerialNumber']
                 else:
                     camera_serial_number[index] = tags['EXIF BodySerialNumber']
 
@@ -122,13 +176,13 @@ def main():
         # Change the drive list here
         for index in range(len(sd_card_list)):
             if str(camera_serial_number[index]) == "032024003117":
-                temp_serial_number[0], camera_serial_number[index] = camera_serial_number[index], temp_serial_number[0]
+                camera_serial_number[0], camera_serial_number[index] = camera_serial_number[index], camera_serial_number[0]
                 sd_card_list[0], sd_card_list[index] = sd_card_list[index], sd_card_list[0]
             elif str(camera_serial_number[index]) == "023052000180":
-                temp_serial_number[1], camera_serial_number[index] = camera_serial_number[index], temp_serial_number[1]
+                camera_serial_number[1], camera_serial_number[index] = camera_serial_number[index], camera_serial_number[1]
                 sd_card_list[1], sd_card_list[index] = sd_card_list[index], sd_card_list[1]
             elif str(camera_serial_number[index]) == "413051000325":
-                temp_serial_number[2], camera_serial_number[index] = camera_serial_number[index], temp_serial_number[2]
+                camera_serial_number[2], camera_serial_number[index] = camera_serial_number[index], camera_serial_number[2]
                 sd_card_list[2], sd_card_list[index] = sd_card_list[index], sd_card_list[2]
     print(camera_serial_number)
 
@@ -143,12 +197,18 @@ def main():
     # Determine the Sortie of the day
     global Sortie
     nums = 0
-    if os.path.isdir(os.path.join(storage_drives[1].mountpoint, str(datetime.date.today()), 'Sortie0')) or \
-            os.path.isdir(os.path.join(storage_drives[0].mountpoint, str(datetime.date.today()), 'Sortie0')):
-        while os.path.isdir(os.path.join(storage_drives[1].mountpoint, str(datetime.date.today()), Sortie)) or \
-         os.path.isdir(os.path.join(storage_drives[0].mountpoint, str(datetime.date.today()), Sortie)):
-            nums += 1
-            Sortie = "Sortie" + str(nums)
+    if drive_count == 1:
+        if os.path.isdir(os.path.join(storage_drives[0].mountpoint, str(datetime.date.today()), 'Sortie0')):
+            while os.path.isdir(os.path.join(storage_drives[0].mountpoint, str(datetime.date.today()), Sortie)):
+                nums += 1
+                Sortie = "Sortie" + str(nums)
+    else:
+        if os.path.isdir(os.path.join(storage_drives[1].mountpoint, str(datetime.date.today()), 'Sortie0')) or \
+                os.path.isdir(os.path.join(storage_drives[0].mountpoint, str(datetime.date.today()), 'Sortie0')):
+            while os.path.isdir(os.path.join(storage_drives[1].mountpoint, str(datetime.date.today()), Sortie)) or \
+             os.path.isdir(os.path.join(storage_drives[0].mountpoint, str(datetime.date.today()), Sortie)):
+                nums += 1
+                Sortie = "Sortie" + str(nums)
     print("sortie: " + Sortie)
 
 # Locks are added to ensure only the necessary processes are running to increase the efficiency as much as possible
@@ -159,52 +219,81 @@ def main():
     threads0 = threading.Thread(target=copy_thread, args=(storage_drives[0].mountpoint, 0, lock0,))  # Internal drive
     threads0.start()
     if len(sd_card_list) == 1:
-        threads1 = threading.Thread(target=copy_thread, args=(storage_drives[1].mountpoint, 0, lock1,))  # External drive
-        threads1.start()
+        if drive_count == 2:
+            threads1 = threading.Thread(target=copy_thread, args=(storage_drives[1].mountpoint, 0, lock1,))  # External drive
+            threads1.start()
     #print("SD: " + str(len(sd_card_list)))
     if len(sd_card_list) == 2:
-        threads1 = threading.Thread(target=copy_thread, args=(storage_drives[1].mountpoint, 1, lock1,))  # External drive
         threads2 = threading.Thread(target=copy_thread, args=(storage_drives[0].mountpoint, 1, lock0,))
-        threads3 = threading.Thread(target=copy_thread, args=(storage_drives[1].mountpoint, 0, lock1,))
-        threads1.start()
         threads2.start()
-        threads3.start()
+        if drive_count == 2:
+            threads1 = threading.Thread(target=copy_thread, args=(storage_drives[1].mountpoint, 1, lock1,))  # External drive
+            threads3 = threading.Thread(target=copy_thread, args=(storage_drives[1].mountpoint, 0, lock1,))
+            threads1.start()
+            threads3.start()
     if len(sd_card_list) == 3:
-        threads1 = threading.Thread(target=copy_thread, args=(storage_drives[1].mountpoint, 1, lock1,))  # External drive
         threads2 = threading.Thread(target=copy_thread, args=(storage_drives[0].mountpoint, 2, lock0,))
-        threads3 = threading.Thread(target=copy_thread, args=(storage_drives[1].mountpoint, 0, lock1,))
         threads4 = threading.Thread(target=copy_thread, args=(storage_drives[0].mountpoint, 1, lock0,))
-        threads5 = threading.Thread(target=copy_thread, args=(storage_drives[1].mountpoint, 2, lock1,))
-        threads1.start()
         threads2.start()
-        threads3.start()
         threads4.start()
-        threads5.start()
+        if drive_count == 2:
+            threads1 = threading.Thread(target=copy_thread, args=(storage_drives[1].mountpoint, 1, lock1,))  # External drive
+            threads3 = threading.Thread(target=copy_thread, args=(storage_drives[1].mountpoint, 0, lock1,))
+            threads5 = threading.Thread(target=copy_thread, args=(storage_drives[1].mountpoint, 2, lock1,))
+            threads1.start()
+            threads3.start()
+            threads5.start()
 
     print("File copy started.")
     print("Active: " + str(threading.active_count()))
     time.sleep(2)
 
     # Show the progress of the copy. Progressbar time is calculated on external drive copy time
-    bar = progressbar.ProgressBar(maxval=2*num_files)
+    bar = progressbar.ProgressBar(maxval=drive_count*num_files)
     try:
-        for copied in bar(range(2*num_files)):
+        for copied in bar(range(drive_count*num_files)):
             copied = 0
-            for index in range(ceil(len(path_list)/len(sd_card_list))):
-                if os.path.isdir(os.path.join(storage_drives[1].mountpoint, str(datetime.date.today()), Sortie, 'images', 'Camera0', path_common[index])):
-                    copied += count_number_of_files(os.path.join(storage_drives[1].mountpoint, str(datetime.date.today()), Sortie, 'images', 'Camera0', path_common[index]))
-                if os.path.isdir(os.path.join(storage_drives[1].mountpoint, str(datetime.date.today()), Sortie, 'images', 'Camera1', path_common[index])):
-                    copied += count_number_of_files(os.path.join(storage_drives[1].mountpoint, str(datetime.date.today()), Sortie, 'images', 'Camera1', path_common[index]))
-                if os.path.isdir(os.path.join(storage_drives[1].mountpoint, str(datetime.date.today()), Sortie, 'images', 'Camera2', path_common[index])):
-                    copied += count_number_of_files(os.path.join(storage_drives[1].mountpoint, str(datetime.date.today()), Sortie, 'images', 'Camera2', path_common[index]))
 
             for index in range(ceil(len(path_list)/len(sd_card_list))):
-                if os.path.isdir(os.path.join(storage_drives[0].mountpoint, str(datetime.date.today()), Sortie, 'images', 'Camera0', path_common[index])):
-                    copied += count_number_of_files(os.path.join(storage_drives[0].mountpoint, str(datetime.date.today()), Sortie, 'images', 'Camera0', path_common[index]))
-                if os.path.isdir(os.path.join(storage_drives[0].mountpoint, str(datetime.date.today()), Sortie, 'images', 'Camera1', path_common[index])):
-                    copied += count_number_of_files(os.path.join(storage_drives[0].mountpoint, str(datetime.date.today()), Sortie, 'images', 'Camera1', path_common[index]))
-                if os.path.isdir(os.path.join(storage_drives[0].mountpoint, str(datetime.date.today()), Sortie, 'images', 'Camera2', path_common[index])):
-                    copied += count_number_of_files(os.path.join(storage_drives[0].mountpoint, str(datetime.date.today()), Sortie, 'images', 'Camera2', path_common[index]))
+                if os.path.isdir(
+                        os.path.join(storage_drives[0].mountpoint, str(datetime.date.today()), Sortie, 'images',
+                                     'Camera0', path_common[index])):
+                    copied += count_number_of_files(
+                        os.path.join(storage_drives[0].mountpoint, str(datetime.date.today()), Sortie, 'images',
+                                     'Camera0', path_common[index]))
+                if os.path.isdir(
+                        os.path.join(storage_drives[0].mountpoint, str(datetime.date.today()), Sortie, 'images',
+                                     'Camera1', path_common[index])):
+                    copied += count_number_of_files(
+                        os.path.join(storage_drives[0].mountpoint, str(datetime.date.today()), Sortie, 'images',
+                                     'Camera1', path_common[index]))
+                if os.path.isdir(
+                        os.path.join(storage_drives[0].mountpoint, str(datetime.date.today()), Sortie, 'images',
+                                     'Camera2', path_common[index])):
+                    copied += count_number_of_files(
+                        os.path.join(storage_drives[0].mountpoint, str(datetime.date.today()), Sortie, 'images',
+                                     'Camera2', path_common[index]))
+
+            if drive_count == 2:
+                for index in range(ceil(len(path_list) / len(sd_card_list))):
+                    if os.path.isdir(
+                            os.path.join(storage_drives[1].mountpoint, str(datetime.date.today()), Sortie, 'images',
+                                         'Camera0', path_common[index])):
+                        copied += count_number_of_files(
+                            os.path.join(storage_drives[1].mountpoint, str(datetime.date.today()), Sortie, 'images',
+                                         'Camera0', path_common[index]))
+                    if os.path.isdir(
+                            os.path.join(storage_drives[1].mountpoint, str(datetime.date.today()), Sortie, 'images',
+                                         'Camera1', path_common[index])):
+                        copied += count_number_of_files(
+                            os.path.join(storage_drives[1].mountpoint, str(datetime.date.today()), Sortie, 'images',
+                                         'Camera1', path_common[index]))
+                    if os.path.isdir(
+                            os.path.join(storage_drives[1].mountpoint, str(datetime.date.today()), Sortie, 'images',
+                                         'Camera2', path_common[index])):
+                        copied += count_number_of_files(
+                            os.path.join(storage_drives[1].mountpoint, str(datetime.date.today()), Sortie, 'images',
+                                         'Camera2', path_common[index]))
 
             bar.update(copied)
             logging.info("Copied: " + str(copied) + " images at " + str(datetime.datetime.now().strftime("%H:%M:%S")))
@@ -212,23 +301,99 @@ def main():
     except ValueError:
         pass
 
-    # Rename folder to make more sense for the user
-
-    if len(sd_card_list) == 3:
-        for drive_num in range(2):
-            if os.path.isdir(os.path.join(storage_drives[drive_num].mountpoint, str(datetime.date.today()), Sortie, 'images', 'Camera0')):
-                os.rename(os.path.join(storage_drives[drive_num].mountpoint, str(datetime.date.today()), Sortie, 'images', 'Camera0'),
-                          os.path.join(storage_drives[drive_num].mountpoint, str(datetime.date.today()), Sortie, 'images', 'Camera Left'))
-            if os.path.isdir(os.path.join(storage_drives[drive_num].mountpoint, str(datetime.date.today()), Sortie, 'images', 'Camera1')):
-                os.rename(os.path.join(storage_drives[drive_num].mountpoint, str(datetime.date.today()), Sortie, 'images', 'Camera1'),
-                          os.path.join(storage_drives[drive_num].mountpoint, str(datetime.date.today()), Sortie, 'images', 'Camera Centre'))
-            if os.path.isdir(os.path.join(storage_drives[drive_num].mountpoint, str(datetime.date.today()), Sortie, 'images', 'Camera2')):
-                os.rename(os.path.join(storage_drives[drive_num].mountpoint, str(datetime.date.today()), Sortie, 'images', 'Camera2'),
-                          os.path.join(storage_drives[drive_num].mountpoint, str(datetime.date.today()), Sortie, 'images', 'Camera Right'))
-
     logging.info("Copying program ended at: " + str(datetime.datetime.now()))
     logging.info("Total copy time: " + str(datetime.datetime.now()-time_start))
-    print("\nFinished Copying")
+
+    # Do a hash function of copied folders to verify if all the content is copied.
+    print("\n")
+    SD_hash = []
+    sha1 = hashlib.sha256()
+    sha2 = hashlib.sha256()
+    sha3 = hashlib.sha256()
+    list1 = []
+    list2 = []
+    list3 = []
+    hash = True
+
+    for index in range(len(sd_card_list)):
+        SD_hash.extend(glob.glob(str(sd_card_list[index]) + '/DCIM/*CANON/*'))
+    for index in range(len(SD_hash)):
+        temp = SD_hash[index].split('\\')
+        list1.append(temp[len(temp)-1])
+        sha1.update(list1[index].encode())
+    print("hash SD cards: " + str(sha1.hexdigest()))
+
+    if drive_count > 0:
+        HD_hash1 = glob.glob(storage_drives[0].mountpoint + "/" + str(datetime.date.today()) + "/" +
+                             str(Sortie) + "/images/Camera*/*CANON/*")
+        for index in range(len(HD_hash1)):
+            temp = HD_hash1[index].split('\\')
+            list2.append(temp[len(temp) - 1])
+            sha2.update(list2[index].encode())
+        print("hash HD internal drive: " + str(sha2.hexdigest()))
+        if sha1.hexdigest() != sha2.hexdigest():
+            hash = False
+    if drive_count > 1:
+        HD_hash2 = glob.glob(storage_drives[1].mountpoint + "/" + str(datetime.date.today()) + "/" +
+                             str(Sortie) + "/images/Camera*/*CANON/*")
+        for index in range(len(HD_hash2)):
+            temp = HD_hash2[index].split('\\')
+            list3.append(temp[len(temp) - 1])
+            sha3.update(list3[index].encode())
+        print("hash HD external drive: " + str(sha3.hexdigest()))
+        if sha1.hexdigest() != sha3.hexdigest():
+            hash = False
+
+    if hash is True:
+        print("\nCopying verified and all content are backed up.")
+    else:
+        print("\nCopying failed!")
+    # print(list1)
+    # print(list2)
+    # print(list3)
+
+    # print("\nComparing folders for final validation.")
+    # for camera_num in range(len(sd_card_list)):
+    #     time1 = datetime.datetime.now()
+    #     directory1 = os.path.join(sd_card_list[camera_num], 'DCIM')
+    #     hash1 = dirhash(directory1, 'md5')
+    #     print("hash SD " + str(sd_card_list[camera_num]) + ": " + str(hash1))
+    #     for drv in range(drive_count):
+    #         directory2 = os.path.join(storage_drives[drv].mountpoint, str(datetime.date.today()), Sortie, 'images', 'Camera' + str(camera_num)) # Sortie
+    #         hash2 = dirhash(directory2, 'md5')
+    #         print("hash drive " + str(storage_drives[drv].mountpoint) + ": " + str(hash2))
+    #     print(str(datetime.datetime.now()-time1))
+
+    # sha256hash1 = dirhash("C:/Users/Pieter.at.Innoventix/Desktop/Innoventix/Tricap docs", 'sha256', excluded_extensions=['pyc'])
+    # print(sha256hash1)
+    # sha256hash2 = dirhash("C:/Users/Pieter.at.Innoventix/Desktop/Innoventix/Tricap docs1", 'sha256',
+    #                      excluded_extensions=['pyc'])
+    # print(sha256hash2)
+
+            # Rename folder to make more sense for the user
+
+    if len(sd_card_list) == 3:
+        for drive_num in range(drive_count):
+            if os.path.isdir(os.path.join(storage_drives[drive_num].mountpoint, str(datetime.date.today()), Sortie,
+                                          'images', 'Camera0')):
+                os.rename(os.path.join(storage_drives[drive_num].mountpoint, str(datetime.date.today()), Sortie,
+                                       'images', 'Camera0'),
+                          os.path.join(storage_drives[drive_num].mountpoint, str(datetime.date.today()), Sortie,
+                                       'images', 'Camera Left'))
+            if os.path.isdir(os.path.join(storage_drives[drive_num].mountpoint, str(datetime.date.today()), Sortie,
+                                          'images', 'Camera1')):
+                os.rename(os.path.join(storage_drives[drive_num].mountpoint, str(datetime.date.today()), Sortie,
+                                       'images', 'Camera1'),
+                          os.path.join(storage_drives[drive_num].mountpoint, str(datetime.date.today()), Sortie,
+                                       'images', 'Camera Centre'))
+            if os.path.isdir(os.path.join(storage_drives[drive_num].mountpoint, str(datetime.date.today()), Sortie,
+                                          'images', 'Camera2')):
+                os.rename(os.path.join(storage_drives[drive_num].mountpoint, str(datetime.date.today()), Sortie,
+                                       'images', 'Camera2'),
+                          os.path.join(storage_drives[drive_num].mountpoint, str(datetime.date.today()), Sortie,
+                                       'images', 'Camera Right'))
+
+    print("Finished Copying")
 
 # Start main program
 if __name__ == '__main__':

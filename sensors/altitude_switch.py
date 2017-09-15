@@ -7,6 +7,8 @@ import local_paths
 from enum import Enum
 from support.configure import TricapConfig
 from config import OVERRIDESTATE
+import app
+from config import CAM_MANAGER_STATES
 
 
 class AltiSwitch(Observer):
@@ -22,6 +24,7 @@ class AltiSwitch(Observer):
         self.manual_override = 0
         self._logger.debug('Altitude Switch started - Automatic switch enabled')
         self.update_boundaries()
+        self.session_started = False
 
     # Altitude switch is not in update, because of the outside use of the function
     def set_altitude_switch(self, override=OVERRIDESTATE.ALTISWITCH.value):
@@ -54,6 +57,10 @@ class AltiSwitch(Observer):
     def update(self, subject):
         self.measured_height = self.alti.measurement
         self.set_state(override=self.get_override_state())
+        # Start session when altiswitch is turned on.
+        if self.state() == True and self.session_started == False:
+            app.session_logger.create_new_session()
+            self.session_started = True
         # self.update_boundaries()  # Put this function in here if not placed anywhere else
 
     def update_boundaries(self):

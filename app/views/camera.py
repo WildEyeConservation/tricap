@@ -17,7 +17,7 @@ def camera():
     free_space_parse = [""] * 3
     battery_parse = [""] * 3
 
-    if not use_dummy_cams:
+    if not use_dummy_cams and len(tricap_manager.get_cameras_as_list()) == 3:
         from support.camera_data import ParseData
         camera_data = ParseData()
         code_inf = GitData()

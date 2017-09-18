@@ -338,10 +338,10 @@ def shutdown():
             rootlogger.info("User requested a shutdown of TriCap")
             command = "/usr/bin/sudo /sbin/poweroff"
 
-            while True:
-                process = subprocess.Popen(command.split(), stdout=subprocess.PIPE)
-                output = process.communicate()[0]  # Execute the command
-            return "Shutting down server"
+            #while True:
+            process = subprocess.Popen(command.split(), stdout=subprocess.PIPE)
+            output = process.communicate()[0]  # Execute the command
+            return '<h1 id="shutdown">Shutting down server</h1>'
     else:
         return render_template("/camera/wait.html")
 

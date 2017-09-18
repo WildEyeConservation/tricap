@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block content %}
+
+    <div class='container'>
+        <div class="row">
+            <div class="col-md-12">
+                <div class="alert alert-info" style="text-align:center;" id="wait_message">
+                    <h2 id="wait_mes">Please wait until cameras has stopped capturing</h2>
+                </div>
+            </div>
+            <div class="col-sm-12">
+                <div class="alert alert-warning" style="text-align:center;" id="home_button">
+                    <a href="{{ url_for('home.index')}}" class="btn btn-lg btn-warning" style="color: white;" >Return Home</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+{% endblock %}
+

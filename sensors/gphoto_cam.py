@@ -243,10 +243,10 @@ class GPhotoCam(AbstractCamera):
             self.notify()
             before_capture_ts = datetime.now()
 
-            if self._trigger_capture():
+            if self._trigger_capture():  # Checks to see if something went wrong with the cameras
                 self._image_count += 1
             else:
-                self._logger.error('Could not succesfully trigger a capture.')
+                self._logger.error('Could not successfully trigger a capture.')
 
             if self.fetch_state:
                 # check if we need to get a new image path
@@ -295,3 +295,9 @@ class GPhotoCam(AbstractCamera):
     def get_cam_image_count(self):
         """Return the number of images captured by the camera, as tracked by this object."""
         return self._image_count
+
+    def get_cam_context(self):
+        return GPhotoCam._context
+
+    def get_cam(self):
+        return self._gp_camera

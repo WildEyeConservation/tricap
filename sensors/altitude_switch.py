@@ -6,56 +6,64 @@ import logging
 import local_paths
 from enum import Enum
 from support.configure import TricapConfig
-
-
-class OverrideState(Enum):
-    ALTISWITCH = 0  # OverrideState.ALTISWITCH.value = 0
-    STOPOVERRIDE = 1
-    MANUALSTART = 2
-
-# CAMERA_STATES = Enum("CamState", ["UNINITIALISED", "INITIALISED", "CAPTURING", "ERROR_CONFIG", "ERROR_CAPTURE"])
+from config import OVERRIDESTATE
+import app
+from config import CAM_MANAGER_STATES
 
 
 class AltiSwitch(Observer):
     _logger = logging.getLogger(__name__)  # start the logger
 
-    def __init__(self, sensor_class): #Constructor for alti switch
+    def __init__(self, sensor_class):  # Constructor for alti switch
         super().__init__()  # get variables from parent class
         self.alti = sensor_class  # SimulatorAlti(settings)
         self.alti_switch_state = False  # start with altimeter switch as off
         self.turn_on_altitude = 0
         self.turn_off_altitude = 0
         self.measured_height = 0
+        self.manual_override = 0
+        self._logger.debug('Altitude Switch started - Automatic switch enabled')
+        self.update_boundaries()
+        self.session_started = False
 
-        self.get_alti_switch_boundary()
-
-    def set_altitude_switch(self, override=OverrideState.ALTISWITCH.value):
-        if override == OverrideState.ALTISWITCH.value:
+    # Altitude switch is not in update, because of the outside use of the function
+    def set_altitude_switch(self, override=OVERRIDESTATE.ALTISWITCH.value):
+        if override == OVERRIDESTATE.ALTISWITCH.value:
             if self.measured_height >= self.turn_on_altitude:
                 self.alti_switch_state = True  # Turn on the altitude switch
-                self._logger.debug('Altitude Switch - capturing')
-            elif self.measured_height < self.turn_off_altitude:
+                #self._logger.debug('Altitude Switch - capturing')
+            #elif self.measured_height < self.turn_off_altitude:
                 # self.alti_switch_state = False  # Turn off altitude switch
-                self._logger.debug('Altitude Switch - Would have stopped capturing')
-        elif override == OverrideState.STOPOVERRIDE.value:  # If switch is overwritten, then the system stops capturing
+                #self._logger.debug('Altitude Switch - Would have stopped capturing')
+        elif override == OVERRIDESTATE.STOPOVERRIDE.value:  # If switch is overwritten, then the system stops capturing
             self.alti_switch_state = False
-            self._logger.debug('Altitude Switch = stopped - not capturing')
+            #self._logger.debug('Altitude Switch = stopped - not capturing')
         else:  # override with start button with manual on switch
             self.alti_switch_state = True
-            self._logger.debug('Altitude Switch = manual - capturing')
+            #self._logger.debug('Altitude Switch = manual - capturing')
 
-    def get_altitude_switch_state(self, override = OverrideState.ALTISWITCH.value):  # True shows the switch is ON and vice versa
-        # self.set_altitude_switch(override)
+    def state(self):  # True shows the switch is ON and vice versa
         return self.alti_switch_state
 
-    def set_altitude_switch_state(self, override=OverrideState.ALTISWITCH.value):
+    def set_state(self, override=OVERRIDESTATE.ALTISWITCH.value):  # Altiswitch is the default state
         self.set_altitude_switch(override)
+
+    def get_override_state(self):
+        return self.manual_override
+
+    def set_override_state(self, override):
+        self.manual_override = override
 
     def update(self, subject):
         self.measured_height = self.alti.measurement
-        self.get_alti_switch_boundary()  # Put this function in here if not placed anywhere else
+        self.set_state(override=self.get_override_state())
+        # Start session when altiswitch is turned on.
+        if self.state() == True and self.session_started == False:
+            app.session_logger.create_new_session()
+            self.session_started = True
+        # self.update_boundaries()  # Put this function in here if not placed anywhere else
 
-    def get_alti_switch_boundary(self):
+    def update_boundaries(self):
         triconfig = TricapConfig()
         web_settings = triconfig.get_section_dict(TricapConfig.WEB_SECTION_HEADER)
         self.turn_on_altitude = int(web_settings['automatic_turn_on_height'])

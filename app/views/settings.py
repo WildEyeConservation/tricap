@@ -10,10 +10,13 @@ from app import forms, tricap_manager, altimeter, session_logger
 from config import DEFAULT_CONFIG_FP, CONFIG_FP
 from support.configure import TricapConfig
 from collections import namedtuple
+from sensors.altitude_switch import AltiSwitch
+from collections import OrderedDict
 
 from app import rootlogger
 
 settings_bp = Blueprint('settings', __name__)
+altitude_switch = AltiSwitch(altimeter)
 
 
 class MiscSettingConfig:
@@ -60,12 +63,14 @@ class WebSettingHandler:
         """Constructor."""
         self.config = config
 
+
 # TODO SMS Settings Handler should get its settings from the actual sms objects
 class SMSSettingHandler:
     """Handles all settings to do with the SMS interface (just a dictionary at the moment)."""
     def __init__(self, config):
         """Constructor."""
         self.config = config
+
 
 def populate_form_section(sdict, handler, form_selects, form_strings, set_data=True):
     """Populate the settings section of the form."""
@@ -109,22 +114,32 @@ def get_form_for_display(config_fp=CONFIG_FP, set_data=True):
 
     # Populate the form
     cam_dict = config.get_section_dict(TricapConfig.CAMERA_SECTION_HEADER)
+    cam_dict = OrderedDict(sorted(cam_dict.items(), key=lambda t: t[0]))
+    #cam_dict = dict(sorted(cam_dict.items()))
     populate_form_section(cam_dict, tricap_manager, form.cam_selects, form.cam_strings, set_data)
 
     alti_dict = config.get_section_dict(TricapConfig.ALTI_SECTION_HEADER)
+    alti_dict = OrderedDict(sorted(alti_dict.items(), key=lambda t: t[0]))
+    #alti_dict = dict(sorted(alti_dict.items()))
     populate_form_section(alti_dict, altimeter, form.alti_selects, form.alti_strings, set_data)
 
     misc_setting_handler = MiscSettingHandler()
     misc_dict = config.get_section_dict(TricapConfig.MISC_SECTION_HEADER)
+    misc_dict = OrderedDict(sorted(misc_dict.items(), key=lambda t: t[0]))
+    #misc_dict = dict(sorted(misc_dict.items()))
     populate_form_section(misc_dict, misc_setting_handler, form.misc_selects, form.misc_strings,
                           set_data)
 
     web_dict = config.get_section_dict(TricapConfig.WEB_SECTION_HEADER)
+    web_dict = OrderedDict(sorted(web_dict.items(), key=lambda t: t[0]))
+    #web_dict = dict(sorted(web_dict.items()))
     web_setting_handler = WebSettingHandler(web_dict)
     populate_form_section(web_dict, web_setting_handler, form.web_selects, form.web_strings,
                           set_data)
 
     sms_dict = config.get_section_dict(TricapConfig.SMS_SECTION_HEADER)
+    sms_dict = OrderedDict(sorted(sms_dict.items(), key=lambda t: t[0]))
+    #sms_dict = dict(sorted(sms_dict.items()))
     sms_setting_handler = SMSSettingHandler(sms_dict)
     populate_form_section(sms_dict, sms_setting_handler, form.sms_selects, form.sms_strings,
                           set_data)
@@ -238,6 +253,7 @@ def save_settings(form, config_fp=CONFIG_FP):
         config.set_section(form_dict[section_header], section_header)
 
     config.save_to_file()
+    altitude_switch.update_boundaries()  # Read new boundaries from saved file
 
 
 def revert_to_default_settings(save_to_fp=CONFIG_FP):
@@ -263,12 +279,12 @@ def settings():
         #  populated with the data from the request.form (i.e. from the browser). However, this form
         #  does not contain the labels and choices of the FieldLists, so we need to populate those
         #  attributes.
-        # TODO Find out why the lables and choices are missing from the FieldLists
+        # TODO Find out why the labels and choices are missing from the FieldLists
         form = populate_pushed_form(forms.SettingsForm())
 
     if form.validate_on_submit():
-        #tricap_manager.stop_capturing()
-        #altimeter.stop_measuring()
+        # tricap_manager.stop_capturing()
+        # altimeter.stop_measuring()
 
         # if form.test.data is True:
         #     change_settings(form)
@@ -278,6 +294,6 @@ def settings():
         elif form.revert.data is True:
             revert_to_default_settings()
 
-        return redirect(url_for('home.index'))
+        return redirect(url_for('home.index'))  # return back to home once settinsg are changed
 
     return render_template('/settings/settings.html', form=form)

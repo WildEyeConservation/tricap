@@ -23,14 +23,39 @@
 </header>
 
 <body>
+
+
     <div class="section">
       <div class="container" id="base_container">
+        <div class="modal fade" id="shutdown_modal" role="dialog">
+          <div class="modal-dialog">
+              <div class="modal-content">
+                  <div class="modal-header">
+                      <button type="button" class="close" data-dismiss="modal">&times;</button>
+                      <h3 class="modal-title">Shutdown</h3>
+                  </div><!-- End header -->
+                  <div class="modal-body">
+                      <form class="form-horizontal">
+                          <h4 style="text-align:center;">Please ensure logs have been downloaded before shutting down.<br></h4>
+                          <h3 style="text-align:center;">Are you sure you want to shutdown?<br></h3>
+                          <div class = "form-group">
+                            <div class="col-md-12" style="text-align:center;">
+                                <a href="{{ url_for('home.shutdown')}}" class="btn btn-info btn-lg">YES</a>
+                                <a href="#" data-dismiss="modal" class="btn btn-danger btn-lg">NO</a>
+                            </div>
+                          </div>
+                      </form>
+                  </div><!-- End body -->
+              </div>
+          </div>
+         </div>
         <div class="row">
           <div class="col-xs-11">
             <div class="alert alert-success" id="alt_main_status">
               <h1 id="h_main_status">TriCap</h1>
             </div>
           </div>
+
           <div class="col-xs-1">
             <div class="btn-group btn-group-sm">
               <a class="btn btn-block btn-lg btn-primary dropdown-toggle" data-toggle="dropdown" id="btn_menu"><i class="fa fa-2x fa-bars fa-fw"></i></a>
@@ -56,6 +81,18 @@
                 </li>
                 <li>
                   <a href="#" id="a_check_sms">Check SMS</a>
+                </li>
+                <li>
+                  <a href="{{ url_for('camera.camera')}}" id="a_check_camera">Check Rig Info</a>
+                </li>
+                <li>
+                  <a href="{{ url_for('home.download')}}" id="a_download_logs">Download Logs</a>
+                </li>
+                <li class="divider"></li>
+                <li>
+                  <a href="#" id="a_shutdown" data-toggle="modal" data-target="#shutdown_modal">
+                      <img src="{{url_for('static', filename='img/Power-Shutdown.png')}}"> Shutdown</a>
+                  <!--<a href="{{ url_for('home.shutdown')}}" id="a_shutdown"><img src="{{url_for('static', filename='img/Power-Shutdown.png')}}"> Shutdown</a>-->
                 </li>
               </ul>
             </div>

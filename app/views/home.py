@@ -2,23 +2,24 @@
 
 import os
 import io
+import subprocess
 from urllib.request import urlopen
 from flask import Blueprint, render_template, send_from_directory, current_app, request, jsonify
-from flask import send_file, redirect, url_for
+from flask import send_file, redirect, url_for, send_from_directory
 
 from app import tricap_manager, altimeter, altimeter_switch, session_logger, talkbox, log_list, stop_all_threads
-from app import rootlogger, fetch_stopper, manual_override, alti_startup
+from app import rootlogger, fetch_stopper, use_dummy_cams
 
 from support.configure import TricapConfig
 from support.sms_sender import SMSSender
-#import winsound
-from enum import Enum
+import shutil, platform
+import local_paths
+import datetime
 
 from config import BUTTON_CODE, CAM_MANAGER_STATES, ALTIMETER_STATE
+from config import OVERRIDESTATE
 
 home_bp = Blueprint('home', __name__)
-
-alti_startup = 0
 
 # Using a dummy colour entry because Enum starts indexing from 1, and not from zero
 # CAMERA_STATES = Enum("CamState", ["UNINITIALISED", "INITIALISED", "CAPTURING", "ERROR_CONFIG", "ERROR_CAPTURE"])
@@ -28,22 +29,17 @@ CAM_MAN_STATE_COLOURS = ['dummy', 'orange', 'green', 'red', 'red']
 # ALTIMETER_STATE = Enum("AltiState", ["NOT_CONNECTED", "CONNECTED", "MEASURING", "ERROR"])
 ALTI_STATE_COLOURS = ['dummy', 'red', 'orange', 'green', 'red']
 
-class OverrideState(Enum):
-    ALTISWITCH = 0  # OverrideState.ALTISWITCH.value = 0
-    STOPOVERRIDE = 1
-    MANUALSTART = 2
-
 
 @home_bp.route('/', methods=['GET'])
 def index_slash():
     """Redirect request to the proper index page."""
     return index()
 
+
 @home_bp.route('/index', methods=['GET'])
 def index():
     """The Main GUI interface page."""
     rootlogger.info('Home Page Requested.')
-    global alti_startup  # static variable
 
     config = TricapConfig()
     js_data = {
@@ -59,18 +55,15 @@ def index():
 
     cams_start_display = config.get('cams_start_display', TricapConfig.WEB_SECTION_HEADER)
     alti_start_display = config.get('alti_start_display', TricapConfig.WEB_SECTION_HEADER)
-
-    if alti_startup == 0:  # Only start the alti measuring startup once (Helps with simulation)
-        altimeter.start_measuring()  # start measuring altitude from the start of homepage call
-        alti_startup = 1
-
+    camera_serial_numbers = ["Left", "Centre", "Right"]
     if cams_start_display.lower() == 'open':
         for cam in tricap_manager.get_cameras_as_list():
             cam._camera.fetch_state = True
 
     return render_template('/home/index.html', num_cams=tricap_manager.get_num_cams(),
                            cams_start_display=cams_start_display,
-                           alti_start_display=alti_start_display, python_data=js_data)
+                           alti_start_display=alti_start_display, python_data=js_data,
+                           serial_numbers=camera_serial_numbers)
 
 
 def _determine_overall_cam_state_colour():
@@ -110,7 +103,7 @@ def _determine_alti_state_colour():
 
 @home_bp.route('/_set_image_fetching_state')
 def _set_image_fetching_state():
-    #winsound.Beep(2000, 300)
+
     image_fetch_state_str = str(request.args.get('image_fetching_state'))
     # TODO Do something with the new image fetch state
     if image_fetch_state_str == 'True':
@@ -127,18 +120,20 @@ def _set_image_fetching_state():
 @home_bp.route('/_get_state_data')
 def provide_state_data():
     """Jsonify all the data pertaining to the state of the system."""
-    #winsound.Beep(2000, 300)
-    altimeter_switch.set_altitude_switch_state(override = manual_override)
 
     alti_data = {'state_colour': _determine_alti_state_colour(),
                  'measurement': str(altimeter.measurement),
-                 'switch_state': str(altimeter_switch.get_altitude_switch_state(override = manual_override)),
-                 'override': str(manual_override)}
+                 'switch_state': str(altimeter_switch.state()),
+                 'override': str(altimeter_switch.get_override_state()),
+                 'error': str(altimeter.get_error())}
 
     cam_image_counts = [cam.get_cam_image_count() for cam in tricap_manager.get_cameras_as_list()]
     cam_data = {'image_counts': cam_image_counts,
                 'overall_cam_state_colour': _determine_overall_cam_state_colour(),
                 'capture_started': _has_capture_started()}
+
+    # if cam_data['capture_started'] == True:
+    #     session_logger.create_new_session()
 
     talk_msgs_strs = [talk_msg.msg for talk_msg in talkbox.talk_msgs]
     talk_msgs_reply_codes = [talk_msg.reply.value for talk_msg in talkbox.talk_msgs]
@@ -147,6 +142,10 @@ def provide_state_data():
 
     sys_msgs = log_list.get_msgs()
     sys_data = {'msgs': sys_msgs}
+
+# Check camera threads
+    # if tricap_manager.get_state() == CAM_MANAGER_STATES.STARTED:
+    #     print(tricap_manager.check_thread_status())
 
     data = {'alti': alti_data,
             'cams': cam_data,
@@ -173,7 +172,7 @@ def _check_gps():
 @home_bp.route('/_send_sms')
 def _send_sms():
     sms_sender = SMSSender()
-    flag = sms_sender.send('Test Message from TriCap.')
+    flag = sms_sender.send('Test Message from TriCap.') # Mesage?
     data = {}
     data['success'] = flag
     if flag:
@@ -224,15 +223,28 @@ def _has_capture_started():
 
     config = TricapConfig()
 
+    if not use_dummy_cams:
+        if altimeter.get_error_start() == True and tricap_manager.get_state() != CAM_MANAGER_STATES.STARTED:
+            tricap_manager.start_capturing()
+            return True
+
+        if str(altimeter.get_error()) != "":
+            if str(altimeter.get_error()) == "01" and tricap_manager.get_state() != CAM_MANAGER_STATES.STARTED:
+                tricap_manager.start_capturing()
+                return True
+            else:
+                print(str(altimeter.get_error()))
+
     # Include here the function to return false if switch is off
-    altimeter_switch.set_altitude_switch_state(manual_override)
-    if altimeter_switch.get_altitude_switch_state(manual_override) == False \
-            or manual_override == OverrideState.STOPOVERRIDE.value:
+    altimeter_switch.set_state(altimeter_switch.get_override_state())
+    if altimeter_switch.state() == False \
+            or altimeter_switch.get_override_state() == OVERRIDESTATE.STOPOVERRIDE.value:
         tricap_manager.stop_capturing()
         return False
 
     cams_started = tricap_manager.state == CAM_MANAGER_STATES.STARTED
     alti_started = altimeter.state == ALTIMETER_STATE.MEASURING
+
 
     cams_a_must = False
     if config.get('cams_required', TricapConfig.WEB_SECTION_HEADER) == 'yes':
@@ -242,7 +254,9 @@ def _has_capture_started():
     if (config.get('alti_required', TricapConfig.WEB_SECTION_HEADER) == 'yes'):
         alti_a_must = True
 
-    if manual_override != OverrideState.STOPOVERRIDE.value:  # = 1
+
+# or str(altimeter.get_error()) == "10"
+    if altimeter_switch.get_override_state() != OVERRIDESTATE.STOPOVERRIDE.value:  # = 1
         tricap_manager.start_capturing()
 
     # if non of the sensors are required, then at least one has had to have started
@@ -253,7 +267,6 @@ def _has_capture_started():
             return False
 
     # if a sensor is required, then capture has not started
-
     if (alti_a_must and not alti_started):
         return False
 
@@ -276,23 +289,81 @@ def reset():
     return redirect(url_for('home.index'))
 
 
+@home_bp.route('/logs/<string:date>', methods=['GET', 'POST'])
+def downloads(date):
+    # Use variable to access the date of the log
+    uploads = os.path.join(local_paths.SESSION_ROOT_DIR, date)
+    if platform.system() == 'Windows':
+        shutil.make_archive("logs", 'zip', uploads)
+        return send_from_directory(directory=os.getcwd(), filename="logs.zip", as_attachment=True)
+    else:
+        os.chdir(local_paths.SESSION_ROOT_DIR)
+        #uploads = os.path.join(os.getcwd(), "logs")
+        shutil.make_archive("logs", 'gztar', uploads)
+        return send_from_directory(directory=local_paths.SESSION_ROOT_DIR, filename="logs.tar.gz", as_attachment=True)
+
+
+# url_for does not work with variable to access different logs
+@home_bp.route('/logs/', methods=['GET', 'POST'])
+def download():
+    date = str(datetime.date.today())
+    uploads = os.path.join(local_paths.SESSION_ROOT_DIR, date)
+    if platform.system() == 'Windows':
+        shutil.make_archive("logs", 'zip', uploads)
+        return send_from_directory(directory=os.getcwd(), filename="logs.zip", as_attachment=True)
+    else:
+        os.chdir(local_paths.SESSION_ROOT_DIR)
+        # uploads = os.path.join(os.getcwd(), "logs")
+        shutil.make_archive("logs", 'gztar', uploads)
+        return send_from_directory(directory=local_paths.SESSION_ROOT_DIR, filename="logs.tar.gz", as_attachment=True)
+
+    # uploads = os.path.join(os.getcwd(), "logs")
+    # if platform.system() == 'Windows':
+    #     shutil.make_archive("logs", 'zip', uploads)
+    #     return send_from_directory(directory=os.getcwd(), filename="logs.zip")
+    # else:
+    #     os.chdir("/home/rpi3/Projects/tricap/tricap/")
+    #     uploads = os.path.join(os.getcwd(), "logs")
+    #     shutil.make_archive("logs", 'gztar', uploads)
+    #     return send_from_directory(directory=os.getcwd(), filename="logs.tar.gz")
+
+@home_bp.route('/_shutdown')
+def shutdown():
+    """Shut down the RPi server from the gui"""
+    if tricap_manager.state != CAM_MANAGER_STATES.STARTED:
+        if use_dummy_cams:
+            # Used only for testing purposes
+            return '<h1 id="shutdown">Shutting down server</h1>'
+        else:
+            rootlogger.info("User requested a shutdown of TriCap")
+            command = "/usr/bin/sudo /sbin/poweroff"
+
+            while True:
+                process = subprocess.Popen(command.split(), stdout=subprocess.PIPE)
+                output = process.communicate()[0]  # Execute the command
+            return "Shutting down server"
+    else:
+        return render_template("/camera/wait.html")
+
+
 @home_bp.route('/_button_click', methods=['GET', 'POST'])
 def handle_button_click():
     button_code = int(request.args.get('buttonCode'))
-    global manual_override
 
     if button_code == BUTTON_CODE.START:
         rootlogger.info('User requested capture to start.')
         session_logger.create_new_session()
         tricap_manager.start_capturing()
-        manual_override = OverrideState.ALTISWITCH.value
+        altimeter_switch.set_override_state(OVERRIDESTATE.ALTISWITCH.value)
         #altimeter.start_measuring()
         return jsonify(capture_started=_has_capture_started())
     elif button_code == BUTTON_CODE.STOP:
         rootlogger.info('User requested capture to stop.')
         tricap_manager.stop_capturing()
-        manual_override = OverrideState.STOPOVERRIDE.value
-        #altimeter.stop_measuring()
+        altimeter_switch.set_override_state(OVERRIDESTATE.STOPOVERRIDE.value)
+        if not use_dummy_cams:
+            altimeter.set_error_start(False)
+        altimeter_switch.session_started = False
         return jsonify(capture_started=_has_capture_started())
     elif button_code == BUTTON_CODE.RESET:
         rootlogger.info('User requested server reset.')
@@ -305,22 +376,25 @@ def handle_button_click():
             # we want to stop
             rootlogger.info('User requested capture to stop.')
             tricap_manager.stop_capturing()
+            if not use_dummy_cams:
+                altimeter.set_error_start(False)
+            altimeter_switch.session_started = False
             #altimeter.stop_measuring()
-            manual_override = OverrideState.STOPOVERRIDE.value  # stop capturing data
+            altimeter_switch.set_override_state(OVERRIDESTATE.STOPOVERRIDE.value)# stop capturing data
         else:  # we want to start
             rootlogger.info('User requested capture to start.')
-            session_logger.create_new_session()
             config = TricapConfig()
             if (config.get('cams_required', TricapConfig.WEB_SECTION_HEADER) != 'no'):
                 tricap_manager.start_capturing()
-                if manual_override == OverrideState.ALTISWITCH.value:
-                    manual_override = OverrideState.MANUALSTART.value  # 2 Other state for start override
+                if altimeter_switch.get_override_state() == OVERRIDESTATE.ALTISWITCH.value:
+                    altimeter_switch.set_override_state(OVERRIDESTATE.MANUALSTART.value)  # "2" Other state for start override
+                    session_logger.create_new_session()
+                    rootlogger.info('User requested manual capture to start with override.')
                     print("Manual override start")
                 else:
-                    manual_override = OverrideState.ALTISWITCH.value  # Other state for start override
+                    altimeter_switch.set_override_state(OVERRIDESTATE.ALTISWITCH.value)  # Other state for start override
+                    rootlogger.info('User requested automatic capture to start with altitude switch.')
                     print("Altitude switch active")
-            # if (config.get('alti_required', TricapConfig.WEB_SECTION_HEADER) != 'no'):
-            #      altimeter.start_measuring()
         # send back the real state of the system
         return jsonify(capture_started=_has_capture_started())
 

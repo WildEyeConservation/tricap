@@ -24,13 +24,15 @@ from support.talkbox import TalkBox
 from support.log_list import LogListAccessor
 from support.basic import TimeMonitor, PeriodicMonitor
 from support.sms_sender import SMSObserver
+from support.git_info import GitData
 
 from support.connection_monitor import generate_net_monitor, NetworkMonitorLogger
 from support.connection_monitor import generate_ip_monitor, IPMonitorLogger
 
 from support.system_monitor import generate_system_monitor, SystemMonitorLogger
 
-from config import SERVER_LOG_DIR
+from config import SERVER_LOG_DIR, ALTIMETER_STATE
+from enum import Enum
 
 
 class AltiMeasurementObserver():
@@ -157,10 +159,11 @@ cam_settings = init_config.get_section_dict(TricapConfig.CAMERA_SECTION_HEADER)
 # Instantiate the sensors
 if init_config.get('cams_required', TricapConfig.WEB_SECTION_HEADER) == 'dummy':
     use_dummy_cams = True
-    rootlogger.debug('Dummy cams will be, in accordance to configuration.')
+    rootlogger.debug('Dummy cams will be used, in accordance to configuration.')
 else:
     use_dummy_cams = False
     rootlogger.debug('Real cams will be used, in accordance to configuration')
+    code_inf = GitData()
 
 tricap_manager = TriCapCamsManager(misc_settings, cam_settings, use_dummy_cams)
 tricap_cameras = tricap_manager.get_cameras_as_list()
@@ -192,8 +195,9 @@ else:
 
 altimeter_switch = AltiSwitch(altimeter)
 altimeter.attach(altimeter_switch)
-manual_override = False
-alti_startup = 0
+
+if altimeter.state != ALTIMETER_STATE.MEASURING:
+    altimeter.start_measuring()
 
 rootlogger.debug('Altimeter has been configured.')
 
@@ -239,6 +243,11 @@ cam_img_num_mon.start()
 alti_mon.start()
 time_mon.start()
 
+if use_dummy_cams == False:
+    rootlogger.info("Git version: " + code_inf.code_id())
+else:
+    rootlogger.info("Git version: " + "DummyGit1234")
+
 
 # some glue functions, which use the module level functions
 
@@ -246,8 +255,7 @@ time_mon.start()
 def stop_fetching():
     """Turn off fetching for all cameras."""
     for cam in tricap_manager.get_cameras_as_list():
-        cam._camera.fetch_state = False
-
+        cam._camera.fetch_state = False  # add pass for testing
 
 fetch_stopper = GateCloser(20.0, stop_fetching)
 
@@ -270,9 +278,11 @@ def stop_all_threads():
 from .views.home import home_bp
 from .views.showlog import showlog_bp
 from .views.settings import settings_bp
+from .views.camera import camera_bp
 
 app.register_blueprint(home_bp)
 app.register_blueprint(showlog_bp)
 app.register_blueprint(settings_bp)
+app.register_blueprint(camera_bp)
 
 rootlogger.info('New instance of TriCap app has been initiated.')

@@ -7,6 +7,7 @@ import logging
 import threading
 import os
 import exifread
+import copy
 
 from config import CAM_MANAGER_STATES, SERVER_LOG_DIR, SESSION_ROOT_DIR
 
@@ -71,6 +72,7 @@ class TriCapCamsManager:
         self._cam_settings = cam_settings
         self._man_settings = man_settings
         self.use_dummy_cams = use_dummy_cams
+        self.camera_list = ""
         self._initialise()
 
     def _initialise(self):
@@ -91,8 +93,25 @@ class TriCapCamsManager:
     def get_cam_image_fp(self, cam_num):
         return self._cameras[cam_num].get_cam_image_fp()
 
-    def get_cameras_as_list(self):
+    def order_cameras_list(self):
+        self.camera_list = self._cameras
+        for camera_nb in range(3):
+            if self.camera_list[camera_nb].config.eosserialnumber == "032024003117":
+                self._cameras[0], self.camera_list[camera_nb] = self.camera_list[camera_nb], self._cameras[0]
+            elif self.camera_list[camera_nb].config.eosserialnumber == "023052000180":
+                self._cameras[1], self.camera_list[camera_nb] = self.camera_list[camera_nb], self._cameras[1]
+            elif self.camera_list[camera_nb].config.eosserialnumber == "413051000325":
+                self._cameras[2], self.camera_list[camera_nb] = self.camera_list[camera_nb], self._cameras[2]
+
+    def show_cameras_list(self):
+        for camera_nb in range(3):
+            print(self._cameras[camera_nb].config.eosserialnumber)
+
+    def get_cameras_as_list(self):  # Sort this list
         return self._cameras
+
+    def get_state(self):
+        return self.state
 
     def _find_cameras(self):
         self._cameras = []
@@ -117,6 +136,8 @@ class TriCapCamsManager:
                     tricap_cam._camera.calibrate_func = tricap_cam.focus_infinity
                     tricap_cam._camera.calibrate_step = int(self._man_settings['calibrate_step'])
                     self._cameras.append(tricap_cam)
+            self.order_cameras_list()
+            # self.show_cameras_list()
 
     # def reset(self, man_settings: dict, cam_settings: dict):
     #     self._man_settings = man_settings
@@ -136,7 +157,7 @@ class TriCapCamsManager:
         for index, cam in enumerate(self._cameras):
             fp = cam.capture_and_download(target_folder=SESSION_ROOT_DIR, target_name=str(index)+'.CR2')
             with open(fp, 'rb') as im_f:
-                tags = exifread.process_file(im_f)
+                tags = exifread.process_file(im_f, stop_tag="GPS GPSLongitude")  # Reduce time of execution by adding a stop tag
                 if 'GPS GPSLongitude' in tags.keys():
                     gps_status_of_cams.append(True)
                 else:
@@ -165,13 +186,16 @@ class TriCapCamsManager:
             else:
                 barrier = threading.Barrier(len(self._cameras))
 
-            for cam in self._cameras:
-                thread = threading.Thread(target=cam.capture, daemon=True,
+            for cam in self._cameras:  # self.thread was thread
+                self.thread = threading.Thread(target=cam.capture, daemon=True,
                                           kwargs={"continuous": True, "barrier": barrier,
                                                   "stop_event": self._kill_pill})
-                thread.start()
+                self.thread.start()
             self.state = CAM_MANAGER_STATES.STARTED
             self._logger.debug('Cam manager - capture threads started.')
+
+    def check_thread_status(self):
+        return self.thread.isAlive()
 
     def stop_capturing(self):
         if self.state == CAM_MANAGER_STATES.STARTED:

@@ -11,7 +11,9 @@
 /*/__pycache__
 /.coveragerc
 /htmlcov
+/coverage_html
 node_modules
+/build
 
 
 # !.gitignore
@@ -22,7 +24,6 @@ node_modules
 *.png
 *.orig
 *.dot
-*.png
 *.zip
 *.tern-project
 *.log
@@ -41,4 +42,6 @@ initial.cfg
 pylintrc
 test_local.py
 delete_log_files.py
+SD_card_reader.spec
+setup.py
 *.coverage

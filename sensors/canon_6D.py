@@ -50,3 +50,9 @@ class Canon6DCam():
     @property
     def state(self):
         return self._camera.state
+
+    def get_camera_context(self):
+        return self._camera.get_cam_context()
+
+    def get_camera(self):
+        return self._camera.get_cam()

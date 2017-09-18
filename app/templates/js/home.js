@@ -180,12 +180,6 @@ var startStopFollowUp = function (data) {
         $('[name="btn_startstop"]').html('Stop');
     } else { // Data capture has not started
         camRefreshTimer.stopTimer();
-//        if(data.override == "1"){
-//            $('[name="btn_startstop"]').html('Start Automatic');
-//        } else {
-//            //$('[name="btn_startstop"]').html('Start');
-//        }
-        //$('[name="btn_startstop"]').html('Start'); //TODO automated and manual displayed with start
     }
 };
 
@@ -254,11 +248,10 @@ var updateAlti = function(data){
         }
     }
 
-
     if(data.switch_state == 'True') { //See switch state to determine if the camera should capture
         //changeMainStatus('green', 'TriCap: Capturing data of cameras');
         changeMainStatus('green', methodOfCapture.concat("Capturing"));
-    } else if(data.measurement > 10) {
+    } else if(data.measurement > 0) {
         changeMainStatus('orange', methodOfCapture.concat('NOT capturing'));
     } else {
         changeMainStatus('green', 'TriCap');
@@ -281,6 +274,11 @@ var updateAlti = function(data){
     } else {
         changeElementColour('#alt_alti_target', 'blue');
         $('#h_alti_target').html('Within target range');
+    }
+
+    if (data.error == "01") { // Error message for no target
+        changeElementColour('#alt_alti_target', 'orange');
+        $('#h_alti_target').html('Above altimeter range');
     }
 
     return false;
@@ -459,9 +457,11 @@ $(function(){
     $('#btn_modal_session_description_submit').on('click', function(event){
         $.getJSON($SCRIPT_ROOT + '/_submit_session_description',
                   {sessionDescription: $('#input_modal_session_description').val()},
-                  function(){
+                  function(){ // Added safety measure for ensuring capture is done at the correct state
+                    if ($('[name="btn_startstop"]').html() === 'Start Manual'){
                       $.getJSON($SCRIPT_ROOT + '/_button_click', {buttonCode: tricap.BUTTON_CODES.STARTSTOP },
                                 startStopFollowUp);
+                      }
                   }
             );
         return true;

@@ -30,11 +30,11 @@ class SMSSender(object):
     def check_response(self, response):
         """Return true if the response is good, false if the reponse is bad."""
         lines = response.readlines()
-        if lines[2] == b'Mesage SENT!<br/>\n':
+        if lines[2] == b'Message SENT!<br/>\n':  # Mesage?
             return True
         else:
             # Not sure if we can ever reach this
-            logging.getLogger('').warning("SMSGateway did not succesfully send sms: %s", lines)
+            logging.getLogger('').warning("SMSGateway did not successfully send sms: %s", lines)
             return False
 
     def send(self, msg):

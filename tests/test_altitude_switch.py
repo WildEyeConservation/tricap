@@ -6,13 +6,8 @@ from time import sleep
 from sensors.alti_simulator import SimulatorAlti
 from sensors.altitude_switch import AltiSwitch
 from support.configure import TricapConfig
+from config import OVERRIDESTATE
 
-from enum import Enum
-
-class OverrideState(Enum):
-    ALTISWITCH = 0  # OverrideState.ALTISWITCH.value = 0
-    STOPOVERRIDE = 1
-    MANUALSTART = 2
 
 class TestAltiSwitch(TestCase):
     """Test the altitude switch with switch state and override status."""
@@ -37,12 +32,12 @@ class TestAltiSwitch(TestCase):
         self.alti._measurement = 160
         self.switch.update(self)
         self.switch.set_altitude_switch()
-        self.assertTrue(self.switch.get_altitude_switch_state() == True)
+        self.assertTrue(self.switch.state() == True)
 
         self.alti._measurement = 130
         self.switch.update(self)
         self.switch.set_altitude_switch()
-        self.assertTrue(self.switch.get_altitude_switch_state() == True)
+        self.assertTrue(self.switch.state() == True)
 
         # self.alti._measurement = 100
         # self.switch.update(self)
@@ -55,22 +50,22 @@ class TestAltiSwitch(TestCase):
         # self.assertTrue(self.switch.get_altitude_switch_state() == False)
 
     def test_override_state(self):
-        """ Test the override functionality of the altitude switch"""
+        """ Test the override functionality of the altitude switch with boundries of 150 and 120"""
         self.create_alti()
 
         self.alti._measurement = 130
         self.switch.update(self)
-        self.switch.set_altitude_switch_state(OverrideState.ALTISWITCH.value)
-        self.assertTrue(self.switch.get_altitude_switch_state(OverrideState.ALTISWITCH.value) == False)
+        self.switch.set_state(OVERRIDESTATE.ALTISWITCH.value)
+        self.assertTrue(self.switch.state() == False)
 
         self.alti._measurement = 160
         self.switch.update(self)
-        self.switch.set_altitude_switch_state(OverrideState.ALTISWITCH.value)
-        self.assertTrue(self.switch.get_altitude_switch_state(OverrideState.ALTISWITCH.value) == True)
+        self.switch.set_state(OVERRIDESTATE.ALTISWITCH.value)
+        self.assertTrue(self.switch.state() == True)
 
-        self.switch.set_altitude_switch_state(OverrideState.STOPOVERRIDE.value)
-        self.assertTrue(self.switch.get_altitude_switch_state(OverrideState.STOPOVERRIDE.value) == False)
+        self.switch.set_state(OVERRIDESTATE.STOPOVERRIDE.value)
+        self.assertTrue(self.switch.state() == False)
 
-        self.switch.set_altitude_switch_state(OverrideState.MANUALSTART.value)
-        self.assertTrue(self.switch.get_altitude_switch_state(OverrideState.MANUALSTART.value) == True)
+        self.switch.set_state(OVERRIDESTATE.MANUALSTART.value)
+        self.assertTrue(self.switch.state() == True)
 

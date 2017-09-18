@@ -1,40 +1,59 @@
 """Parse the data from the cameras using gphoto2"""
-import gphoto2 as gp
+
+from app import use_dummy_cams
+if not use_dummy_cams:
+    import gphoto2 as gp
+    from app import tricap_cameras
 
 
-class ParseCamera():
-    def __init__(self):
-        self.context = gp.Context()
-        self.camera = gp.Camera()
-        self.camera.init(self.context)
-        self.text = self.camera.get_summary(self.context)
-        self.tex = str(self.text)
-        self.parse = ""
+    class ParseData():
 
-    def parsing(self, data):
-        self.parse = ""
-        self.index = self.tex.find(data) + len(data)
-        while self.tex[self.index] != ' ' and self.tex[self.index] != '\n':
-            self.parse += str(self.tex[self.index])
-            self.index += 1
-        return self.parse
+        def parse_data(self, data, number):
+            self.context = tricap_cameras[number].get_camera_context()
+            self.text = tricap_cameras[number].get_camera().get_summary(self.context)
 
-    def parse_serial_number(self):
-        self.serial_number = self.parsing("Serial Number: ")
-        return self.serial_number
+            self.tex = str(self.text)
+            self.parse[number] = ""
+            self.index = self.tex.find(data) + len(data)
+            while self.tex[self.index] != ' ' and self.tex[self.index] != '\n':
+                self.parse[number] += str(self.tex[self.index])
+                self.index += 1
+            return self.parse[number]
 
-    def parse_available_space(self):
-        self.available_space = self.parsing("Free Space (Bytes): ")
-        self.available_space = int(self.available_space)/(1024*1024)
-        return str(self.available_space) + " Mb"
+        @staticmethod
+        def parse_serial_number(number):  # self parameter
+            #self.serial_number = self.parse_data("Serial Number: ", number)
+            return tricap_cameras[number].serial_num
 
-    def parse_battery_level(self):
-        self.serial_number = self.parsing("value: ")
-        return self.serial_number.strip("%")
+        def parse_available_space(self, number):
+            self.available_space = self.parse_data("Free Space (Bytes): ", number)
+            self.available_space = int(self.available_space)/(1024*1024)
+            return str(self.available_space) + " Mb"
 
-# Pi test code
-camera_data = ParseCamera()
-print(camera_data.parse_available_space())
-print(camera_data.parse_serial_number())
-print(camera_data.parse_battery_level())
+        def parse_battery_level(self, number):
+            self.serial_number = self.parse_data("value: ", number)
+            return self.serial_number
 
+        def parse_camera(self, number):
+            self.context = tricap_cameras[number].get_camera_context()
+            self.text = tricap_cameras[number].get_camera().get_summary(self.context)
+
+            self.tex = str(self.text)
+            self.parse = [""]*3
+            self.parse[0] = tricap_cameras[number].serial_num
+            self.index = self.tex.find("Free Space (Bytes): ") + len("Free Space (Bytes): ")
+            while self.tex[self.index] != ' ' and self.tex[self.index] != '\n':
+                self.parse[1] += str(self.tex[self.index])
+                self.index += 1
+            self.index = self.tex.find("value: ") + len("value: ")
+            while self.tex[self.index] != ' ' and self.tex[self.index] != '\n':
+                self.parse[2] += str(self.tex[self.index])
+                self.index += 1
+
+            return self.parse[0], str(int(self.parse[1])/(1024*1024)), self.parse[2].strip('%')
+
+else: # test code
+    class ParseData():
+        @staticmethod
+        def parse_serial_number(number):
+            return number+1

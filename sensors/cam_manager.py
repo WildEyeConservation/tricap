@@ -95,13 +95,14 @@ class TriCapCamsManager:
 
     def order_cameras_list(self):
         self.camera_list = self._cameras
-        for camera_nb in range(3):
-            if self.camera_list[camera_nb].config.eosserialnumber == "032024003117":
-                self._cameras[0], self.camera_list[camera_nb] = self.camera_list[camera_nb], self._cameras[0]
-            elif self.camera_list[camera_nb].config.eosserialnumber == "023052000180":
-                self._cameras[1], self.camera_list[camera_nb] = self.camera_list[camera_nb], self._cameras[1]
-            elif self.camera_list[camera_nb].config.eosserialnumber == "413051000325":
-                self._cameras[2], self.camera_list[camera_nb] = self.camera_list[camera_nb], self._cameras[2]
+        if len(self.camera_list) == 3:
+            for camera_nb in range(3):
+                if self.camera_list[camera_nb].config.eosserialnumber == "032024003117":
+                    self._cameras[0], self.camera_list[camera_nb] = self.camera_list[camera_nb], self._cameras[0]
+                elif self.camera_list[camera_nb].config.eosserialnumber == "023052000180":
+                    self._cameras[1], self.camera_list[camera_nb] = self.camera_list[camera_nb], self._cameras[1]
+                elif self.camera_list[camera_nb].config.eosserialnumber == "413051000325":
+                    self._cameras[2], self.camera_list[camera_nb] = self.camera_list[camera_nb], self._cameras[2]
 
     def show_cameras_list(self):
         for camera_nb in range(3):

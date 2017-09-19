@@ -111,7 +111,9 @@
             {% for cam_num in range(num_cams) %}
               <div class="col-xs-{{12//num_cams}}">
                 <div class="alert alert-info" id="alt_cam{{cam_num}}">
-                  <h3>{{serial_numbers[cam_num]}} camera</h3>
+                    {% if num_cams == 3 %}
+                        <h3>{{serial_numbers[cam_num]}} camera</h3>
+                    {% endif %}
                   <img src="{{url_for('static', filename='img/default.jpg')}}"
                        class="img-responsive" id="img_cam{{cam_num}}">
                 </div>

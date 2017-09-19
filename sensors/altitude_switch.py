@@ -6,6 +6,7 @@ import logging
 import local_paths
 from enum import Enum
 from support.configure import TricapConfig
+from support.sms_sender import SMSSender
 from config import OVERRIDESTATE
 import app
 from config import CAM_MANAGER_STATES
@@ -25,14 +26,21 @@ class AltiSwitch(Observer):
         self._logger.debug('Altitude Switch started - Automatic switch enabled')
         self.update_boundaries()
         self.session_started = False
+        self.landed = True
 
     # Altitude switch is not in update, because of the outside use of the function
     def set_altitude_switch(self, override=OVERRIDESTATE.ALTISWITCH.value):
         if override == OVERRIDESTATE.ALTISWITCH.value:
             if self.measured_height >= self.turn_on_altitude:
                 self.alti_switch_state = True  # Turn on the altitude switch
+                self.landed = False
                 #self._logger.debug('Altitude Switch - capturing')
-            #elif self.measured_height < self.turn_off_altitude:
+            elif self.measured_height < self.turn_off_altitude:
+                if not self.landed:
+                    # print("Aircraft has landed.")
+                    self._logger.info('Aircraft has landed.')
+                    self.landed = True
+                #     self.session_started = False  # Create a new session when altiSwitch turns on again
                 # self.alti_switch_state = False  # Turn off altitude switch
                 #self._logger.debug('Altitude Switch - Would have stopped capturing')
         elif override == OVERRIDESTATE.STOPOVERRIDE.value:  # If switch is overwritten, then the system stops capturing
@@ -59,8 +67,11 @@ class AltiSwitch(Observer):
         self.set_state(override=self.get_override_state())
         # Start session when altiswitch is turned on.
         if self.state() == True and self.session_started == False:
+            self._logger.info('New session started with altitude switch.')
             app.session_logger.create_new_session()
             self.session_started = True
+            sms_sender = SMSSender()
+            flag = sms_sender.send('Altitude switch is active.')
         # self.update_boundaries()  # Put this function in here if not placed anywhere else
 
     def update_boundaries(self):

@@ -229,8 +229,8 @@ def _has_capture_started():
                     tricap_manager.start_capturing()
                     altimeter.set_error_start(True)
                     return True
-            else:
-                print(str(altimeter.get_error()))
+            # else:
+            #     print(str(altimeter.get_error()))
 
         if altimeter.get_error_start() is True:
             return True

@@ -249,7 +249,7 @@ var updateAlti = function(data){
         }
     }
 
-    if(data.switch_state == 'True') { //See switch state to determine if the camera should capture
+    if(data.switch_state == 'True' || data.capture_started === true) { //See switch state to determine if the camera should capture
         //changeMainStatus('green', 'TriCap: Capturing data of cameras');
         changeMainStatus('green', methodOfCapture.concat("Capturing"));
     } else if(data.measurement > 0) {

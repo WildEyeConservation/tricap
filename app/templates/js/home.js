@@ -279,7 +279,7 @@ var updateAlti = function(data){
 
     if (data.error == "01") { // Error message for no target
         errorCount = errorCount + 1;
-        if (errorCount > 3) {
+        if (errorCount > 1) { // TODO Change to 3
         changeElementColour('#alt_alti_target', 'orange');
         $('#h_alti_target').html('Above altimeter range');
         }

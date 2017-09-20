@@ -94,6 +94,7 @@ class TrusenseAltimeter(Subject):
         self.unit = 'm'
         self.error = ""
         self.error_start = False
+        self.alti_code = 2*[""]
 
         self._ser = None  # set this to None if something goes wrong with getting the Serial object
 
@@ -154,7 +155,10 @@ class TrusenseAltimeter(Subject):
         if reply[0:3] == b'$ER':
             err_code = reply[4:6].decode(encoding='ascii')
             self.set_error(err_code)
-            self._logger.warning(TrusenseAltimeter.errorCodes[err_code])
+            self.alti_code[0] = TrusenseAltimeter.errorCodes[err_code]
+            if self.alti_code[0] != self.alti_code[1]:
+                self.alti_code[1] = self.alti_code[0]
+                self._logger.warning(TrusenseAltimeter.errorCodes[err_code])
 
     def _check_ok(self, error_msg):
         reply = self._ser.readline()

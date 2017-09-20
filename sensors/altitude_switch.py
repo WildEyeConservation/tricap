@@ -26,6 +26,7 @@ class AltiSwitch(Observer):
         self.update_boundaries()
         self.session_started = False
         self.landed = True
+        self.sms_sender = SMSSender()
 
     # Altitude switch is not in update, because of the outside use of the function
     def set_altitude_switch(self, override=OVERRIDESTATE.ALTISWITCH.value):
@@ -36,12 +37,14 @@ class AltiSwitch(Observer):
                 #self._logger.debug('Altitude Switch - capturing')
             elif self.measured_height < self.turn_off_altitude:
                 if not self.landed:
-                    # print("Aircraft has landed.")
-                    self._logger.info('Aircraft has landed.')
-                    self.landed = True
-                #     self.session_started = False  # Create a new session when altiSwitch turns on again
-                # self.alti_switch_state = False  # Turn off altitude switch
-                #self._logger.debug('Altitude Switch - Would have stopped capturing')
+                    if self.turn_off_altitude < self.turn_on_altitude:
+                        # print("Aircraft has landed.")
+                        self._logger.info('Aircraft has landed.')
+                        self.landed = True
+                        flag = self.sms_sender.send('Aircraft has landed.')
+                    #     self.session_started = False  # Create a new session when altiSwitch turns on again
+                    # self.alti_switch_state = False  # Turn off altitude switch
+                    #self._logger.debug('Altitude Switch - Would have stopped capturing')
         elif override == OVERRIDESTATE.STOPOVERRIDE.value:  # If switch is overwritten, then the system stops capturing
             self.alti_switch_state = False
             #self._logger.debug('Altitude Switch = stopped - not capturing')
@@ -70,8 +73,7 @@ class AltiSwitch(Observer):
             from app import session_logger
             session_logger.create_new_session()
             self.session_started = True
-            sms_sender = SMSSender()
-            flag = sms_sender.send('Altitude switch is active.')
+            flag = self.sms_sender.send('Altitude switch is active.')
         # self.update_boundaries()  # Put this function in here if not placed anywhere else
 
     def update_boundaries(self):

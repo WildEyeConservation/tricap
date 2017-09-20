@@ -8,7 +8,6 @@ from enum import Enum
 from support.configure import TricapConfig
 from support.sms_sender import SMSSender
 from config import OVERRIDESTATE
-import app
 from config import CAM_MANAGER_STATES
 
 
@@ -68,7 +67,8 @@ class AltiSwitch(Observer):
         # Start session when altiswitch is turned on.
         if self.state() == True and self.session_started == False:
             self._logger.info('New session started with altitude switch.')
-            app.session_logger.create_new_session()
+            from app import session_logger
+            session_logger.create_new_session()
             self.session_started = True
             sms_sender = SMSSender()
             flag = sms_sender.send('Altitude switch is active.')

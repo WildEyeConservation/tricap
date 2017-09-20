@@ -19,8 +19,8 @@ class TestSessionLogger(TriCapTempFilerTestCase):
 
         time.sleep(1)
 
-        expected_fp = os.path.join(self.tempdir, time.strftime("%Y_%m_%d"),
-                                   time.strftime("%Y_%m_%d_session00"))
+        expected_fp = os.path.join(self.tempdir, time.strftime("%Y-%m-%d"),
+                                   time.strftime("%Y-%m-%d_session00"))
         self.assertEqual(session_logger._session_folder, expected_fp)
 
         with open(session_logger._log_fp, 'r') as log_file:
@@ -59,8 +59,8 @@ class TestSessionLogger(TriCapTempFilerTestCase):
         session_logger.create_new_session()
 
         session_logger.create_new_session()
-        expected_fp = os.path.join(self.tempdir, time.strftime("%Y_%m_%d"),
-                                   time.strftime("%Y_%m_%d_session01"))
+        expected_fp = os.path.join(self.tempdir, time.strftime("%Y-%m-%d"),
+                                   time.strftime("%Y-%m-%d_session01"))
         self.assertEqual(session_logger._session_folder, expected_fp)
 
         session_logger._remove_handlers()

@@ -16,9 +16,8 @@ from sensors.trusense_altimeter import TrusenseAltimeter
 #from sensors.dummy_alti import DummyAlti
 from sensors.alti_simulator import SimulatorAlti
 from sensors.camera_logger import cameraLoggingObserver
-from sensors.altitude_switch import AltiSwitch
-
 from support.session_logger import SessionLogger
+from sensors.altitude_switch import AltiSwitch
 from support.configure import TricapConfig
 from support.talkbox import TalkBox
 from support.log_list import LogListAccessor

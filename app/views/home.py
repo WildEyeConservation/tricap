@@ -221,12 +221,12 @@ def _has_capture_started():
     config = TricapConfig()
 
     if not use_dummy_cams:
-        if altimeter.get_error_start() == True and tricap_manager.get_state() != CAM_MANAGER_STATES.STARTED:
-            tricap_manager.start_capturing()
-            return True
+        # if altimeter.get_error_start() == True and tricap_manager.get_state() != CAM_MANAGER_STATES.STARTED:
+        #     tricap_manager.start_capturing()
+        #     return True
 
         if str(altimeter.get_error()) != "":
-            if str(altimeter.get_error()) == "01" and tricap_manager.get_state() != CAM_MANAGER_STATES.STARTED:
+            if (str(altimeter.get_error()) == "01" or altimeter.get_error_start() is True) and tricap_manager.get_state() != CAM_MANAGER_STATES.STARTED:
                 tricap_manager.start_capturing()
                 return True
             else:

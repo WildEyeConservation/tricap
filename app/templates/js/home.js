@@ -16,6 +16,7 @@ var altiRange = {{python_data.alti_range}};
 var altiConvertToFeet = "{{python_data.alti_convert_to_feet}}"
 var vibrate = "{{python_data.vibrate}}";
 var defaultSessionDescription = "{{python_data.default_session_description}}"
+var errorCount = 0
 // Code here will be ignored by JSHint.
 /* jshint ignore:end */
 
@@ -277,8 +278,13 @@ var updateAlti = function(data){
     }
 
     if (data.error == "01") { // Error message for no target
+        errorCount = errorCount + 1;
+        if (errorCount > 3) {
         changeElementColour('#alt_alti_target', 'orange');
         $('#h_alti_target').html('Above altimeter range');
+        }
+    } else {
+        errorCount = 0;
     }
 
     return false;
@@ -357,6 +363,7 @@ var updateTalkBox = function(data){
             // '<input type="text" class="form-control" disabled="" target="tb_msg" value="'+data.msgs[index]+'">'
             '<div class="input-group" target="tb_msg">' +
                 '<input type="text" class="form-control" disabled="" value="'+data.msgs[index]+'">'+
+//                '<textarea name="Text1" rows="5">'+data.msgs[index]+'</textarea>' +
                 '<span class="input-group-btn">'+
                     '<button type="button" class="btn '+yes_class+'" target="tb_msg_btn">Yes</a>' +
                     '<button type="button" class="btn '+no_class+'" target="tb_msg_btn">No</a>' +

@@ -10,7 +10,7 @@ import exifread
 import platform
 from math import ceil
 import logging
-from checksumdir import dirhash  # checksumdir 1.1.4
+#from checksumdir import dirhash  # checksumdir 1.1.4
 import filecmp
 import glob
 import hashlib
@@ -18,7 +18,7 @@ import hashlib
 # Variables accessible throughout the whole program
 sd_card_list = []
 Sortie = "Sortie0"
-day = datetime.date.today() #  Global created for re-use
+day = datetime.date.today()  # Global created for re-use
 
 
 # Copy directory from source to destination
@@ -55,8 +55,7 @@ def count_number_of_files(path):
 
 
 def main():
-
-# Main variables used
+    # Main variables used
     num_files = 0
     camera_serial_number = 3 * [""]
     temp_serial_number = 3 * [""]
@@ -64,7 +63,7 @@ def main():
     path_list = []
     path_common = ['100CANON', '101CANON', '102CANON', '103CANON', '104CANON']
     global day
-    SD_hash = []
+    sd_hash = []
     sha1 = hashlib.sha256()
     sha2 = hashlib.sha256()
     sha3 = hashlib.sha256()
@@ -88,11 +87,11 @@ def main():
     # Get input from the user for the internal, external and SD cards
     drive_count = int(input("Are you copying to 1 or 2 drives?:"))
     if drive_count == 1:
-        internal = int(input("Choose drive from list above and enter number: "))
+        internal = int(input("Choose a drive to copy to from list above and enter number: "))
         storage_drives[0], storage_drives[internal] = storage_drives[internal], storage_drives[0]
     elif drive_count == 2:
-        internal = int(input("Choose internal drive from list above and enter number: "))
-        external = int(input("Choose external drive from list above and enter number: "))
+        internal = int(input("Choose internal drive to copy to from list above and enter number: "))
+        external = int(input("Choose external drive to copy to from list above and enter number: "))
         storage_drives[0], storage_drives[internal] = storage_drives[internal], storage_drives[0]
         storage_drives[1], storage_drives[external] = storage_drives[external], storage_drives[1]
     else:
@@ -169,10 +168,12 @@ def main():
             day2 = day2.replace(':', '-')
 
     if day != day2:
-        print("Please choose a date for naming: 1)", day, ' or 2)', day2)
-        option_input = int(input("Choose option 1 or 2: "))
+        print("Please choose a date for folder naming: 1)", day, ' or 2)', day2, 'or 3) own folder name')
+        option_input = int(input("Choose option 1, 2 or 3: "))
         if option_input == 2:
             day = day2
+        elif option_input == 3:
+            day = str(input("Please type in folder name: "))
 
     if len(sd_card_list) == 3:
         # Change the drive list here
@@ -298,7 +299,7 @@ def main():
 
             bar.update(copied)
             logging.info("Copied: " + str(copied) + " images at " + str(datetime.datetime.now().strftime("%H:%M:%S")))
-            time.sleep(2)
+            time.sleep(1)
     except ValueError:
         pass
 
@@ -309,9 +310,12 @@ def main():
     print("\n\nComparing folders for final validation.")
 
     for index in range(len(sd_card_list)):
-        SD_hash.extend(glob.glob(str(sd_card_list[index]) + '/DCIM/*CANON/*'))
-    for index in range(len(SD_hash)):
-        temp = SD_hash[index].split('\\')
+        sd_hash.extend(glob.glob(str(sd_card_list[index]) + '/DCIM/*CANON/*'))
+    for index in range(len(sd_hash)):  
+        if platform.system() == 'Windows':
+            temp = sd_hash[index].split('\\')
+        else:
+            temp = sd_hash[index].split('/')
         list1.append(temp[len(temp)-1])
         sha1.update(list1[index].encode())
     print("hash SD cards: " + str(sha1.hexdigest()))
@@ -320,7 +324,10 @@ def main():
         hd_hash1 = glob.glob(storage_drives[0].mountpoint + "/" + day + "/" +
                              str(Sortie) + "/images/Camera*/*CANON/*")
         for index in range(len(hd_hash1)):
-            temp = hd_hash1[index].split('\\')
+            if platform.system() == 'Windows':
+                temp = hd_hash1[index].split('\\')
+            else:
+                temp = hd_hash1[index].split('/')
             list2.append(temp[len(temp) - 1])
             sha2.update(list2[index].encode())
         print("hash HD internal drive: " + str(sha2.hexdigest()))
@@ -330,7 +337,10 @@ def main():
         hd_hash2 = glob.glob(storage_drives[1].mountpoint + "/" + day + "/" +
                              str(Sortie) + "/images/Camera*/*CANON/*")
         for index in range(len(hd_hash2)):
-            temp = hd_hash2[index].split('\\')
+            if platform.system() == 'Windows':
+                temp = hd_hash2[index].split('\\')
+            else:
+                temp = hd_hash2[index].split('/')
             list3.append(temp[len(temp) - 1])
             sha3.update(list3[index].encode())
         print("hash HD external drive: " + str(sha3.hexdigest()))
@@ -341,7 +351,7 @@ def main():
         print("\nCopying verified and all the images are backed up.")
         logging.info("Copying verified.")
     else:
-        print("\nCopying failed!")
+        print("\nCopying verification failed!")
         logging.info("Copying verification failed.")
     # print(list1)
     # print(list2)
@@ -372,6 +382,7 @@ def main():
 
     print("Finished Copying.")
 
+# ******************************************************************************************************************** #
 # Start main program
 if __name__ == '__main__':
     main()

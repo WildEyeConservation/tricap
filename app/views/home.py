@@ -132,9 +132,6 @@ def provide_state_data():
                 'overall_cam_state_colour': _determine_overall_cam_state_colour(),
                 'capture_started': _has_capture_started()}
 
-    # if cam_data['capture_started'] == True:
-    #     session_logger.create_new_session()
-
     talk_msgs_strs = [talk_msg.msg for talk_msg in talkbox.talk_msgs]
     talk_msgs_reply_codes = [talk_msg.reply.value for talk_msg in talkbox.talk_msgs]
     talk_data = {'msgs': talk_msgs_strs,

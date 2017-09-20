@@ -216,7 +216,7 @@ class GPhotoCam(AbstractCamera):
 
         If a gphoto2 exception is triggered, try up to MAX_TRIGGER_ATTEMPTS again.
 
-        Return True if succesful, or False if too many exceptions were caused.
+        Return True if successful, or False if too many exceptions were caused.
         """
         trigger_attempts = 0
         while trigger_attempts < MAX_TRIGGER_ATTEMPTS:

@@ -30,7 +30,9 @@ class SMSSender(object):
     def check_response(self, response):
         """Return true if the response is good, false if the reponse is bad."""
         lines = response.readlines()
-        if lines[2] == b'Message SENT!<br/>\n':  # Mesage?
+        # if lines[2] == b'Mesage SENT!<br/>\n':
+        if b'Mesage SENT' in lines[2]:  # Keep as Mesage
+            # print("Message sent successfully")
             return True
         else:
             # Not sure if we can ever reach this

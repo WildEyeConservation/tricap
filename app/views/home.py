@@ -221,19 +221,18 @@ def _has_capture_started():
     config = TricapConfig()
 
     if not use_dummy_cams:
-        # if altimeter.get_error_start() == True and tricap_manager.get_state() != CAM_MANAGER_STATES.STARTED:
-        #     tricap_manager.start_capturing()
-        #     return True
+        if altimeter.get_error_start() == True and tricap_manager.get_state() != CAM_MANAGER_STATES.STARTED:
+            print(1)
+            tricap_manager.start_capturing()
+            return True
 
         if str(altimeter.get_error()) != "":
-            should_start = (str(altimeter.get_error()) == "01" or altimeter.get_error_start() is True)
-            print("Should: " + str(should_start))
-            if should_start and tricap_manager.get_state() != CAM_MANAGER_STATES.STARTED:
+            if str(altimeter.get_error()) == "01" and tricap_manager.get_state() != CAM_MANAGER_STATES.STARTED:
+                print(2)
                 tricap_manager.start_capturing()
-                print("Started with error")
                 return True
             else:
-                print("Error: " + str(altimeter.get_error()))
+                print(str(altimeter.get_error()))
 
     # Include here the function to return false if switch is off
     altimeter_switch.set_state(altimeter_switch.get_override_state())
@@ -353,8 +352,7 @@ def handle_button_click():
     if button_code == BUTTON_CODE.START:
         rootlogger.info('User requested capture to start.')
         session_logger.create_new_session()
-        if tricap_manager.get_state() != CAM_MANAGER_STATES.STARTED:
-            tricap_manager.start_capturing()
+        tricap_manager.start_capturing()
         altimeter_switch.set_override_state(OVERRIDESTATE.ALTISWITCH.value)
         #altimeter.start_measuring()
         return jsonify(capture_started=_has_capture_started())
@@ -386,8 +384,7 @@ def handle_button_click():
             rootlogger.info('User requested capture to start.')
             config = TricapConfig()
             if (config.get('cams_required', TricapConfig.WEB_SECTION_HEADER) != 'no'):
-                if tricap_manager.get_state() != CAM_MANAGER_STATES.STARTED:
-                    tricap_manager.start_capturing()
+                tricap_manager.start_capturing()
                 if altimeter_switch.get_override_state() == OVERRIDESTATE.ALTISWITCH.value:
                     altimeter_switch.set_override_state(OVERRIDESTATE.MANUALSTART.value)  # "2" Other state for start override
                     session_logger.create_new_session()

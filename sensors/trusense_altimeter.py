@@ -138,8 +138,8 @@ class TrusenseAltimeter(Subject):
 
     def set_error(self, error_code = ""):
         self.error = error_code
-        if str(error_code) == "01":
-            self.error_start = True
+        # if str(error_code) == "01":
+        #     self.error_start = True
         #print("Error: " + str(error_code))
 
     def get_error(self):

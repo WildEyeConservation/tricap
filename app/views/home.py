@@ -226,8 +226,11 @@ def _has_capture_started():
         #     return True
 
         if str(altimeter.get_error()) != "":
-            if (str(altimeter.get_error()) == "01" or altimeter.get_error_start() is True) and tricap_manager.get_state() != CAM_MANAGER_STATES.STARTED:
+            should_start = (str(altimeter.get_error()) == "01" or altimeter.get_error_start() is True)
+            print("Should: " + str(should_start))
+            if should_start and tricap_manager.get_state() != CAM_MANAGER_STATES.STARTED:
                 tricap_manager.start_capturing()
+                print("Started with error")
                 return True
             else:
                 print("Error: " + str(altimeter.get_error()))

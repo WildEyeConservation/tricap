@@ -4,7 +4,7 @@ from app import use_dummy_cams
 if not use_dummy_cams:
     import gphoto2 as gp
     from app import tricap_cameras
-
+    from support.camera_image import save_last_file
 
     class ParseData():
 
@@ -20,9 +20,14 @@ if not use_dummy_cams:
                 self.index += 1
             return self.parse[number]
 
+        def get_last_image(self, number):
+            self.context_file = tricap_cameras[number].get_camera_context()
+            self.camera_file = tricap_cameras[number].get_camera().get_summary(self.context)
+            save_last_file(self.camera_file, self.context_file)
+
         @staticmethod
         def parse_serial_number(number):  # self parameter
-            #self.serial_number = self.parse_data("Serial Number: ", number)
+            # self.serial_number = self.parse_data("Serial Number: ", number)
             return tricap_cameras[number].serial_num
 
         def parse_available_space(self, number):

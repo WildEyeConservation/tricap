@@ -12,6 +12,7 @@ from app import rootlogger, fetch_stopper, use_dummy_cams
 
 from support.configure import TricapConfig
 from support.sms_sender import SMSSender
+from support.camera_data import ParseData
 import shutil, platform
 import local_paths
 import datetime
@@ -338,22 +339,21 @@ def shutdown():
     else:
         return render_template("/camera/wait.html")
 
+
 @home_bp.route('/_test')
 def test():
     """Test the images for focus problems"""
     if tricap_manager.state != CAM_MANAGER_STATES.STARTED:
         if use_dummy_cams:
-            # Used only for testing purposes
-            return '<h1 id="cam_focus">Testing camera focus</h1>'
+            return send_from_directory(
+                directory="C:/Users/Pieter.at.Innoventix/Desktop/Innoventix/SourceTree Innoventix/tests",
+                filename="defaultend.jpg", as_attachment=True)
         else:
-            rootlogger.info("User requested a shutdown of TriCap")
-            command = "gphoto2 --list-files"
-
-            #while True:
-            process = subprocess.Popen(command.split(), stdout=subprocess.PIPE)
-            output = process.communicate()[0]  # Execute the command
-            print(output)
-            return '<h1 id="shutdown">Tested camera focus</h1>'
+            camerafile = ParseData()
+            camerafile.get_last_image(0)
+            return send_from_directory(
+                directory="C:/Users/Pieter.at.Innoventix/Desktop/Innoventix/SourceTree Innoventix/support",
+                filename="defaultend.jpg", as_attachment=True)
     else:
         return render_template("/camera/wait.html")
 

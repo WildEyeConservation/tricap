@@ -297,6 +297,7 @@ def downloads(date):
         shutil.make_archive("logs", 'zip', uploads)
         return send_from_directory(directory=os.getcwd(), filename="logs.zip", as_attachment=True)
     else:
+        shutil.copyfile("/var/log/syslog", uploads + "/syslog")
         os.chdir(local_paths.SESSION_ROOT_DIR)
         #uploads = os.path.join(os.getcwd(), "logs")
         shutil.make_archive("logs", 'gztar', uploads)
@@ -312,20 +313,12 @@ def download():
         shutil.make_archive("logs", 'zip', uploads)
         return send_from_directory(directory=os.getcwd(), filename="logs.zip", as_attachment=True)
     else:
+        shutil.copyfile("/var/log/syslog", uploads + "/syslog")
         os.chdir(local_paths.SESSION_ROOT_DIR)
         # uploads = os.path.join(os.getcwd(), "logs")
         shutil.make_archive("logs", 'gztar', uploads)
         return send_from_directory(directory=local_paths.SESSION_ROOT_DIR, filename="logs.tar.gz", as_attachment=True)
 
-    # uploads = os.path.join(os.getcwd(), "logs")
-    # if platform.system() == 'Windows':
-    #     shutil.make_archive("logs", 'zip', uploads)
-    #     return send_from_directory(directory=os.getcwd(), filename="logs.zip")
-    # else:
-    #     os.chdir("/home/rpi3/Projects/tricap/tricap/")
-    #     uploads = os.path.join(os.getcwd(), "logs")
-    #     shutil.make_archive("logs", 'gztar', uploads)
-    #     return send_from_directory(directory=os.getcwd(), filename="logs.tar.gz")
 
 @home_bp.route('/_shutdown')
 def shutdown():

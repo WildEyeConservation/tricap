@@ -338,6 +338,25 @@ def shutdown():
     else:
         return render_template("/camera/wait.html")
 
+@home_bp.route('/_test')
+def test():
+    """Test the images for focus problems"""
+    if tricap_manager.state != CAM_MANAGER_STATES.STARTED:
+        if use_dummy_cams:
+            # Used only for testing purposes
+            return '<h1 id="cam_focus">Testing camera focus</h1>'
+        else:
+            rootlogger.info("User requested a shutdown of TriCap")
+            command = "gphoto2 --list-files"
+
+            #while True:
+            process = subprocess.Popen(command.split(), stdout=subprocess.PIPE)
+            output = process.communicate()[0]  # Execute the command
+            print(output)
+            return '<h1 id="shutdown">Tested camera focus</h1>'
+    else:
+        return render_template("/camera/wait.html")
+
 
 @home_bp.route('/_button_click', methods=['GET', 'POST'])
 def handle_button_click():

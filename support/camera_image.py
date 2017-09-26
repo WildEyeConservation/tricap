@@ -58,6 +58,7 @@ def save_last_file(camera, context):
         offset += bytes_read
         #print(bytes_read)
     print(' '.join(map(str, data[0:10])))
+
     import rawpy
     import imageio
     raw = rawpy.imread(io.BytesIO(data))

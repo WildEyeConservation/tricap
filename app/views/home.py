@@ -349,10 +349,11 @@ def test():
                 directory="C:/Users/Pieter.at.Innoventix/Desktop/Innoventix/SourceTree Innoventix/tests",
                 filename="defaultend.jpg", as_attachment=True)
         else:
+            os.chdir("/home/rpi3/Projects/tricap/tricap/")
             camerafile = ParseData()
             camerafile.get_last_image(0)
             return send_from_directory(
-                directory="C:/Users/Pieter.at.Innoventix/Desktop/Innoventix/SourceTree Innoventix/support",
+                directory="/home/rpi3/Projects/tricap/tricap/",
                 filename="defaultend.jpg", as_attachment=True)
     else:
         return render_template("/camera/wait.html")

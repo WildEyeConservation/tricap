@@ -352,9 +352,11 @@ def test():
             os.chdir("/home/rpi3/Projects/tricap/tricap/")
             camerafile = ParseData()
             camerafile.get_last_image(0)
+            camerafile.get_last_image(1)
+            camerafile.get_last_image(2)
             return send_from_directory(
                 directory="/home/rpi3/Projects/tricap/tricap/",
-                filename="defaultend.jpg", as_attachment=True)
+                filename="focus/defaultend0.jpg", as_attachment=True)
     else:
         return render_template("/camera/wait.html")
 

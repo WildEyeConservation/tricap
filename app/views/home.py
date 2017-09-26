@@ -354,9 +354,10 @@ def test():
             camerafile.get_last_image(0)
             camerafile.get_last_image(1)
             camerafile.get_last_image(2)
+            shutil.make_archive("focus", 'gztar', "/home/rpi3/Projects/tricap/tricap/focus")
             return send_from_directory(
                 directory="/home/rpi3/Projects/tricap/tricap/",
-                filename="focus/defaultend0.jpg", as_attachment=True)
+                filename="focus.tar.gz", as_attachment=True)
     else:
         return render_template("/camera/wait.html")
 

@@ -23,7 +23,7 @@ if not use_dummy_cams:
         def get_last_image(self, number):
             self.context_file = tricap_cameras[number].get_camera_context()
             self.camera_file = tricap_cameras[number].get_camera()
-            save_last_file(self.camera_file, self.context_file)
+            save_last_file(self.camera_file, self.context_file, number)
 
         @staticmethod
         def parse_serial_number(number):  # self parameter

@@ -4,7 +4,6 @@ import logging
 import os
 import io
 import sys
-from matplotlib import pyplot as plt
 
 from PIL import Image
 
@@ -28,7 +27,7 @@ def list_files(camera, context, path='/'):
     return result
 
 
-def save_last_file(camera, context):
+def save_last_file(camera, context, number):
     # logging.basicConfig(
     #     format='%(levelname)s: %(name)s: %(message)s', level=logging.WARNING)
     # gp.check_result(gp.use_python_logging())
@@ -63,33 +62,12 @@ def save_last_file(camera, context):
     import imageio
     raw = rawpy.imread(io.BytesIO(data))
     rgb = raw.postprocess()
-    imageio.imsave('defaultend.jpg', rgb)
+    imageio.imsave('focus/defaultend' + str(number) + '.jpg', rgb)
     gp.check_result(gp.gp_camera_exit(camera, context))
     return 0
 
 # gphoto2 -f /store_00020002/DCIM/100PHOTO -d 1
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-if __name__ == "__main__":
-    sys.exit(main())
+# if __name__ == "__main__":
+#     sys.exit(main())

@@ -8,7 +8,7 @@ from flask import Blueprint, render_template, send_from_directory, current_app, 
 from flask import send_file, redirect, url_for, send_from_directory
 
 from app import tricap_manager, altimeter, altimeter_switch, session_logger, talkbox, log_list, stop_all_threads
-from app import rootlogger, fetch_stopper, use_dummy_cams
+from app import rootlogger, fetch_stopper, use_dummy_cams, tricap_length
 
 from support.configure import TricapConfig
 from support.sms_sender import SMSSender
@@ -340,8 +340,8 @@ def shutdown():
         return render_template("/camera/wait.html")
 
 
-@home_bp.route('/_test')
-def test():
+@home_bp.route('/test_focus')
+def test_focus():
     """Test the images for focus problems"""
     if tricap_manager.state != CAM_MANAGER_STATES.STARTED:
         if use_dummy_cams:
@@ -351,13 +351,14 @@ def test():
         else:
             os.chdir("/home/rpi3/Projects/tricap/tricap/")
             camerafile = ParseData()
-            camerafile.get_last_image(0)
-            camerafile.get_last_image(1)
-            camerafile.get_last_image(2)
+            for index in range(tricap_length):
+                camerafile.get_last_image(index)
+            print("Archiving")
             shutil.make_archive("focus", 'gztar', "/home/rpi3/Projects/tricap/tricap/focus")
             return send_from_directory(
                 directory="/home/rpi3/Projects/tricap/tricap/",
                 filename="focus.tar.gz", as_attachment=True)
+        return render_template("/camera/wait.html")
     else:
         return render_template("/camera/wait.html")
 

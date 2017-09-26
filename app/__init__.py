@@ -166,6 +166,7 @@ else:
 
 tricap_manager = TriCapCamsManager(misc_settings, cam_settings, use_dummy_cams)
 tricap_cameras = tricap_manager.get_cameras_as_list()
+tricap_length = len(tricap_cameras)
 camera_loggers = []
 
 for index, cam in enumerate(tricap_cameras):

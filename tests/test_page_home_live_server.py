@@ -88,9 +88,11 @@ class TestLiveServerHome(TriCapLiveServerTestCase):
         # Get local server page and test for no error messages
         self.open_page(self.get_server_url(), wait_for_element_id='btn_startstop_m')
 
-        self.driver.find_element_by_id('btn_menu').click()  # First click for manual start
+        self.driver.find_element_by_id('btn_menu').click()  #
         sleep(1)
-        self.driver.find_element_by_id('a_shutdown').click()  # First click for manual start
+        self.driver.find_element_by_id('a_shutdown').click()  #
+        sleep(1)
+        self.driver.find_element_by_id('confirm_shutdown').click()  #
         sleep(1)
         h_main_status = self.driver.find_element_by_id('shutdown')
         self.assertEqual(h_main_status.get_attribute('innerHTML'), 'Shutting down server')

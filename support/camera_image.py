@@ -64,6 +64,7 @@ def save_last_file(camera, context, number):
     rgb = raw.postprocess()
     imageio.imsave('focus/defaultend' + str(number) + '.jpg', rgb)
     gp.check_result(gp.gp_camera_exit(camera, context))
+    print("Image saved successfully")
     return 0
 
 # gphoto2 -f /store_00020002/DCIM/100PHOTO -d 1

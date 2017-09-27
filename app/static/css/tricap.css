@@ -365,4 +365,9 @@ fieldset[disabled] .btn-tricap-grey.focus {
 }
 .talk_disabled {
     height: 63px;
+    border-radius: 5px;
+}
+
+#talk_text {
+    border-radius: 5px;
 }

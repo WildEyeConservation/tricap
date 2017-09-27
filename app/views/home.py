@@ -358,7 +358,6 @@ def test_focus():
             return send_from_directory(
                 directory="/home/rpi3/Projects/tricap/tricap/",
                 filename="focus.tar.gz", as_attachment=True)
-        return render_template("/camera/wait.html")
     else:
         return render_template("/camera/wait.html")
 

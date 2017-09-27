@@ -44,6 +44,7 @@ def copy_thread(drive, camera_num, lock):
     finally:
         lock.release()
 
+
 # Count the number of files in a folder at a certain moment
 def count_number_of_files(path):
     total_number_of_files = len([f for f in os.listdir(path)
@@ -195,7 +196,7 @@ def main():
         temp_num_files = len([f for f in os.listdir(path)
                               if os.path.isfile(os.path.join(path, f))])
         num_files += temp_num_files
-    logging.info("Copying " + str(num_files) + " to each drive.")
+    logging.info("Copying " + str(num_files) + " images to each drive.")
 
     # Determine the Sortie of the day
     global Sortie

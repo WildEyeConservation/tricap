@@ -366,7 +366,7 @@ var updateTalkBox = function(data){
             // '<input type="text" class="form-control" disabled="" target="tb_msg" value="'+data.msgs[index]+'">'
             '<div class="input-group" target="tb_msg">' +
 //                '<input type="text" class="form-control talk_disabled" disabled="" value="'+data.msgs[index]+'">'+
-                '<textarea name="Text1" class="form-control" rows="2" disabled="">'+data.msgs[index]+'</textarea>' +
+                '<textarea id="talk_text" class="form-control" rows="2" disabled="">'+data.msgs[index]+'</textarea>' +
                 '<span class="input-group-btn">'+
                     '<button type="button" class="btn btn-sm talk_disabled '+yes_class+'" target="tb_msg_btn">Yes</a>' +
                     '<button type="button" class="btn btn-sm talk_disabled '+no_class+'" target="tb_msg_btn">No</a>' +

@@ -3,7 +3,7 @@
 //  (the $() is short for $(document).ready())
 
 var batteryWarning = 50; // Below 50 percent
-var spaceWarning = 100000; // Below +-100Gb
+var spaceWarning = 50000; // Below +-100Gb
 
 //Jquery code to determine the state of the camera
 $(function(){

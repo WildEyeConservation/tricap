@@ -8,7 +8,7 @@ from flask import Blueprint, render_template, send_from_directory, current_app, 
 from flask import send_file, redirect, url_for, send_from_directory
 
 from app import tricap_manager, altimeter, altimeter_switch, session_logger, talkbox, log_list, stop_all_threads
-from app import rootlogger, fetch_stopper, use_dummy_cams, tricap_length
+from app import rootlogger, fetch_stopper, use_dummy_cams, tricap_length, alti_sim
 
 from support.configure import TricapConfig
 from support.sms_sender import SMSSender
@@ -121,7 +121,6 @@ def _set_image_fetching_state():
 @home_bp.route('/_get_state_data')
 def provide_state_data():
     """Jsonify all the data pertaining to the state of the system."""
-
     alti_data = {'state_colour': _determine_alti_state_colour(),
                  'measurement': str(altimeter.measurement),
                  'switch_state': str(altimeter_switch.state()),
@@ -140,10 +139,6 @@ def provide_state_data():
 
     sys_msgs = log_list.get_msgs()
     sys_data = {'msgs': sys_msgs}
-
-# Check camera threads
-    # if tricap_manager.get_state() == CAM_MANAGER_STATES.STARTED:
-    #     print(tricap_manager.check_thread_status())
 
     data = {'alti': alti_data,
             'cams': cam_data,

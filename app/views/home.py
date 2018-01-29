@@ -8,7 +8,7 @@ from flask import Blueprint, render_template, send_from_directory, current_app, 
 from flask import send_file, redirect, url_for, send_from_directory
 
 from app import tricap_manager, altimeter, altimeter_switch, session_logger, talkbox, log_list, stop_all_threads
-from app import rootlogger, fetch_stopper, use_dummy_cams, tricap_length, alti_sim
+from app import rootlogger, fetch_stopper, use_dummy_cams, tricap_length
 
 from support.configure import TricapConfig
 from support.sms_sender import SMSSender

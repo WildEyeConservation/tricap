@@ -72,6 +72,7 @@ class SimulatorAlti(Subject):
         self.flight_tempo = 5
         self.flight_points = [160, 120, 210, 150, 119, 151, 121, 171, 80, 0]
         self.error = ""
+        self.error_start = False
         self.test = False
         # self.flight_points = [160,100,20,80,0]  # heights of the flight plan
 
@@ -109,6 +110,12 @@ class SimulatorAlti(Subject):
 
     # def get_error(self):
     #     return ""
+
+    def get_error_start(self):
+        return self.error_start
+
+    def set_error_start(self, error_code):
+        self.error_start = error_code
 
     def set_state_string(self, state):
         self.state.name = state

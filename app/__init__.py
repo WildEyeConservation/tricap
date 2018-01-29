@@ -186,7 +186,8 @@ rootlogger.debug('Cameras have been configured.')
 alti_settings = init_config.get_section_dict(TricapConfig.ALTI_SECTION_HEADER)
 web_settings = init_config.get_section_dict(TricapConfig.WEB_SECTION_HEADER)
 
-if init_config.get('alti_required', TricapConfig.WEB_SECTION_HEADER) == 'dummy':
+alti_choice_str = init_config.get('alti_required', TricapConfig.WEB_SECTION_HEADER)
+if alti_choice_str == 'dummy':
     rootlogger.debug('Using a dummy altimeter.')
     altimeter = SimulatorAlti(alti_settings)  # DummyAlti(alti_settings)
     alti_sim = SimulatorAlti(alti_settings)
@@ -194,7 +195,7 @@ else:
     rootlogger.debug('Using a real altimeter.')
     altimeter = TrusenseAltimeter(alti_settings)
 
-altimeter_switch = AltiSwitch(altimeter)
+altimeter_switch = AltiSwitch(altimeter, cam_manager=tricap_manager)
 altimeter.attach(altimeter_switch)
 
 if altimeter.state != ALTIMETER_STATE.MEASURING:

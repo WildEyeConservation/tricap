@@ -138,10 +138,10 @@ class SimulatorAlti(Subject):
             if self._measurement <= points[self.flight_path_points_index]:
                 self.flight_path_points_index += 1
 
-        if self._measurement >= 100:
-            self.set_error("01")
-        else:
-            self.set_error("")
+        # if self._measurement >= 100:
+        #     self.set_error("01")
+        # else:
+        #     self.set_error("")
 
     def _read(self, stop_event):
         while not stop_event.is_set():

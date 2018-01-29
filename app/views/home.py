@@ -13,7 +13,8 @@ from app import rootlogger, fetch_stopper, use_dummy_cams, tricap_length, alti_s
 from support.configure import TricapConfig
 from support.sms_sender import SMSSender
 from support.camera_data import ParseData
-import shutil, platform
+import shutil
+import platform
 import local_paths
 import datetime
 
@@ -144,7 +145,7 @@ def provide_state_data():
             'cams': cam_data,
             'talk': talk_data,
             'sys': sys_data}
-
+    # return "<h1>Hey there</h1>"
     return jsonify(data)
 
 
@@ -221,6 +222,7 @@ def _has_capture_started():
             if str(altimeter.get_error()) == "01" and tricap_manager.get_state() != CAM_MANAGER_STATES.STARTED:
                 if altimeter_switch.get_override_state() == OVERRIDESTATE.ALTISWITCH.value:
                     altimeter_switch.set_override_state(OVERRIDESTATE.MANUALSTART.value)
+                    altimeter_switch.set_state(OVERRIDESTATE.MANUALSTART.value)
                     print("starting...")
                     tricap_manager.start_capturing()
                     altimeter.set_error_start(True)

@@ -363,3 +363,11 @@ fieldset[disabled] .btn-tricap-grey.focus {
   color: #464545;
   background-color: #ffffff;
 }
+.talk_disabled {
+    height: 63px;
+    border-radius: 5px;
+}
+
+#talk_text {
+    border-radius: 5px;
+}

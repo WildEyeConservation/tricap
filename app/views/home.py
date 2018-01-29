@@ -8,11 +8,13 @@ from flask import Blueprint, render_template, send_from_directory, current_app, 
 from flask import send_file, redirect, url_for, send_from_directory
 
 from app import tricap_manager, altimeter, altimeter_switch, session_logger, talkbox, log_list, stop_all_threads
-from app import rootlogger, fetch_stopper, use_dummy_cams
+from app import rootlogger, fetch_stopper, use_dummy_cams, tricap_length, alti_sim
 
 from support.configure import TricapConfig
 from support.sms_sender import SMSSender
-import shutil, platform
+from support.camera_data import ParseData
+import shutil
+import platform
 import local_paths
 import datetime
 
@@ -120,7 +122,6 @@ def _set_image_fetching_state():
 @home_bp.route('/_get_state_data')
 def provide_state_data():
     """Jsonify all the data pertaining to the state of the system."""
-
     alti_data = {'state_colour': _determine_alti_state_colour(),
                  'measurement': str(altimeter.measurement),
                  'switch_state': str(altimeter_switch.state()),
@@ -140,15 +141,11 @@ def provide_state_data():
     sys_msgs = log_list.get_msgs()
     sys_data = {'msgs': sys_msgs}
 
-# Check camera threads
-    # if tricap_manager.get_state() == CAM_MANAGER_STATES.STARTED:
-    #     print(tricap_manager.check_thread_status())
-
     data = {'alti': alti_data,
             'cams': cam_data,
             'talk': talk_data,
             'sys': sys_data}
-
+    # return "<h1>Hey there</h1>"
     return jsonify(data)
 
 
@@ -225,6 +222,7 @@ def _has_capture_started():
             if str(altimeter.get_error()) == "01" and tricap_manager.get_state() != CAM_MANAGER_STATES.STARTED:
                 if altimeter_switch.get_override_state() == OVERRIDESTATE.ALTISWITCH.value:
                     altimeter_switch.set_override_state(OVERRIDESTATE.MANUALSTART.value)
+                    altimeter_switch.set_state(OVERRIDESTATE.MANUALSTART.value)
                     print("starting...")
                     tricap_manager.start_capturing()
                     altimeter.set_error_start(True)
@@ -297,6 +295,7 @@ def downloads(date):
         shutil.make_archive("logs", 'zip', uploads)
         return send_from_directory(directory=os.getcwd(), filename="logs.zip", as_attachment=True)
     else:
+        shutil.copyfile("/var/log/syslog", uploads + "/syslog")
         os.chdir(local_paths.SESSION_ROOT_DIR)
         #uploads = os.path.join(os.getcwd(), "logs")
         shutil.make_archive("logs", 'gztar', uploads)
@@ -312,20 +311,12 @@ def download():
         shutil.make_archive("logs", 'zip', uploads)
         return send_from_directory(directory=os.getcwd(), filename="logs.zip", as_attachment=True)
     else:
+        shutil.copyfile("/var/log/syslog", uploads + "/syslog")
         os.chdir(local_paths.SESSION_ROOT_DIR)
         # uploads = os.path.join(os.getcwd(), "logs")
         shutil.make_archive("logs", 'gztar', uploads)
         return send_from_directory(directory=local_paths.SESSION_ROOT_DIR, filename="logs.tar.gz", as_attachment=True)
 
-    # uploads = os.path.join(os.getcwd(), "logs")
-    # if platform.system() == 'Windows':
-    #     shutil.make_archive("logs", 'zip', uploads)
-    #     return send_from_directory(directory=os.getcwd(), filename="logs.zip")
-    # else:
-    #     os.chdir("/home/rpi3/Projects/tricap/tricap/")
-    #     uploads = os.path.join(os.getcwd(), "logs")
-    #     shutil.make_archive("logs", 'gztar', uploads)
-    #     return send_from_directory(directory=os.getcwd(), filename="logs.tar.gz")
 
 @home_bp.route('/_shutdown')
 def shutdown():
@@ -342,6 +333,28 @@ def shutdown():
             process = subprocess.Popen(command.split(), stdout=subprocess.PIPE)
             output = process.communicate()[0]  # Execute the command
             return '<h1 id="shutdown">Shutting down server</h1>'
+    else:
+        return render_template("/camera/wait.html")
+
+
+@home_bp.route('/test_focus')
+def test_focus():
+    """Test the images for focus problems"""
+    if tricap_manager.state != CAM_MANAGER_STATES.STARTED:
+        if use_dummy_cams:
+            return send_from_directory(
+                directory="C:/Users/Pieter.at.Innoventix/Desktop/Innoventix/SourceTree Innoventix/tests",
+                filename="defaultend.jpg", as_attachment=True)
+        else:
+            os.chdir("/home/rpi3/Projects/tricap/tricap/")
+            camerafile = ParseData()
+            for index in range(tricap_length):
+                camerafile.get_last_image(index)
+            print("Archiving")
+            shutil.make_archive("focus", 'gztar', "/home/rpi3/Projects/tricap/tricap/focus")
+            return send_from_directory(
+                directory="/home/rpi3/Projects/tricap/tricap/",
+                filename="focus.tar.gz", as_attachment=True)
     else:
         return render_template("/camera/wait.html")
 

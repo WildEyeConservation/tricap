@@ -2,6 +2,7 @@ from time import sleep
 import logging
 from support.log_list import LogListAccessor
 from support.configure import TricapConfig
+from app import altimeter
 
 from .tricap_flask_live_server_test_case import TriCapLiveServerTestCase
 
@@ -88,12 +89,31 @@ class TestLiveServerHome(TriCapLiveServerTestCase):
         # Get local server page and test for no error messages
         self.open_page(self.get_server_url(), wait_for_element_id='btn_startstop_m')
 
-        self.driver.find_element_by_id('btn_menu').click()  # First click for manual start
+        self.driver.find_element_by_id('btn_menu').click()  #
         sleep(1)
-        self.driver.find_element_by_id('a_shutdown').click()  # First click for manual start
+        self.driver.find_element_by_id('a_shutdown').click()  #
+        sleep(1)
+        self.driver.find_element_by_id('confirm_shutdown').click()  #
         sleep(1)
         h_main_status = self.driver.find_element_by_id('shutdown')
         self.assertEqual(h_main_status.get_attribute('innerHTML'), 'Shutting down server')
+    #
+    # def test_error(self):
+    #     """Test to see if shutdown is pressed and signal is received"""
+    #     count = 0
+    #     triconfig = TricapConfig()
+    #     web_settings = triconfig.get_section_dict(TricapConfig.WEB_SECTION_HEADER)
+    #     web_settings['alti_required'] = 'dummy'
+    #     web_settings['cams_required'] = 'dummy'
+    #     triconfig.set_section(web_settings, TricapConfig.WEB_SECTION_HEADER)
+    #     triconfig.save_to_file()
+    #     self.start_server()
+    #     # Get local server page and test for no error messages
+    #     self.open_page(self.get_server_url(), wait_for_element_id='btn_startstop_m')
+    #
+    #     sleep(10)
+    #     h_main_status = self.driver.find_element_by_id('h_alti_target')
+    #     self.assertEqual(h_main_status.get_attribute('innerHTML'), 'Above altimeter range')
 
     def test_title(self):
         """Test the title and that it shows the correct name in all the states with button clicks"""

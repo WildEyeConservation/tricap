@@ -166,6 +166,7 @@ else:
 
 tricap_manager = TriCapCamsManager(misc_settings, cam_settings, use_dummy_cams)
 tricap_cameras = tricap_manager.get_cameras_as_list()
+tricap_length = len(tricap_cameras)
 camera_loggers = []
 
 for index, cam in enumerate(tricap_cameras):
@@ -188,6 +189,7 @@ web_settings = init_config.get_section_dict(TricapConfig.WEB_SECTION_HEADER)
 if init_config.get('alti_required', TricapConfig.WEB_SECTION_HEADER) == 'dummy':
     rootlogger.debug('Using a dummy altimeter.')
     altimeter = SimulatorAlti(alti_settings)  # DummyAlti(alti_settings)
+    alti_sim = SimulatorAlti(alti_settings)
 else:
     rootlogger.debug('Using a real altimeter.')
     altimeter = TrusenseAltimeter(alti_settings)

@@ -44,6 +44,7 @@ def copy_thread(drive, camera_num, lock):
     finally:
         lock.release()
 
+
 # Count the number of files in a folder at a certain moment
 def count_number_of_files(path):
     total_number_of_files = len([f for f in os.listdir(path)
@@ -166,6 +167,8 @@ def main():
         if 'GPS GPSDate' in tags.keys():
             day2 = str(tags['GPS GPSDate'])
             day2 = day2.replace(':', '-')
+        else:
+            day2 = day
 
     if day != day2:
         print("Please choose a date for folder naming: 1)", day, ' or 2)', day2, 'or 3) own folder name')
@@ -195,7 +198,7 @@ def main():
         temp_num_files = len([f for f in os.listdir(path)
                               if os.path.isfile(os.path.join(path, f))])
         num_files += temp_num_files
-    logging.info("Copying " + str(num_files) + " to each drive.")
+    logging.info("Copying " + str(num_files) + " images to each drive.")
 
     # Determine the Sortie of the day
     global Sortie
@@ -308,6 +311,7 @@ def main():
 
     # Do a hash function of copied folders to verify if all the content is copied.
     print("\n\nComparing folders for final validation.")
+    time.sleep(2)
 
     for index in range(len(sd_card_list)):
         sd_hash.extend(glob.glob(str(sd_card_list[index]) + '/DCIM/*CANON/*'))
@@ -318,6 +322,7 @@ def main():
             temp = sd_hash[index].split('/')
         list1.append(temp[len(temp)-1])
         sha1.update(list1[index].encode())
+    # print(list1)
     print("hash SD cards: " + str(sha1.hexdigest()))
 
     if drive_count > 0:
@@ -330,6 +335,7 @@ def main():
                 temp = hd_hash1[index].split('/')
             list2.append(temp[len(temp) - 1])
             sha2.update(list2[index].encode())
+        # print(list2)
         print("hash HD internal drive: " + str(sha2.hexdigest()))
         if sha1.hexdigest() != sha2.hexdigest():
             hash_flag = False

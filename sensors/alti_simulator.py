@@ -70,7 +70,9 @@ class SimulatorAlti(Subject):
         self.flight_path_points_index = 0
 
         self.flight_tempo = 5
-        self.flight_points = [160, 140, 150, 119, 151, 121, 171, 80, 0]
+        self.flight_points = [160, 120, 210, 150, 119, 151, 121, 171, 80, 0]
+        self.error = ""
+        self.test = False
         # self.flight_points = [160,100,20,80,0]  # heights of the flight plan
 
         self.generation_period = 0.5
@@ -92,8 +94,21 @@ class SimulatorAlti(Subject):
     def get_state_as_string(self):
         return self.state.name
 
+    def set_error(self, error_code = ""):
+        self.error = error_code
+
+    # def set_test(self):
+    #     print("Set the test")
+    #     self.test = True
+
     def get_error(self):
-        return ""
+        # if self.test:
+        #     return "01"
+        # else:
+        return self.error
+
+    # def get_error(self):
+    #     return ""
 
     def set_state_string(self, state):
         self.state.name = state
@@ -122,6 +137,11 @@ class SimulatorAlti(Subject):
             self._measurement -= tempo
             if self._measurement <= points[self.flight_path_points_index]:
                 self.flight_path_points_index += 1
+
+        # if self._measurement >= 100:
+        #     self.set_error("01")
+        # else:
+        #     self.set_error("")
 
     def _read(self, stop_event):
         while not stop_event.is_set():

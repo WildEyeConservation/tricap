@@ -241,6 +241,9 @@ var updateAlti = function(data){
 
     if (data.capture_started === true){
         $('[name="btn_startstop"]').html('Stop');
+        if (data.error == "01") {
+            changeMainStatus('green', "TriCap Manual: Capturing");
+        }
     } else { // Data capture has not started
         if(data.override == "1"){
             $('[name="btn_startstop"]').html('Start Auto');
@@ -249,7 +252,7 @@ var updateAlti = function(data){
         }
     }
 
-    if(data.switch_state == 'True' || data.capture_started === true) { //See switch state to determine if the camera should capture
+    if(data.switch_state == 'True') { //See switch state to determine if the camera should capture
         //changeMainStatus('green', 'TriCap: Capturing data of cameras');
         changeMainStatus('green', methodOfCapture.concat("Capturing"));
     } else if(data.measurement > 0) {
@@ -279,7 +282,7 @@ var updateAlti = function(data){
 
     if (data.error == "01") { // Error message for no target
         errorCount = errorCount + 1;
-        if (errorCount > 1) { // TODO Change to 3
+        if (errorCount > 2) { // TODO Change to 3
         changeElementColour('#alt_alti_target', 'orange');
         $('#h_alti_target').html('Above altimeter range');
         }
@@ -362,11 +365,11 @@ var updateTalkBox = function(data){
         $('#alt_msgs_talkbox').append(
             // '<input type="text" class="form-control" disabled="" target="tb_msg" value="'+data.msgs[index]+'">'
             '<div class="input-group" target="tb_msg">' +
-                '<input type="text" class="form-control" disabled="" value="'+data.msgs[index]+'">'+
-//                '<textarea name="Text1" rows="5">'+data.msgs[index]+'</textarea>' +
+//                '<input type="text" class="form-control talk_disabled" disabled="" value="'+data.msgs[index]+'">'+
+                '<textarea id="talk_text" class="form-control" rows="2" disabled="">'+data.msgs[index]+'</textarea>' +
                 '<span class="input-group-btn">'+
-                    '<button type="button" class="btn '+yes_class+'" target="tb_msg_btn">Yes</a>' +
-                    '<button type="button" class="btn '+no_class+'" target="tb_msg_btn">No</a>' +
+                    '<button type="button" class="btn btn-sm talk_disabled '+yes_class+'" target="tb_msg_btn">Yes</a>' +
+                    '<button type="button" class="btn btn-sm talk_disabled '+no_class+'" target="tb_msg_btn">No</a>' +
                 '</span></div>'
         );
     }
@@ -379,7 +382,8 @@ var updateTalkBox = function(data){
         $(this).removeClass('btn-default');
         $(this).addClass('btn-success');
 
-        var msg = $(this).parent().parent().find('input').val();
+        //var msg = $(this).parent().parent().find('input').val();
+        var msg = $(this).parent().parent().find('textarea').val();
         var reply_code;
         if ($(this).html() === 'Yes'){
             reply_code = 1;

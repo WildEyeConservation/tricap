@@ -21,6 +21,7 @@ def camera():
         from support.camera_data import ParseData
         camera_data = ParseData()
         code_inf = GitData()
+        spare_detected = False
         for camera_number in range(3):
             serial_number_parse[camera_number], free_space_parse[camera_number], battery_parse[camera_number] =\
                 camera_data.parse_camera(camera_number)
@@ -37,6 +38,22 @@ def camera():
                 serial_number[2] = serial_number_parse[camera_number]
                 free_space[2] = free_space_parse[camera_number]
                 battery[2] = battery_parse[camera_number]
+            else:
+                spare_detected = True
+                spare_info = (serial_number_parse[camera_number], free_space_parse[camera_number], battery_parse[camera_number])
+
+        if spare_detected:
+            if serial_number[0] == '':
+                spare_number = 0
+            elif serial_number[1] == '':
+                spare_number = 1
+            else:
+                spare_number = 2
+
+            serial_number[spare_number] = spare_info[0]
+            free_space[spare_number] = spare_info[1]
+            battery[spare_number] = spare_info[2]
+
         code_id = code_inf.code_id()
         code_date = code_inf.code_date()
     else:

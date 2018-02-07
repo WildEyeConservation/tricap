@@ -14,7 +14,7 @@ from config import CAM_MANAGER_STATES
 class AltiSwitch(Observer):
     _logger = logging.getLogger(__name__)  # start the logger
 
-    def __init__(self, sensor_class):  # Constructor for alti switch
+    def __init__(self, sensor_class, cam_manager=None):  # Constructor for alti switch
         super().__init__()  # get variables from parent class
         self.alti = sensor_class  # SimulatorAlti(settings)
         self.alti_switch_state = False  # start with altimeter switch as off
@@ -27,6 +27,7 @@ class AltiSwitch(Observer):
         self.session_started = False
         self.landed = True
         self.sms_sender = SMSSender()
+        self.cam_manager = cam_manager
 
     # Altitude switch is not in update, because of the outside use of the function
     def set_altitude_switch(self, override=OVERRIDESTATE.ALTISWITCH.value):
@@ -73,6 +74,9 @@ class AltiSwitch(Observer):
             from app import session_logger
             session_logger.create_new_session()
             self.session_started = True
+            # TODO TIGHT COUPLING, MAKE IT BETTER
+            if self.cam_manager:
+                self.cam_manager.start_capturing()
             flag = self.sms_sender.send('Altitude switch is active.')
         # self.update_boundaries()  # Put this function in here if not placed anywhere else
 

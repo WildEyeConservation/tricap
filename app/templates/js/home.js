@@ -231,35 +231,6 @@ var updateAlti = function(data){
         $('#h_alti').html('Altitude: ' + Math.round(data.measurement) + ' m');
     }
 
-    if (data.override == '0'){
-        methodOfCapture = "TriCap Automatic: ";
-    } else if (data.override == '2') {
-        methodOfCapture = "TriCap Manual: ";
-    } else if (data.override == '1') {
-        methodOfCapture = "TriCap: ";
-    }
-
-    if (data.capture_started === true){
-        $('[name="btn_startstop"]').html('Stop');
-        if (data.error == "01") {
-            changeMainStatus('green', "TriCap Manual: Capturing");
-        }
-    } else { // Data capture has not started
-        if(data.override == "1"){
-            $('[name="btn_startstop"]').html('Start Auto');
-        } else {
-            $('[name="btn_startstop"]').html('Start Manual');
-        }
-    }
-
-    if(data.switch_state == 'True') { //See switch state to determine if the camera should capture
-        //changeMainStatus('green', 'TriCap: Capturing data of cameras');
-        changeMainStatus('green', methodOfCapture.concat("Capturing"));
-    } else if(data.measurement > 0) {
-        changeMainStatus('orange', methodOfCapture.concat('NOT capturing'));
-    } else {
-        changeMainStatus('green', 'TriCap');
-    }
 
     changeElementColour('#alt_alti', data.state_colour);
     changeElementColour('#alt_alti_inner', data.state_colour);
@@ -422,6 +393,26 @@ var updatePage = function(data){
      if ($('#h_main_status').html() === 'No Response From Server') {
          changeMainStatus('green', 'TriCap');
      }
+
+    if (data.override == '0'){
+        methodOfCapture = "TriCap Automatic: ";
+    } else if (data.override == '2') {
+        methodOfCapture = "TriCap Manual: ";
+    } else if (data.override == '1') {
+        methodOfCapture = "TriCap: ";
+    }
+
+    if (data.cams.capture_started === true){
+        $('[name="btn_startstop"]').html('Stop');
+        changeMainStatus('green', "TriCap Manual: Capturing");
+    } else { // Data capture has not started
+        changeMainStatus('green', "TriCap Manual");
+        if(data.override == "1"){
+            $('[name="btn_startstop"]').html('Start Auto');
+        } else {
+            $('[name="btn_startstop"]').html('Start Manual');
+        }
+    }
 
      updateAlti(data.alti);
      updateCamState(data.cams);

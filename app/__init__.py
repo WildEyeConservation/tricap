@@ -195,8 +195,8 @@ else:
     rootlogger.debug('Using a real altimeter.')
     altimeter = TrusenseAltimeter(alti_settings)
 
-altimeter_switch = AltiSwitch(altimeter, cam_manager=tricap_manager)
-altimeter.attach(altimeter_switch)
+# altimeter_switch = AltiSwitch(altimeter, cam_manager=tricap_manager)
+# altimeter.attach(altimeter_switch)
 
 if altimeter.state != ALTIMETER_STATE.MEASURING:
     altimeter.start_measuring()

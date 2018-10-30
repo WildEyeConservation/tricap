@@ -9,7 +9,7 @@ from flask import send_file, redirect, url_for, send_from_directory
 
 from app import tricap_manager, altimeter, session_logger, talkbox, log_list, stop_all_threads
 # from app import altitude_switch
-from app import rootlogger, fetch_stopper, use_dummy_cams, tricap_length
+from app import rootlogger, fetch_stopper, use_dummy_cams, tricap_length, toggle_switch_monitor
 
 from support.configure import TricapConfig
 from support.sms_sender import SMSSender
@@ -349,11 +349,14 @@ def handle_button_click():
         return jsonify(capture_started=_has_capture_started())
     elif button_code == BUTTON_CODE.STOP:
         rootlogger.info('User requested capture to stop.')
-        tricap_manager.stop_capturing()
-        # altimeter_switch.set_override_state(OVERRIDESTATE.STOPOVERRIDE.value)
-        if not use_dummy_cams:
-            altimeter.set_error_start(False)
-        # altimeter_switch.session_started = False
+        if toggle_switch_monitor.value == 1:
+            rootlogger.warning('Will not stop capturing as toggle switch is on.')
+        else:
+            tricap_manager.stop_capturing()
+            # altimeter_switch.set_override_state(OVERRIDESTATE.STOPOVERRIDE.value)
+            if not use_dummy_cams:
+                altimeter.set_error_start(False)
+            # altimeter_switch.session_started = False
         return jsonify(capture_started=_has_capture_started())
     elif button_code == BUTTON_CODE.RESET:
         rootlogger.info('User requested server reset.')

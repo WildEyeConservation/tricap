@@ -218,33 +218,8 @@ def _has_capture_started():
 
     config = TricapConfig()
 
-    if not use_dummy_cams:
-        if str(altimeter.get_error()) != "":
-            if str(altimeter.get_error()) == "01" and \
-               tricap_manager.get_state() != CAM_MANAGER_STATES.STARTED:
-                #if altimeter_switch.get_override_state() == OVERRIDESTATE.ALTISWITCH.value:
-                #    altimeter_switch.set_override_state(OVERRIDESTATE.MANUALSTART.value)
-                #    altimeter_switch.set_state(OVERRIDESTATE.MANUALSTART.value)
-                #    print("starting...")
-                #    tricap_manager.start_capturing()
-                #    altimeter.set_error_start(True)
-                #    return True
-            # else:
-            #     print(str(altimeter.get_error()))
-
-        if altimeter.get_error_start() is True:
-            return True
-
-    # Include here the function to return false if switch is off
-    # altimeter_switch.set_state(altimeter_switch.get_override_state())
-    # if altimeter_switch.state() == False \
-    #        or altimeter_switch.get_override_state() == OVERRIDESTATE.STOPOVERRIDE.value:
-    #    tricap_manager.stop_capturing()
-    #    return False
-
     cams_started = tricap_manager.state == CAM_MANAGER_STATES.STARTED
     alti_started = altimeter.state == ALTIMETER_STATE.MEASURING
-
 
     cams_a_must = False
     if config.get('cams_required', TricapConfig.WEB_SECTION_HEADER) == 'yes':

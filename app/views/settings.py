@@ -10,13 +10,13 @@ from app import forms, tricap_manager, altimeter, session_logger
 from config import DEFAULT_CONFIG_FP, CONFIG_FP
 from support.configure import TricapConfig
 from collections import namedtuple
-from sensors.altitude_switch import AltiSwitch
+# from sensors.altitude_switch import AltiSwitch
 from collections import OrderedDict
 
 from app import rootlogger
 
 settings_bp = Blueprint('settings', __name__)
-altitude_switch = AltiSwitch(altimeter)
+# altitude_switch = AltiSwitch(altimeter)
 
 
 class MiscSettingConfig:
@@ -253,7 +253,7 @@ def save_settings(form, config_fp=CONFIG_FP):
         config.set_section(form_dict[section_header], section_header)
 
     config.save_to_file()
-    altitude_switch.update_boundaries()  # Read new boundaries from saved file
+    # altitude_switch.update_boundaries()  # Read new boundaries from saved file
 
 
 def revert_to_default_settings(save_to_fp=CONFIG_FP):

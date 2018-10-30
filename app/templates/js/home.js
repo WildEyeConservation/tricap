@@ -146,12 +146,14 @@ var buttonClick = function(buttonCode){
     if (buttonCode === tricap.BUTTON_CODES.START || buttonCode === tricap.BUTTON_CODES.STOP ||
         buttonCode === tricap.BUTTON_CODES.STARTSTOP){
         // If we are starting a new session, get a new description
-        if ($('[name="btn_startstop"]').html() === 'Start Manual'){ // Add modal for manual start
-            $('#input_modal_session_description').val(defaultSessionDescription);
-            $('#modal_session_description').modal();
-        } else {
-            $.getJSON($SCRIPT_ROOT + '/_button_click', {buttonCode: buttonCode }, startStopFollowUp);
-        }
+        $.getJSON($SCRIPT_ROOT + '/_button_click', {buttonCode: buttonCode }, startStopFollowUp);
+
+        //if ($('[name="btn_startstop"]').html() === 'Start Manual'){ // Add modal for manual start
+        //    $('#input_modal_session_description').val(defaultSessionDescription);
+        //    $('#modal_session_description').modal();
+        //} else {
+        //    $.getJSON($SCRIPT_ROOT + '/_button_click', {buttonCode: buttonCode }, startStopFollowUp);
+        //}
 
     } else if (buttonCode === tricap.BUTTON_CODES.RESET){
         $.getJSON($SCRIPT_ROOT + '/_button_click', {buttonCode: buttonCode },
@@ -406,7 +408,7 @@ var updatePage = function(data){
         $('[name="btn_startstop"]').html('Stop');
         changeMainStatus('green', "TriCap Manual: Capturing");
     } else { // Data capture has not started
-        changeMainStatus('green', "TriCap Manual");
+        changeMainStatus('orange', "TriCap Manual");
         if(data.override == "1"){
             $('[name="btn_startstop"]').html('Start Auto');
         } else {

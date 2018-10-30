@@ -25,6 +25,9 @@ from support.basic import TimeMonitor, PeriodicMonitor
 from support.sms_sender import SMSObserver
 from support.git_info import GitData
 
+from sensors.toggle_switch import ToggleSwitchObserver, ToggleSwitchMonitor
+from sensors.toggle_switch import CamCapturingMonitor, LEDController
+
 from support.connection_monitor import generate_net_monitor, NetworkMonitorLogger
 from support.connection_monitor import generate_ip_monitor, IPMonitorLogger
 
@@ -250,6 +253,15 @@ if use_dummy_cams == False:
 else:
     rootlogger.info("Git version: " + "DummyGit1234")
 
+# Toggle switch
+toggle_switch_monitor = ToggleSwitchMonitor(period=0.5)
+toggle_switch_observer = ToggleSwitchObserver(tricap_manager, session_logger, toggle_switch_monitor)
+toggle_switch_monitor.start()
+
+# LED Lights
+cam_man_state_monitor = CamCapturingMonitor(tricap_manager, period=0.5)
+led_controller = LEDController(cam_man_state_monitor)
+cam_man_state_monitor.start()
 
 # some glue functions, which use the module level functions
 

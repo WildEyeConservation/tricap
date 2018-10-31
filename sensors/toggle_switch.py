@@ -9,6 +9,8 @@ import logging
 
 from config import CAM_MANAGER_STATES
 
+GPIO.setmode(GPIO.BCM)
+
 SWITCH_PIN = 22
 RED_PIN = 17
 GREEN_PIN = 27
@@ -88,7 +90,7 @@ class CamCapturingMonitor(PeriodicMonitor):
 
     def monitor_step(self):
         """Update the value."""
-        if self.cam_manager.CAM_MANAGER_STATES.STARTED:
+        if self.cam_manager.state == CAM_MANAGER_STATES.STARTED:
             self.value = 1
         else:
             self.value = 0

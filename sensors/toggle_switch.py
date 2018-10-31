@@ -92,7 +92,7 @@ class CamCapturingMonitor(PeriodicMonitor):
 
     def monitor_step(self):
         """Update the value."""
-        if self.cam_manager.CAM_MANAGER_STATES.STARTED:
+        if self.cam_manager == CAM_MANAGER_STATES.STARTED:
             self.value = 1
         else:
             self.value = 0
@@ -109,10 +109,13 @@ class LEDController(Observer):
         self.toggled_on = False
 
         GPIO.setup(GREEN_PIN, GPIO.OUT)
-        GPIO.setup(RED_PIN, GPIO.OUT)
+        GPIO.setup(RED_PIN, GPIO.OUT)        
 
         GPIO.output(GREEN_PIN, GPIO.LOW)
         GPIO.output(RED_PIN, GPIO.HIGH)
+
+        self.red_pwm = GPIO.PWM(RED_PIN, 0.3)
+        self.green_pwm = GPIO.PWM(GREEN_PIN, 0.3)
     
         if boolean_monitor is not None:
             boolean_monitor.attach(self)
@@ -129,14 +132,16 @@ class LEDController(Observer):
                 self._logger.info('LED controller - off state.')
                 # GPIO.output(GREEN_PIN, GPIO.LOW)
                 # GPIO.output(RED_PIN, GPIO.HIGH)
+                self.green_pwm.stop()
                 GPIO.output(GREEN_PIN, GPIO.LOW)
-                GPIO.PWM(RED_PIN, 0.3)
+                self.red_pwm.start(1)
                 self.toggled_on = False
         else: # switch is in the on position
             if self.toggled_on is False: # User has flicked the switch on
                 self._logger.info('Toggle switch - starting capture.')
                 # GPIO.output(GREEN_PIN, GPIO.HIGH)
                 # GPIO.output(RED_PIN, GPIO.LOW)
+                self.red_pwm.stop()
                 GPIO.output(RED_PIN, GPIO.LOW)
-                GPIO.PWM(GREEN_PIN, 0.3)
+                self.green_pwm.start(1)
                 self.toggled_on = True

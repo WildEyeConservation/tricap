@@ -29,13 +29,17 @@ class ToggleSwitchMonitor(PeriodicMonitor):
 
         self._logger.info('Toggle switch monitor has been instantiated.')
 
+    def __del__(self):
+        """Destructor."""
+        GPIO.cleanup()
+
     def monitor_step(self):
         """Update the value."""
         if GPIO.input(SWITCH_PIN):
-            # toggle switch is on
-            self.value = 1
-        else:
+            # toggle switch is high impedance, which we are interpreting as off
             self.value = 0
+        else:
+            self.value = 1
 
 class ToggleSwitchObserver(Observer):
     """React to the toggle switch status."""
@@ -115,16 +119,24 @@ class LEDController(Observer):
 
         self._logger.info('LED Controller has been instantiated.')
 
+    def __del__(self):
+        """Destructor."""
+        GPIO.cleanup()
+
     def update(self, subject):        
         if subject.value == 0: # Capture is stopped 
             if self.toggled_on: # Capture was stopped (previous observation was still running)
                 self._logger.info('LED controller - off state.')
+                # GPIO.output(GREEN_PIN, GPIO.LOW)
+                # GPIO.output(RED_PIN, GPIO.HIGH)
                 GPIO.output(GREEN_PIN, GPIO.LOW)
-                GPIO.output(RED_PIN, GPIO.HIGH)
+                GPIO.PWM(RED_PIN, 0.3)
                 self.toggled_on = False
         else: # switch is in the on position
             if self.toggled_on is False: # User has flicked the switch on
                 self._logger.info('Toggle switch - starting capture.')
-                GPIO.output(GREEN_PIN, GPIO.HIGH)
+                # GPIO.output(GREEN_PIN, GPIO.HIGH)
+                # GPIO.output(RED_PIN, GPIO.LOW)
                 GPIO.output(RED_PIN, GPIO.LOW)
+                GPIO.PWM(GREEN_PIN, 0.3)
                 self.toggled_on = True

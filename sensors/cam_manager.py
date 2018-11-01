@@ -188,6 +188,7 @@ class TriCapCamsManager:
                 barrier = threading.Barrier(len(self._cameras))
 
             for cam in self._cameras:  # self.thread was thread
+                # TODO This seems to be a mistake, should probaby make a list of the threads
                 self.thread = threading.Thread(target=cam.capture, daemon=True,
                                           kwargs={"continuous": True, "barrier": barrier,
                                                   "stop_event": self._kill_pill})

@@ -232,10 +232,10 @@ class GPhotoCam(AbstractCamera):
 
     def capture(self, continuous=False, barrier: threading.Barrier = None, stop_event=None):
         """Start capturing photos, typically called by a thread."""
+        self.state = CAMERA_STATES.INITIALISED
         while True:
             if stop_event and stop_event.is_set():
                     return
-            self.state = CAMERA_STATES.CAPTURING
             if barrier:
                 barrier.wait()
 
@@ -245,8 +245,10 @@ class GPhotoCam(AbstractCamera):
 
             if self._trigger_capture():  # Checks to see if something went wrong with the cameras
                 self._image_count += 1
+                self.state = CAMERA_STATES.CAPTURING
             else:
                 self._logger.error('Could not successfully trigger a capture.')
+                self.state = CAMERA_STATES.ERROR_CAPTURE
 
             if self.fetch_state:
                 # check if we need to get a new image path
@@ -275,8 +277,6 @@ class GPhotoCam(AbstractCamera):
                 self.notify()
                 self.update_message = 'after preview fetch'
                 self.notify()
-
-            self.state = CAMERA_STATES.INITIALISED
 
             self._run_calibrate_if_needed()
 

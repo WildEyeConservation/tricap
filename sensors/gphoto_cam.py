@@ -1,8 +1,11 @@
-"""Camera driver for a generic camera that can be accessed using the libgphoto2 library."""
+"""Camera driver for a generic camera that can be accessed using the libgphoto2
+library."""
 
 import os
 import logging
 import threading
+from io import BytesIO
+import exifread
 
 from time import sleep
 from datetime import datetime
@@ -14,7 +17,7 @@ from config import CAMERA_STATES
 from .abstract_cam import AbstractCamera, CamConfigType
 from .base_setting import BaseSetting
 
-# A maximum number of attempts can be made to trigger a photo during the capture process
+# Max attempts that can be made to trigger a photo during the capture process
 MAX_TRIGGER_ATTEMPTS = 5
 IMAGE_COUNT_DELTA_FOR_WAIT_FOR_PATH = 10
 IMAGE_COUNT_DELTA_FOR_FETCH = 5
@@ -137,7 +140,6 @@ class GPhotoCam(AbstractCamera):
         port_info = GPhotoCam._port_info_list[GPhotoCam._port_info_list.lookup_path(self._address)]
         self._gp_camera.set_port_info(port_info)
         self._gp_camera.init(GPhotoCam._context)
-        #import pdb; pdb.set_trace()
         # Do not catch exceptions here. Camera init is mission critical. If camera initialisation fails, we want top
         # level code to know about it.
         for key, value in settings.items():
@@ -161,6 +163,44 @@ class GPhotoCam(AbstractCamera):
             raise
 
         return camera_file
+
+    def get_current_folder(self):
+        """Get the latest folder from the camera."""
+        folder = '/'
+        done_flag = False
+        while done_flag is False:
+            cam_folders = self._gp_camera.folder_list_folders(folder, self._context)
+            if len(cam_folders) == 0:
+                done_flag = True
+            else:
+                folder += cam_folders[-1][0] + '/'
+
+        return folder
+
+    def calibrate_func(self):
+        print('running the calibration function.')
+        # get the latest folder and file
+        folder = self.get_current_folder()
+        print(folder)
+        cam_files = self._gp_camera.folder_list_files(folder, self._context)
+        fname = cam_files[-1][0]
+        print(fname)
+        
+        # get the exif data from that file
+        buf = bytearray(32*1024)
+        self._gp_camera.file_read(folder, fname, gp.GP_FILE_TYPE_NORMAL, 0, 
+                                  buf)
+        bio = BytesIO()
+        bio.write(buf)
+        bio.seek(0)
+        exif_data = exifread.process_file(bio)
+
+        # print the exif data
+        print(exif_data)
+
+        # react to it, i.e. use autofocus to correct?
+
+        pass
 
     def _update_image(self, camera_file):
         file_data = camera_file.get_data_and_size()

@@ -134,7 +134,7 @@ class TriCapCamsManager:
                     tricap_cam = Canon6DCam(Camera(address, self._cam_settings))
                     tricap_cam._camera.rate_fp = os.path.join(SERVER_LOG_DIR,
                                                       'canon6dcam_%s_rates.txt' % tricap_cam.serial_num)
-                    tricap_cam._camera.calibrate_func = tricap_cam.focus_infinity
+                    # tricap_cam._camera.calibrate_func = tricap_cam.focus_infinity
                     tricap_cam._camera.calibrate_step = int(self._man_settings['calibrate_step'])
                     self._cameras.append(tricap_cam)
             self.order_cameras_list()

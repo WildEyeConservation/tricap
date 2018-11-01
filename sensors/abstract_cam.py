@@ -31,12 +31,15 @@ class AbstractCamera(Subject):
         super(AbstractCamera, self).__init__()
 
         # TODO This is bad OOP Code, fix this!
-        self.calibrate_func = None
         self.calibrate_timing = 0
 
         self.fetch_state = False
 
         self.update_message = 'Camera observer update message.'
+
+    def calibrate_func(self):
+        """Run some kind of calibration."""
+        pass
 
     @abstractmethod
     def is_cam_image_fresh(self):

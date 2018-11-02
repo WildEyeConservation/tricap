@@ -185,18 +185,23 @@ class GPhotoCam(AbstractCamera):
     def calibrate_func(self):
         print('running the calibration function.')
         # get the latest folder and file
-        folder = self.get_current_folder()
-        print(folder)
-        cam_files = self._gp_camera.folder_list_files('/', self._context)
-        cam_files = self._gp_camera.folder_list_files(folder, self._context)
-        print(cam_files)
-        print(len(cam_files))
-        fname = cam_files[-1][0]
-        print(fname)
+        # folder = self.get_current_folder()
+        # print(folder)
+        # cam_files = self._gp_camera.folder_list_files('/', self._context)
+        # cam_files = self._gp_camera.folder_list_files(folder, self._context)
+        # print(cam_files)
+        # print(len(cam_files))
+        # fname = cam_files[-1][0]
+        # print(fname)
+
+        # capturing image
+        _, cam_fp =  self._gp_camera.capture(gp.GP_CAPTURE_IMAGE, 
+                                             self._context)        
         
         # get the exif data from that file
         buf = bytearray(32*1024)
-        self._gp_camera.file_read(folder, fname, gp.GP_FILE_TYPE_NORMAL, 0, 
+        self._gp_camera.file_read(cam_fp.folder, cam_fp.name, 
+                                  gp.GP_FILE_TYPE_NORMAL, 0, 
                                   buf, self._context)
         bio = BytesIO()
         bio.write(buf)

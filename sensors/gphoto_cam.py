@@ -195,9 +195,15 @@ class GPhotoCam(AbstractCamera):
         # print(fname)
 
         # capturing image
-        _, cam_fp =  self._gp_camera.capture(gp.GP_CAPTURE_IMAGE, 
-                                             self._context)        
-        
+        trigger_attempts = 0
+        while trigger_attempts < MAX_TRIGGER_ATTEMPTS:
+            try:
+                cam_fp = self._gp_camera.capture(gp.GP_CAPTURE_IMAGE, GPhotoCam._context)
+                return True
+            except gp.GPhoto2Error as ex:
+                self._logger.warning('Exception when trying to trigger a capture: %s', ex)
+                trigger_attempts += 1
+
         # get the exif data from that file
         buf = bytearray(32*1024)
         self._gp_camera.file_read(cam_fp.folder, cam_fp.name, 

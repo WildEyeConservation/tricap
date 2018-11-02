@@ -173,7 +173,12 @@ class GPhotoCam(AbstractCamera):
             if len(cam_folders) == 0:
                 done_flag = True
             else:
-                folder += cam_folders[-1][0] + '/'
+                target_folder = cam_folders[-1][0]
+                if cam_folders[-1][0] == 'MISC':
+                    target_folder = cam_folders[-2][0]
+                folder += target_folder + '/'
+                for name, value in cam_folders:
+                    print(name)
 
         return folder
 
@@ -182,25 +187,27 @@ class GPhotoCam(AbstractCamera):
         # get the latest folder and file
         folder = self.get_current_folder()
         print(folder)
+        cam_files = self._gp_camera.folder_list_files('/', self._context)
         cam_files = self._gp_camera.folder_list_files(folder, self._context)
+        print(cam_files)
+        print(len(cam_files))
         fname = cam_files[-1][0]
         print(fname)
         
         # get the exif data from that file
         buf = bytearray(32*1024)
         self._gp_camera.file_read(folder, fname, gp.GP_FILE_TYPE_NORMAL, 0, 
-                                  buf)
+                                  buf, self._context)
         bio = BytesIO()
         bio.write(buf)
         bio.seek(0)
         exif_data = exifread.process_file(bio)
 
         # print the exif data
-        print(exif_data)
+        print(exif_data['EXIF FocalLength'])
 
         # react to it, i.e. use autofocus to correct?
 
-        pass
 
     def _update_image(self, camera_file):
         file_data = camera_file.get_data_and_size()

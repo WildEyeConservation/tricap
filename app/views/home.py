@@ -368,9 +368,10 @@ def handle_button_click():
         if started:
             # we want to stop
             rootlogger.info('User requested capture to stop.')
-            tricap_manager.stop_capturing()
             if toggle_switch_monitor.value == 1:
                 rootlogger.warning('Will not stop capturing as toggle switch is on.')
+            else:
+                tricap_manager.stop_capturing()
                 if not use_dummy_cams:
                     altimeter.set_error_start(False)
             # altimeter_switch.session_started = False

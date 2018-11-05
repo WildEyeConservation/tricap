@@ -267,15 +267,19 @@ def reset():
 @home_bp.route('/logs/<string:date>', methods=['GET', 'POST'])
 def downloads(date):
     # Use variable to access the date of the log
+    print("Downloading logs for " + str(date))
     uploads = os.path.join(local_paths.SESSION_ROOT_DIR, date)
     if platform.system() == 'Windows':
         shutil.make_archive("logs", 'zip', uploads)
         return send_from_directory(directory=os.getcwd(), filename="logs.zip", as_attachment=True)
     else:
+        print("copying the syslog")
         shutil.copyfile("/var/log/syslog", uploads + "/syslog")
         os.chdir(local_paths.SESSION_ROOT_DIR)
         #uploads = os.path.join(os.getcwd(), "logs")
+        print("making the archive")
         shutil.make_archive("logs", 'gztar', uploads)
+        print("serving the files.")
         return send_from_directory(directory=local_paths.SESSION_ROOT_DIR, filename="logs.tar.gz", as_attachment=True)
 
 
@@ -283,15 +287,19 @@ def downloads(date):
 @home_bp.route('/logs/', methods=['GET', 'POST'])
 def download():
     date = str(datetime.date.today())
+    print("Downloading logs for " + str(date))
     uploads = os.path.join(local_paths.SESSION_ROOT_DIR, date)
     if platform.system() == 'Windows':
         shutil.make_archive("logs", 'zip', uploads)
         return send_from_directory(directory=os.getcwd(), filename="logs.zip", as_attachment=True)
     else:
+        print("copying the syslog")
         shutil.copyfile("/var/log/syslog", uploads + "/syslog")
         os.chdir(local_paths.SESSION_ROOT_DIR)
         # uploads = os.path.join(os.getcwd(), "logs")
+        print("making the archive")
         shutil.make_archive("logs", 'gztar', uploads)
+        print("serving the files.")
         return send_from_directory(directory=local_paths.SESSION_ROOT_DIR, filename="logs.tar.gz", as_attachment=True)
 
 

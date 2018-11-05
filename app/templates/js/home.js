@@ -512,3 +512,35 @@ $(function(){
     setInterval(requestStateData, stateRefreshRate);
     timeoutFunc = setTimeout(function(){showMainError('No Response From Server');}, timeOutPeriod);
 });
+
+document.querySelector('#a_download_logs').addEventListener('click', (event) => {
+    let logUrl = '/logs?'+Math.random();
+    event.preventDefault();
+    $.ajax({
+        url: logUrl,
+        type: 'get',
+        xhr: function () {
+            var xhr = $.ajaxSettings.xhr();
+            xhr.onprogress = function (e) {
+                // For downloads
+                console.log('Progress')
+                console.log(e)
+                if (e.lengthComputable) {
+                    console.log(e.loaded / e.total);
+                }
+            };
+            xhr.onloadstart = function() {
+                console.log("Starting download");
+            };
+        return xhr;
+    }
+    }).done(function (e) {
+        console.log("completed")
+        window.location.href = logUrl;
+        // Do something
+    }).fail(function (e) {
+        console.log("failed.")
+        // Do something
+    });
+    alert('downloading logs');
+});

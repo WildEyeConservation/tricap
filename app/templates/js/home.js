@@ -20,6 +20,9 @@ var errorCount = 0
 // Code here will be ignored by JSHint.
 /* jshint ignore:end */
 
+const progressLogsDownload = document.querySelector('#progress_logs_download');
+const hDownloadStatus = document.querySelector('#hDownloadStatus');
+const modalLogsDownload = $('#modal_logs_download');
 // Constants go first (declared without a var}
 
 tricap.GLOBAL_STATES = Object.freeze({
@@ -514,6 +517,7 @@ $(function(){
 });
 
 document.querySelector('#a_download_logs').addEventListener('click', (event) => {
+    modalLogsDownload.modal();
     let logUrl = '/logs?'+Math.random();
     event.preventDefault();
     $.ajax({
@@ -523,22 +527,27 @@ document.querySelector('#a_download_logs').addEventListener('click', (event) => 
             var xhr = $.ajaxSettings.xhr();
             xhr.onprogress = function (e) {
                 // For downloads
+               hDownloadStatus.innerHTML = 'Downloading Logs';
                 console.log('Progress')
                 console.log(e)
                 if (e.lengthComputable) {
                     console.log(e.loaded / e.total);
+                  progressLogsDownload.style.width = String(e.loaded/e.total*100)+'%'
                 }
             };
             xhr.onloadstart = function() {
-                console.log("Starting download");
+                console.log("oad");
+              hDownloadStatus.innerHTML = 'Compressing Logs';
             };
         return xhr;
     }
     }).done(function (e) {
         console.log("completed")
+      hDownloadStatus.innerHTML = 'Download Completed'
         window.location.href = logUrl;
         // Do something
     }).fail(function (e) {
+      hDownloadStatus.innerHTML = 'Download Failed!'
         console.log("failed.")
         // Do something
     });

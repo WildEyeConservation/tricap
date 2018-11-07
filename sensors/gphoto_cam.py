@@ -5,7 +5,9 @@ import os
 import logging
 import threading
 from io import BytesIO
-import exifread
+# import exifread
+import pyexifinfo
+import tempfile
 
 from time import sleep
 from datetime import datetime
@@ -197,37 +199,55 @@ class GPhotoCam(AbstractCamera):
         # print(fname)
 
         # capturing image
-        trigger_attempts = 0
-        cam_fp = None
-        done_flag = False
-        while trigger_attempts < MAX_TRIGGER_ATTEMPTS and done_flag is False:
-            try:
-                cam_fp = self._gp_camera.capture(gp.GP_CAPTURE_IMAGE, GPhotoCam._context)
-                print(cam_fp)
-                done_flag = True
-            except gp.GPhoto2Error as ex:
-                self._logger.warning('Exception when trying to trigger a capture: %s', ex)
-                trigger_attempts += 1
-                sleep(1)
+        MAX_FOCUS_ATTEMPTS = 3
+        focus_flag = False
+        focus_attempts = 0
+        while focus_flag is False and focus_attempts < MAX_FOCUS_ATTEMPTS: 
+            trigger_attempts = 0
+            cam_fp = None
+            done_flag = False
+            while trigger_attempts < MAX_TRIGGER_ATTEMPTS and done_flag is False:
+                try:
+                    cam_fp = self._gp_camera.capture(gp.GP_CAPTURE_IMAGE, GPhotoCam._context)
+                    done_flag = True
+                except gp.GPhoto2Error as ex:
+                    self._logger.warning('Exception when trying to trigger a capture: %s', ex)
+                    trigger_attempts += 1
+                    sleep(1)
 
-        if cam_fp is None:
-            print("could not successfully capture.")
-            return
+            if done_flag is False:
+                print("could not successfully capture.")                
+                self._logger.error('Calibration: could not autofocus.')
+                return -1
 
-        print("successfully captured.")
+            print("successfully captured.")
 
-        # get the exif data from that file
-        buf = bytearray(32*1024)
-        self._gp_camera.file_read(cam_fp.folder, cam_fp.name, 
-                                  gp.GP_FILE_TYPE_NORMAL, 0, 
-                                  buf, GPhotoCam._context)
-        bio = BytesIO()
-        bio.write(buf)
-        bio.seek(0)
-        exif_data = exifread.process_file(bio)
+            # get the exif data from that file
+            buf = bytearray(128*1024)
+            self._gp_camera.file_read(cam_fp.folder, cam_fp.name, 
+                                      gp.GP_FILE_TYPE_NORMAL, 0, 
+                                      buf, GPhotoCam._context)
+            tfile = tempfile.NamedTemporaryFile('wb', delete=True)
+            tfile.write(buf)
+            exif_data = pyexifinfo.get_json(tfile.name)[0]
 
-        # print the exif data
-        print(exif_data['EXIF FocalLength'])
+            print(exif_data['MakerNotes:FocusDistanceLower'])
+            fdl = float(exif_data['MakerNotes:FocusDistanceLower'][:-2])
+            if fdl != 11.9:
+                print('not in focus')
+                focus_attempts += 1
+            else:
+                print('focussed')
+                focus_flag = True
+
+        if focus_flag is False:
+            print("impossible to focus")
+            
+            self._logger.error('Calibration: could not autofocus.')
+        else:
+            self._logger.info('Calibration: focus a success.')
+
+
 
         # react to it, i.e. use autofocus to correct?
 
@@ -286,12 +306,12 @@ class GPhotoCam(AbstractCamera):
         if self.calibrate_step > 0: 
             # full press (bypass focus)
             config = self._gp_camera.get_config(GPhotoCam._context)
-            GPhotoSetting(config.get_child_by_name('eosremoterelease')).set(2)
+            GPhotoSetting(config.get_child_by_name('eosremoterelease')).set('Press Full')
             self._gp_camera.set_config(config, GPhotoCam._context)
 
             # release full press
             config = self._gp_camera.get_config(GPhotoCam._context)
-            GPhotoSetting(config.get_child_by_name('eosremoterelease')).set(4)
+            GPhotoSetting(config.get_child_by_name('eosremoterelease')).set('Release Full')
             self._gp_camera.set_config(config, GPhotoCam._context)
         else:
             self._gp_camera.trigger_capture(GPhotoCam._context)
@@ -307,7 +327,8 @@ class GPhotoCam(AbstractCamera):
         while trigger_attempts < MAX_TRIGGER_ATTEMPTS:
             try:
                 # file_path = self._gp_camera.capture(gp.GP_CAPTURE_IMAGE, GPhotoCam._context)
-                self._gp_camera.trigger_capture(GPhotoCam._context)
+                # self._gp_camera.trigger_capture(GPhotoCam._context)
+                self.cam_trigger()
                 return True
             except gp.GPhoto2Error as ex:
                 self._logger.warning('Exception when trying to trigger a capture: %s', ex)

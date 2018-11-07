@@ -519,6 +519,7 @@ $(function(){
 document.querySelector('#a_download_logs').addEventListener('click', (event) => {
     modalLogsDownload.modal();
     let logUrl = '/logs?'+Math.random();
+    progressLogsDownload.style.width = '0%'
     event.preventDefault();
     $.ajax({
         url: logUrl,
@@ -551,5 +552,4 @@ document.querySelector('#a_download_logs').addEventListener('click', (event) => 
         console.log("failed.")
         // Do something
     });
-    alert('downloading logs');
 });

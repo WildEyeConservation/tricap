@@ -118,6 +118,8 @@ class GPhotoCam(AbstractCamera):
 
         self._image_count = 0
 
+        self.calibrate_step = 0
+
         self._image_path = None
         self._old_image_count = 0
 
@@ -278,6 +280,21 @@ class GPhotoCam(AbstractCamera):
         gp.gp_file_save(camera_file, target_fp)
 
         return target_fp
+
+    def cam_trigger(self):
+        """Trigger using either normal function or the eos remote release."""
+        if self.calibrate_step > 0: 
+            # full press (bypass focus)
+            config = self._gp_camera.get_config(GPhotoCam._context)
+            GPhotoSetting(config.get_child_by_name('eosremoterelease')).set(2)
+            self._gp_camera.set_config(config, GPhotoCam._context)
+
+            # release full press
+            config = self._gp_camera.get_config(GPhotoCam._context)
+            GPhotoSetting(config.get_child_by_name('eosremoterelease')).set(4)
+            self._gp_camera.set_config(config, GPhotoCam._context)
+        else:
+            self._gp_camera.trigger_capture(GPhotoCam._context)
 
     def _trigger_capture(self):
         """Make the camera capture an image but don't wait for it to return.

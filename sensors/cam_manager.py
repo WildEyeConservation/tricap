@@ -179,6 +179,9 @@ class TriCapCamsManager:
         elif self.state == CAM_MANAGER_STATES.STOPPED:
             self._kill_pill = threading.Event()
 
+            for cam in self._cameras:
+                cam._camera._image_count = 0
+
             if self._image_capture_interval != 0:
                 barrier = threading.Barrier(len(self._cameras)+1)  # add one for the timer
                 self._rate_timer = RepeatingBarrierPasser(self._image_capture_interval,

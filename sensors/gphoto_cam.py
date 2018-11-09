@@ -261,7 +261,8 @@ class GPhotoCam(AbstractCamera):
     def _run_calibrate_if_needed(self):
         if self.calibrate_func is not None:
             if self.calibrate_step > 0:
-                if self._image_count % self.calibrate_step == 0:
+                print(self._image_count)
+                if self._image_count == 1 or self._image_count % self.calibrate_step == 0:
                     self.calibrate_func()
 
     def _wait_for_image_path(self, before_capture_ts=None):

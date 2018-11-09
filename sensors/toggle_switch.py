@@ -31,7 +31,7 @@ class ToggleSwitchMonitor(PeriodicMonitor):
         """Constructor."""
         super(ToggleSwitchMonitor, self).__init__(period)
 
-        GPIO.setup(SWITCH_PIN, GPIO.IN)
+        GPIO.setup(SWITCH_PIN, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
 
         self.type_id = 'ToggleSwitch'
         self.value = 0

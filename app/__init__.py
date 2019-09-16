@@ -82,7 +82,9 @@ class CamImgNumMonitor(PeriodicMonitor):
 
     def monitor_step(self):
         """Update the value with the current time as a string."""
-        self.value = cam.get_cam_image_count()
+        self.value = 0
+        for cam in self.cam:
+            self.value = self.value + cam.get_cam_image_count()
 
 
 # TODO Bad metaphor
@@ -241,7 +243,7 @@ altimeter.attach(alti_observer)
 
 # setup a time monitor and the sms sender
 time_mon = TimeMonitor(5*60)  # will emit the time every 5 minutes as primary observer
-cam_img_num_mon = CamImgNumMonitor(5*59, tricap_cameras[0]) # will update just before time_mon
+cam_img_num_mon = CamImgNumMonitor(5*59, tricap_cameras) # will update just before time_mon
 alti_mon = AltitudeMonitor(5*59, altimeter)
 sms_observer = SMSObserver(time_mon, [cam_img_num_mon, alti_mon], send_on_start=True)
 cam_img_num_mon.start()

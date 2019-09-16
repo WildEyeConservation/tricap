@@ -9,6 +9,8 @@ import logging
 
 from config import CAM_MANAGER_STATES, CAMERA_STATES
 
+import time
+
 GPIO.setmode(GPIO.BCM)
 
 SWITCH_PIN = 22
@@ -98,7 +100,7 @@ class CamManagerMonitor(PeriodicMonitor):
         self.value = 0
         self.unit = 'boolean'
 
-        self._logger.info('Toggle switch monitor has been instantiated.')
+        self._logger.info('Cam Manager monitor has been instantiated.')
 
     def monitor_step(self):
         """Update the value."""
@@ -109,6 +111,7 @@ class CamManagerMonitor(PeriodicMonitor):
 
 class CamErrorMonitor(PeriodicMonitor):
     """Monitor for each camera."""
+    _logger = logging.getLogger(__name__)  # start the logger
 
     def __init__(self, cam, index, period=1):
         """Constructor."""
@@ -124,6 +127,7 @@ class CamErrorMonitor(PeriodicMonitor):
         """Updat the value."""
         if self.cam.state == CAMERA_STATES.ERROR_CONFIG or \
            self.cam.state == CAMERA_STATES.ERROR_CAPTURE:
+            self._logger.warning('Single cam monitor: error')
             self.value = 1
         else:
             self.value = 0
@@ -147,17 +151,20 @@ class LEDController(Observer):
         self.red_pwm.start(50)
         self.green_pwm = GPIO.PWM(GREEN_PIN, 0.5)
 
-        self.allowed_cam_errors = 0
+        self.allowed_cam_errors = 20
         self.cam_errors = [0]*len(cam_error_monitors)
 
         self.error_state = 0
         self.run_state = 0
+        self.prev_error_state = 0
     
         cam_man_monitor.attach(self)
         for cem in cam_error_monitors:
             cem.attach(self)
 
         self._logger.info('LED Controller has been instantiated.')
+
+        self.sms_sender = SMSSender()
 
     def __del__(self):
         """Destructor."""
@@ -167,12 +174,21 @@ class LEDController(Observer):
         # Check first for the cameras and their error states
         if subject.type_id[:len('CamError')] == 'CamError':
             idx = int(subject.type_id[-1])
-            self.cam_errors[idx] = subject.value
+            if subject.value == 0:
+                self.cam_errors[idx] = 0
+            else:
+                self.cam_errors[idx] += 1
+                print('Error count on %d is %d' %(idx, self.cam_errors[idx]))
 
-        if sum(self.cam_errors) > self.allowed_cam_errors:
-            self.error_state = 1
-        else: 
-            self.error_state = 0
+        self.error_state = 0
+        for idx in range(len(self.cam_errors)):
+            if self.cam_errors[idx] >= self.allowed_cam_errors:
+                self.error_state = 1
+
+        # if sum(self.cam_errors) > self.allowed_cam_errors:
+        #     self.error_state = 1
+        # else: 
+        #     self.error_state = 0
 
         if self.error_state == 0:
             # no errors, we turn lights according to cam manager state
@@ -193,9 +209,17 @@ class LEDController(Observer):
                         self.green_pwm = GPIO.PWM(GREEN_PIN, 0.5)
                         self.green_pwm.start(50)
                         self.toggled_on = True
+                        self.smsElapsedStartTime = time.time()
         else:
+            # error
             self.red_pwm.stop()
             self.green_pwm.stop()
             GPIO.output(GREEN_PIN, GPIO.HIGH)
             GPIO.output(RED_PIN, GPIO.HIGH)
 
+        if (self.prev_error_state != self.error_state and 
+            self.error_state == 1):
+            # error state changed and in error
+            self.sms_sender.send('Error state entered')
+        
+        self.prev_error_state = self.error_state

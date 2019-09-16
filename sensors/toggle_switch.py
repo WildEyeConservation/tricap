@@ -9,6 +9,8 @@ import logging
 
 from config import CAM_MANAGER_STATES, CAMERA_STATES
 
+import time
+
 GPIO.setmode(GPIO.BCM)
 
 SWITCH_PIN = 22
@@ -152,12 +154,15 @@ class LEDController(Observer):
 
         self.error_state = 0
         self.run_state = 0
+        self.prev_error_state = 0
     
         cam_man_monitor.attach(self)
         for cem in cam_error_monitors:
             cem.attach(self)
 
         self._logger.info('LED Controller has been instantiated.')
+
+        self.sms_sender = SMSSender()
 
     def __del__(self):
         """Destructor."""
@@ -193,9 +198,17 @@ class LEDController(Observer):
                         self.green_pwm = GPIO.PWM(GREEN_PIN, 0.5)
                         self.green_pwm.start(50)
                         self.toggled_on = True
+                        self.smsElapsedStartTime = time.time()
         else:
+            # error
             self.red_pwm.stop()
             self.green_pwm.stop()
             GPIO.output(GREEN_PIN, GPIO.HIGH)
             GPIO.output(RED_PIN, GPIO.HIGH)
 
+        if (self.prev_error_state != self.error_state and 
+            self.error_state == 1):
+            # error state changed and in error
+            self.sms_sender.send('Error state entered')
+        
+        self.prev_error_state = self.error_state

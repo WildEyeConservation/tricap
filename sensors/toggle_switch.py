@@ -151,7 +151,7 @@ class LEDController(Observer):
         self.red_pwm.start(50)
         self.green_pwm = GPIO.PWM(GREEN_PIN, 0.5)
 
-        self.allowed_cam_errors = 20
+        self.allowed_cam_errors = 0
         self.cam_errors = [0]*len(cam_error_monitors)
 
         self.error_state = 0

@@ -20,7 +20,7 @@ from .abstract_cam import AbstractCamera, CamConfigType
 from .base_setting import BaseSetting
 
 # Max attempts that can be made to trigger a photo during the capture process
-MAX_TRIGGER_ATTEMPTS = 1
+MAX_TRIGGER_ATTEMPTS = 5
 IMAGE_COUNT_DELTA_FOR_WAIT_FOR_PATH = 10
 IMAGE_COUNT_DELTA_FOR_FETCH = 5
 

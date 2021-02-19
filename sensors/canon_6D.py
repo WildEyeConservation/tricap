@@ -12,6 +12,7 @@ class Canon6DCam():
         # self.config.output = 'Off'  # Do not be in live mode
         self.config.drivemode = 'Single'
         self.config.reviewtime = 'None'
+        self.config.imageformat = 'RAW'
         self.capture = self._camera.capture
         self.capture_and_download = self._camera.capture_and_download
         self.get_state_as_string = self._camera.get_state_as_string

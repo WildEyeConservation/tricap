@@ -7,7 +7,7 @@ class GitData():
         self.git_parse = ""
         self.parse_id = ""
         self.parse_date = ""
-        self.git_parse = Popen('git --git-dir /home/rpi3/Projects/tricap/tricap/.git log', shell=True, stdout=PIPE)
+        self.git_parse = Popen('git --git-dir /home/pi/tricap/tricap/.git log', shell=True, stdout=PIPE)
         (log, _) = self.git_parse.communicate()
         self.log = str(log)
 

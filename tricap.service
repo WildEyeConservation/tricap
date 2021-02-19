@@ -7,9 +7,9 @@ After=network.target
 User=rpi3
 Nice=-15
 Restart=always
-ExecStartPre=/home/pi/tricap/tricap/get_time_from_camera.sh
-ExecStart=/home/pi/tricap/tricap/tricap_launcher.sh
-# ExecStart=/usr/local/bin/uwsgi --ini /home/pi/tricap/tricap/tricap.ini
+ExecStartPre=/home/pi/tricap/get_time_from_camera.sh
+ExecStart=/home/pi/tricap/tricap_launcher.sh
+# ExecStart=/usr/local/bin/uwsgi --ini /home/pi/tricap/tricap.ini
 PermissionsStartOnly=True
 
 [Install]

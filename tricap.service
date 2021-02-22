@@ -4,7 +4,7 @@ Description=Tricap Launcher
 After=network.target
 
 [Service]
-User=rpi3
+User=pi
 Nice=-15
 Restart=always
 ExecStartPre=/home/pi/tricap/get_time_from_camera.sh

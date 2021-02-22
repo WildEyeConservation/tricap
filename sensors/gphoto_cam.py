@@ -324,6 +324,11 @@ class GPhotoCam(AbstractCamera):
 
         Return True if successful, or False if too many exceptions were caused.
         """
+
+        if self.is_disk_space_available() == False:
+            self._logger.warning('No/invalid storage info found')
+            return False
+
         trigger_attempts = 0
         while trigger_attempts < MAX_TRIGGER_ATTEMPTS:
             try:
@@ -335,6 +340,7 @@ class GPhotoCam(AbstractCamera):
                 self._logger.warning('Exception when trying to trigger a capture: %s', ex)
                 trigger_attempts += 1
 
+        self._logger.warning('Trigger failed')
         return False
 
     def capture(self, continuous=False, barrier: threading.Barrier = None, stop_event=None):
@@ -350,7 +356,7 @@ class GPhotoCam(AbstractCamera):
             self.notify()
             before_capture_ts = datetime.now()
 
-            if self._trigger_capture():  # Checks to see if something went wrong with the cameras
+            if self._trigger_capture() and self.is_disk_space_available():  # Checks to see if something went wrong with the cameras
                 self._image_count += 1
                 self.state = CAMERA_STATES.CAPTURING
             else:
@@ -408,3 +414,21 @@ class GPhotoCam(AbstractCamera):
 
     def get_cam(self):
         return self._gp_camera
+
+    def is_disk_space_available(self):
+        # start_get_storageinfo = datetime.now()
+        sifs = self._gp_camera.get_storageinfo(GPhotoCam._context)
+        # print('get_storageinfo delay={:.2f}ms'.format((datetime.now()-start_get_storageinfo).total_seconds()*1000))
+        # approximately 2.7ms to get storage info
+        try:
+            if sifs[0].freekbytes > 45000:
+                # print('Free space={}MB'.format(sifs[0].freekbytes/1024.0))
+                return True
+        except IndexError as ex:
+            self._logger.warning('Exception: no storage info: %s', ex)
+            pass
+        except AttributeError:
+            self._logger.warning('Exception: invalid storage info: %s', ex)
+            pass
+
+        return False

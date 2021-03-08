@@ -10,6 +10,7 @@ import exifread
 import copy
 
 from config import CAM_MANAGER_STATES, SERVER_LOG_DIR, SESSION_ROOT_DIR
+from support.configure import TricapConfig
 
 # TODO : Create a camera factory that will import cameras according to its config and make them available via its own
 # autodetect function
@@ -61,12 +62,8 @@ class TriCapCamsManager:
         """Construct."""
         self.state = CAM_MANAGER_STATES.STOPPED
 
-        self._capture_thread = None
-        self._kill_pill = None
-
+        self._kill_cpy_pill = None
         self._cameras = None
-        self._cam_threads = None
-        self._capture_thread = None
         self._rate_timer = None
         self._kill_pill = None
         self._cam_settings = cam_settings
@@ -78,11 +75,9 @@ class TriCapCamsManager:
     def _initialise(self):
         self._find_cameras()
 
-        # clear the threads
-        self._cam_threads = []
-        self._capture_thread = None
-
         self._image_capture_interval = float(self._man_settings['image_capture_interval'])
+
+        self.start_copying()
 
     def is_cam_image_fresh(self, cam_num):
         return self._cameras[cam_num].is_cam_image_fresh()
@@ -177,6 +172,7 @@ class TriCapCamsManager:
             self.state = CAM_MANAGER_STATES.ERROR_NO_CAMS
             self._logger.debug('Tried to start capture threads with no cameras connected.')
         elif self.state == CAM_MANAGER_STATES.STOPPED:
+            self.stop_copying()
             self._kill_pill = threading.Event()
 
             for cam in self._cameras:
@@ -207,6 +203,40 @@ class TriCapCamsManager:
             self._kill_pill.set()
             self.state = CAM_MANAGER_STATES.STOPPED
             self._logger.debug('Cam manager - capture threads stopped.')
+            self.start_copying()
+
+    def list_exisiting_files(self, dir):
+        result = []
+        for root, dirs, files in os.walk(os.path.expanduser(dir)):
+            for name in files:
+                if '.thumbs' in dirs:
+                    dirs.remove('.thumbs')
+                if name in ('.directory',):
+                    continue
+                ext = os.path.splitext(name)[1].lower()
+                if ext in ('.db',):
+                    continue
+                result.append(os.path.join(root, name))
+        return result
+
+    def start_copying(self):
+        self._logger.debug('Cam manager - copy threads started.')
+        triconfig = TricapConfig()
+        web_settings = triconfig.get_section_dict(TricapConfig.WEB_SECTION_HEADER)
+        PHOTO_DIR = str(web_settings['file_path'])
+        existing_files = self.list_exisiting_files(PHOTO_DIR)
+
+        threads = list()
+        self._kill_cpy_pill = threading.Event()
+        for index, camera in enumerate(self._cameras):
+            x = threading.Thread(target=camera.cpy_images, args=(existing_files, index, PHOTO_DIR, self._kill_cpy_pill, ), daemon=True)
+            threads.append(x)
+            x.start()
+
+    def stop_copying(self):
+        self._logger.debug('Cam manager - copy threads stopped.')
+        if self._kill_cpy_pill:
+            self._kill_cpy_pill.set()
 
     def get_image_capture_interval(self):
         return self._man_settings['image_capture_interval']

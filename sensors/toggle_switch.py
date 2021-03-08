@@ -182,7 +182,7 @@ class LEDController(Observer):
 
         self.error_state = 0
         for idx in range(len(self.cam_errors)):
-            if self.cam_errors[idx] >= self.allowed_cam_errors:
+            if self.cam_errors[idx] > self.allowed_cam_errors:
                 self.error_state = 1
 
         # if sum(self.cam_errors) > self.allowed_cam_errors:
@@ -198,7 +198,7 @@ class LEDController(Observer):
                         self._logger.info('LED controller - off state.')
                         self.green_pwm.stop()
                         GPIO.output(GREEN_PIN, GPIO.LOW)
-                        self.red_pwm = GPIO.PWM(RED_PIN, 0.5)
+                        # self.red_pwm = GPIO.PWM(RED_PIN, 0.5)
                         self.red_pwm.start(50)
                         self.toggled_on = False
                 else: # switch is in the on position
@@ -206,7 +206,7 @@ class LEDController(Observer):
                         self._logger.info('Toggle switch - starting capture.')
                         self.red_pwm.stop()
                         GPIO.output(RED_PIN, GPIO.LOW)
-                        self.green_pwm = GPIO.PWM(GREEN_PIN, 0.5)
+                        # self.green_pwm = GPIO.PWM(GREEN_PIN, 0.5)
                         self.green_pwm.start(50)
                         self.toggled_on = True
                         self.smsElapsedStartTime = time.time()

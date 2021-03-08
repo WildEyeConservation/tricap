@@ -325,10 +325,6 @@ class GPhotoCam(AbstractCamera):
         Return True if successful, or False if too many exceptions were caused.
         """
 
-        if self.is_disk_space_available() == False:
-            self._logger.warning('No/invalid storage info found')
-            return False
-
         trigger_attempts = 0
         while trigger_attempts < MAX_TRIGGER_ATTEMPTS:
             try:
@@ -345,10 +341,13 @@ class GPhotoCam(AbstractCamera):
 
     def capture(self, continuous=False, barrier: threading.Barrier = None, stop_event=None):
         """Start capturing photos, typically called by a thread."""
+        sleep(3) # wait for copy process to stop
         self.state = CAMERA_STATES.INITIALISED
         while True:
             if stop_event and stop_event.is_set():
                     return
+
+            space_available = self.is_disk_space_available()
             if barrier:
                 barrier.wait()
 
@@ -356,7 +355,7 @@ class GPhotoCam(AbstractCamera):
             self.notify()
             before_capture_ts = datetime.now()
 
-            if self._trigger_capture() and self.is_disk_space_available():  # Checks to see if something went wrong with the cameras
+            if space_available and self._trigger_capture():  # Checks to see if something went wrong with the cameras
                 self._image_count += 1
                 self.state = CAMERA_STATES.CAPTURING
             else:
@@ -432,3 +431,70 @@ class GPhotoCam(AbstractCamera):
             pass
 
         return False
+
+    def get_target_dir(self, timestamp, index, photo_dir):
+        addDir = "{}/{}/".format(timestamp.strftime('%Y/%Y_%m_%d'), str(index))
+        return os.path.join(photo_dir, addDir)
+
+    def list_camera_files(self, path='/'):
+        result = []
+        # get files
+        gp_list = self._gp_camera.folder_list_files(path, GPhotoCam._context)
+        for name, value in gp_list:
+            result.append(os.path.join(path, name))
+        # read folders
+        folders = []
+        gp_list = self._gp_camera.folder_list_folders(path, GPhotoCam._context)
+        for name, value in gp_list:
+            folders.append(name)
+        # recurse over subfolders
+        for name in folders:
+            result.extend(self.list_camera_files(os.path.join(path, name)))
+        return result
+
+    def get_camera_file_info(self, path):
+        folder, name = os.path.split(path)
+        return self._gp_camera.file_get_info(folder, name, GPhotoCam._context)
+
+    def cpy_images(self, computer_files, index, photo_dir, stop_event):
+        sleep(3) # wait for capture process to stop cleanly
+        camera_files = self.list_camera_files()
+        if not camera_files:
+            self._logger.debug('No files found')
+            self._gp_camera.exit()
+            return
+
+        # print('Copying %d files to %s' % (len(camera_files), photo_dir))
+        for path in camera_files:
+            if stop_event and stop_event.is_set():
+                self._gp_camera.exit()
+                return
+
+            info = self.get_camera_file_info(path)
+            timestamp = datetime.fromtimestamp(info.file.mtime)
+            folder, name = os.path.split(path)
+            dest_dir = self.get_target_dir(timestamp, index, photo_dir)
+            dest = os.path.join(dest_dir, name)
+            if dest in computer_files:
+                continue
+
+            # print('%s -> %s' % (path, dest_dir))
+            if not os.path.isdir(dest_dir):
+                os.makedirs(dest_dir)
+
+            camera_file = self._gp_camera.file_get(folder, name, gp.GP_FILE_TYPE_RAW, GPhotoCam._context)
+            for attemp in range(3):
+                try:
+                    # pass
+                    gp.check_result(gp.gp_file_save(camera_file, dest))
+                    self._gp_camera.file_delete(folder, name, GPhotoCam._context)
+                except:
+                    self._logger.debug("Save exception, sleep...")
+                    sleep(2)
+                else:
+                    break
+            else:
+                self._logger.debug("Attemps failed")
+
+        self._gp_camera.exit()
+        self._logger.debug('Copy thread completed.')

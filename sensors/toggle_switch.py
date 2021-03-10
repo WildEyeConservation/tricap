@@ -76,7 +76,7 @@ class ToggleSwitchObserver(Observer):
         if subject.value == 0: # switch is in the off position
             if self.toggled_on: # User has flicked the switch off
                 self._logger.info('Toggle switch - stopping capture.')
-                self.cam_manager.stop_capturing()                
+                self.cam_manager.stop_capturing()
                 self.toggled_on = False
         else: # switch is in the on position
             if self.toggled_on is False: # User has flicked the switch on
@@ -108,6 +108,7 @@ class CamManagerMonitor(PeriodicMonitor):
             self.value = 1
         else:
             self.value = 0
+        self.cam_manager.copy_disk_monitor()
 
 class CamErrorMonitor(PeriodicMonitor):
     """Monitor for each camera."""

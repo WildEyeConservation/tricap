@@ -19,6 +19,8 @@ from config import CAMERA_STATES
 from .abstract_cam import AbstractCamera, CamConfigType
 from .base_setting import BaseSetting
 
+import subprocess, hashlib
+
 # Max attempts that can be made to trigger a photo during the capture process
 MAX_TRIGGER_ATTEMPTS = 5
 IMAGE_COUNT_DELTA_FOR_WAIT_FOR_PATH = 10
@@ -124,6 +126,7 @@ class GPhotoCam(AbstractCamera):
 
         self._image_path = None
         self._old_image_count = 0
+        self._images_to_delete = list()
 
         self._setup_camera(settings)
 
@@ -456,45 +459,102 @@ class GPhotoCam(AbstractCamera):
         folder, name = os.path.split(path)
         return self._gp_camera.file_get_info(folder, name, GPhotoCam._context)
 
-    def cpy_images(self, computer_files, index, photo_dir, stop_event):
+    def refresh_camera(self):
+        self._gp_camera.exit()
+        sleep(500e-3)
+        self._gp_camera.init(GPhotoCam._context)
+    
+    def cpy_images(self, computer_files, index, photo_dir, stop_event, pause_event):
         sleep(3) # wait for capture process to stop cleanly
+        self.refresh_camera()
         camera_files = self.list_camera_files()
+        paused = False
         if not camera_files:
             self._logger.debug('No files found')
             self._gp_camera.exit()
             return
 
-        # print('Copying %d files to %s' % (len(camera_files), photo_dir))
+        self._logger.debug('Copying %d files to %s' % (len(camera_files), photo_dir))
         for path in camera_files:
+            while pause_event and pause_event.is_set():
+                # wait for all threads to pause before flushing external drive
+                if not paused:
+                    self._logger.debug("Paused")
+                paused = True
+                sleep(500e-3)
+
             if stop_event and stop_event.is_set():
                 self._gp_camera.exit()
                 return
+
+            if paused:
+                # external drive has been flushed -> delete from SD card
+                paused = False
+                self.delete_images()
 
             info = self.get_camera_file_info(path)
             timestamp = datetime.fromtimestamp(info.file.mtime)
             folder, name = os.path.split(path)
             dest_dir = self.get_target_dir(timestamp, index, photo_dir)
             dest = os.path.join(dest_dir, name)
-            if dest in computer_files:
-                continue
-
-            # print('%s -> %s' % (path, dest_dir))
             if not os.path.isdir(dest_dir):
                 os.makedirs(dest_dir)
 
+            if any(x[0] == folder and x[1] == name for x in self._images_to_delete):
+                # file already copied and waiting to be deleted from SD card
+                continue
+            
+            while dest in computer_files:
+                # file exists -> add in /copy/
+                dest = "{0}_{2}.{1}".format(*dest.rsplit(".", 1), "copy")
+            
+            # self._logger.debug('%s -> %s' % (path, dest))
             camera_file = self._gp_camera.file_get(folder, name, gp.GP_FILE_TYPE_RAW, GPhotoCam._context)
-            for attemp in range(3):
-                try:
-                    # pass
-                    gp.check_result(gp.gp_file_save(camera_file, dest))
-                    self._gp_camera.file_delete(folder, name, GPhotoCam._context)
-                except:
-                    self._logger.debug("Save exception, sleep...")
-                    sleep(2)
-                else:
-                    break
-            else:
-                self._logger.debug("Attemps failed")
+            try:
+                gp.check_result(gp.gp_file_save(camera_file, dest))
+                self._images_to_delete.append((folder, name, dest))
+            except:
+                self._logger.warning("Save exception %s %s -> %s" % (folder, name, dest))
 
         self._gp_camera.exit()
         self._logger.debug('Copy thread completed.')
+
+    def get_camera_image_hash(self, folder, name):
+        h = "cam"
+        try:
+            camera_file = self._gp_camera.file_get(folder, name, gp.GP_FILE_TYPE_RAW, GPhotoCam._context)
+            h = hashlib.sha256(memoryview(camera_file.get_data_and_size())).hexdigest()
+        except:
+            self._logger.warning("Failed to get %s %s hash" % (folder, name))
+        return h
+
+    def get_external_image_hash(self, path):
+        h = "ext"
+        try:
+            f = open(path, "rb")
+            h = hashlib.sha256(f.read()).hexdigest()
+            f.close()
+        except:
+            self._logger.warning("Failed to get %s hash" % (path))
+        return h
+
+    def delete_images(self):
+        # verify first and last file hash
+        if len(self._images_to_delete) > 0:
+            self._logger.debug("Delete {} files".format(len(self._images_to_delete)))
+            folder, name, dest = self._images_to_delete[0]
+            folderLast, nameLast, destLast = self._images_to_delete[-1]
+
+            if (self.get_camera_image_hash(folder, name) == self.get_external_image_hash(dest) and
+                self.get_camera_image_hash(folderLast, nameLast) == self.get_external_image_hash(destLast)):
+                # first and last image hash match -> delete copied files from SD card
+                for folder, name, _  in self._images_to_delete:
+                    try:
+                        # self._logger.debug("Delete %s %s" % (folder, name))
+                        self._gp_camera.file_delete(folder, name, GPhotoCam._context)
+                    except:
+                        self._logger.warning("Delete exception for folder: %s, name: %s" % (folder, name))
+            else:
+                self._logger.warning("Hash mismatch")
+            self._logger.debug("Delete done")
+            self._images_to_delete = list()

@@ -31,7 +31,7 @@ NUM_DUMMY_CAMS = 3
 CAMERA_STATES = Enum("CamState", ["UNINITIALISED", "INITIALISED", "CAPTURING", 
                                   "ERROR_CONFIG", "ERROR_CAPTURE"])
 CAM_MANAGER_STATES = Enum("CamManagerState", ["STOPPED", "STARTED", 
-                                              "ERROR_NO_CAMS", "ERROR_CONFIG"])
+                                              "ERROR_NO_CAMS", "ERROR_CONFIG", "COPYING"])
 ALTIMETER_STATE = Enum("AltiState", ["NOT_CONNECTED", "CONNECTED", "MEASURING", 
                                      "ERROR"])
 BUTTON_CODE = IntEnum("ButtonCode", {"START": 0, "STOP": 1, "TEST": 2,

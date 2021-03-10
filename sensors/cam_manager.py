@@ -8,9 +8,10 @@ import threading
 import os
 import exifread
 import copy
+import subprocess, time
+from datetime import datetime
 
 from config import CAM_MANAGER_STATES, SERVER_LOG_DIR, SESSION_ROOT_DIR
-from support.configure import TricapConfig
 
 # TODO : Create a camera factory that will import cameras according to its config and make them available via its own
 # autodetect function
@@ -25,6 +26,7 @@ from .dummy_cam import DummyShell, external_dummy_calibrate_func
 
 from support.basic import RepeatingBarrierPasser
 
+MOUNT_POINT = "/mnt/ext_cam_storage"
 
 class MultiConfig:
     dictkeys = ["_cameras", "_context"]
@@ -63,6 +65,9 @@ class TriCapCamsManager:
         self.state = CAM_MANAGER_STATES.STOPPED
 
         self._kill_cpy_pill = None
+        self._pause_cpy_pill = None
+        self._copy_flush_time = None
+        self.cpy_threads = list()
         self._cameras = None
         self._rate_timer = None
         self._kill_pill = None
@@ -171,8 +176,10 @@ class TriCapCamsManager:
         if len(self._cameras) == 0:
             self.state = CAM_MANAGER_STATES.ERROR_NO_CAMS
             self._logger.debug('Tried to start capture threads with no cameras connected.')
-        elif self.state == CAM_MANAGER_STATES.STOPPED:
-            self.stop_copying()
+        elif self.state == CAM_MANAGER_STATES.STOPPED or self.state == CAM_MANAGER_STATES.COPYING:
+            if self.state == CAM_MANAGER_STATES.COPYING:
+                self.stop_copying()
+
             self._kill_pill = threading.Event()
 
             for cam in self._cameras:
@@ -202,8 +209,8 @@ class TriCapCamsManager:
         if self.state == CAM_MANAGER_STATES.STARTED:
             self._kill_pill.set()
             self.state = CAM_MANAGER_STATES.STOPPED
-            self._logger.debug('Cam manager - capture threads stopped.')
             self.start_copying()
+            self._logger.debug('Cam manager - capture threads stopped.')
 
     def list_exisiting_files(self, dir):
         result = []
@@ -219,24 +226,124 @@ class TriCapCamsManager:
                 result.append(os.path.join(root, name))
         return result
 
+    def mount_disk(self):
+        if not os.path.ismount(MOUNT_POINT):
+            try:
+                mount_status = subprocess.run(["mount", "/dev/sda1", MOUNT_POINT], check=True)
+                self._logger.debug(mount_status)
+            except:
+                self._logger.warning('Failed to mount')
+                return False
+        else:
+            self._logger.info('Disk already mounted')
+        return True
+
+    def unmount_disk(self):
+        if os.path.ismount(MOUNT_POINT):
+            try:
+                mount_status = subprocess.run(["umount", MOUNT_POINT], check=True)
+                self._logger.debug(mount_status)
+            except:
+                self._logger.warning('Failed to umount')
+                return False
+        else:
+            self._logger.info('Disk not mounted')
+        return True
+
+    def flush_disk(self):
+        if os.path.ismount(MOUNT_POINT):
+            try:
+                flush_status = subprocess.run(["hdparm", "-F", "/dev/sda1"], check=True)
+                self._logger.debug(flush_status)
+                return True
+            except:
+                self._logger.warning("Flush failed")
+        else:
+            self._logger.info('Disk not mounted')
+        return False
+
     def start_copying(self):
         self._logger.debug('Cam manager - copy threads started.')
-        triconfig = TricapConfig()
-        web_settings = triconfig.get_section_dict(TricapConfig.WEB_SECTION_HEADER)
-        PHOTO_DIR = str(web_settings['file_path'])
-        existing_files = self.list_exisiting_files(PHOTO_DIR)
+        if not self.mount_disk():
+            # no disk -> do not copy
+            return
 
-        threads = list()
+        existing_files = self.list_exisiting_files(MOUNT_POINT)
+
         self._kill_cpy_pill = threading.Event()
+        self._pause_cpy_pill = threading.Event()
+        self._copy_flush_time = datetime.now()
         for index, camera in enumerate(self._cameras):
-            x = threading.Thread(target=camera.cpy_images, args=(existing_files, index, PHOTO_DIR, self._kill_cpy_pill, ), daemon=True)
-            threads.append(x)
+            x = threading.Thread(target=camera.cpy_images, args=(existing_files, index, MOUNT_POINT, self._kill_cpy_pill, self._pause_cpy_pill, ), daemon=True)
+            self.cpy_threads.append(x)
             x.start()
+
+        self.state = CAM_MANAGER_STATES.COPYING
 
     def stop_copying(self):
         self._logger.debug('Cam manager - copy threads stopped.')
         if self._kill_cpy_pill:
             self._kill_cpy_pill.set()
+        self.unmount_disk()
+        self.state = CAM_MANAGER_STATES.STOPPED
+
+    def copy_disk_monitor(self):
+        """
+        If all threads are done -> unmount the external disk
+        Flush the external drive cache every 15 minutes during the copy process
+        """
+        if self.state != CAM_MANAGER_STATES.COPYING:
+            return
+            
+        if not os.path.ismount(MOUNT_POINT) or not self._pause_cpy_pill:
+            return
+
+        # check if all copy threads are finished
+        finished = True
+        if os.path.ismount(MOUNT_POINT):
+            for thread in self.cpy_threads:
+                if thread.is_alive():
+                    finished = False
+                    break
+    
+        if not finished:
+            # flush external and delete from SD cards every x seconds
+            if (datetime.now() - self._copy_flush_time).total_seconds() > 600:
+                self._copy_flush_time = datetime.now()
+                # pause copy process
+                self._pause_cpy_pill.set()
+                # wait for current image copy to finish
+                time.sleep(3)
+                # flush external disk cache -> do this here and not multiple times in gphoto_cam.py
+                if self.flush_disk():
+                    # flush successful -> unpause, delete and continue copying
+                    self._pause_cpy_pill.clear()
+                else:
+                    # flush failed -> do not delete and stop copying
+                    self._pause_cpy_pill.clear()
+                    self.stop_copying()
+                    return
+
+        if finished and self.state == CAM_MANAGER_STATES.COPYING:
+            # flush external disk cache
+            if not self.flush_disk():
+                # flush failed -> do not delete from SD card
+                self.state = CAM_MANAGER_STATES.STOPPED
+                return # do not delete images from SD card if there is something wrong with the external
+                
+            # delete remaining SD card images
+            del_threads = list()
+            for index, camera in enumerate(self._cameras):
+                x = threading.Thread(target=camera.delete_images, daemon=True)
+                del_threads.append(x)
+                x.start()
+
+            for t in del_threads:
+                t.join()
+
+            # unmount external disk
+            self.unmount_disk()
+            self.state == CAM_MANAGER_STATES.STOPPED
 
     def get_image_capture_interval(self):
         return self._man_settings['image_capture_interval']

@@ -293,6 +293,7 @@ def stop_all_threads():
             sm.stop()
 
     tricap_manager.stop_capturing()
+    tricap_manager.stop_copying()
     altimeter.stop_measuring()
 
 

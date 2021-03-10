@@ -27,8 +27,8 @@ home_bp = Blueprint('home', __name__)
 # Using a dummy colour entry because Enum starts indexing from 1, and not from zero
 # CAMERA_STATES = Enum("CamState", ["UNINITIALISED", "INITIALISED", "CAPTURING", "ERROR_CONFIG", "ERROR_CAPTURE"])
 CAM_STATE_COLOURS = ['dummy', 'red', 'orange', 'green', 'red', 'red']
-# CAM_MANAGER_STATES = Enum("CamManagerState", ["STOPPED", "STARTED", "ERROR_NO_CAMS", "ERROR_CONFIG"])
-CAM_MAN_STATE_COLOURS = ['dummy', 'orange', 'green', 'red', 'red']
+# CAM_MANAGER_STATES = Enum("CamManagerState", ["STOPPED", "STARTED", "ERROR_NO_CAMS", "ERROR_CONFIG", "COPYING"])
+CAM_MAN_STATE_COLOURS = ['dummy', 'orange', 'green', 'red', 'red', 'orange']
 # ALTIMETER_STATE = Enum("AltiState", ["NOT_CONNECTED", "CONNECTED", "MEASURING", "ERROR"])
 ALTI_STATE_COLOURS = ['dummy', 'red', 'orange', 'green', 'red']
 

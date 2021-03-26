@@ -36,6 +36,7 @@ from support.system_monitor import generate_system_monitor, SystemMonitorLogger
 from config import SERVER_LOG_DIR, ALTIMETER_STATE
 from enum import Enum
 
+from serial_comms.SerialInterface import SerialInterface
 
 class AltiMeasurementObserver():
     """A custom observer to link the alti to the session logger."""
@@ -169,6 +170,8 @@ else:
     rootlogger.debug('Real cams will be used, in accordance to configuration')
     code_inf = GitData()
 
+ser = SerialInterface('/dev/rfcomm0')
+
 tricap_manager = TriCapCamsManager(misc_settings, cam_settings, use_dummy_cams)
 tricap_cameras = tricap_manager.get_cameras_as_list()
 tricap_length = len(tricap_cameras)
@@ -273,7 +276,6 @@ cam_man_state_monitor.start()
 
 # some glue functions, which use the module level functions
 
-
 def stop_fetching():
     """Turn off fetching for all cameras."""
     for cam in tricap_manager.get_cameras_as_list():
@@ -294,6 +296,7 @@ def stop_all_threads():
 
     tricap_manager.stop_capturing()
     tricap_manager.stop_copying()
+    tricap_manager.stop_load_preview()
     altimeter.stop_measuring()
 
 
@@ -302,10 +305,12 @@ from .views.home import home_bp
 from .views.showlog import showlog_bp
 from .views.settings import settings_bp
 from .views.camera import camera_bp
+from .views.api import api_bp
 
 app.register_blueprint(home_bp)
 app.register_blueprint(showlog_bp)
 app.register_blueprint(settings_bp)
 app.register_blueprint(camera_bp)
+app.register_blueprint(api_bp)
 
 rootlogger.info('New instance of TriCap app has been initiated.')

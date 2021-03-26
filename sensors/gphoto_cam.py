@@ -8,6 +8,9 @@ from io import BytesIO
 # import exifread
 import pyexifinfo
 import tempfile
+import numpy as np
+import rawpy, base64
+from PIL import Image
 
 from time import sleep
 from datetime import datetime
@@ -127,6 +130,9 @@ class GPhotoCam(AbstractCamera):
         self._image_path = None
         self._old_image_count = 0
         self._images_to_delete = list()
+        self._preview_images = list()
+        self._im_aspect_ratio = 1.0
+        self._generating_preview = False
 
         self._setup_camera(settings)
 
@@ -344,13 +350,17 @@ class GPhotoCam(AbstractCamera):
 
     def capture(self, continuous=False, barrier: threading.Barrier = None, stop_event=None):
         """Start capturing photos, typically called by a thread."""
-        sleep(3) # wait for copy process to stop
         self.state = CAMERA_STATES.INITIALISED
         while True:
             if stop_event and stop_event.is_set():
-                    return
+                return
 
-            space_available = self.is_disk_space_available()
+            disk_info = self.get_disk_info()
+            if "freeMB" in disk_info:
+                space_available = disk_info['freeMB'] > 45
+            else:
+                space_available = False
+
             if barrier:
                 barrier.wait()
 
@@ -417,15 +427,18 @@ class GPhotoCam(AbstractCamera):
     def get_cam(self):
         return self._gp_camera
 
-    def is_disk_space_available(self):
+    def get_disk_info(self):
         # start_get_storageinfo = datetime.now()
-        sifs = self._gp_camera.get_storageinfo(GPhotoCam._context)
+        # sifs = self._gp_camera.get_storageinfo(GPhotoCam._context)
         # print('get_storageinfo delay={:.2f}ms'.format((datetime.now()-start_get_storageinfo).total_seconds()*1000))
         # approximately 2.7ms to get storage info
+        info = {}
         try:
-            if sifs[0].freekbytes > 45000:
-                # print('Free space={}MB'.format(sifs[0].freekbytes/1024.0))
-                return True
+            sifs = self._gp_camera.get_storageinfo(GPhotoCam._context)[0]
+            info['freeMB'] = sifs.freekbytes // 1024
+            info['freeGB'] = sifs.freekbytes // 1048576
+            info['capacityGB'] = sifs.capacitykbytes // 1048576
+            info['usedGB'] = info['capacityGB'] - info['freeGB']
         except IndexError as ex:
             self._logger.warning('Exception: no storage info: %s', ex)
             pass
@@ -433,7 +446,7 @@ class GPhotoCam(AbstractCamera):
             self._logger.warning('Exception: invalid storage info: %s', ex)
             pass
 
-        return False
+        return info
 
     def get_target_dir(self, timestamp, index, photo_dir):
         addDir = "{}/{}/".format(timestamp.strftime('%Y/%Y_%m_%d'), str(index))
@@ -465,7 +478,6 @@ class GPhotoCam(AbstractCamera):
         self._gp_camera.init(GPhotoCam._context)
     
     def cpy_images(self, computer_files, index, photo_dir, stop_event, pause_event):
-        sleep(3) # wait for capture process to stop cleanly
         self.refresh_camera()
         camera_files = self.list_camera_files()
         paused = False
@@ -558,3 +570,61 @@ class GPhotoCam(AbstractCamera):
                 self._logger.warning("Hash mismatch")
             self._logger.debug("Delete done")
             self._images_to_delete = list()
+
+    def cr2_to_jpeg(self, path):
+        with rawpy.imread(path) as raw:
+            self._im_aspect_ratio = raw.sizes.width / float(raw.sizes.height)
+            rgb = raw.postprocess()
+
+        im = Image.fromarray(rgb)
+
+        bytes_io = BytesIO()
+        im.save(bytes_io, format='JPEG')
+        if len(bytes_io.getvalue()) < 3000000:
+            # avoid memory crash on app
+            self._preview_images.append(base64.b64encode(bytes_io.getvalue()).decode("utf-8"))
+        self._logger.debug(len(bytes_io.getvalue()))
+
+    def load_preview(self, stop_event):
+        self._generating_preview = True
+        sleep(2)
+
+        camera_files = self.list_camera_files()
+        if not camera_files:
+            self._logger.debug('No files found')
+            self._gp_camera.exit()
+            return
+
+        im_preview_idxs = list()
+        im_preview_idxs.append((len(camera_files)-1) // 10)
+        im_preview_idxs.append((len(camera_files)-1) // 2)
+        im_preview_idxs.append(((9*len(camera_files)-1)) // 10)
+
+        self._preview_images = list()
+        for preview_idx in im_preview_idxs:
+            if stop_event and stop_event.is_set():
+                self._gp_camera.exit()
+                return
+
+            try:
+                # folder, name = os.path.split(camera_files[preview_idx])
+                # camera_file = self._gp_camera.file_get(folder, name, gp.GP_FILE_TYPE_RAW , GPhotoCam._context)
+                # file_data = camera_file.get_data_and_size()
+                # with open('/tmp/im.cr2', 'wb') as f:
+                #     f.write(memoryview(file_data).tobytes())
+
+                # self.cr2_to_jpeg('/tmp/im.cr2')
+
+                self.cr2_to_jpeg('/home/pi/Pictures/07_24_23_000.cr2')
+            except:
+                self._logger.debug('get_image failed')
+
+        self._generating_preview = False
+
+    def get_preview_images(self):
+        if self._generating_preview:
+            return []
+        return self._preview_images
+
+    def get_aspect_ratio(self):
+        return self._im_aspect_ratio

@@ -8,7 +8,7 @@ import threading
 import os
 import exifread
 import copy
-import subprocess, time
+import subprocess, time, shutil
 from datetime import datetime
 
 from config import CAM_MANAGER_STATES, SERVER_LOG_DIR, SESSION_ROOT_DIR
@@ -67,7 +67,10 @@ class TriCapCamsManager:
         self._kill_cpy_pill = None
         self._pause_cpy_pill = None
         self._copy_flush_time = None
-        self.cpy_threads = list()
+        self._cpy_threads = list()
+        self._capture_threads = list()
+        self._kill_preview_pill = None
+        self._preview_threads = list()
         self._cameras = None
         self._rate_timer = None
         self._kill_pill = None
@@ -82,7 +85,7 @@ class TriCapCamsManager:
 
         self._image_capture_interval = float(self._man_settings['image_capture_interval'])
 
-        self.start_copying()
+        self.load_preview()
 
     def is_cam_image_fresh(self, cam_num):
         return self._cameras[cam_num].is_cam_image_fresh()
@@ -179,6 +182,8 @@ class TriCapCamsManager:
         elif self.state == CAM_MANAGER_STATES.STOPPED or self.state == CAM_MANAGER_STATES.COPYING:
             if self.state == CAM_MANAGER_STATES.COPYING:
                 self.stop_copying()
+            if self.state == CAM_MANAGER_STATES.LOADING_PREVIEW:
+                self.stop_load_preview()
 
             self._kill_pill = threading.Event()
 
@@ -193,24 +198,54 @@ class TriCapCamsManager:
             else:
                 barrier = threading.Barrier(len(self._cameras))
 
+            self._capture_threads = list()
+            while self.is_copy_thread_alive() or self.is_preview_thread_alive():
+                time.sleep(200e-3)
             for cam in self._cameras:  # self.thread was thread
                 # TODO This seems to be a mistake, should probaby make a list of the threads
-                self.thread = threading.Thread(target=cam.capture, daemon=True,
-                                          kwargs={"continuous": True, "barrier": barrier,
-                                                  "stop_event": self._kill_pill})
-                self.thread.start()
+                x = threading.Thread(target=cam.capture, daemon=True, args=(True,barrier,self._kill_pill, ))
+                self._capture_threads.append(x)
+                x.start()
             self.state = CAM_MANAGER_STATES.STARTED
             self._logger.debug('Cam manager - capture threads started.')
-
-    def check_thread_status(self):
-        return self.thread.isAlive()
 
     def stop_capturing(self):
         if self.state == CAM_MANAGER_STATES.STARTED:
             self._kill_pill.set()
             self.state = CAM_MANAGER_STATES.STOPPED
-            self.start_copying()
+            self.load_preview()
             self._logger.debug('Cam manager - capture threads stopped.')
+
+    def is_copy_thread_alive(self):
+        """ Return true if any cam thread is alive """
+        for t in self._cpy_threads:
+            if t.is_alive():
+                return True
+        return False
+
+    def is_preview_thread_alive(self):
+        """ Return true if any cam thread is alive """
+        for t in self._preview_threads:
+            if t.is_alive():
+                return True
+        return False
+
+    def load_preview(self):
+        self._logger.debug('Cam manager - preview threads started.')
+        self._kill_preview_pill = threading.Event()
+        self._preview_threads = list()
+        for camera in self._cameras:
+            x = threading.Thread(target=camera.load_preview, args=(self._kill_cpy_pill, ), daemon=True)
+            self._preview_threads.append(x)
+            x.start()
+        
+        self.state = CAM_MANAGER_STATES.LOADING_PREVIEW
+
+    def stop_load_preview(self):
+        self._logger.debug('Cam manager - preview threads stopped.')
+        if self._kill_preview_pill:
+            self._kill_preview_pill.set()
+        self.state = CAM_MANAGER_STATES.STOPPED
 
     def list_exisiting_files(self, dir):
         result = []
@@ -266,6 +301,7 @@ class TriCapCamsManager:
         self._logger.debug('Cam manager - copy threads started.')
         if not self.mount_disk():
             # no disk -> do not copy
+            self.state = CAM_MANAGER_STATES.STOPPED
             return
 
         existing_files = self.list_exisiting_files(MOUNT_POINT)
@@ -273,9 +309,10 @@ class TriCapCamsManager:
         self._kill_cpy_pill = threading.Event()
         self._pause_cpy_pill = threading.Event()
         self._copy_flush_time = datetime.now()
+        self._cpy_threads = list()
         for index, camera in enumerate(self._cameras):
             x = threading.Thread(target=camera.cpy_images, args=(existing_files, index, MOUNT_POINT, self._kill_cpy_pill, self._pause_cpy_pill, ), daemon=True)
-            self.cpy_threads.append(x)
+            self._cpy_threads.append(x)
             x.start()
 
         self.state = CAM_MANAGER_STATES.COPYING
@@ -292,6 +329,11 @@ class TriCapCamsManager:
         If all threads are done -> unmount the external disk
         Flush the external drive cache every 15 minutes during the copy process
         """
+        if self.state == CAM_MANAGER_STATES.LOADING_PREVIEW:
+            if not self.is_preview_thread_alive():
+                self.start_copying()
+                return
+
         if self.state != CAM_MANAGER_STATES.COPYING:
             return
             
@@ -301,10 +343,8 @@ class TriCapCamsManager:
         # check if all copy threads are finished
         finished = True
         if os.path.ismount(MOUNT_POINT):
-            for thread in self.cpy_threads:
-                if thread.is_alive():
-                    finished = False
-                    break
+            if self.is_copy_thread_alive():
+                finished = False
     
         if not finished:
             # flush external and delete from SD cards every x seconds
@@ -372,3 +412,19 @@ class TriCapCamsManager:
     @property
     def config(self):
         return MultiConfig(self._cameras)
+
+    def external_disk_info(self):
+        self._logger.debug('external_disk_info')
+        info = {}
+        is_mounted = os.path.ismount(MOUNT_POINT)
+        if self.mount_disk():
+            total, used, free = shutil.disk_usage(MOUNT_POINT)
+            if not is_mounted:
+                # only unmount if unmounted at the start of this function
+                self.unmount_disk()
+
+            info['totalGB'] = total // 1073741824,
+            info['usedGB'] = used // 1073741824,
+            info['freeGB'] = free // 1073741824
+        
+        return info

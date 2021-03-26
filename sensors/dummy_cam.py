@@ -5,9 +5,13 @@ import os
 import pickle
 import threading
 import time
+from io import BytesIO
 from collections import namedtuple
 from glob import glob
 from datetime import datetime
+import rawpy, base64
+from PIL import Image
+import subprocess, hashlib
 
 from anytree import PreOrderIter, RenderTree
 
@@ -38,7 +42,7 @@ class DummyConfig:
 
     def _get_child_by_name(self, key):
         config_widget = [widget for widget in PreOrderIter(self._tree)
-                         if widget.name == key and widget.is_leaf]
+                         if widget._name == key and widget.is_leaf]
         if len(config_widget) == 0:            
             raise CameraException("%s does not have an entry!" % key)
         elif len(config_widget) != 1:
@@ -127,6 +131,8 @@ class DummyCam(AbstractCamera):
             self.config[setting_name] = setting_value
 
         self.generation_period = 1
+        self._preview_images = list()
+        self._im_aspect_ratio = 1.0
 
     @property
     def config(self):
@@ -198,6 +204,53 @@ class DummyCam(AbstractCamera):
         """Get the number of images captured so far."""
         return self._counter
 
+    def cr2_to_jpeg(self, path):
+        with rawpy.imread(path) as raw:
+            self._im_aspect_ratio = raw.sizes.width / float(raw.sizes.height)
+            rgb = raw.postprocess()
+
+        im = Image.fromarray(rgb)
+
+        bytes_io = BytesIO()
+        im.save(bytes_io, format='JPEG')
+        if len(bytes_io.getvalue()) < 3000000:
+            # avoid memory crash on app
+            self._preview_images.append(base64.b64encode(bytes_io.getvalue()).decode("utf-8"))
+
+    def cpy_images(self):
+        pass
+
+    def delete_images(self):
+        pass
+
+    def load_preview(self, stop_event):
+        self._generating_preview = True
+
+        for preview_idx in range(3):
+            if stop_event and stop_event.is_set():
+                return
+            try:
+                self.cr2_to_jpeg('/home/pi/Pictures/07_24_23_000.cr2')
+            except:
+                pass
+
+        self._generating_preview = False
+
+    def get_disk_info(self):
+        info = {}
+        info['freeMB'] = 1234000 // 1024
+        info['freeGB'] = 1234000 // 1048576
+        info['capacityGB'] = 5678000 // 1048576
+        info['usedGB'] = info['capacityGB'] - info['freeGB']
+        return info
+
+    def get_preview_images(self):
+        if self._generating_preview:
+            return []
+        return self._preview_images
+
+    def get_aspect_ratio(self):
+        return self._im_aspect_ratio
 
 class DummyShell():
     """Mimic the Canon6D camera shell for the purposes of testing on system without GPhoto."""
@@ -212,6 +265,12 @@ class DummyShell():
         self.capture_and_download = self._camera.capture_and_download
         self.get_state_as_string = self._camera.get_state_as_string
         self.is_cam_image_fresh = self._camera.is_cam_image_fresh
+        self.cpy_images = self._camera.cpy_images
+        self.delete_images = self._camera.delete_images
+        self.load_preview = self._camera.load_preview
+        self.get_disk_info = self._camera.get_disk_info
+        self.get_preview_images = self._camera.get_preview_images
+        self.get_aspect_ratio = self._camera.get_aspect_ratio
 
     @property
     def config(self):

@@ -51,3 +51,11 @@ def get_image(cam_idx):
   for img in im['images']:
     _logger.debug(len(img))
   return im
+
+@api_bp.route('/api/copy_eta')
+def copy_eta():
+  info = tricap_manager.copy_eta()
+  if info == "":
+    return Response("{}", status=400, mimetype='application/json')
+
+  return info

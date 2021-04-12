@@ -25,6 +25,7 @@ from .dummy_cam import DummyCam
 from .dummy_cam import DummyShell, external_dummy_calibrate_func
 
 from support.basic import RepeatingBarrierPasser
+from statistics import mean
 
 MOUNT_POINT = "/mnt/ext_cam_storage"
 
@@ -67,6 +68,7 @@ class TriCapCamsManager:
         self._kill_cpy_pill = None
         self._pause_cpy_pill = None
         self._copy_flush_time = None
+        self._copy_start_time = None
         self._cpy_threads = list()
         self._capture_threads = list()
         self._kill_preview_pill = None
@@ -78,6 +80,7 @@ class TriCapCamsManager:
         self._man_settings = man_settings
         self.use_dummy_cams = use_dummy_cams
         self.camera_list = ""
+        self._prev_copy_eta_s = 0
         self._initialise()
 
     def _initialise(self):
@@ -309,6 +312,8 @@ class TriCapCamsManager:
         self._kill_cpy_pill = threading.Event()
         self._pause_cpy_pill = threading.Event()
         self._copy_flush_time = datetime.now()
+        self._copy_start_time = datetime.now()
+        self._prev_copy_eta_s = 0
         self._cpy_threads = list()
         for index, camera in enumerate(self._cameras):
             x = threading.Thread(target=camera.cpy_images, args=(existing_files, index, MOUNT_POINT, self._kill_cpy_pill, self._pause_cpy_pill, ), daemon=True)
@@ -423,8 +428,29 @@ class TriCapCamsManager:
                 # only unmount if unmounted at the start of this function
                 self.unmount_disk()
 
-            info['capacityGB'] = total // 1073741824,
-            info['usedGB'] = used // 1073741824,
-            info['freeGB'] = free // 1073741824
+            info['capacityGB'] = round(total / 1073741824, 2)
+            info['usedGB'] = round(used / 1073741824, 2)
+            info['freeGB'] = round(free / 1073741824, 2)
         
         return info
+
+    def copy_eta(self):
+        if self._copy_start_time == None:
+            return ""
+        all_cam_copy_info = []
+        for cam in self._cameras:
+            all_cam_copy_info.append(cam.get_copy_info())
+        
+        average_percentage = mean(all_cam_copy_info)
+        if average_percentage == 0:
+            # invalid
+            return ""
+        elapsed_sec = (datetime.now() - self._copy_start_time).total_seconds()
+        remaining_sec = elapsed_sec / average_percentage - elapsed_sec
+        minutes = remaining_sec // 60
+        hours = minutes // 60
+
+        ret = {}
+        ret['percentage'] = round(average_percentage, 2)
+        ret['timeRemaining'] = "%02dh:%02dm:%02ds" % (hours, minutes % 60, remaining_sec % 60)
+        return ret

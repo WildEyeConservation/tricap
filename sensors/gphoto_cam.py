@@ -133,6 +133,8 @@ class GPhotoCam(AbstractCamera):
         self._preview_images = list()
         self._im_aspect_ratio = 1.0
         self._generating_preview = False
+        self._num_images_to_copy = 0
+        self._num_images_copied = 0
 
         self._setup_camera(settings)
 
@@ -435,10 +437,10 @@ class GPhotoCam(AbstractCamera):
         info = {}
         try:
             sifs = self._gp_camera.get_storageinfo(GPhotoCam._context)[0]
-            info['freeMB'] = sifs.freekbytes // 1024
-            info['freeGB'] = sifs.freekbytes // 1048576
-            info['capacityGB'] = sifs.capacitykbytes // 1048576
-            info['usedGB'] = info['capacityGB'] - info['freeGB']
+            info['freeMB'] = round(sifs.freekbytes / 1024, 2)
+            info['freeGB'] = round(sifs.freekbytes / 1048576, 2)
+            info['capacityGB'] = round(sifs.capacitykbytes / 1048576, 2)
+            info['usedGB'] = round(info['capacityGB'] - info['freeGB'], 2)
         except IndexError as ex:
             self._logger.warning('Exception: no storage info: %s', ex)
             pass
@@ -480,6 +482,7 @@ class GPhotoCam(AbstractCamera):
     def cpy_images(self, computer_files, index, photo_dir, stop_event, pause_event):
         self.refresh_camera()
         camera_files = self.list_camera_files()
+        self._num_images_to_copy = len(camera_files)
         paused = False
         if not camera_files:
             self._logger.debug('No files found')
@@ -525,6 +528,7 @@ class GPhotoCam(AbstractCamera):
             try:
                 gp.check_result(gp.gp_file_save(camera_file, dest))
                 self._images_to_delete.append((folder, name, dest))
+                self._num_images_copied = len(self._images_to_delete)
             except:
                 self._logger.warning("Save exception %s %s -> %s" % (folder, name, dest))
 
@@ -594,6 +598,8 @@ class GPhotoCam(AbstractCamera):
     def load_preview(self, stop_event, index):
         self._generating_preview = True
         sleep(2)
+        self._generating_preview = False
+        return
 
         self.refresh_camera()
         camera_files = self.list_camera_files()
@@ -633,3 +639,10 @@ class GPhotoCam(AbstractCamera):
 
     def get_aspect_ratio(self):
         return self._im_aspect_ratio
+
+    def get_copy_info(self):
+        if self._num_images_to_copy == 0:
+            # invalid
+            return 0
+
+        return round(self._num_images_copied / self._num_images_to_copy, 2)

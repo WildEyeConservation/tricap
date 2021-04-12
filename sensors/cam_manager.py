@@ -234,8 +234,8 @@ class TriCapCamsManager:
         self._logger.debug('Cam manager - preview threads started.')
         self._kill_preview_pill = threading.Event()
         self._preview_threads = list()
-        for camera in self._cameras:
-            x = threading.Thread(target=camera.load_preview, args=(self._kill_cpy_pill, ), daemon=True)
+        for index, camera in enumerate(self._cameras):
+            x = threading.Thread(target=camera.load_preview, args=(self._kill_cpy_pill, index, ), daemon=True)
             self._preview_threads.append(x)
             x.start()
         
@@ -383,7 +383,7 @@ class TriCapCamsManager:
 
             # unmount external disk
             self.unmount_disk()
-            self.state == CAM_MANAGER_STATES.STOPPED
+            self.state = CAM_MANAGER_STATES.STOPPED
 
     def get_image_capture_interval(self):
         return self._man_settings['image_capture_interval']
@@ -423,7 +423,7 @@ class TriCapCamsManager:
                 # only unmount if unmounted at the start of this function
                 self.unmount_disk()
 
-            info['totalGB'] = total // 1073741824,
+            info['capacityGB'] = total // 1073741824,
             info['usedGB'] = used // 1073741824,
             info['freeGB'] = free // 1073741824
         

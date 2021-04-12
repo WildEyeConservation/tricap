@@ -3,12 +3,15 @@ from time import sleep
 from threading import Thread, Lock
 import base64
 import serial_comms.out.tricap_pb2 as pb
+import logging, subprocess
 
 from .SerialProcess import SerialProcess
 
 GET_STATUS = 1
 
 class SerialInterface(SerialProcess):
+  _logger = logging.getLogger(__name__)
+
   def __init__(self, port):
     super().__init__()
     self.port = port
@@ -29,7 +32,7 @@ class SerialInterface(SerialProcess):
       self.open()
       sleep(1)
     self.isConnected = True
-    print('Serial port ' + self.port + ' connected')
+    self._logger.debug('Serial port {} connected'.format(self.port))
 
   def open(self):
     with self._lock:
@@ -39,7 +42,8 @@ class SerialInterface(SerialProcess):
         bytesWaiting = self.serialPort.inWaiting()
       except:
         self.serialPort.close()
-        # print('Failed to open port')
+        subprocess.run(['rfcomm', 'release', '0'])
+        # self._logger.debug('Failed to open port')
 
   def close(self):
     """
@@ -49,25 +53,25 @@ class SerialInterface(SerialProcess):
       self.isConnected = False
       self.killThread = True
       self.serialPort.close()
+      subprocess.run(['rfcomm', 'release', '0'])
 
   def reconnect(self):
     with self._lock:
       self.serialPort.close()
+      subprocess.run(['rfcomm', 'release', '0'])
     self.connect()
 
   def write(self, buff):
     with self._lock:
-      print('tx', buff, len(buff))
-      print('tx enc', base64.b64encode(buff), len(base64.b64encode(buff)))
-      print('tx trailer', base64.b64encode(b'~!'))
+      self._logger.debug('tx {} {}'.format(buff, len(buff)))
       try:
         self.serialPort.write(base64.b64encode(buff))
         self.serialPort.write(base64.b64encode(b'~!'))
       except:
-        print('tx failed')
+        self._logger.debug('tx failed')
 
   def thread(self):
-    print('Serial thread started')
+    self._logger.debug('Serial thread started')
     buff = bytearray()
     while self.killThread == False:
       if self.isConnected:
@@ -77,9 +81,7 @@ class SerialInterface(SerialProcess):
           while bytesWaiting > 0:
             newData = True
             buff += self.serialPort.read(bytesWaiting)
-            print(len(buff))
-            print('rx '+''.join('{:02x}'.format(x) for x in buff))
-            print(buff)
+            self._logger.debug('rx {} {}'.format(buff, len(buff)))
             sleep(1e-3)
             bytesWaiting = self.serialPort.inWaiting()
           if newData:
@@ -88,12 +90,12 @@ class SerialInterface(SerialProcess):
                   # clear buffer
                   buff = bytearray()
         except:
-          print('Serial thread error')
+          self._logger.debug('Serial thread error')
           self.reconnect()
           buff = bytearray()
 
       for request in self._requests:
-        print('Process {}'.format(request.msgType))
+        self._logger.debug('Process {}'.format(request.msgType))
         msg = bytearray()
         if request.msgType == pb.Message.MessageType.IP_ADDRESS:
           msg = self.buildIpAddress()
@@ -104,4 +106,4 @@ class SerialInterface(SerialProcess):
           self.write(msg)
       self._requests = list()
       sleep(50e-3)
-    print('Serial thread stopped')
+    self._logger.debug('Serial thread stopped')

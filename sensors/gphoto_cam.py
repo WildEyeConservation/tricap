@@ -533,21 +533,27 @@ class GPhotoCam(AbstractCamera):
 
     def get_camera_image_hash(self, folder, name):
         h = "cam"
-        try:
-            camera_file = self._gp_camera.file_get(folder, name, gp.GP_FILE_TYPE_RAW, GPhotoCam._context)
-            h = hashlib.sha256(memoryview(camera_file.get_data_and_size())).hexdigest()
-        except:
-            self._logger.warning("Failed to get %s %s hash" % (folder, name))
+        for i in range(3):
+            try:
+                camera_file = self._gp_camera.file_get(folder, name, gp.GP_FILE_TYPE_RAW, GPhotoCam._context)
+                h = hashlib.sha256(memoryview(camera_file.get_data_and_size())).hexdigest()
+                return h
+            except:
+                self._logger.warning("Failed to get %s %s hash" % (folder, name))
+                sleep(1)
         return h
 
     def get_external_image_hash(self, path):
         h = "ext"
-        try:
-            f = open(path, "rb")
-            h = hashlib.sha256(f.read()).hexdigest()
-            f.close()
-        except:
-            self._logger.warning("Failed to get %s hash" % (path))
+        for i in range(3):
+            try:
+                f = open(path, "rb")
+                h = hashlib.sha256(f.read()).hexdigest()
+                f.close()
+                return h
+            except:
+                self._logger.warning("Failed to get %s hash" % (path))
+                sleep(1)
         return h
 
     def delete_images(self):
@@ -580,15 +586,16 @@ class GPhotoCam(AbstractCamera):
 
         bytes_io = BytesIO()
         im.save(bytes_io, format='JPEG')
-        if len(bytes_io.getvalue()) < 3000000:
+        if len(bytes_io.getvalue()) < 5000000:
             # avoid memory crash on app
             self._preview_images.append(base64.b64encode(bytes_io.getvalue()).decode("utf-8"))
         self._logger.debug(len(bytes_io.getvalue()))
 
-    def load_preview(self, stop_event):
+    def load_preview(self, stop_event, index):
         self._generating_preview = True
         sleep(2)
 
+        self.refresh_camera()
         camera_files = self.list_camera_files()
         if not camera_files:
             self._logger.debug('No files found')
@@ -607,15 +614,13 @@ class GPhotoCam(AbstractCamera):
                 return
 
             try:
-                # folder, name = os.path.split(camera_files[preview_idx])
-                # camera_file = self._gp_camera.file_get(folder, name, gp.GP_FILE_TYPE_RAW , GPhotoCam._context)
-                # file_data = camera_file.get_data_and_size()
-                # with open('/tmp/im.cr2', 'wb') as f:
-                #     f.write(memoryview(file_data).tobytes())
+                folder, name = os.path.split(camera_files[preview_idx])
+                camera_file = self._gp_camera.file_get(folder, name, gp.GP_FILE_TYPE_RAW , GPhotoCam._context)
+                file_data = camera_file.get_data_and_size()
+                with open('/tmp/im{}.cr2'.format(index), 'wb') as f:
+                    f.write(memoryview(file_data).tobytes())
 
-                # self.cr2_to_jpeg('/tmp/im.cr2')
-
-                self.cr2_to_jpeg('/home/pi/Pictures/07_24_23_000.cr2')
+                self.cr2_to_jpeg('/tmp/im{}.cr2'.format(index))
             except:
                 self._logger.debug('get_image failed')
 

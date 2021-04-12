@@ -223,10 +223,10 @@ class DummyCam(AbstractCamera):
     def delete_images(self):
         pass
 
-    def load_preview(self, stop_event):
+    def load_preview(self, stop_event, index):
         self._generating_preview = True
 
-        for preview_idx in range(3):
+        for preview_idx in range(1):
             if stop_event and stop_event.is_set():
                 return
             try:
@@ -238,9 +238,9 @@ class DummyCam(AbstractCamera):
 
     def get_disk_info(self):
         info = {}
-        info['freeMB'] = 1234000 // 1024
-        info['freeGB'] = 1234000 // 1048576
-        info['capacityGB'] = 5678000 // 1048576
+        info['freeMB'] = 131072
+        info['freeGB'] = 128
+        info['capacityGB'] = 256
         info['usedGB'] = info['capacityGB'] - info['freeGB']
         return info
 

@@ -1,9 +1,10 @@
-from flask import Blueprint, request
+from flask import Blueprint, request, Response
 from app import tricap_manager, use_dummy_cams
 import base64, logging, cv2
 import numpy as np
 from random import randint
 from datetime import datetime
+from config import CAM_MANAGER_STATES
 
 api_bp = Blueprint('api', __name__)
 _logger = logging.getLogger(__name__)
@@ -20,6 +21,8 @@ def status():
 
 @api_bp.route('/api/statistics')
 def statistics():
+  if tricap_manager.state == CAM_MANAGER_STATES.STARTED:
+    return Response("{}", status=400, mimetype='application/json')
   stats = {}
   cameras = []
   for cam in tricap_manager._cameras:
@@ -33,9 +36,11 @@ def statistics():
 
 @api_bp.route('/api/image/<cam_idx>')
 def get_image(cam_idx):
+  if tricap_manager.state == CAM_MANAGER_STATES.STARTED:
+    return Response("{}", status=400, mimetype='application/json')
   idx = int(cam_idx)
   if idx >= len(tricap_manager._cameras):
-    return {}
+    return Response("{}", status=400, mimetype='application/json')
 
   im = {}
   cam = tricap_manager._cameras[idx]

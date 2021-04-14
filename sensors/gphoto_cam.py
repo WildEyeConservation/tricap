@@ -5,7 +5,6 @@ import os
 import logging
 import threading
 from io import BytesIO
-# import exifread
 import pyexifinfo
 import tempfile
 import numpy as np
@@ -22,13 +21,14 @@ from config import CAMERA_STATES
 from .abstract_cam import AbstractCamera, CamConfigType
 from .base_setting import BaseSetting
 
-import subprocess, hashlib
+import subprocess, hashlib, json
 
 # Max attempts that can be made to trigger a photo during the capture process
 MAX_TRIGGER_ATTEMPTS = 5
 IMAGE_COUNT_DELTA_FOR_WAIT_FOR_PATH = 10
 IMAGE_COUNT_DELTA_FOR_FETCH = 5
 
+PREVIEW_FROM_CR2 = False
 
 class GPhotoSetting(BaseSetting):
     """Setting handler for gphoto cameras."""
@@ -478,7 +478,32 @@ class GPhotoCam(AbstractCamera):
         self._gp_camera.exit()
         sleep(500e-3)
         self._gp_camera.init(GPhotoCam._context)
-    
+
+    def save_exif_info(self, cam_file, name, dest_dir):
+        file_data = cam_file.get_data_and_size()
+        tfile = tempfile.NamedTemporaryFile('wb', delete=True)
+        tfile.write(memoryview(file_data).tobytes())
+        exif_data = pyexifinfo.get_json(tfile.name)[0]
+        filtered_exif = {}
+        for key in ('EXIF:DateTimeOriginal', 'EXIF:LensModel', 'EXIF:Copyright'):
+            if key in exif_data:
+                filtered_exif[key] = exif_data[key]
+        exif_dir = "{}/exif_info.json".format(dest_dir)
+        if not os.path.exists(exif_dir):
+            # no existing file
+            new_data = {}
+            new_data['exif'] = [filtered_exif]
+            with open(exif_dir, 'w') as f:
+                json.dump(new_data, f)
+        else:
+            # existing file
+            exisiting_data = {}
+            with open(exif_dir, 'r') as f:
+                exisiting_data = json.load(f)
+                exisiting_data['exif'].append(filtered_exif)
+            with open(exif_dir, 'w') as f:
+                json.dump(exisiting_data, f)
+
     def cpy_images(self, computer_files, index, photo_dir, stop_event, pause_event):
         self.refresh_camera()
         camera_files = self.list_camera_files()
@@ -524,10 +549,11 @@ class GPhotoCam(AbstractCamera):
                 dest = "{0}_{2}.{1}".format(*dest.rsplit(".", 1), "copy")
             
             # self._logger.debug('%s -> %s' % (path, dest))
-            camera_file = self._gp_camera.file_get(folder, name, gp.GP_FILE_TYPE_RAW, GPhotoCam._context)
+            camera_file = self._gp_camera.file_get(folder, name, gp.GP_FILE_TYPE_NORMAL, GPhotoCam._context)
             try:
                 gp.check_result(gp.gp_file_save(camera_file, dest))
                 self._images_to_delete.append((folder, name, dest))
+                self.save_exif_info(camera_file, name, dest_dir)
                 self._num_images_copied = len(self._images_to_delete)
             except:
                 self._logger.warning("Save exception %s %s -> %s" % (folder, name, dest))
@@ -539,7 +565,7 @@ class GPhotoCam(AbstractCamera):
         h = "cam"
         for i in range(3):
             try:
-                camera_file = self._gp_camera.file_get(folder, name, gp.GP_FILE_TYPE_RAW, GPhotoCam._context)
+                camera_file = self._gp_camera.file_get(folder, name, gp.GP_FILE_TYPE_NORMAL, GPhotoCam._context)
                 h = hashlib.sha256(memoryview(camera_file.get_data_and_size())).hexdigest()
                 return h
             except:
@@ -598,8 +624,6 @@ class GPhotoCam(AbstractCamera):
     def load_preview(self, stop_event, index):
         self._generating_preview = True
         sleep(2)
-        self._generating_preview = False
-        return
 
         self.refresh_camera()
         camera_files = self.list_camera_files()
@@ -621,12 +645,19 @@ class GPhotoCam(AbstractCamera):
 
             try:
                 folder, name = os.path.split(camera_files[preview_idx])
-                camera_file = self._gp_camera.file_get(folder, name, gp.GP_FILE_TYPE_RAW , GPhotoCam._context)
-                file_data = camera_file.get_data_and_size()
-                with open('/tmp/im{}.cr2'.format(index), 'wb') as f:
-                    f.write(memoryview(file_data).tobytes())
+                if PREVIEW_FROM_CR2:
+                    camera_file = self._gp_camera.file_get(folder, name, gp.GP_FILE_TYPE_NORMAL , GPhotoCam._context)
+                    file_data = camera_file.get_data_and_size()
+                    data = memoryview(file_data).tobytes()
+                    with open('/tmp/im{}.cr2'.format(index), 'wb') as f:
+                        f.write(memoryview(file_data).tobytes())
 
-                self.cr2_to_jpeg('/tmp/im{}.cr2'.format(index))
+                    self.cr2_to_jpeg('/tmp/im{}.cr2'.format(index))
+                else:
+                    camera_file = self._gp_camera.file_get(folder, name, gp.GP_FILE_TYPE_PREVIEW , GPhotoCam._context)
+                    file_data = camera_file.get_data_and_size()
+                    data = memoryview(file_data).tobytes()
+                    self._preview_images.append(base64.b64encode(data).decode("utf-8"))
             except:
                 self._logger.debug('get_image failed')
 

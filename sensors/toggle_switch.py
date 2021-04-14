@@ -197,17 +197,21 @@ class LEDController(Observer):
                 if subject.value == 0: # Capture is stopped 
                     if self.toggled_on: # Capture was stopped (previous observation was still running)
                         self._logger.info('LED controller - off state.')
-                        self.green_pwm.stop()
-                        GPIO.output(GREEN_PIN, GPIO.LOW)
+                        # BUG - cannot stop and start PWM -> use start(0)
+                        # self.green_pwm.stop()
+                        # GPIO.output(GREEN_PIN, GPIO.LOW)
                         # self.red_pwm = GPIO.PWM(RED_PIN, 0.5)
+                        self.green_pwm.start(0)
                         self.red_pwm.start(50)
                         self.toggled_on = False
                 else: # switch is in the on position
                     if self.toggled_on is False: # User has flicked the switch on
                         self._logger.info('Toggle switch - starting capture.')
-                        self.red_pwm.stop()
-                        GPIO.output(RED_PIN, GPIO.LOW)
+                        # BUG - cannot stop and start PWM -> use start(0)
+                        # self.red_pwm.stop()
+                        # GPIO.output(RED_PIN, GPIO.LOW)
                         # self.green_pwm = GPIO.PWM(GREEN_PIN, 0.5)
+                        self.red_pwm.start(0)
                         self.green_pwm.start(50)
                         self.toggled_on = True
                         self.smsElapsedStartTime = time.time()

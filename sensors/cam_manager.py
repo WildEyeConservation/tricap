@@ -315,8 +315,8 @@ class TriCapCamsManager:
         self._copy_start_time = datetime.now()
         self._prev_copy_eta_s = 0
         self._cpy_threads = list()
-        for index, camera in enumerate(self._cameras):
-            x = threading.Thread(target=camera.cpy_images, args=(existing_files, index, MOUNT_POINT, self._kill_cpy_pill, self._pause_cpy_pill, ), daemon=True)
+        for camera in self._cameras:
+            x = threading.Thread(target=camera.cpy_images, args=(existing_files, MOUNT_POINT, self._kill_cpy_pill, self._pause_cpy_pill, ), daemon=True)
             self._cpy_threads.append(x)
             x.start()
 
@@ -437,14 +437,16 @@ class TriCapCamsManager:
     def copy_eta(self):
         if self._copy_start_time == None:
             return ""
+        ret = {}
         all_cam_copy_info = []
         for cam in self._cameras:
             all_cam_copy_info.append(cam.get_copy_info())
         
         average_percentage = mean(all_cam_copy_info)
         if average_percentage == 0:
-            # invalid
-            return ""
+            ret['percentage'] = 0
+            ret['timeRemaining'] = "Calculating..."
+            return ret
         elapsed_sec = (datetime.now() - self._copy_start_time).total_seconds()
         remaining_sec = elapsed_sec / average_percentage - elapsed_sec
         minutes = remaining_sec // 60
@@ -454,3 +456,7 @@ class TriCapCamsManager:
         ret['percentage'] = round(average_percentage, 2)
         ret['timeRemaining'] = "%02dh:%02dm:%02ds" % (hours, minutes % 60, remaining_sec % 60)
         return ret
+        
+    @property
+    def mount_point(self):
+        return MOUNT_POINT

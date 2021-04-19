@@ -131,10 +131,13 @@ class GPhotoCam(AbstractCamera):
         self._old_image_count = 0
         self._images_to_delete = list()
         self._preview_images = list()
+        self._exif_info = {}
         self._im_aspect_ratio = 1.0
         self._generating_preview = False
         self._num_images_to_copy = 0
         self._num_images_copied = 0
+        self._prev_im_timestamp = None
+        self._session_idx = 0
 
         self._setup_camera(settings)
 
@@ -450,9 +453,35 @@ class GPhotoCam(AbstractCamera):
 
         return info
 
-    def get_target_dir(self, timestamp, index, photo_dir):
-        addDir = "{}/{}/".format(timestamp.strftime('%Y/%Y_%m_%d'), str(index))
-        return os.path.join(photo_dir, addDir)
+    def get_session_dir(self, timestamp, session_idx):
+        return "{}/{}".format(timestamp.strftime('%Y_%m_%d'), session_idx)
+
+    def get_complete_session_dir(self, mount_point, session_dir):
+        return os.path.join(mount_point, session_dir, str(self.config.eosserialnumber))
+
+    def find_session_dir(self, mount_point, timestamp, session_idx):
+        i = session_idx
+        session_dir = self.get_session_dir(timestamp, i)
+        complete_dir = self.get_complete_session_dir(mount_point, session_dir)
+        while os.path.exists(complete_dir):
+            i += 1
+            session_dir = self.get_session_dir(timestamp, i)
+            complete_dir = self.get_complete_session_dir(mount_point, session_dir)
+        return session_dir, complete_dir, i
+
+    def get_im_target_dir(self, timestamp, mount_point):
+        session_dir = self.get_session_dir(timestamp, self._session_idx)
+        complete_dir = self.get_complete_session_dir(mount_point, session_dir)
+        if self._prev_im_timestamp == None:
+            # first save after reboot -> always start new session idx
+            session_dir, complete_dir, self._session_idx = self.find_session_dir(mount_point, timestamp, self._session_idx)
+        elif (timestamp - self._prev_im_timestamp).total_seconds() > 120:
+            # x seconds passed between captures -> save as new capture session
+            session_dir, complete_dir, self._session_idx = self.find_session_dir(mount_point, timestamp, self._session_idx)
+        if not self._prev_im_timestamp == None:
+            self._logger.debug('Seconds diff {}'.format((timestamp - self._prev_im_timestamp).total_seconds()))
+        self._prev_im_timestamp = timestamp
+        return complete_dir
 
     def list_camera_files(self, path='/'):
         result = []
@@ -479,32 +508,61 @@ class GPhotoCam(AbstractCamera):
         sleep(500e-3)
         self._gp_camera.init(GPhotoCam._context)
 
-    def save_exif_info(self, cam_file, name, dest_dir):
+    def append_exif_info(self, cam_file, name, dest_dir):
         file_data = cam_file.get_data_and_size()
         tfile = tempfile.NamedTemporaryFile('wb', delete=True)
-        tfile.write(memoryview(file_data).tobytes())
+        data_bytes = memoryview(file_data).tobytes()
+        tfile.write(data_bytes)
         exif_data = pyexifinfo.get_json(tfile.name)[0]
         filtered_exif = {}
-        for key in ('EXIF:DateTimeOriginal', 'EXIF:LensModel', 'EXIF:Copyright'):
+        KEYS_TO_SAVE = ('Composite:SubSecDateTimeOriginal','EXIF:ExifImageHeight','EXIF:ExifImageWidth','Composite:GPSAltitude','EXIF:GPSDateStamp','Composite:GPSLatitude','Composite:GPSLongitude','EXIF:GPSTimeStamp','EXIF:ISO', 'EXIF:ShutterSpeedValue','MakerNotes:FocusMode','MakerNotes:Quality')
+        if 'EXIF:SerialNumber' not in exif_data:
+            return
+        for key in KEYS_TO_SAVE:
             if key in exif_data:
-                filtered_exif[key] = exif_data[key]
-        exif_dir = "{}/exif_info.json".format(dest_dir)
-        if not os.path.exists(exif_dir):
-            # no existing file
-            new_data = {}
-            new_data['exif'] = [filtered_exif]
-            with open(exif_dir, 'w') as f:
-                json.dump(new_data, f)
-        else:
-            # existing file
-            exisiting_data = {}
-            with open(exif_dir, 'r') as f:
-                exisiting_data = json.load(f)
-                exisiting_data['exif'].append(filtered_exif)
-            with open(exif_dir, 'w') as f:
-                json.dump(exisiting_data, f)
+                formatted_key = key[key.index(':')+1:]
+                filtered_exif[formatted_key] = exif_data[key]
 
-    def cpy_images(self, computer_files, index, photo_dir, stop_event, pause_event):
+        # do not save temporary filename
+        filtered_exif['FileName'] = name
+        filtered_exif['FileDir'] = dest_dir
+        filtered_exif['md5'] = hashlib.md5(data_bytes).hexdigest() # 170ms for MD5 calc
+
+        if dest_dir not in self._exif_info:
+            self._exif_info[dest_dir] = []
+        self._exif_info[dest_dir].append(filtered_exif)
+
+    def save_exif_info(self):
+        # Save exif info
+        for exif_dir in self._exif_info:
+            filename = os.path.join(exif_dir, 'exif_cam.json')
+            if not os.path.exists(filename):
+                # no existing file
+                self._logger.debug('no existing file')
+                new_data = {}
+                new_data['serialNumber'] = str(self.config.eosserialnumber)
+                new_data['exifInfo'] = self._exif_info[exif_dir]
+
+                # find session index from dest_dir
+                dir_split = exif_dir.split('/')
+                new_data['sessionId'] = dir_split[-3] + "#" + dir_split[-2] # date (YYYY_MM_DD) + session idx
+                
+                with open(filename, 'w') as f:
+                    json.dump(new_data, f, sort_keys=True)
+            else:
+                # existing file
+                self._logger.debug('existing file')
+                exisiting_data = {}
+                with open(filename, 'r') as f:
+                    exisiting_data = json.load(f)
+                exisiting_data['exifInfo'].append(self._exif_info[exif_dir])
+                with open(filename, 'w') as f:
+                    json.dump(exisiting_data, f, sort_keys=True)   
+
+    def cpy_images(self, computer_files, mount_point, stop_event, pause_event):
+        self._num_images_copied = 0
+        self._num_images_to_copy = 0
+        sleep(500e-3)
         self.refresh_camera()
         camera_files = self.list_camera_files()
         self._num_images_to_copy = len(camera_files)
@@ -514,7 +572,7 @@ class GPhotoCam(AbstractCamera):
             self._gp_camera.exit()
             return
 
-        self._logger.debug('Copying %d files to %s' % (len(camera_files), photo_dir))
+        self._logger.debug('Copying %d files to %s' % (len(camera_files), mount_point))
         for path in camera_files:
             while pause_event and pause_event.is_set():
                 # wait for all threads to pause before flushing external drive
@@ -535,7 +593,7 @@ class GPhotoCam(AbstractCamera):
             info = self.get_camera_file_info(path)
             timestamp = datetime.fromtimestamp(info.file.mtime)
             folder, name = os.path.split(path)
-            dest_dir = self.get_target_dir(timestamp, index, photo_dir)
+            dest_dir = self.get_im_target_dir(timestamp, mount_point)
             dest = os.path.join(dest_dir, name)
             if not os.path.isdir(dest_dir):
                 os.makedirs(dest_dir)
@@ -548,13 +606,13 @@ class GPhotoCam(AbstractCamera):
                 # file exists -> add in /copy/
                 dest = "{0}_{2}.{1}".format(*dest.rsplit(".", 1), "copy")
             
-            # self._logger.debug('%s -> %s' % (path, dest))
+            self._logger.debug('%s -> %s' % (path, dest))
             camera_file = self._gp_camera.file_get(folder, name, gp.GP_FILE_TYPE_NORMAL, GPhotoCam._context)
             try:
                 gp.check_result(gp.gp_file_save(camera_file, dest))
                 self._images_to_delete.append((folder, name, dest))
-                self.save_exif_info(camera_file, name, dest_dir)
-                self._num_images_copied = len(self._images_to_delete)
+                self.append_exif_info(camera_file, name, dest_dir)
+                self._num_images_copied += 1
             except:
                 self._logger.warning("Save exception %s %s -> %s" % (folder, name, dest))
 
@@ -596,6 +654,7 @@ class GPhotoCam(AbstractCamera):
             if (self.get_camera_image_hash(folder, name) == self.get_external_image_hash(dest) and
                 self.get_camera_image_hash(folderLast, nameLast) == self.get_external_image_hash(destLast)):
                 # first and last image hash match -> delete copied files from SD card
+                self.save_exif_info()
                 for folder, name, _  in self._images_to_delete:
                     try:
                         # self._logger.debug("Delete %s %s" % (folder, name))
@@ -606,6 +665,7 @@ class GPhotoCam(AbstractCamera):
                 self._logger.warning("Hash mismatch")
             self._logger.debug("Delete done")
             self._images_to_delete = list()
+            self._exif_info = {}
 
     def cr2_to_jpeg(self, path):
         with rawpy.imread(path) as raw:

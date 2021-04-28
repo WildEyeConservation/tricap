@@ -12,6 +12,7 @@ from urllib.error import HTTPError, URLError
 from support.configure import TricapConfig
 
 from .basic import PeriodicMonitor
+import os
 
 
 class SMSSender(object):
@@ -41,8 +42,16 @@ class SMSSender(object):
 
     def send(self, msg):
         """Send a message through the http request, return success flag."""
+        gw = os.popen("ip -4 route show default").read().split('\n') # possibly eth and wlan0
+        ip = ''
+        for interface in gw:
+            if 'wlan0' in interface:
+                ip = interface.split()[2]
+
+        if ip == '':
+            ip = self.ip
         args = urlencode({'phone': self.number, 'text': msg, 'password': self.pwd})
-        sms_url = 'http://%s:9090/sendsms?%s' % (self.ip, args)
+        sms_url = 'http://%s:9090/sendsms?%s' % (ip, args)
         try:
             # TODO: The use of a timeout is a short term fix. SMSSender should use a separate
             # thread to send sms, to prevent the system from hanging if it struggles to send the
@@ -88,6 +97,7 @@ class SMSObserver():
     def update(self, monitor):
         """Update method called by monitor subject."""
         val = str(monitor.value)
+        logging.getLogger('').debug("update SMS {} {}".format(val), self.msg)
 
         if monitor == self.prime_monitor:
             self.msg = monitor.type_id + ' : ' + val + self.msg

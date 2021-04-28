@@ -28,7 +28,7 @@ MAX_TRIGGER_ATTEMPTS = 5
 IMAGE_COUNT_DELTA_FOR_WAIT_FOR_PATH = 10
 IMAGE_COUNT_DELTA_FOR_FETCH = 5
 
-PREVIEW_FROM_CR2 = False
+PREVIEW_FROM_CR2 = True
 
 class GPhotoSetting(BaseSetting):
     """Setting handler for gphoto cameras."""
@@ -138,6 +138,7 @@ class GPhotoCam(AbstractCamera):
         self._num_images_copied = 0
         self._prev_im_timestamp = None
         self._session_idx = 0
+        self._lens_serial_number = ''
 
         self._setup_camera(settings)
 
@@ -459,8 +460,8 @@ class GPhotoCam(AbstractCamera):
     def get_complete_session_dir(self, mount_point, session_dir):
         return os.path.join(mount_point, session_dir, str(self.config.eosserialnumber))
 
-    def find_session_dir(self, mount_point, timestamp, session_idx):
-        i = session_idx
+    def find_session_dir(self, mount_point, timestamp):
+        i = 0
         session_dir = self.get_session_dir(timestamp, i)
         complete_dir = self.get_complete_session_dir(mount_point, session_dir)
         while os.path.exists(complete_dir):
@@ -473,11 +474,36 @@ class GPhotoCam(AbstractCamera):
         session_dir = self.get_session_dir(timestamp, self._session_idx)
         complete_dir = self.get_complete_session_dir(mount_point, session_dir)
         if self._prev_im_timestamp == None:
-            # first save after reboot -> always start new session idx
-            session_dir, complete_dir, self._session_idx = self.find_session_dir(mount_point, timestamp, self._session_idx)
+            # first save after reboot -> check if you can find the last timestamp from exif info
+            session_dir, complete_dir, self._session_idx = self.find_session_dir(mount_point, timestamp)
+            if self._session_idx > 0:
+                # possibly a previous session to add to
+                last_idx = self._session_idx - 1
+                last_session_dir = self.get_session_dir(timestamp, last_idx)
+                last_complete_dir = self.get_complete_session_dir(mount_point, last_session_dir)
+
+                filename = os.path.join(last_complete_dir, 'exif_cam.json')
+                if not os.path.exists(filename):
+                    # no exif available -> start new session
+                    pass
+                else:
+                    exisiting_data = {}
+                    with open(filename, 'r') as f:
+                        exisiting_data = json.load(f)
+                    if 'exifInfo' in exisiting_data:
+                        if len(exisiting_data['exifInfo']) > 0:
+                            last_im = exisiting_data['exifInfo'][-1]
+                            last_timestamp = datetime.strptime(last_im['SubSecDateTimeOriginal'], '%Y:%m:%d %H:%M:%S.%f')
+                            if (timestamp - last_timestamp).total_seconds() > 120:
+                                pass
+                            else:
+                                # add to previous session
+                                session_dir = last_session_dir
+                                complete_dir = last_complete_dir
+                                self._session_idx = last_idx
         elif (timestamp - self._prev_im_timestamp).total_seconds() > 120:
             # x seconds passed between captures -> save as new capture session
-            session_dir, complete_dir, self._session_idx = self.find_session_dir(mount_point, timestamp, self._session_idx)
+            session_dir, complete_dir, self._session_idx = self.find_session_dir(mount_point, timestamp)
         if not self._prev_im_timestamp == None:
             self._logger.debug('Seconds diff {}'.format((timestamp - self._prev_im_timestamp).total_seconds()))
         self._prev_im_timestamp = timestamp
@@ -516,8 +542,9 @@ class GPhotoCam(AbstractCamera):
         exif_data = pyexifinfo.get_json(tfile.name)[0]
         filtered_exif = {}
         KEYS_TO_SAVE = ('Composite:SubSecDateTimeOriginal','EXIF:ExifImageHeight','EXIF:ExifImageWidth','Composite:GPSAltitude','EXIF:GPSDateStamp','Composite:GPSLatitude','Composite:GPSLongitude','EXIF:GPSTimeStamp','EXIF:ISO', 'EXIF:ShutterSpeedValue','MakerNotes:FocusMode','MakerNotes:Quality')
-        if 'EXIF:SerialNumber' not in exif_data:
-            return
+        # if str(self.config.eosserialnumber) == '113053000777':
+        #     for key in exif_data:
+        #         self._logger.debug('{} {}'.format(key, exif_data[key]))
         for key in KEYS_TO_SAVE:
             if key in exif_data:
                 formatted_key = key[key.index(':')+1:]
@@ -527,6 +554,7 @@ class GPhotoCam(AbstractCamera):
         filtered_exif['FileName'] = name
         filtered_exif['FileDir'] = dest_dir
         filtered_exif['md5'] = hashlib.md5(data_bytes).hexdigest() # 170ms for MD5 calc
+        self._lens_serial_number = exif_data['EXIF:LensSerialNumber']
 
         if dest_dir not in self._exif_info:
             self._exif_info[dest_dir] = []
@@ -542,6 +570,8 @@ class GPhotoCam(AbstractCamera):
                 new_data = {}
                 new_data['serialNumber'] = str(self.config.eosserialnumber)
                 new_data['exifInfo'] = self._exif_info[exif_dir]
+                new_data['lensSerialNumber'] = self._lens_serial_number
+                # self._logger.debug('serialNumber {} lens {}'.format(new_data['serialNumber'], new_data['lensSerialNumber']))
 
                 # find session index from dest_dir
                 dir_split = exif_dir.split('/')
@@ -555,7 +585,7 @@ class GPhotoCam(AbstractCamera):
                 exisiting_data = {}
                 with open(filename, 'r') as f:
                     exisiting_data = json.load(f)
-                exisiting_data['exifInfo'].append(self._exif_info[exif_dir])
+                exisiting_data['exifInfo'] = exisiting_data['exifInfo'] + self._exif_info[exif_dir]
                 with open(filename, 'w') as f:
                     json.dump(exisiting_data, f, sort_keys=True)   
 

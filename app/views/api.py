@@ -6,6 +6,7 @@ from random import randint
 from datetime import datetime
 from config import CAM_MANAGER_STATES, CAMERA_STATES
 import os, json
+from support.camera_data import ParseData
 
 api_bp = Blueprint('api', __name__)
 _logger = logging.getLogger(__name__)
@@ -43,14 +44,22 @@ def images_captured():
 def statistics():
   if tricap_manager.state == CAM_MANAGER_STATES.STARTED:
     return Response("{}", status=400, mimetype='application/json')
+  camera_data = ParseData()
   stats = {}
   cameras = []
-  for cam in tricap_manager._cameras:
+  sum_battery = 0.0
+  for index, cam in enumerate(tricap_manager._cameras):
     cam_info = cam.get_disk_info()
     cam_info['id'] = str(cam.serial_num)
     cameras.append(cam_info)
+    _, _, battery_parse = camera_data.parse_camera(index)
+    sum_battery += float(battery_parse)
   stats['external'] = tricap_manager.external_disk_info()
   stats['cameras'] = cameras
+  if len(tricap_manager._cameras) == 0:
+    stats['battery'] = 0
+  else:
+    stats['battery'] = sum_battery / len(tricap_manager._cameras)
   _logger.debug(stats)
   return stats
 

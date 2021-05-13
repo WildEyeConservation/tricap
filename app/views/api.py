@@ -1,4 +1,4 @@
-from flask import Blueprint, request, Response
+from flask import Blueprint, request, jsonify
 from app import tricap_manager, use_dummy_cams
 import base64, logging, cv2
 import numpy as np
@@ -7,6 +7,7 @@ from datetime import datetime
 from config import CAM_MANAGER_STATES, CAMERA_STATES
 import os, json
 from support.camera_data import ParseData
+from support.configure import TricapConfig
 
 api_bp = Blueprint('api', __name__)
 _logger = logging.getLogger(__name__)
@@ -31,9 +32,6 @@ def status():
 
 @api_bp.route('/api/images_captured')
 def images_captured():
-  if tricap_manager.state != CAM_MANAGER_STATES.STARTED:
-    return Response("{}", status=400, mimetype='application/json')
-
   ret = {}
   cams = tricap_manager.get_cameras_as_list()
   ret['imageCount'] = [cam.get_cam_image_count() for cam in cams]
@@ -42,34 +40,44 @@ def images_captured():
 
 @api_bp.route('/api/statistics')
 def statistics():
-  if tricap_manager.state == CAM_MANAGER_STATES.STARTED:
-    return Response("{}", status=400, mimetype='application/json')
-  camera_data = ParseData()
-  stats = {}
-  cameras = []
-  sum_battery = 0.0
-  for index, cam in enumerate(tricap_manager._cameras):
-    cam_info = cam.get_disk_info()
-    cam_info['id'] = str(cam.serial_num)
-    cameras.append(cam_info)
-    _, _, battery_parse = camera_data.parse_camera(index)
-    sum_battery += float(battery_parse)
-  stats['external'] = tricap_manager.external_disk_info()
-  stats['cameras'] = cameras
-  if len(tricap_manager._cameras) == 0:
-    stats['battery'] = 0
-  else:
-    stats['battery'] = sum_battery / len(tricap_manager._cameras)
-  _logger.debug(stats)
-  return stats
+  if tricap_manager.state == CAM_MANAGER_STATES.STARTED or tricap_manager.state == CAM_MANAGER_STATES.COPYING:
+    return jsonify({'msg': 'Not allowed in started or copying state'}), 400
+  try:
+    camera_data = ParseData()
+    stats = {}
+    cameras = []
+    sum_battery = 0.0
+    battery_count = 0
+    for index, cam in enumerate(tricap_manager._cameras):
+      cam_info = cam.get_disk_info()
+      cam_info['id'] = str(cam.serial_num)
+      cameras.append(cam_info)
+      try:
+        _, _, battery_parse = camera_data.parse_camera(index)
+        sum_battery += float(battery_parse)
+        battery_count += 1
+      except Exception as ex:
+        pass
+    stats['external'] = tricap_manager.external_disk_info()
+    stats['cameras'] = cameras
+    if battery_count == 0:
+      stats['battery'] = 0
+    else:
+      stats['battery'] = sum_battery / battery_count
+    config = TricapConfig()
+    stats['captureInterval'] = float(config.get('image_capture_interval', TricapConfig.MISC_SECTION_HEADER)[0])
+    # _logger.debug(stats['captureInterval'])
+    return stats
+  except Exception as ex:
+    return "", 420
 
 @api_bp.route('/api/image/<cam_idx>')
 def get_image(cam_idx):
   if tricap_manager.state == CAM_MANAGER_STATES.STARTED:
-    return Response("{}", status=400, mimetype='application/json')
+    return jsonify({'msg': 'Not allowed in started state'}), 400
   idx = int(cam_idx)
   if idx >= len(tricap_manager._cameras):
-    return Response("{}", status=400, mimetype='application/json')
+    return jsonify({'msg': 'Invalid camera index'}), 400
 
   im = {}
   cam = tricap_manager._cameras[idx]
@@ -85,14 +93,14 @@ def get_image(cam_idx):
 def copy_eta():
   info = tricap_manager.copy_eta()
   if info == "":
-    return Response("{}", status=400, mimetype='application/json')
+    return jsonify({'msg': 'No copy information'}), 400
 
   return info
 
 @api_bp.route('/api/exif_sessions')
 def exif_sessions():
   if tricap_manager.state == CAM_MANAGER_STATES.STARTED or tricap_manager.state == CAM_MANAGER_STATES.COPYING:
-    return Response("{}", status=400, mimetype='application/json')
+    return jsonify({'msg': 'Not allowed in started or copying state'}), 400
 
   ids = []
   if tricap_manager.mount_disk():
@@ -109,7 +117,7 @@ def exif_sessions():
 
     tricap_manager.unmount_disk()
   else:
-    return Response("{}", status=400, mimetype='application/json')
+    return jsonify({'msg': 'Failed to mount external disk'}), 400
 
   return {
     'sessionIds': ids
@@ -118,11 +126,11 @@ def exif_sessions():
 @api_bp.route('/api/exif_info', methods = ['POST'])
 def exif_info():
   if tricap_manager.state == CAM_MANAGER_STATES.STARTED or tricap_manager.state == CAM_MANAGER_STATES.COPYING:
-    return Response("{}", status=400, mimetype='application/json')
+    return jsonify({'msg': 'Not allowed in started or copying state'}), 400
 
   data = request.get_json()
   if not 'sessionIds' in data:
-    return Response("{}", status=400, mimetype='application/json')
+    return jsonify({'msg': 'Invalid session information'}), 400
   
   sessions = [] # array of session
   if tricap_manager.mount_disk():
@@ -146,7 +154,7 @@ def exif_info():
                 sessions[session_idx]['sessionInfo'].append(cam_info)
     tricap_manager.unmount_disk()
   else:
-    return Response("{}", status=400, mimetype='application/json')
+    return jsonify({'msg': 'Failed to mount external disk'}), 400
 
   return {
     'sessions': sessions

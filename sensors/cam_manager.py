@@ -358,7 +358,7 @@ class TriCapCamsManager:
                 # pause copy process
                 self._pause_cpy_pill.set()
                 # wait for current image copy to finish
-                time.sleep(3)
+                time.sleep(5)
                 # flush external disk cache -> do this here and not multiple times in gphoto_cam.py
                 if self.flush_disk():
                     # flush successful -> unpause, delete and continue copying
@@ -438,11 +438,14 @@ class TriCapCamsManager:
         if self._copy_start_time == None:
             return ""
         ret = {}
-        all_cam_copy_info = []
+        all_cam_copy_percentage = []
+        all_cam_copy_exceptions = []
         for cam in self._cameras:
-            all_cam_copy_info.append(cam.get_copy_info())
+            all_cam_copy_percentage.append(cam.get_copy_percentage())
+            all_cam_copy_exceptions.append(cam.get_copy_exception_count())
         
-        average_percentage = mean(all_cam_copy_info)
+        ret['exceptions'] = all_cam_copy_exceptions
+        average_percentage = mean(all_cam_copy_percentage)
         if average_percentage == 0:
             ret['percentage'] = 0
             ret['timeRemaining'] = "Calculating..."
@@ -452,7 +455,6 @@ class TriCapCamsManager:
         minutes = remaining_sec // 60
         hours = minutes // 60
 
-        ret = {}
         ret['percentage'] = round(average_percentage, 2)
         ret['timeRemaining'] = "%02dh:%02dm:%02ds" % (hours, minutes % 60, remaining_sec % 60)
         return ret

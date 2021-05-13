@@ -105,5 +105,5 @@ class SerialInterface(SerialProcess):
         if len(msg) > 0:
           self.write(msg)
       self._requests = list()
-      sleep(50e-3)
+      sleep(100e-3)
     self._logger.debug('Serial thread stopped')

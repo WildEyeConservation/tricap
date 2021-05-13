@@ -72,7 +72,8 @@ class ToggleSwitchObserver(Observer):
 
         self._logger.info('Toggle switch observer has been instantiated.')
 
-    def update(self, subject):        
+    def update(self, subject):      
+        # self._logger.info('Toggle switch - update.')  
         if subject.value == 0: # switch is in the off position
             if self.toggled_on: # User has flicked the switch off
                 self._logger.info('Toggle switch - stopping capture.')

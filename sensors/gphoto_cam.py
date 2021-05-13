@@ -136,6 +136,7 @@ class GPhotoCam(AbstractCamera):
         self._generating_preview = False
         self._num_images_to_copy = 0
         self._num_images_copied = 0
+        self._num_images_failed = 0
         self._prev_im_timestamp = None
         self._session_idx = 0
         self._lens_serial_number = ''
@@ -504,8 +505,8 @@ class GPhotoCam(AbstractCamera):
         elif (timestamp - self._prev_im_timestamp).total_seconds() > 120:
             # x seconds passed between captures -> save as new capture session
             session_dir, complete_dir, self._session_idx = self.find_session_dir(mount_point, timestamp)
-        if not self._prev_im_timestamp == None:
-            self._logger.debug('Seconds diff {}'.format((timestamp - self._prev_im_timestamp).total_seconds()))
+        # if not self._prev_im_timestamp == None:
+        #     self._logger.debug('Seconds diff {}'.format((timestamp - self._prev_im_timestamp).total_seconds()))
         self._prev_im_timestamp = timestamp
         return complete_dir
 
@@ -592,6 +593,7 @@ class GPhotoCam(AbstractCamera):
     def cpy_images(self, computer_files, mount_point, stop_event, pause_event):
         self._num_images_copied = 0
         self._num_images_to_copy = 0
+        self._num_images_failed = 0
         sleep(500e-3)
         self.refresh_camera()
         camera_files = self.list_camera_files()
@@ -630,13 +632,17 @@ class GPhotoCam(AbstractCamera):
 
             if any(x[0] == folder and x[1] == name for x in self._images_to_delete):
                 # file already copied and waiting to be deleted from SD card
-                continue
+                if self.get_camera_image_hash(folder, name) == self.get_external_image_hash(dest):
+                    self._logger.debug('File already copied {}/{}'.format(folder, name))
+                    self._images_to_delete.append((folder, name, dest))
+                    continue
             
             while dest in computer_files:
                 # file exists -> add in /copy/
                 dest = "{0}_{2}.{1}".format(*dest.rsplit(".", 1), "copy")
+                self._logger.debug('Save as _copy {}'.format(dest))
             
-            self._logger.debug('%s -> %s' % (path, dest))
+            # self._logger.debug('%s -> %s' % (path, dest))
             camera_file = self._gp_camera.file_get(folder, name, gp.GP_FILE_TYPE_NORMAL, GPhotoCam._context)
             try:
                 gp.check_result(gp.gp_file_save(camera_file, dest))
@@ -645,6 +651,7 @@ class GPhotoCam(AbstractCamera):
                 self._num_images_copied += 1
             except:
                 self._logger.warning("Save exception %s %s -> %s" % (folder, name, dest))
+                self._num_images_failed += 1
 
         self._gp_camera.exit()
         self._logger.debug('Copy thread completed.')
@@ -690,7 +697,7 @@ class GPhotoCam(AbstractCamera):
                         # self._logger.debug("Delete %s %s" % (folder, name))
                         self._gp_camera.file_delete(folder, name, GPhotoCam._context)
                     except:
-                        self._logger.warning("Delete exception for folder: %s, name: %s" % (folder, name))
+                        self._logger.warning("Delete exception for %s/%s" % (folder, name))
             else:
                 self._logger.warning("Hash mismatch")
             self._logger.debug("Delete done")
@@ -713,7 +720,7 @@ class GPhotoCam(AbstractCamera):
 
     def load_preview(self, stop_event, index):
         self._generating_preview = True
-        sleep(2)
+        sleep(3)
 
         self.refresh_camera()
         camera_files = self.list_camera_files()
@@ -761,9 +768,12 @@ class GPhotoCam(AbstractCamera):
     def get_aspect_ratio(self):
         return self._im_aspect_ratio
 
-    def get_copy_info(self):
+    def get_copy_percentage(self):
         if self._num_images_to_copy == 0:
             # invalid
             return 0
 
         return round(self._num_images_copied / self._num_images_to_copy, 2)
+
+    def get_copy_exception_count(self):
+        return self._num_images_failed

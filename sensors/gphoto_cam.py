@@ -742,7 +742,7 @@ class GPhotoCam(AbstractCamera):
 
             try:
                 folder, name = os.path.split(camera_files[preview_idx])
-                if PREVIEW_FROM_CR2:
+                if PREVIEW_FROM_CR2 and len(camera_files) > 30:
                     camera_file = self._gp_camera.file_get(folder, name, gp.GP_FILE_TYPE_NORMAL , GPhotoCam._context)
                     file_data = camera_file.get_data_and_size()
                     data = memoryview(file_data).tobytes()

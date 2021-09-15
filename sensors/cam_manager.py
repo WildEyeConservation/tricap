@@ -81,6 +81,8 @@ class TriCapCamsManager:
         self.use_dummy_cams = use_dummy_cams
         self.camera_list = ""
         self._prev_copy_eta_s = 0
+        self._shutdownStartTime = None
+        self._shutdownEnabled = False
         self._initialise()
 
     def _initialise(self):
@@ -179,6 +181,7 @@ class TriCapCamsManager:
 
     def start_capturing(self):
         """Start the capturing threads of all connected cams."""
+        self._shutdownEnabled = False
         if len(self._cameras) == 0:
             self.state = CAM_MANAGER_STATES.ERROR_NO_CAMS
             self._logger.debug('Tried to start capture threads with no cameras connected.')
@@ -339,6 +342,10 @@ class TriCapCamsManager:
                 self.start_copying()
                 return
 
+        if self.state == CAM_MANAGER_STATES.STOPPED and self._shutdownEnabled:
+            if (datetime.now() - self._shutdownStartTime).total_seconds() > 3600:
+                subprocess.call('poweroff', shell=True)
+
         if self.state != CAM_MANAGER_STATES.COPYING:
             return
             
@@ -389,6 +396,9 @@ class TriCapCamsManager:
             # unmount external disk
             self.unmount_disk()
             self.state = CAM_MANAGER_STATES.STOPPED
+
+            self._shutdownStartTime = datetime.now()
+            self._shutdownEnabled = True
 
     def get_image_capture_interval(self):
         return self._man_settings['image_capture_interval']

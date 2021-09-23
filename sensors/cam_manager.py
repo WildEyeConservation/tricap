@@ -211,7 +211,9 @@ class TriCapCamsManager:
                 # TODO This seems to be a mistake, should probaby make a list of the threads
                 x = threading.Thread(target=cam.capture, daemon=True, args=(True,barrier,self._kill_pill, ))
                 self._capture_threads.append(x)
-                x.start()
+            
+            for t in self._capture_threads:
+                t.start()
             self.state = CAM_MANAGER_STATES.STARTED
             self._logger.debug('Cam manager - capture threads started.')
 
@@ -243,7 +245,9 @@ class TriCapCamsManager:
         for index, camera in enumerate(self._cameras):
             x = threading.Thread(target=camera.load_preview, args=(self._kill_cpy_pill, index, ), daemon=True)
             self._preview_threads.append(x)
-            x.start()
+        
+        for t in self._preview_threads:
+            t.start()
         
         self.state = CAM_MANAGER_STATES.LOADING_PREVIEW
 
@@ -321,7 +325,9 @@ class TriCapCamsManager:
         for camera in self._cameras:
             x = threading.Thread(target=camera.cpy_images, args=(existing_files, MOUNT_POINT, self._kill_cpy_pill, self._pause_cpy_pill, ), daemon=True)
             self._cpy_threads.append(x)
-            x.start()
+
+        for t in self._cpy_threads:
+            t.start()
 
         self.state = CAM_MANAGER_STATES.COPYING
 
@@ -388,7 +394,9 @@ class TriCapCamsManager:
             for index, camera in enumerate(self._cameras):
                 x = threading.Thread(target=camera.delete_images, daemon=True)
                 del_threads.append(x)
-                x.start()
+
+            for t in del_threads:
+                t.start()
 
             for t in del_threads:
                 t.join()

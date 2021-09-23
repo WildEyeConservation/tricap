@@ -109,6 +109,18 @@ class CamManagerMonitor(PeriodicMonitor):
             self.value = 1
         else:
             self.value = 0
+
+class CamCopyMonitor(PeriodicMonitor):
+    """Monitor for each camera."""
+    _logger = logging.getLogger(__name__)  # start the logger
+
+    def __init__(self, cam_manager, period=1):
+        """Constructor."""
+        super().__init__(period)
+        self.cam_manager = cam_manager
+
+    def monitor_step(self):
+        """Updat the value."""
         self.cam_manager.copy_disk_monitor()
 
 class CamErrorMonitor(PeriodicMonitor):
@@ -134,11 +146,41 @@ class CamErrorMonitor(PeriodicMonitor):
         else:
             self.value = 0
 
+class CamCaptureMonitor(PeriodicMonitor):
+    """Monitor for each camera."""
+    _logger = logging.getLogger(__name__)  # start the logger
+
+    def __init__(self, cam, index, period=0.3):
+        """Constructor."""
+        super().__init__(period)
+
+        self.cam = cam
+        self._captureCount = 0
+        self._monitorCount = 0
+
+        self.type_id = 'CamCapture' + str(index)
+        self.value = 0
+        self.unit = 'capture'
+
+    def monitor_step(self):
+        """Updat the value."""
+        if self._captureCount != self.cam.captureCount and self.cam.captureCount != 0:
+            # Turn on green LED
+            self.value = 1
+            self._monitorCount = 0
+        else:
+            self._monitorCount += 1
+            if self._monitorCount == 3:
+                # Turn off green LED
+                self.value = 0
+                
+        self._captureCount = self.cam.captureCount
+
 class LEDController(Observer):
     """React to the cam capturing status."""
 
     _logger = logging.getLogger(__name__)  # start the logger
-    def __init__(self, cam_man_monitor, cam_error_monitors):
+    def __init__(self, cam_man_monitor, cam_error_monitors, cam_capture_monitors):
         """Constructor."""
         super().__init__()
 
@@ -149,20 +191,24 @@ class LEDController(Observer):
 
         GPIO.output(GREEN_PIN, GPIO.LOW)
 
-        self.red_pwm = GPIO.PWM(RED_PIN, 0.5)
-        self.red_pwm.start(50)
-        self.green_pwm = GPIO.PWM(GREEN_PIN, 0.5)
+        # self.red_pwm = GPIO.PWM(RED_PIN, 0.5)
+        # self.red_pwm.start(50)
+        # self.green_pwm = GPIO.PWM(GREEN_PIN, 0.5)
 
         self.allowed_cam_errors = 0
         self.cam_errors = [0]*len(cam_error_monitors)
+        self.cam_captures = [0]*len(cam_capture_monitors)
 
         self.error_state = 0
+        self.capture_state = 0
         self.run_state = 0
         self.prev_error_state = 0
     
         cam_man_monitor.attach(self)
         for cem in cam_error_monitors:
             cem.attach(self)
+        for ccm in cam_capture_monitors:
+            ccm.attach(self)
 
         self._logger.info('LED Controller has been instantiated.')
 
@@ -187,44 +233,23 @@ class LEDController(Observer):
             if self.cam_errors[idx] > self.allowed_cam_errors:
                 self.error_state = 1
 
-        # if sum(self.cam_errors) > self.allowed_cam_errors:
-        #     self.error_state = 1
-        # else: 
-        #     self.error_state = 0
+        if subject.type_id[:len('CamCapture')] == 'CamCapture':
+            idx = int(subject.type_id[-1])
+            self.cam_captures[idx] = subject.value
 
-        if self.error_state == 0:
-            # no errors, we turn lights according to cam manager state
-            if subject.type_id == 'CamManager':
-                if subject.value == 0: # Capture is stopped 
-                    if self.toggled_on: # Capture was stopped (previous observation was still running)
-                        self._logger.info('LED controller - off state.')
-                        # BUG - cannot stop and start PWM -> use start(0)
-                        # self.green_pwm.stop()
-                        # GPIO.output(GREEN_PIN, GPIO.LOW)
-                        # self.red_pwm = GPIO.PWM(RED_PIN, 0.5)
-                        self.green_pwm.start(0)
-                        self.red_pwm.start(50)
-                        self.toggled_on = False
-                else: # switch is in the on position
-                    if self.toggled_on is False: # User has flicked the switch on
-                        self._logger.info('Toggle switch - starting capture.')
-                        # BUG - cannot stop and start PWM -> use start(0)
-                        # self.red_pwm.stop()
-                        # GPIO.output(RED_PIN, GPIO.LOW)
-                        # self.green_pwm = GPIO.PWM(GREEN_PIN, 0.5)
-                        self.red_pwm.start(0)
-                        self.green_pwm.start(50)
-                        self.toggled_on = True
-                        self.smsElapsedStartTime = time.time()
-        else:
-            # error
-            self.red_pwm.stop()
-            self.green_pwm.stop()
+        self.capture_state = self.cam_captures == [1]*len(self.cam_captures)
+
+        if self.error_state == 1:
             GPIO.output(GREEN_PIN, GPIO.HIGH)
             GPIO.output(RED_PIN, GPIO.HIGH)
+        elif self.capture_state == 1:
+            GPIO.output(GREEN_PIN, GPIO.HIGH)
+            GPIO.output(RED_PIN, GPIO.LOW)
+        else:
+            GPIO.output(GREEN_PIN, GPIO.LOW)
+            GPIO.output(RED_PIN, GPIO.HIGH)
 
-        if (self.prev_error_state != self.error_state and 
-            self.error_state == 1):
+        if (self.prev_error_state != self.error_state and self.error_state == 1):
             # error state changed and in error
             self.sms_sender.send('Error state entered')
         

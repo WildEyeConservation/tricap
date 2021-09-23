@@ -28,7 +28,7 @@ MAX_TRIGGER_ATTEMPTS = 5
 IMAGE_COUNT_DELTA_FOR_WAIT_FOR_PATH = 10
 IMAGE_COUNT_DELTA_FOR_FETCH = 5
 
-PREVIEW_FROM_CR2 = True
+PREVIEW_FROM_CR2 = False
 
 class GPhotoSetting(BaseSetting):
     """Setting handler for gphoto cameras."""
@@ -531,9 +531,12 @@ class GPhotoCam(AbstractCamera):
         return self._gp_camera.file_get_info(folder, name, GPhotoCam._context)
 
     def refresh_camera(self):
-        self._gp_camera.exit()
-        sleep(500e-3)
-        self._gp_camera.init(GPhotoCam._context)
+        try:
+            self._gp_camera.exit()
+            sleep(500e-3)
+            self._gp_camera.init(GPhotoCam._context)
+        except:
+            pass
 
     def append_exif_info(self, cam_file, name, dest_dir):
         file_data = cam_file.get_data_and_size()
@@ -730,9 +733,9 @@ class GPhotoCam(AbstractCamera):
             return
 
         im_preview_idxs = list()
-        im_preview_idxs.append((len(camera_files)-1) // 10)
+        im_preview_idxs.append((2*len(camera_files)-1) // 10)
         im_preview_idxs.append((len(camera_files)-1) // 2)
-        im_preview_idxs.append(((9*len(camera_files)-1)) // 10)
+        im_preview_idxs.append(((8*len(camera_files)-1)) // 10)
 
         self._preview_images = list()
         for preview_idx in im_preview_idxs:

@@ -26,7 +26,7 @@ from support.sms_sender import SMSObserver
 from support.git_info import GitData
 
 from sensors.toggle_switch import ToggleSwitchObserver, ToggleSwitchMonitor
-from sensors.toggle_switch import CamManagerMonitor, LEDController, CamErrorMonitor 
+from sensors.toggle_switch import CamManagerMonitor, LEDController, CamErrorMonitor, CamCopyMonitor, CamCaptureMonitor
 
 from support.connection_monitor import generate_net_monitor, NetworkMonitorLogger
 from support.connection_monitor import generate_ip_monitor, IPMonitorLogger
@@ -265,14 +265,22 @@ toggle_switch_monitor.start()
 
 # LED Lights
 cam_man_state_monitor = CamManagerMonitor(tricap_manager, period=0.5)
+cam_copy_monitor = CamCopyMonitor(tricap_manager, period=0.5)
 cam_error_monitors = []
+cam_capture_monitors = []
 for idx, cam in enumerate(tricap_cameras):
     cem = CamErrorMonitor(cam, idx)
     cem.start()
     cam_error_monitors.append(cem)
 
-led_controller = LEDController(cam_man_state_monitor, cam_error_monitors)
+for idx, cam in enumerate(tricap_cameras):
+    ccm = CamCaptureMonitor(cam, idx)
+    ccm.start()
+    cam_capture_monitors.append(ccm)
+
+led_controller = LEDController(cam_man_state_monitor, cam_error_monitors, cam_capture_monitors)
 cam_man_state_monitor.start()
+cam_copy_monitor.start()
 
 # some glue functions, which use the module level functions
 

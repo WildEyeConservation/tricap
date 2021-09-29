@@ -10,6 +10,7 @@ import exifread
 import copy
 import subprocess, time, shutil
 from datetime import datetime
+import RPi.GPIO as GPIO
 
 from config import CAM_MANAGER_STATES, SERVER_LOG_DIR, SESSION_ROOT_DIR
 
@@ -28,6 +29,8 @@ from support.basic import RepeatingBarrierPasser
 from statistics import mean
 
 MOUNT_POINT = "/mnt/ext_cam_storage"
+RED_PIN = 17
+GREEN_PIN = 27
 
 class MultiConfig:
     dictkeys = ["_cameras", "_context"]
@@ -185,7 +188,7 @@ class TriCapCamsManager:
         if len(self._cameras) == 0:
             self.state = CAM_MANAGER_STATES.ERROR_NO_CAMS
             self._logger.debug('Tried to start capture threads with no cameras connected.')
-        elif self.state == CAM_MANAGER_STATES.STOPPED or self.state == CAM_MANAGER_STATES.COPYING:
+        elif self.state == CAM_MANAGER_STATES.STOPPED or self.state == CAM_MANAGER_STATES.COPYING or self.state == CAM_MANAGER_STATES.LOADING_PREVIEW:
             if self.state == CAM_MANAGER_STATES.COPYING:
                 self.stop_copying()
             if self.state == CAM_MANAGER_STATES.LOADING_PREVIEW:
@@ -205,6 +208,7 @@ class TriCapCamsManager:
                 barrier = threading.Barrier(len(self._cameras))
 
             self._capture_threads = list()
+            self._logger.debug('Cam manager - waiting for copy and preview threads to finish')
             while self.is_copy_thread_alive() or self.is_preview_thread_alive():
                 time.sleep(200e-3)
             for cam in self._cameras:  # self.thread was thread
@@ -243,7 +247,7 @@ class TriCapCamsManager:
         self._kill_preview_pill = threading.Event()
         self._preview_threads = list()
         for index, camera in enumerate(self._cameras):
-            x = threading.Thread(target=camera.load_preview, args=(self._kill_cpy_pill, index, ), daemon=True)
+            x = threading.Thread(target=camera.load_preview, args=(self._kill_preview_pill, index, ), daemon=True)
             self._preview_threads.append(x)
         
         for t in self._preview_threads:
@@ -349,7 +353,9 @@ class TriCapCamsManager:
                 return
 
         if self.state == CAM_MANAGER_STATES.STOPPED and self._shutdownEnabled:
-            if (datetime.now() - self._shutdownStartTime).total_seconds() > 3600:
+            if (datetime.now() - self._shutdownStartTime).total_seconds() > 9000:
+                GPIO.output(RED_PIN, GPIO.LOW)
+                GPIO.output(GREEN_PIN, GPIO.LOW)
                 subprocess.call('poweroff', shell=True)
 
         if self.state != CAM_MANAGER_STATES.COPYING:

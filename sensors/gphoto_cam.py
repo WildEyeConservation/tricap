@@ -360,13 +360,14 @@ class GPhotoCam(AbstractCamera):
         self.state = CAMERA_STATES.INITIALISED
         while True:
             if stop_event and stop_event.is_set():
+                self.update_message = 'capture stop event is set'
+                self.notify()
                 return
 
-            disk_info = self.get_disk_info()
-            if "freeMB" in disk_info:
-                space_available = disk_info['freeMB'] > 45
-            else:
-                space_available = False
+            space_available = True
+
+            self.update_message = 'before barrier wait'
+            self.notify()
 
             if barrier:
                 barrier.wait()
@@ -449,8 +450,11 @@ class GPhotoCam(AbstractCamera):
         except IndexError as ex:
             self._logger.warning('Exception: no storage info: %s', ex)
             pass
-        except AttributeError:
+        except AttributeError as ex:
             self._logger.warning('Exception: invalid storage info: %s', ex)
+            pass
+        except Exception as ex:
+            self._logger.warning('Exception: invalid general storage info: %s', ex)
             pass
 
         return info
@@ -686,6 +690,7 @@ class GPhotoCam(AbstractCamera):
 
     def delete_images(self):
         # verify first and last file hash
+        sleep(10e-3)
         if len(self._images_to_delete) > 0:
             self._logger.debug("Delete {} files".format(len(self._images_to_delete)))
             folder, name, dest = self._images_to_delete[0]
@@ -780,3 +785,4 @@ class GPhotoCam(AbstractCamera):
 
     def get_copy_exception_count(self):
         return self._num_images_failed
+        

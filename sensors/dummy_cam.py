@@ -123,6 +123,7 @@ class DummyCam(AbstractCamera):
         self._counter = 0
         self.data = None
         self.serial_num = 0
+        self._image_count = 0
         for filename in fnames:
             with open(filename, 'rb') as f:
                 self._imgs.append(f.read())
@@ -175,12 +176,16 @@ class DummyCam(AbstractCamera):
             if stop_event:
                 if stop_event.is_set():
                     return
-            self.state = CAMERA_STATES.CAPTURING
+            if self._counter > 2:
+                self.state = CAMERA_STATES.ERROR_CAPTURE
+            else:
+                self.state = CAMERA_STATES.CAPTURING
             time.sleep(self.generation_period)
             if barrier:
                 barrier.wait()
 
             self._counter += 1
+            self._image_count += 1
             self.update_message = 'before capture'
             self.notify()
             self.data = self._imgs[self._counter % len(self._imgs)]
@@ -188,7 +193,7 @@ class DummyCam(AbstractCamera):
             self.notify()
             if self.fetch_state is True:
                 self._fresh_capture = True
-            self.state = CAMERA_STATES.INITIALISED
+            # self.state = CAMERA_STATES.INITIALISED
 
             if self.calibrate_func is not None:
                 if self.calibrate_step > 0:
@@ -217,13 +222,14 @@ class DummyCam(AbstractCamera):
             # avoid memory crash on app
             self._preview_images.append(base64.b64encode(bytes_io.getvalue()).decode("utf-8"))
 
-    def cpy_images(self):
-        pass
+    def cpy_images(self, computer_files, mount_point, stop_event, pause_event):
+        return
 
     def delete_images(self):
-        pass
+        return
 
     def load_preview(self, stop_event, index):
+        return
         self._generating_preview = True
 
         for preview_idx in range(1):
@@ -295,6 +301,10 @@ class DummyShell():
     def state(self):
         """Return the state of the underlying camera."""
         return self._camera.state
+
+    @property
+    def captureCount(self):
+        return self._camera._image_count
 
     # Node('main', label='Camera and Driver Configuration', type=<CamConfigType.Window: 0>)
     # ├── Node('main/actions', label='Camera Actions', type=<CamConfigType.Section: 1>)

@@ -4,6 +4,7 @@ import RPi.GPIO as GPIO
 
 from support.sms_sender import SMSSender
 from support.basic import PeriodicMonitor, Observer
+import subprocess
 
 import logging
 
@@ -237,7 +238,8 @@ class LEDController(Observer):
             idx = int(subject.type_id[-1])
             self.cam_captures[idx] = subject.value
 
-        self.capture_state = self.cam_captures == [1]*len(self.cam_captures)
+        # self.capture_state = self.cam_captures == [1]*len(self.cam_captures)
+        self.capture_state = self.cam_captures == [1, 1, 1]
 
         if self.error_state == 1:
             GPIO.output(GREEN_PIN, GPIO.HIGH)
@@ -248,6 +250,20 @@ class LEDController(Observer):
         else:
             GPIO.output(GREEN_PIN, GPIO.LOW)
             GPIO.output(RED_PIN, GPIO.HIGH)
+
+        if subject.type_id == 'CamManager':
+            if subject.value == 0: # Capture is stopped 
+                if self.toggled_on: # Capture was stopped (previous observation was still running)
+                    self._logger.info('LEDController - Capture was stopped')
+                    self.toggled_on = False
+                    if self.error_state == 1:
+                        self._logger.info('Restarting...')
+                        # subprocess.run(["systemctl", "restart", "tricap.service"])
+                        subprocess.call('reboot', shell=True)
+            else: # switch is in the on position
+                if self.toggled_on is False: # User has flicked the switch on
+                    self._logger.info('LEDController - Capture has started')
+                    self.toggled_on = True
 
         if (self.prev_error_state != self.error_state and self.error_state == 1):
             # error state changed and in error

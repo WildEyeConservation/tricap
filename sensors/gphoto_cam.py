@@ -499,14 +499,14 @@ class GPhotoCam(AbstractCamera):
                         if len(exisiting_data['exifInfo']) > 0:
                             last_im = exisiting_data['exifInfo'][-1]
                             last_timestamp = datetime.strptime(last_im['SubSecDateTimeOriginal'], '%Y:%m:%d %H:%M:%S.%f')
-                            if (timestamp - last_timestamp).total_seconds() > 120:
+                            if (timestamp - last_timestamp).total_seconds() > 3600:
                                 pass
                             else:
                                 # add to previous session
                                 session_dir = last_session_dir
                                 complete_dir = last_complete_dir
                                 self._session_idx = last_idx
-        elif (timestamp - self._prev_im_timestamp).total_seconds() > 120:
+        elif (timestamp - self._prev_im_timestamp).total_seconds() > 3600:
             # x seconds passed between captures -> save as new capture session
             session_dir, complete_dir, self._session_idx = self.find_session_dir(mount_point, timestamp)
         # if not self._prev_im_timestamp == None:

@@ -86,14 +86,14 @@ class TriCapCamsManager:
         self._prev_copy_eta_s = 0
         self._shutdownStartTime = None
         self._shutdownEnabled = False
+        self._startupTime = datetime.now()
+        self._copyDelayEn = True
         self._initialise()
 
     def _initialise(self):
         self._find_cameras()
 
         self._image_capture_interval = float(self._man_settings['image_capture_interval'])
-
-        self.load_preview()
 
     def is_cam_image_fresh(self, cam_num):
         return self._cameras[cam_num].is_cam_image_fresh()
@@ -185,6 +185,7 @@ class TriCapCamsManager:
     def start_capturing(self):
         """Start the capturing threads of all connected cams."""
         self._shutdownEnabled = False
+        self._copyDelayEn = False
         if len(self._cameras) == 0:
             self.state = CAM_MANAGER_STATES.ERROR_NO_CAMS
             self._logger.debug('Tried to start capture threads with no cameras connected.')
@@ -357,6 +358,13 @@ class TriCapCamsManager:
                 GPIO.output(RED_PIN, GPIO.LOW)
                 GPIO.output(GREEN_PIN, GPIO.LOW)
                 subprocess.call('poweroff', shell=True)
+
+        if self.state == CAM_MANAGER_STATES.STOPPED and self._copyDelayEn:
+            if (datetime.now() - self._startupTime).total_seconds() > 300:
+                self._logger.debug('Cam manager - load_preview after startup delay.')
+                self._copyDelayEn = False
+                self.load_preview()
+                return
 
         if self.state != CAM_MANAGER_STATES.COPYING:
             return

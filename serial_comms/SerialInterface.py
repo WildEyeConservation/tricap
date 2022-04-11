@@ -17,6 +17,7 @@ class SerialInterface(SerialProcess):
     self.port = port
     self.isConnected = False
     self.killThread = False
+    subprocess.run(['rfcomm', 'release', '0'])
     self.serialPort = serial.Serial()
     self.rxThread = Thread(target=self.thread, daemon=True)
     self.mainThread = Thread(target=self.connect, daemon=True)
@@ -30,35 +31,28 @@ class SerialInterface(SerialProcess):
     """
     while self.serialPort.is_open == False:
       self.open()
-      sleep(1)
+      sleep(2)
     self.isConnected = True
     self._logger.debug('Serial port {} connected'.format(self.port))
 
   def open(self):
     with self._lock:
       try:
+        # self._logger.debug('Serial port try connect')
         self.serialPort = serial.Serial(port=self.port)
-        sleep(50e-3)
+        sleep(10e-3)
         bytesWaiting = self.serialPort.inWaiting()
       except:
         self.serialPort.close()
         subprocess.run(['rfcomm', 'release', '0'])
         # self._logger.debug('Failed to open port')
 
-  def close(self):
-    """
-    Stop thread and close serial port 
-    """
+  def reconnect(self):
     with self._lock:
-      self.isConnected = False
-      self.killThread = True
+      self._logger.debug('Serial port reconnect')
       self.serialPort.close()
       subprocess.run(['rfcomm', 'release', '0'])
 
-  def reconnect(self):
-    with self._lock:
-      self.serialPort.close()
-      subprocess.run(['rfcomm', 'release', '0'])
     self.connect()
 
   def write(self, buff):

@@ -67,6 +67,7 @@ class GPhotoConfig:
 
     def __setattr__(self, key, value):
         """Set a configuration setting to a new value."""
+        # print("__setattr__ {} {}".format(key, value))
         if key in GPhotoConfig.dictkeys:
             self.__dict__[key] = value
         else:
@@ -602,7 +603,6 @@ class GPhotoCam(AbstractCamera):
         self._num_images_to_copy = 0
         self._num_images_failed = 0
         sleep(500e-3)
-        self.refresh_camera()
         camera_files = self.list_camera_files()
         self._num_images_to_copy = len(camera_files)
         paused = False
@@ -629,10 +629,21 @@ class GPhotoCam(AbstractCamera):
                 paused = False
                 self.delete_images()
 
-            info = self.get_camera_file_info(path)
+            self._logger.debug('Get info')
+            try:
+                info = self.get_camera_file_info(path)
+            except:
+                self._logger.warning('File info failed {}'.format(path))
+                continue
+
+            self._logger.debug('Image time {}'.format(info.file.mtime))
+
             timestamp = datetime.fromtimestamp(info.file.mtime)
+            self._logger.debug('timestamp {}'.format(timestamp))
             folder, name = os.path.split(path)
+            self._logger.debug('folder, name {} {}'.format(folder, name))
             dest_dir = self.get_im_target_dir(timestamp, mount_point)
+            self._logger.debug('dest_dir {}'.format(dest_dir))
             dest = os.path.join(dest_dir, name)
             if not os.path.isdir(dest_dir):
                 os.makedirs(dest_dir)
@@ -640,7 +651,7 @@ class GPhotoCam(AbstractCamera):
             if any(x[0] == folder and x[1] == name for x in self._images_to_delete):
                 # file already copied and waiting to be deleted from SD card
                 if self.get_camera_image_hash(folder, name) == self.get_external_image_hash(dest):
-                    self._logger.debug('File already copied {}/{}'.format(folder, name))
+                    self._logger.warning('File already copied {}/{}'.format(folder, name))
                     self._images_to_delete.append((folder, name, dest))
                     continue
             
@@ -649,9 +660,9 @@ class GPhotoCam(AbstractCamera):
                 dest = "{0}_{2}.{1}".format(*dest.rsplit(".", 1), "copy")
                 self._logger.debug('Save as _copy {}'.format(dest))
             
-            # self._logger.debug('%s -> %s' % (path, dest))
-            camera_file = self._gp_camera.file_get(folder, name, gp.GP_FILE_TYPE_NORMAL, GPhotoCam._context)
+            self._logger.debug('%s -> %s' % (path, dest))            
             try:
+                camera_file = self._gp_camera.file_get(folder, name, gp.GP_FILE_TYPE_NORMAL, GPhotoCam._context)
                 gp.check_result(gp.gp_file_save(camera_file, dest))
                 self._images_to_delete.append((folder, name, dest))
                 self.append_exif_info(camera_file, name, dest_dir)

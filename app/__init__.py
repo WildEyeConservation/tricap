@@ -28,8 +28,8 @@ from support.git_info import GitData
 from sensors.toggle_switch import ToggleSwitchObserver, ToggleSwitchMonitor
 from sensors.toggle_switch import CamManagerMonitor, LEDController, CamErrorMonitor, CamCopyMonitor, CamCaptureMonitor
 
-from support.connection_monitor import generate_net_monitor, NetworkMonitorLogger
-from support.connection_monitor import generate_ip_monitor, IPMonitorLogger
+# from support.connection_monitor import generate_net_monitor, NetworkMonitorLogger
+# from support.connection_monitor import generate_ip_monitor, IPMonitorLogger
 
 from support.system_monitor import generate_system_monitor, SystemMonitorLogger
 
@@ -215,16 +215,16 @@ talkbox = TalkBox(Lock(), 3)
 talkbox.clear()
 
 # Setup monitor and logger for wireless network connection
-wlan_mon = generate_net_monitor(period=26)
-net_mon_logger = NetworkMonitorLogger(wlan_mon)
-wlan_mon.start()
+# wlan_mon = generate_net_monitor(period=26)
+# net_mon_logger = NetworkMonitorLogger(wlan_mon)
+# wlan_mon.start()
 
 # Setup monitor and logger for vpn and internet connection
-vpn_mon = generate_ip_monitor('192.168.88.1', period=27)
-internet_mon = generate_ip_monitor('8.8.8.8', period=32)
-ip_mon_logger = IPMonitorLogger([vpn_mon, internet_mon])
-vpn_mon.start()
-internet_mon.start()
+# vpn_mon = generate_ip_monitor('192.168.88.1', period=27)
+# internet_mon = generate_ip_monitor('8.8.8.8', period=32)
+# ip_mon_logger = IPMonitorLogger([vpn_mon, internet_mon])
+# vpn_mon.start()
+# internet_mon.start()
 
 # Setup monitors for system values
 sys_mons = []
@@ -294,9 +294,9 @@ fetch_stopper = GateCloser(20.0, stop_fetching)
 
 def stop_all_threads():
     """Helper function for a clean exit."""
-    wlan_mon.stop()
-    vpn_mon.stop()
-    internet_mon.stop()
+    # wlan_mon.stop()
+    # vpn_mon.stop()
+    # internet_mon.stop()
 
     for sm in sys_mons:
         if sm is not None:

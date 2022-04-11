@@ -8,7 +8,7 @@ import time
 import gphoto2 as gp
 
 # PHOTO_DIR = os.path.expanduser('/home/pi/Pictures/from_camera')
-PHOTO_DIR = os.path.expanduser('/mnt/samsung_ssd/from_camera')
+PHOTO_DIR = os.path.expanduser('/mnt/ext_cam_storage')
 
 def get_target_dir(timestamp, index):
   addDir = "{}/{}/".format(timestamp.strftime('%Y/%Y_%m_%d'), str(index))
@@ -86,11 +86,12 @@ def cpy_images(camera, computer_files, index, stop):
     print('%s -> %s' % (path, dest_dir))
     if not os.path.isdir(dest_dir):
       os.makedirs(dest_dir)
-    camera_file = camera.file_get(folder, name, gp.GP_FILE_TYPE_RAW)
+    camera_file = camera.file_get(folder, name, gp.GP_FILE_TYPE_NORMAL)
     for attemp in range(3):
       try:
-        gp.check_result(gp.gp_file_save(camera_file, dest))
-        camera.file_delete(folder, name)
+#        gp.check_result(gp.gp_file_save(camera_file, dest))
+#        camera.file_delete(folder, name)
+         pass
       except:
         print("Save exception, sleep...")
         time.sleep(2)

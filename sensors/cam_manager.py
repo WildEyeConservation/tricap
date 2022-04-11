@@ -19,6 +19,7 @@ from config import CAM_MANAGER_STATES, SERVER_LOG_DIR, SESSION_ROOT_DIR
 try:
     from .canon_6D import Canon6DCam
     from .gphoto_cam import GPhotoCam as Camera
+    from .canon_R import CanonRCam
 except ImportError:
     logging.getLogger(__name__).warning('Could not import gphoto based libs.')
 
@@ -61,7 +62,7 @@ class MultiConfig:
 class TriCapCamsManager:
     """TriCapCamsManager manages TriCap camera objects"""
 
-    supportedCameras = {"Canon EOS 6D", "Dummy Cam"}
+    supportedCameras = {"Canon EOS 6D", "Dummy Cam", "Canon EOS R"}
     _logger = logging.getLogger(__name__)
 
     def __init__(self, man_settings: dict, cam_settings: dict, use_dummy_cams=False):
@@ -140,11 +141,19 @@ class TriCapCamsManager:
                     self._cameras.append(tricap_cam)
         else:
             for name, address in Camera.autodetect():
+                self._logger.info('Detected camera %s at address %s ' % (name, address))
                 if name in TriCapCamsManager.supportedCameras:
                     self._logger.info('Adding camera %s at address %s ' % (name, address))
-                    tricap_cam = Canon6DCam(Camera(address, self._cam_settings))
+                    if name == "Canon EOS 6D":                    
+                        tricap_cam = Canon6DCam(Camera(address, self._cam_settings))
+                    elif name == "Canon EOS R":
+                        tricap_cam = CanonRCam(Camera(address, self._cam_settings))
+                    else:
+                        # this should not happen
+                        continue
+                        
                     tricap_cam._camera.rate_fp = os.path.join(SERVER_LOG_DIR,
-                                                      'canon6dcam_%s_rates.txt' % tricap_cam.serial_num)
+                                                    'canon6dcam_%s_rates.txt' % tricap_cam.serial_num)
                     # tricap_cam._camera.calibrate_func = tricap_cam.focus_infinity
                     tricap_cam._camera.calibrate_step = int(self._man_settings['calibrate_step'])
                     self._cameras.append(tricap_cam)
@@ -167,13 +176,16 @@ class TriCapCamsManager:
         """
         gps_status_of_cams = []
         for index, cam in enumerate(self._cameras):
-            fp = cam.capture_and_download(target_folder=SESSION_ROOT_DIR, target_name=str(index)+'.CR2')
-            with open(fp, 'rb') as im_f:
-                tags = exifread.process_file(im_f, stop_tag="GPS GPSLongitude")  # Reduce time of execution by adding a stop tag
-                if 'GPS GPSLongitude' in tags.keys():
-                    gps_status_of_cams.append(True)
-                else:
-                    gps_status_of_cams.append(False)
+            try:
+                fp = cam.capture_and_download(target_folder=SESSION_ROOT_DIR, target_name=str(index)+'.CR2')
+                with open(fp, 'rb') as im_f:
+                    tags = exifread.process_file(im_f, stop_tag="GPS GPSLongitude")  # Reduce time of execution by adding a stop tag
+                    if 'GPS GPSLongitude' in tags.keys():
+                        gps_status_of_cams.append(True)
+                    else:
+                        gps_status_of_cams.append(False)
+            except:
+                gps_status_of_cams.append(False)
 
             # get the camera to capture an image and download it to a provided folder
             # get the exif data from the image

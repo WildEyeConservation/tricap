@@ -63,7 +63,7 @@ class AbstractCamera(Subject):
         pass
 
     @abstractmethod
-    def capture_and_download(self, target_folder: str, target_name: str):
+    def capture_and_read_exif(self):
         """Capture an image and download it to a target folder."""
         pass
 

@@ -107,14 +107,14 @@ class TriCapCamsManager:
 
     def order_cameras_list(self):
         self.camera_list = self._cameras
-        if len(self.camera_list) == 3:
-            for camera_nb in range(3):
-                if self.camera_list[camera_nb].config.eosserialnumber == "032024003117":
-                    self._cameras[0], self.camera_list[camera_nb] = self.camera_list[camera_nb], self._cameras[0]
-                elif self.camera_list[camera_nb].config.eosserialnumber == "023052000180":
-                    self._cameras[1], self.camera_list[camera_nb] = self.camera_list[camera_nb], self._cameras[1]
-                elif self.camera_list[camera_nb].config.eosserialnumber == "413051000325":
-                    self._cameras[2], self.camera_list[camera_nb] = self.camera_list[camera_nb], self._cameras[2]
+        # if len(self.camera_list) == 3:
+        #     for camera_nb in range(3):
+        #         if self.camera_list[camera_nb].config.eosserialnumber == "032024003117":
+        #             self._cameras[0], self.camera_list[camera_nb] = self.camera_list[camera_nb], self._cameras[0]
+        #         elif self.camera_list[camera_nb].config.eosserialnumber == "023052000180":
+        #             self._cameras[1], self.camera_list[camera_nb] = self.camera_list[camera_nb], self._cameras[1]
+        #         elif self.camera_list[camera_nb].config.eosserialnumber == "413051000325":
+        #             self._cameras[2], self.camera_list[camera_nb] = self.camera_list[camera_nb], self._cameras[2]
 
     def show_cameras_list(self):
         for camera_nb in range(3):
@@ -177,14 +177,13 @@ class TriCapCamsManager:
         gps_status_of_cams = []
         for index, cam in enumerate(self._cameras):
             try:
-                fp = cam.capture_and_download(target_folder=SESSION_ROOT_DIR, target_name=str(index)+'.CR2')
-                with open(fp, 'rb') as im_f:
-                    tags = exifread.process_file(im_f, stop_tag="GPS GPSLongitude")  # Reduce time of execution by adding a stop tag
-                    if 'GPS GPSLongitude' in tags.keys():
-                        gps_status_of_cams.append(True)
-                    else:
-                        gps_status_of_cams.append(False)
+                exif = cam.capture_and_read_exif()
+                if 'Composite:GPSLatitude' in exif.keys():
+                    gps_status_of_cams.append(True)
+                else:
+                    gps_status_of_cams.append(False)
             except:
+                self._logger.debug('Failed to read GPSLongitude from exifdata')
                 gps_status_of_cams.append(False)
 
             # get the camera to capture an image and download it to a provided folder

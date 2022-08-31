@@ -13,8 +13,9 @@ class Canon6DCam():
         self.config.drivemode = 'Single'
         self.config.reviewtime = 'None'
         self.config.imageformat = 'RAW'
+        self.raw_image_format = 'CR2'
         self.capture = self._camera.capture
-        self.capture_and_download = self._camera.capture_and_download
+        self.capture_and_read_exif = self._camera.capture_and_read_exif
         self.get_state_as_string = self._camera.get_state_as_string
         self.is_cam_image_fresh = self._camera.is_cam_image_fresh
         self.cpy_images = self._camera.cpy_images

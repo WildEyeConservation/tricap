@@ -13,6 +13,7 @@ from PIL import Image
 
 from time import sleep
 from datetime import datetime
+from dateutil import parser
 
 import gphoto2 as gp
 from anytree import Node, PreOrderIter, RenderTree
@@ -24,7 +25,7 @@ from .base_setting import BaseSetting
 import subprocess, hashlib, json
 
 # Max attempts that can be made to trigger a photo during the capture process
-MAX_TRIGGER_ATTEMPTS = 5
+MAX_TRIGGER_ATTEMPTS = 1
 IMAGE_COUNT_DELTA_FOR_WAIT_FOR_PATH = 10
 IMAGE_COUNT_DELTA_FOR_FETCH = 5
 
@@ -303,25 +304,32 @@ class GPhotoCam(AbstractCamera):
 
         return image_path
 
-    def capture_and_download(self, target_folder: str, target_name: str = None):
+    def capture_and_read_exif(self):
         """Capture an image and download it."""
         file_path = self._gp_camera.capture(gp.GP_CAPTURE_IMAGE, GPhotoCam._context)
-        camera_file = self._gp_camera.file_get(file_path.folder,
-                                               file_path.name,
-                                               gp.GP_FILE_TYPE_NORMAL,
-                                               GPhotoCam._context)
-        if target_name is None:
-            target_name = file_path.name
 
-        target_fp = os.path.join(target_folder, target_name)
+        sleep(100e-3)
 
-        gp.gp_file_save(camera_file, target_fp)
+        camera_files = self.list_camera_files()
+        exif_data = None
+        if len(camera_files) > 0:
+            # read last image exif data
+            folder, name = os.path.split(camera_files[-1])
+            camera_file = self._gp_camera.file_get(folder,
+                                                name,
+                                                gp.GP_FILE_TYPE_NORMAL,
+                                                GPhotoCam._context)
+            file_data = camera_file.get_data_and_size()
+            data_bytes = memoryview(file_data).tobytes()
+            tfile = tempfile.NamedTemporaryFile('wb', delete=True)            
+            tfile.write(data_bytes)
+            exif_data = pyexifinfo.get_json(tfile.name)[0]
 
-        return target_fp
+        return exif_data
 
     def cam_trigger(self):
         """Trigger using either normal function or the eos remote release."""
-        if self.calibrate_step > 0: 
+        if self.calibrate_step > 0:
             # full press (bypass focus)
             config = self._gp_camera.get_config(GPhotoCam._context)
             GPhotoSetting(config.get_child_by_name('eosremoterelease')).set('Press Full')
@@ -499,7 +507,16 @@ class GPhotoCam(AbstractCamera):
                     if 'exifInfo' in exisiting_data:
                         if len(exisiting_data['exifInfo']) > 0:
                             last_im = exisiting_data['exifInfo'][-1]
-                            last_timestamp = datetime.strptime(last_im['SubSecDateTimeOriginal'], '%Y:%m:%d %H:%M:%S.%f')
+                            last_timestamp = datetime.now()
+                            try:
+                                temp_timestamp = last_im['SubSecDateTimeOriginal']
+                                timezon_pos = temp_timestamp.find('+')                                
+                                if timezon_pos > 0:
+                                    # timezone found -> remove time zone
+                                    temp_timestamp = temp_timestamp[:timezon_pos]
+                                last_timestamp = datetime.strptime(temp_timestamp, '%Y:%m:%d %H:%M:%S.%f')
+                            except:
+                                self._logger.warning('Could not get timestamp from image {}'.format(last_im))
                             if (timestamp - last_timestamp).total_seconds() > 3600:
                                 pass
                             else:
@@ -629,21 +646,15 @@ class GPhotoCam(AbstractCamera):
                 paused = False
                 self.delete_images()
 
-            self._logger.debug('Get info')
             try:
                 info = self.get_camera_file_info(path)
             except:
                 self._logger.warning('File info failed {}'.format(path))
                 continue
 
-            self._logger.debug('Image time {}'.format(info.file.mtime))
-
             timestamp = datetime.fromtimestamp(info.file.mtime)
-            self._logger.debug('timestamp {}'.format(timestamp))
             folder, name = os.path.split(path)
-            self._logger.debug('folder, name {} {}'.format(folder, name))
             dest_dir = self.get_im_target_dir(timestamp, mount_point)
-            self._logger.debug('dest_dir {}'.format(dest_dir))
             dest = os.path.join(dest_dir, name)
             if not os.path.isdir(dest_dir):
                 os.makedirs(dest_dir)
@@ -660,7 +671,7 @@ class GPhotoCam(AbstractCamera):
                 dest = "{0}_{2}.{1}".format(*dest.rsplit(".", 1), "copy")
                 self._logger.debug('Save as _copy {}'.format(dest))
             
-            self._logger.debug('%s -> %s' % (path, dest))            
+            self._logger.debug('%s -> %s' % (path, dest))
             try:
                 camera_file = self._gp_camera.file_get(folder, name, gp.GP_FILE_TYPE_NORMAL, GPhotoCam._context)
                 gp.check_result(gp.gp_file_save(camera_file, dest))

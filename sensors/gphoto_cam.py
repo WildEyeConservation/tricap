@@ -11,7 +11,7 @@ import numpy as np
 import rawpy, base64
 from PIL import Image
 
-from time import sleep
+from time import sleep, time
 from datetime import datetime
 from dateutil import parser
 
@@ -30,6 +30,8 @@ IMAGE_COUNT_DELTA_FOR_WAIT_FOR_PATH = 10
 IMAGE_COUNT_DELTA_FOR_FETCH = 5
 
 PREVIEW_FROM_CR2 = False
+
+MAX_FILE_SIZE = 35000000
 
 class GPhotoSetting(BaseSetting):
     """Setting handler for gphoto cameras."""
@@ -142,6 +144,9 @@ class GPhotoCam(AbstractCamera):
         self._prev_im_timestamp = None
         self._session_idx = 0
         self._lens_serial_number = ''
+        self._chunk_size = 1024*1024*4
+        self._to_copy_queue = []
+        self._done_copying_queue = []
 
         self._setup_camera(settings)
 
@@ -429,6 +434,81 @@ class GPhotoCam(AbstractCamera):
     #     """Reset the camera."""
     #     self.state = CAMERA_STATES.UNINITIALISED
     #     self._setup_camera(settings)
+
+    def capture_and_copy(self, interval, init_start, stop_capture=None, stop_capture_and_copy=None):
+        # empty event buffer
+        code=0
+        while code!=1:
+            code,filepath=self._gp_camera.wait_for_event(1)
+
+        # local variables
+        start = init_start
+        safetyMargins = [0.3, 0.8]
+        safetyMargin = safetyMargins[1]
+        file = ''
+        currentFolder = ''
+        currentFilename = ''
+        offset=0
+        data=[]
+        view = memoryview()
+
+        # main loop
+        while True:
+            if stop_capture_and_copy and stop_capture_and_copy.is_set():
+                self.update_message = 'capture thread stop event is set'
+                self.notify()
+                return
+
+            # check if trigger is required
+            if (time() - start > interval) and (stop_capture and not stop_capture.is_set()):
+                # trigger required
+                if self._trigger_capture():  # Checks to see if something went wrong with the cameras
+                    self._image_count += 1
+                    self.state = CAMERA_STATES.CAPTURING
+                    start += interval
+                    safetyMargin = safetyMargins[1]
+                else:
+                    self._logger.error('Could not successfully trigger a capture.')
+                    self.state = CAMERA_STATES.ERROR_CAPTURE                
+            
+            # check for new image event
+            code, filepath = self._gp_camera.wait_for_event(1)
+            if code == 2:
+                # new image available event
+                self._to_copy_queue.append(os.path.join(filepath.folder, filepath.name))
+                safetyMargin = safetyMargins[0]
+            
+            # check if copy should happen
+            if offset < len(data):
+                # copy required
+                if time() - start < interval - safetyMargin:
+                    # do copy
+                    bytesRead = gp.check_result(self._gp_camera.file_read(currentFolder, currentFilename, gp.GP_FILE_TYPE_NORMAL, offset, view[offset:offset + self._chunk_size]))
+                    offset += bytesRead
+                    if bytesRead < self._chunk_size:
+                        # copy done
+                        offset = len(data)
+
+            # check if copy is done
+            if offset >= len(data):
+                # done copying or haven't started
+                if len(data) > 0 and file != '':
+                    # done copying
+                    file = ''
+                
+            if len(self._to_copy_queue) > 0 and file == '':
+                # done copying and new file in queue
+                file = self._to_copy_queue.pop(0)
+                currentFolder, currentName = os.path.split(file)
+                fi = self._gp_camera.file_get_info(currentFolder, currentName, GPhotoCam._context)
+                offset = 0
+                if fi.file.size < MAX_FILE_SIZE and fi.file.size > 0:
+                    data = bytearray(fi.file.size)
+                    view = memoryview(data)
+                else:
+                    self._logger.warning(f"*************FILE SIZE ERROR {fi.file.size} *******************")
+                    file = ''
+                    data = bytearray()
 
     def get_state_as_string(self):
         """Return the state of the camera as a string."""

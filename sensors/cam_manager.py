@@ -79,7 +79,8 @@ class TriCapCamsManager:
         self._preview_threads = list()
         self._cameras = None
         self._rate_timer = None
-        self._kill_pill = None
+        self._stop_capture = None
+        self._stop_capture_and_copy = None
         self._cam_settings = cam_settings
         self._man_settings = man_settings
         self.use_dummy_cams = use_dummy_cams
@@ -200,44 +201,31 @@ class TriCapCamsManager:
         if len(self._cameras) == 0:
             self.state = CAM_MANAGER_STATES.ERROR_NO_CAMS
             self._logger.debug('Tried to start capture threads with no cameras connected.')
-        elif self.state == CAM_MANAGER_STATES.STOPPED or self.state == CAM_MANAGER_STATES.COPYING or self.state == CAM_MANAGER_STATES.LOADING_PREVIEW:
-            if self.state == CAM_MANAGER_STATES.COPYING:
-                self.stop_copying()
-            if self.state == CAM_MANAGER_STATES.LOADING_PREVIEW:
-                self.stop_load_preview()
-
-            self._kill_pill = threading.Event()
+        elif self.state == CAM_MANAGER_STATES.STOPPED:
+            self._stop_capture = threading.Event()
+            self._stop_capture_and_copy = threading.Event()
 
             for cam in self._cameras:
                 cam._camera._image_count = 0
 
-            if self._image_capture_interval != 0:
-                barrier = threading.Barrier(len(self._cameras)+1)  # add one for the timer
-                self._rate_timer = RepeatingBarrierPasser(self._image_capture_interval,
-                                                          self._kill_pill, barrier, daemon=True)
-                self._rate_timer.start()
-            else:
-                barrier = threading.Barrier(len(self._cameras))
-
             self._capture_threads = list()
-            self._logger.debug('Cam manager - waiting for copy and preview threads to finish')
-            while self.is_copy_thread_alive() or self.is_preview_thread_alive():
-                time.sleep(200e-3)
+            self._logger.debug('Cam manager - start copying thread')
+            global_start_time = time.time()
             for cam in self._cameras:  # self.thread was thread
-                # TODO This seems to be a mistake, should probaby make a list of the threads
-                x = threading.Thread(target=cam.capture, daemon=True, args=(True,barrier,self._kill_pill, ))
+                x = threading.Thread(target=cam.capture_and_copy, daemon=True, args=(self._image_capture_interval, global_start_time, self._stop_capture, self._stop_capture_and_copy, ))
                 self._capture_threads.append(x)
             
             for t in self._capture_threads:
                 t.start()
+
             self.state = CAM_MANAGER_STATES.STARTED
             self._logger.debug('Cam manager - capture threads started.')
 
     def stop_capturing(self):
         if self.state == CAM_MANAGER_STATES.STARTED:
-            self._kill_pill.set()
+            self._stop_capture.set()
             self.state = CAM_MANAGER_STATES.STOPPED
-            self.load_preview()
+            # self.load_preview()
             self._logger.debug('Cam manager - capture threads stopped.')
 
     def is_copy_thread_alive(self):

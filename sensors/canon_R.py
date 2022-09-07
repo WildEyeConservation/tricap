@@ -15,6 +15,7 @@ class CanonRCam():
         self.config.imageformat = 'RAW'
         self.raw_image_format = 'CR3'
         self.capture = self._camera.capture
+        self.capture_and_copy = self._camera.capture_and_copy        
         self.capture_and_read_exif = self._camera.capture_and_read_exif
         self.get_state_as_string = self._camera.get_state_as_string
         self.is_cam_image_fresh = self._camera.is_cam_image_fresh

@@ -1,3 +1,4 @@
+import RPi.GPIO as GPIO
 """D Joubert 16 November 2016 - Camera managers for Tricap app."""
 # coding=utf-8
 
@@ -80,6 +81,7 @@ class TriCapCamsManager:
         self._cameras = None
         self._rate_timer = None
         self._stop_capture = None
+        self._stop_capture_and_copy = None
         self._cam_settings = cam_settings
         self._man_settings = man_settings
         self.use_dummy_cams = use_dummy_cams
@@ -201,23 +203,17 @@ class TriCapCamsManager:
             self.state = CAM_MANAGER_STATES.ERROR_NO_CAMS
             self._logger.debug('Tried to start capture threads with no cameras connected.')
         elif self.state == CAM_MANAGER_STATES.STOPPED:
+            self._stop_capture = threading.Event()
+            self._stop_capture_and_copy = threading.Event()
+
             for cam in self._cameras:
                 cam._camera._image_count = 0
 
-            self._capture_threads.clear()
-            self._logger.debug('Cam manager - start capturing thread')
-            self._stop_capture = threading.Event()
-
-            if not self.mount_disk():
-                # no disk -> do not copy
-                self.state = CAM_MANAGER_STATES.STOPPED
-                return
-
-            existing_files = self.list_exisiting_files(MOUNT_POINT)
-            global_start_time = time.time() + 1
-            session_start_date = datetime.now()
+            self._capture_threads = list()
+            self._logger.debug('Cam manager - start copying thread')
+            global_start_time = time.time()
             for cam in self._cameras:  # self.thread was thread
-                x = threading.Thread(target=cam.capture_and_copy, daemon=True, args=(self._image_capture_interval, global_start_time, MOUNT_POINT, existing_files, session_start_date, self._stop_capture, ))
+                x = threading.Thread(target=cam.capture_and_copy, daemon=True, args=(self._image_capture_interval, global_start_time, self._stop_capture, self._stop_capture_and_copy, ))
                 self._capture_threads.append(x)
             
             for t in self._capture_threads:
@@ -225,22 +221,13 @@ class TriCapCamsManager:
 
             self.state = CAM_MANAGER_STATES.STARTED
             self._logger.debug('Cam manager - capture threads started.')
-        elif self.state == CAM_MANAGER_STATES.STARTED:
-            self._logger.debug('Cam manager - continue capturing thread')
-            self._stop_capture.clear()
 
     def stop_capturing(self):
         if self.state == CAM_MANAGER_STATES.STARTED:
             self._stop_capture.set()
+            self.state = CAM_MANAGER_STATES.STOPPED
             # self.load_preview()
-            self._logger.debug('Cam manager - capture threads stop requested.')
-
-    def is_capture_thread_alive(self):
-        """ Return true if any cam thread is alive """
-        for t in self._capture_threads:
-            if t.is_alive():
-                return True
-        return False
+            self._logger.debug('Cam manager - capture threads stopped.')
 
     def is_copy_thread_alive(self):
         """ Return true if any cam thread is alive """
@@ -361,10 +348,79 @@ class TriCapCamsManager:
         If all threads are done -> unmount the external disk
         Flush the external drive cache every 15 minutes during the copy process
         """
+        if self.state == CAM_MANAGER_STATES.LOADING_PREVIEW:
+            if not self.is_preview_thread_alive():
+                self.start_copying()
+                return
 
-        if not self.is_capture_thread_alive() and self.state == CAM_MANAGER_STATES.STARTED:
-            self.state = CAM_MANAGER_STATES.STOPPED
+        if self.state == CAM_MANAGER_STATES.STOPPED and self._shutdownEnabled:
+            if (datetime.now() - self._shutdownStartTime).total_seconds() > 9000:
+                GPIO.output(RED_PIN, GPIO.LOW)
+                GPIO.output(GREEN_PIN, GPIO.LOW)
+                subprocess.call('poweroff', shell=True)
+
+        if self.state == CAM_MANAGER_STATES.STOPPED and self._copyDelayEn:
+            if (datetime.now() - self._startupTime).total_seconds() > 300:
+                self._logger.debug('Cam manager - load_preview after startup delay.')
+                self._copyDelayEn = False
+                self.load_preview()
+                return
+
+        if self.state != CAM_MANAGER_STATES.COPYING:
+            return
+            
+        if not os.path.ismount(MOUNT_POINT) or not self._pause_cpy_pill:
+            return
+
+        # check if all copy threads are finished
+        finished = True
+        if os.path.ismount(MOUNT_POINT):
+            if self.is_copy_thread_alive():
+                finished = False
+    
+        if not finished:
+            # flush external and delete from SD cards every x seconds
+            if (datetime.now() - self._copy_flush_time).total_seconds() > 600:
+                self._copy_flush_time = datetime.now()
+                # pause copy process
+                self._pause_cpy_pill.set()
+                # wait for current image copy to finish
+                time.sleep(5)
+                # flush external disk cache -> do this here and not multiple times in gphoto_cam.py
+                if self.flush_disk():
+                    # flush successful -> unpause, delete and continue copying
+                    self._pause_cpy_pill.clear()
+                else:
+                    # flush failed -> do not delete and stop copying
+                    self._pause_cpy_pill.clear()
+                    self.stop_copying()
+                    return
+
+        if finished and self.state == CAM_MANAGER_STATES.COPYING:
+            # flush external disk cache
+            if not self.flush_disk():
+                # flush failed -> do not delete from SD card
+                self.state = CAM_MANAGER_STATES.STOPPED
+                return # do not delete images from SD card if there is something wrong with the external
+                
+            # delete remaining SD card images
+            del_threads = list()
+            for index, camera in enumerate(self._cameras):
+                x = threading.Thread(target=camera.delete_images, daemon=True)
+                del_threads.append(x)
+
+            for t in del_threads:
+                t.start()
+
+            for t in del_threads:
+                t.join()
+
+            # unmount external disk
             self.unmount_disk()
+            self.state = CAM_MANAGER_STATES.STOPPED
+
+            self._shutdownStartTime = datetime.now()
+            self._shutdownEnabled = True
 
     def get_image_capture_interval(self):
         return self._man_settings['image_capture_interval']

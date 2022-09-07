@@ -267,7 +267,7 @@ class DummyShell():
         # self.config.output = 'Undefined'  # Do not be in live mode
         self.config.drivemode = 'Single'
         self.config.reviewtime = 'None'
-        self.capture = self._camera.capture
+        self.capture = self._camera.capture        
         self.capture_and_read_exif = self._camera.capture_and_read_exif
         self.get_state_as_string = self._camera.get_state_as_string
         self.is_cam_image_fresh = self._camera.is_cam_image_fresh

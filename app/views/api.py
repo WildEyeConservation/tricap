@@ -73,8 +73,8 @@ def statistics():
 
 @api_bp.route('/api/image/<cam_idx>')
 def get_image(cam_idx):
-  if tricap_manager.state == CAM_MANAGER_STATES.STARTED:
-    return jsonify({'msg': 'Not allowed in started state'}), 400
+  # if tricap_manager.state == CAM_MANAGER_STATES.STARTED:
+  #   return jsonify({'msg': 'Not allowed in started state'}), 400
   idx = int(cam_idx)
   if idx >= len(tricap_manager._cameras):
     return jsonify({'msg': 'Invalid camera index'}), 400
@@ -142,17 +142,21 @@ def exif_info():
           with open(filename, 'r') as f:
             cam_info = json.load(f)
           if 'sessionId' in cam_info:
-            if not any(cam_info['sessionId'] == s['sessionId'] for s in sessions):
-              new_session = {
-                'sessionId': cam_info['sessionId'],
-                'sessionInfo': [cam_info]
-              }
-              sessions.append(new_session)
-            else:
-              session_idx = next((index for (index, d) in enumerate(sessions) if d['sessionId'] == cam_info['sessionId']), None)
-              if session_idx >= 0 and session_idx < len(sessions):
-                sessions[session_idx]['sessionInfo'].append(cam_info)
-    tricap_manager.unmount_disk()
+            if cam_info['sessionId'] in data['sessionIds']:
+              # missing session detected
+              if any(cam_info['sessionId'] == s['sessionId'] for s in sessions):
+                # add camera info
+                session_idx = next((index for (index, d) in enumerate(sessions) if d['sessionId'] == cam_info['sessionId']), None)
+                if session_idx >= 0 and session_idx < len(sessions):
+                  sessions[session_idx]['sessionInfo'].append(cam_info)
+              else:
+                # first cam of session
+                new_session = {
+                  'sessionId': cam_info['sessionId'],
+                  'sessionInfo': [cam_info]
+                }
+                sessions.append(new_session)
+    # tricap_manager.unmount_disk()
   else:
     return jsonify({'msg': 'Failed to mount external disk'}), 400
 

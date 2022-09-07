@@ -215,9 +215,9 @@ class TriCapCamsManager:
 
             existing_files = self.list_exisiting_files(MOUNT_POINT)
             global_start_time = time.time() + 1
-            session_start_date = datetime.now()
+            self._copy_start_time = datetime.now()
             for cam in self._cameras:  # self.thread was thread
-                x = threading.Thread(target=cam.capture_and_copy, daemon=True, args=(self._image_capture_interval, global_start_time, MOUNT_POINT, existing_files, session_start_date, self._stop_capture, ))
+                x = threading.Thread(target=cam.capture_and_copy, daemon=True, args=(self._image_capture_interval, global_start_time, MOUNT_POINT, existing_files, self._copy_start_time, self._stop_capture, ))
                 self._capture_threads.append(x)
             
             for t in self._capture_threads:
@@ -416,11 +416,17 @@ class TriCapCamsManager:
         ret = {}
         all_cam_copy_percentage = []
         all_cam_copy_exceptions = []
+        all_cam_copied = []
+        all_cam_captured = []
         for cam in self._cameras:
             all_cam_copy_percentage.append(cam.get_copy_percentage())
             all_cam_copy_exceptions.append(cam.get_copy_exception_count())
+            all_cam_copied.append(cam.get_images_copied())
+            all_cam_captured.append(cam.get_images_to_copy())
         
         ret['exceptions'] = all_cam_copy_exceptions
+        ret['copied'] = all_cam_copied
+        ret['captured'] = all_cam_captured
         average_percentage = mean(all_cam_copy_percentage)
         if average_percentage == 0:
             ret['percentage'] = 0

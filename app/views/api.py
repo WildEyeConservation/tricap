@@ -27,6 +27,9 @@ def status():
     ret['camError'] = True
   else: 
     ret['camError'] = False
+  progress = tricap_manager.copy_eta()
+  if progress != "":
+    ret['progress'] = progress
 
   return ret
 

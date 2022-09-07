@@ -27,6 +27,8 @@ class Canon6DCam():
         self.get_aspect_ratio = self._camera.get_aspect_ratio
         self.get_copy_percentage = self._camera.get_copy_percentage
         self.get_copy_exception_count = self._camera.get_copy_exception_count
+        self.get_images_to_copy = self._camera.get_images_to_copy
+        self.get_images_copied = self._camera.get_images_copied
 
     def focus_infinity(self):
         """Change the focus of the lens to infinity using series of manual focus events."""

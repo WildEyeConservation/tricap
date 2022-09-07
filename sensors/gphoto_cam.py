@@ -487,7 +487,7 @@ class GPhotoCam(AbstractCamera):
                     start += interval
                     missedCount += 1
 
-                self._logger.debug(f"next capture in {start - time() + interval} {triggers} {missedCount} {len(self._to_copy_queue)} {len(self._to_save_queue)} {len(self._to_delete_queue)} {deletedCount}")
+                # self._logger.debug(f"next capture in {start - time() + interval} {triggers} {missedCount} {len(self._to_copy_queue)} {len(self._to_save_queue)} {len(self._to_delete_queue)} {deletedCount}")
             
             # check for new image event
             code, filepath = self._gp_camera.wait_for_event(1)
@@ -684,7 +684,7 @@ class GPhotoCam(AbstractCamera):
             pass
 
     def append_exif_info(self, data_bytes, name, dest_dir, exif_data, md5):
-        self._logger.debug(f'append_exif_info {len(data_bytes)} name {name} dest_dir {dest_dir}')
+        # self._logger.debug(f'append_exif_info {len(data_bytes)} name {name} dest_dir {dest_dir}')
         filtered_exif = {}
         KEYS_TO_SAVE = ('Composite:SubSecDateTimeOriginal','EXIF:ExifImageHeight','EXIF:ExifImageWidth','Composite:GPSAltitude','EXIF:GPSDateStamp','Composite:GPSLatitude','Composite:GPSLongitude','EXIF:GPSTimeStamp','EXIF:ISO', 'EXIF:ShutterSpeedValue','MakerNotes:FocusMode','MakerNotes:Quality')
         # if str(self.config.eosserialnumber) == '113053000777':
@@ -926,4 +926,10 @@ class GPhotoCam(AbstractCamera):
 
     def get_copy_exception_count(self):
         return self._num_images_failed
+
+    def get_images_to_copy(self):
+        return self._num_images_to_copy
+
+    def get_images_copied(self):
+        return self._num_images_copied
         

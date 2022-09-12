@@ -222,26 +222,6 @@ class DummyCam(AbstractCamera):
             # avoid memory crash on app
             self._preview_images.append(base64.b64encode(bytes_io.getvalue()).decode("utf-8"))
 
-    def cpy_images(self, computer_files, mount_point, stop_event, pause_event):
-        return
-
-    def delete_images(self):
-        return
-
-    def load_preview(self, stop_event, index):
-        return
-        self._generating_preview = True
-
-        for preview_idx in range(1):
-            if stop_event and stop_event.is_set():
-                return
-            try:
-                self.cr2_to_jpeg('/home/pi/Pictures/07_24_23_000.cr2')
-            except:
-                pass
-
-        self._generating_preview = False
-
     def get_disk_info(self):
         info = {}
         info['freeMB'] = 131072
@@ -250,10 +230,10 @@ class DummyCam(AbstractCamera):
         info['usedGB'] = info['capacityGB'] - info['freeGB']
         return info
 
-    def get_preview_images(self):
-        if self._generating_preview:
-            return []
-        return self._preview_images
+    def get_preview_image(self, idx):
+        if idx >= len(self._preview_images):
+            return ''
+        return self._preview_images[idx]
 
     def get_aspect_ratio(self):
         return self._im_aspect_ratio
@@ -271,11 +251,8 @@ class DummyShell():
         self.capture_and_read_exif = self._camera.capture_and_read_exif
         self.get_state_as_string = self._camera.get_state_as_string
         self.is_cam_image_fresh = self._camera.is_cam_image_fresh
-        self.cpy_images = self._camera.cpy_images
-        self.delete_images = self._camera.delete_images
-        self.load_preview = self._camera.load_preview
         self.get_disk_info = self._camera.get_disk_info
-        self.get_preview_images = self._camera.get_preview_images
+        self.get_preview_image = self._camera.get_preview_image
         self.get_aspect_ratio = self._camera.get_aspect_ratio
 
     @property

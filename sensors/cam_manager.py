@@ -69,26 +69,23 @@ class TriCapCamsManager:
         """Construct."""
         self.state = CAM_MANAGER_STATES.STOPPED
 
-        self._kill_cpy_pill = None
-        self._pause_cpy_pill = None
-        self._copy_flush_time = None
         self._copy_start_time = None
-        self._cpy_threads = list()
+        self._save_threads = list()
         self._capture_threads = list()
-        self._kill_preview_pill = None
         self._preview_threads = list()
         self._cameras = None
         self._rate_timer = None
         self._stop_capture = None
+        self._stop_save_to_ssd = None
         self._cam_settings = cam_settings
         self._man_settings = man_settings
         self.use_dummy_cams = use_dummy_cams
         self.camera_list = ""
-        self._prev_copy_eta_s = 0
         self._shutdownStartTime = None
         self._shutdownEnabled = False
         self._startupTime = datetime.now()
-        self._copyDelayEn = True
+        self._capture_and_copy_lock = list()
+        self._save_and_preview_lock = list()
         self._initialise()
 
     def _initialise(self):
@@ -196,31 +193,50 @@ class TriCapCamsManager:
     def start_capturing(self):
         """Start the capturing threads of all connected cams."""
         self._shutdownEnabled = False
-        self._copyDelayEn = False
+        self._logger.debug(f"Cam manager - current state {self.state}")
         if len(self._cameras) == 0:
             self.state = CAM_MANAGER_STATES.ERROR_NO_CAMS
             self._logger.debug('Tried to start capture threads with no cameras connected.')
         elif self.state == CAM_MANAGER_STATES.STOPPED:
             for cam in self._cameras:
                 cam._camera._image_count = 0
-
-            self._capture_threads.clear()
+            
             self._logger.debug('Cam manager - start capturing thread')
             self._stop_capture = threading.Event()
+            self._stop_capture.clear()
+            self._stop_save_to_ssd = threading.Event()
+            self._stop_save_to_ssd.clear()
+
+            if len(self._capture_and_copy_lock) == 0:
+                for cam in self._cameras:
+                    self._capture_and_copy_lock.append(threading.Lock())
+
+            if len(self._save_and_preview_lock) == 0:
+                for cam in self._cameras:
+                    self._save_and_preview_lock.append(threading.Lock())  
 
             if not self.mount_disk():
                 # no disk -> do not copy
                 self.state = CAM_MANAGER_STATES.STOPPED
                 return
 
-            existing_files = self.list_exisiting_files(MOUNT_POINT)
-            global_start_time = time.time() + 1
+            global_start_time = time.time() + 0.5
             self._copy_start_time = datetime.now()
-            for cam in self._cameras:  # self.thread was thread
-                x = threading.Thread(target=cam.capture_and_copy, daemon=True, args=(self._image_capture_interval, global_start_time, MOUNT_POINT, existing_files, self._copy_start_time, self._stop_capture, ))
+            self._capture_threads.clear()
+            for index, cam in enumerate(self._cameras):  # self.thread was thread
+                x = threading.Thread(target=cam.capture_and_copy, daemon=True, args=(self._image_capture_interval, global_start_time, self._copy_start_time, cam.serial_num, self._stop_capture, self._capture_and_copy_lock[index], ))
                 self._capture_threads.append(x)
             
+            existing_files = self.list_exisiting_files(MOUNT_POINT)
+            self._save_threads.clear()
+            for index, cam in enumerate(self._cameras):  # self.thread was thread
+                x = threading.Thread(target=cam.save_to_ssd, daemon=True, args=(MOUNT_POINT, existing_files, cam.serial_num, self._stop_save_to_ssd, self._capture_and_copy_lock[index], self._save_and_preview_lock[index], ))
+                self._save_threads.append(x)
+
             for t in self._capture_threads:
+                t.start()
+
+            for t in self._save_threads:
                 t.start()
 
             self.state = CAM_MANAGER_STATES.STARTED
@@ -228,11 +244,35 @@ class TriCapCamsManager:
         elif self.state == CAM_MANAGER_STATES.STARTED:
             self._logger.debug('Cam manager - continue capturing thread')
             self._stop_capture.clear()
+        elif self.state == CAM_MANAGER_STATES.COPYING:
+            self._stop_capture.clear()            
+            global_start_time = time.time() + 0.5
+            self._copy_start_time = datetime.now()
+            self._capture_threads.clear()
+            for index, cam in enumerate(self._cameras):
+                x = threading.Thread(target=cam.capture_and_copy, daemon=True, args=(self._image_capture_interval, global_start_time, self._copy_start_time, cam.serial_num, self._stop_capture, self._capture_and_copy_lock[index], ))
+                self._capture_threads.append(x)
+
+            for t in self._capture_threads:
+                t.start()
+            
+            self.state = CAM_MANAGER_STATES.STARTED
+            self._logger.debug('Cam manager - capturing thread restarted')
 
     def stop_capturing(self):
         if self.state == CAM_MANAGER_STATES.STARTED:
             self._stop_capture.set()
-            # self.load_preview()
+
+            if not self.is_preview_thread_alive():
+                self._logger.debug('Cam manager - start preview thread')
+                if len(self._preview_threads) == 0:
+                    for index, cam in enumerate(self._cameras):
+                        x = threading.Thread(target=cam.load_preview_images, daemon=True, args=(self._save_and_preview_lock[index], ))
+                        self._preview_threads.append(x)
+
+                for t in self._preview_threads:
+                    t.start()
+
             self._logger.debug('Cam manager - capture threads stop requested.')
 
     def is_capture_thread_alive(self):
@@ -242,9 +282,9 @@ class TriCapCamsManager:
                 return True
         return False
 
-    def is_copy_thread_alive(self):
+    def is_save_thread_alive(self):
         """ Return true if any cam thread is alive """
-        for t in self._cpy_threads:
+        for t in self._save_threads:
             if t.is_alive():
                 return True
         return False
@@ -255,25 +295,6 @@ class TriCapCamsManager:
             if t.is_alive():
                 return True
         return False
-
-    def load_preview(self):
-        self._logger.debug('Cam manager - preview threads started.')
-        self._kill_preview_pill = threading.Event()
-        self._preview_threads = list()
-        for index, camera in enumerate(self._cameras):
-            x = threading.Thread(target=camera.load_preview, args=(self._kill_preview_pill, index, ), daemon=True)
-            self._preview_threads.append(x)
-        
-        for t in self._preview_threads:
-            t.start()
-        
-        self.state = CAM_MANAGER_STATES.LOADING_PREVIEW
-
-    def stop_load_preview(self):
-        self._logger.debug('Cam manager - preview threads stopped.')
-        if self._kill_preview_pill:
-            self._kill_preview_pill.set()
-        self.state = CAM_MANAGER_STATES.STOPPED
 
     def list_exisiting_files(self, dir):
         result = []
@@ -313,58 +334,28 @@ class TriCapCamsManager:
             self._logger.info('Disk not mounted')
         return True
 
-    def flush_disk(self):
-        if os.path.ismount(MOUNT_POINT):
-            try:
-                flush_status = subprocess.run(["hdparm", "-F", "/dev/sda1"], check=True)
-                self._logger.debug(flush_status)
-                return True
-            except:
-                self._logger.warning("Flush failed")
-        else:
-            self._logger.info('Disk not mounted')
-        return False
-
-    def start_copying(self):
-        self._logger.debug('Cam manager - copy threads started.')
-        if not self.mount_disk():
-            # no disk -> do not copy
-            self.state = CAM_MANAGER_STATES.STOPPED
-            return
-
-        existing_files = self.list_exisiting_files(MOUNT_POINT)
-
-        self._kill_cpy_pill = threading.Event()
-        self._pause_cpy_pill = threading.Event()
-        self._copy_flush_time = datetime.now()
-        self._copy_start_time = datetime.now()
-        self._prev_copy_eta_s = 0
-        self._cpy_threads = list()
-        for camera in self._cameras:
-            x = threading.Thread(target=camera.cpy_images, args=(existing_files, MOUNT_POINT, self._kill_cpy_pill, self._pause_cpy_pill, ), daemon=True)
-            self._cpy_threads.append(x)
-
-        for t in self._cpy_threads:
-            t.start()
-
-        self.state = CAM_MANAGER_STATES.COPYING
-
-    def stop_copying(self):
-        self._logger.debug('Cam manager - copy threads stopped.')
-        if self._kill_cpy_pill:
-            self._kill_cpy_pill.set()
-        self.unmount_disk()
-        self.state = CAM_MANAGER_STATES.STOPPED
-
     def copy_disk_monitor(self):
         """
         If all threads are done -> unmount the external disk
-        Flush the external drive cache every 15 minutes during the copy process
         """
 
         if not self.is_capture_thread_alive() and self.state == CAM_MANAGER_STATES.STARTED:
+            self._logger.debug("Capture and copy completed - wait for save to complete")
+            self._stop_save_to_ssd.set()
+            self.state = CAM_MANAGER_STATES.COPYING
+
+        if not self.is_save_thread_alive() and self.state == CAM_MANAGER_STATES.COPYING:
+            self._logger.debug("Save completed - unmount disk")
             self.state = CAM_MANAGER_STATES.STOPPED
             self.unmount_disk()
+            self._shutdownEnabled = True
+            self._shutdownStartTime = datetime.now()
+
+        # if self.state == CAM_MANAGER_STATES.STOPPED and self._shutdownEnabled:
+        #     if (datetime.now() - self._shutdownStartTime).total_seconds() > 9000:
+        #         GPIO.output(RED_PIN, GPIO.LOW)
+        #         GPIO.output(GREEN_PIN, GPIO.LOW)
+        #         subprocess.call('poweroff', shell=True)
 
     def get_image_capture_interval(self):
         return self._man_settings['image_capture_interval']

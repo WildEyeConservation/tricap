@@ -8,6 +8,7 @@ from config import CAM_MANAGER_STATES, CAMERA_STATES
 import os, json
 from support.camera_data import ParseData
 from support.configure import TricapConfig
+import subprocess
 
 api_bp = Blueprint('api', __name__)
 _logger = logging.getLogger(__name__)
@@ -74,23 +75,37 @@ def statistics():
   except Exception as ex:
     return "", 420
 
-@api_bp.route('/api/image/<cam_idx>')
-def get_image(cam_idx):
+@api_bp.route('/api/image/<cam_idx>/<im_idx>')
+def get_image(cam_idx, im_idx):
   # if tricap_manager.state == CAM_MANAGER_STATES.STARTED:
   #   return jsonify({'msg': 'Not allowed in started state'}), 400
-  idx = int(cam_idx)
-  if idx >= len(tricap_manager._cameras):
+  camIdx = int(cam_idx)
+  imIdx = int(im_idx)
+  if camIdx >= len(tricap_manager._cameras):
     return jsonify({'msg': 'Invalid camera index'}), 400
 
   im = {}
-  cam = tricap_manager._cameras[idx]
+  cam = tricap_manager._cameras[camIdx]
   im['serialNumber'] = str(cam.serial_num)
-  im['images'] = cam.get_preview_images()
+  im['image'] = cam.get_preview_image(imIdx)
   im['aspectRatio'] = cam.get_aspect_ratio()
 
-  for img in im['images']:
-    _logger.debug(len(img))
+  _logger.debug(len(im['image']))
   return im
+
+@api_bp.route('/api/lensNumber')
+def lens_number():
+  ret = {}
+  ret['lens'] = ''
+
+  return ret
+
+@api_bp.route('/api/restart')
+def restart():
+  _logger.debug('restart called')
+  subprocess.run(['systemctl', 'restart', 'tricap.service'], check=True)
+  _logger.debug('restart')
+  return {'success': True}
 
 @api_bp.route('/api/copy_eta')
 def copy_eta():
@@ -98,7 +113,7 @@ def copy_eta():
   if info == "":
     return jsonify({'msg': 'No copy information'}), 400
 
-  return info
+  return info  
 
 @api_bp.route('/api/exif_sessions')
 def exif_sessions():
@@ -109,7 +124,7 @@ def exif_sessions():
   if tricap_manager.mount_disk():
     for root, dirs, files in os.walk(tricap_manager.mount_point):
       for name in files:
-        if name == 'exif_cam.json':
+        if name == 'alk_to_fix.json':
           cam_info = {}
           filename = os.path.join(root, name)
           with open(filename, 'r') as f:
@@ -139,7 +154,7 @@ def exif_info():
   if tricap_manager.mount_disk():
     for root, dirs, files in os.walk(tricap_manager.mount_point):
       for name in files:
-        if name == 'exif_cam.json':
+        if name == 'alk_to_fix.json':
           cam_info = {}
           filename = os.path.join(root, name)
           with open(filename, 'r') as f:
@@ -159,7 +174,7 @@ def exif_info():
                   'sessionInfo': [cam_info]
                 }
                 sessions.append(new_session)
-    # tricap_manager.unmount_disk()
+    tricap_manager.unmount_disk()
   else:
     return jsonify({'msg': 'Failed to mount external disk'}), 400
 

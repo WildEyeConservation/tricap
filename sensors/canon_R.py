@@ -19,11 +19,8 @@ class CanonRCam():
         self.capture_and_read_exif = self._camera.capture_and_read_exif
         self.get_state_as_string = self._camera.get_state_as_string
         self.is_cam_image_fresh = self._camera.is_cam_image_fresh
-        self.cpy_images = self._camera.cpy_images
-        self.delete_images = self._camera.delete_images
-        self.load_preview = self._camera.load_preview
         self.get_disk_info = self._camera.get_disk_info
-        self.get_preview_images = self._camera.get_preview_images
+        self.get_preview_image = self._camera.get_preview_image
         self.get_aspect_ratio = self._camera.get_aspect_ratio
         self.get_copy_percentage = self._camera.get_copy_percentage
         self.get_copy_exception_count = self._camera.get_copy_exception_count

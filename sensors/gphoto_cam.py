@@ -135,8 +135,11 @@ class GPhotoCam(AbstractCamera):
         self._old_image_count = 0
         self._images_to_delete = list()
         self._preview_images = list()
+        self._preview_images_raw = list()
         self._exif_info = {}
         self._im_aspect_ratio = 1.0
+        self._im_width = 1.0
+        self._im_height = 1.0
         self._generating_preview = False
         self._num_images_to_copy = 0
         self._num_images_copied = 0
@@ -148,6 +151,8 @@ class GPhotoCam(AbstractCamera):
         self._chunk_size = 1024*1024*4
         self._to_copy_queue = []
         self._to_save_queue = []
+        self._to_save_data_queue = []
+        self._to_save_info_queue = []
         self._to_delete_queue = []
 
         self._setup_camera(settings)
@@ -444,7 +449,7 @@ class GPhotoCam(AbstractCamera):
     #     self.state = CAMERA_STATES.UNINITIALISED
     #     self._setup_camera(settings)
 
-    def capture_and_copy(self, interval, init_start, mount_point, computer_files, session_start_date, stop_capture=None):
+    def capture_and_copy(self, interval, init_start, session_start_date, serial_number, stop_capture, lock_with_save):
         # empty event buffer
         self._logger.debug(f'capture_and_copy {init_start}')
         # code=0
@@ -453,10 +458,10 @@ class GPhotoCam(AbstractCamera):
 
         # local variables
         start = init_start
-        safetyMargins = [0.6, 1.0]
+        safetyMargins = [0.4, 0.8]
         safetyMargin = safetyMargins[1]
         offset = 0
-        data = []
+        data = bytearray()
         copyDone = True
         triggers = 0
         deletedCount = 0
@@ -466,6 +471,8 @@ class GPhotoCam(AbstractCamera):
         self._num_images_copied = 0
         self._num_images_to_copy = 0
         self._num_images_failed = 0
+        stopTriggerInitiated = False
+        self._gp_camera.exit()
 
         # main loop
         while True:
@@ -487,80 +494,41 @@ class GPhotoCam(AbstractCamera):
                     start += interval
                     missedCount += 1
 
-                # self._logger.debug(f"next capture in {start - time() + interval} {triggers} {missedCount} {len(self._to_copy_queue)} {len(self._to_save_queue)} {len(self._to_delete_queue)} {deletedCount}")
-            
             # check for new image event
             code, filepath = self._gp_camera.wait_for_event(1)
             if code == 2:
                 # new image available event
                 self._to_copy_queue.append(os.path.join(filepath.folder, filepath.name))
                 safetyMargin = safetyMargins[0]
-                # self._logger.debug(f'new image event {filepath.folder} {filepath.name}')
-                # self._logger.debug(f'to delete {len(self._to_delete_queue)} to copy {len(self._to_copy_queue)} triggers {triggers} to save {len(self._to_save_queue)}')
-                if len(self._to_delete_queue) + len(self._to_copy_queue) + len(self._to_save_queue) < triggers - deletedCount:
-                    self._logger.warning('Event missed')
-                    # self._gp_camera.exit()
-                    triggers -= 1
+                with lock_with_save:
+                    if len(self._to_delete_queue) + len(self._to_copy_queue) + len(self._to_save_queue) < triggers - deletedCount:
+                        self._logger.warning('Event missed')
+                        # self._gp_camera.exit()
+                        triggers -= 1
             
             # check if copy should happen
-            if (start - time() + interval > safetyMargin) or (stop_capture and stop_capture.is_set()):
-                if len(self._to_save_queue) > 0:
-                    # save required
-                    info = None
-                    fileToSave = self._to_save_queue.pop(0)
-                    try:
-                        info = self.get_camera_file_info(fileToSave)
-                    except:
-                        self._logger.warning('File info failed {}'.format(fileToSave))
-
-                    if info != None:
-                        timestamp = datetime.fromtimestamp(info.file.mtime)
-                        dest_dir = self.get_im_target_dir(timestamp, mount_point)
-                        dest = os.path.join(dest_dir, currentFilename)
-                        if not os.path.isdir(dest_dir):
-                            os.makedirs(dest_dir)
-
-                        while dest in computer_files:
-                            # file exists -> add in /copy/
-                            dest = "{0}_{2}.{1}".format(*dest.rsplit(".", 1), "copy")
-                            self._logger.debug('Save as _copy {}'.format(dest))
-                        
-                        # self._logger.debug('%s -> %s' % (fileToSave, dest))
-                        try:
-                            f = open(dest, "wb")
-                            f.write(data)
-                            exif_data = pyexifinfo.get_json(f.name)[0]
-                            f.close()
-                            self._to_delete_queue.append(fileToSave)
-                            self.append_exif_info(data, currentFilename, dest_dir, exif_data, hashlib.md5(data).hexdigest()) # 170ms for MD5 calc
-                            self._num_images_copied += 1
-                            if len(self._preview_images) < 3:
-                                if "EXIF:ExifImageWidth" in exif_data and "EXIF:ExifImageHeight" in exif_data:
-                                    self._im_aspect_ratio = exif_data["EXIF:ExifImageWidth"] / exif_data["EXIF:ExifImageHeight"]
-                                else:
-                                    self._logger.warning("Cannot set image aspect ration from exif data")
-                                self._preview_images.append(base64.b64encode(data).decode("utf-8"))
-                            elif self._num_images_copied % 200 == 0:
-                                self._preview_images.pop(0)
-                                self._preview_images.append(base64.b64encode(data).decode("utf-8"))
-                        except:
-                            self._logger.warning("Save exception %s %s -> %s" % (currentFolder, currentFilename, dest))
-                            self._num_images_failed += 1
-                elif offset < len(data):
+            if (start - time() + interval > safetyMargin) or (stop_capture.is_set()):
+                isDeleteRequired = False
+                with lock_with_save:
+                    if len(self._to_delete_queue) > 0:
+                        isDeleteRequired = True
+                if offset < len(data):
                     # copy required
-                    if (start - time() + interval > safetyMargin) or (stop_capture and stop_capture.is_set()):
+                    if (start - time() + interval > safetyMargin) or (stop_capture.is_set()):
                         # do copy
                         bytesRead = gp.check_result(self._gp_camera.file_read(currentFolder, currentFilename, gp.GP_FILE_TYPE_NORMAL, offset, view[offset:offset + self._chunk_size]))
                         offset += bytesRead
                         if bytesRead < self._chunk_size:
                             # copy done
-                            offset = len(data)
+                            offset = len(data)                        
                             # self._logger.debug(f'copy done {fileToCopy}')                                    
-                elif len(self._to_delete_queue) > 0:
+                elif isDeleteRequired:
                     # delete required
                     try:
                         # self._logger.debug("Delete %s %s" % (folder, name))
-                        fileToDelete = self._to_delete_queue.pop(0)
+                        fileToDelete = ''
+                        with lock_with_save:
+                            fileToDelete = self._to_delete_queue.pop(0)
                         currentFolderDelete, currentFilenameDelete = os.path.split(fileToDelete)
                         self._gp_camera.file_delete(currentFolderDelete, currentFilenameDelete, GPhotoCam._context)
                         # self._logger.debug(f'delete done {fileToDelete}')
@@ -572,10 +540,17 @@ class GPhotoCam(AbstractCamera):
             if offset >= len(data) and not copyDone:
                 # save to external disk
                 copyDone = True
-                self._to_save_queue.append(fileToCopy)
-                        
+                with lock_with_save:
+                    try:
+                        info = self.get_camera_file_info(fileToCopy)  
+                        self._to_save_queue.append(fileToCopy)
+                        self._to_save_data_queue.append(data)
+                        self._to_save_info_queue.append(info)
+                    except:
+                        self._logger.warning('File info failed {}'.format(fileToCopy))
+                    
             # check if new copy should start
-            if len(self._to_copy_queue) > 0 and copyDone and len(self._to_save_queue) == 0:
+            if len(self._to_copy_queue) > 0 and copyDone:
                 # done copying and new file in queue
                 fileToCopy = self._to_copy_queue.pop(0)
                 currentFolder, currentFilename = os.path.split(fileToCopy)
@@ -590,22 +565,136 @@ class GPhotoCam(AbstractCamera):
                     self._logger.warning(f"*************FILE SIZE ERROR {fi.file.size} *******************")
                     data = bytearray()
 
+            if not stop_capture.is_set() and stopTriggerInitiated:
+                # restart trigger
+                stopTriggerInitiated = False
+
             # check of thread is done
+            isDeleteDone = False
+            with lock_with_save:
+                if len(self._to_delete_queue) == 0:
+                    isDeleteDone = True
+
             if len(self._to_copy_queue) == 0 and \
-                stop_capture and stop_capture.is_set() and \
+                stop_capture.is_set() and \
                 copyDone and \
-                len(self._to_delete_queue) == 0 and \
-                len(self._to_save_queue) == 0:
+                isDeleteDone:
                     
                 # all done -> check if any files were missed
                 self._gp_camera.exit()
                 self._to_copy_queue = self.list_camera_files()
+                self._num_images_to_copy += len(self._to_copy_queue)
                 self._logger.debug(f"Exit thread 1 {len(self._to_copy_queue)}")
                 if len(self._to_copy_queue) == 0:
                     # no new files
+                    self.save_exif_info(serial_number)
+                    self._exif_info = {}
                     self._logger.debug('Exit thread 2')
-                    self.save_exif_info()
                     return
+
+
+    def save_to_ssd(self, mount_point, computer_files, serial_num, stop_save, lock_with_copy, lock_with_preview):
+        self._logger.debug(f"Save to SSD thread started")
+        while True:
+            fileToSave = ''
+            dataToSave = bytes()
+            info = None
+            with lock_with_copy:
+                if stop_save.is_set() and len(self._to_save_queue) == 0:
+                    self._logger.debug("Save done")
+                    return
+
+                if len(self._to_save_queue) > 0:
+                    fileToSave = self._to_save_queue.pop(0)
+                    dataToSave = self._to_save_data_queue.pop(0)
+                    info = self._to_save_info_queue.pop(0)
+                    # self._logger.debug(f"Do copy {fileToSave} {len(dataToSave)}")
+
+            if fileToSave != '':
+                # save required
+                currentFolder, currentFilename = os.path.split(fileToSave)
+                if info != None:
+                    timestamp = datetime.fromtimestamp(info.file.mtime)
+                    dest_dir = self.get_im_target_dir(timestamp, mount_point, serial_num)
+                    dest = os.path.join(dest_dir, currentFilename)
+                    if not os.path.isdir(dest_dir):
+                        os.makedirs(dest_dir)
+                    
+                    imageHash =  hashlib.md5(dataToSave).hexdigest() # 170ms for MD5 calc
+                    imageAlreadySaved = False
+                    if dest in computer_files:
+                        # file exists
+                        self._logger.debug('File exists {}'.format(dest))
+                        try:
+                            f = open(dest, "rb")
+                            h = hashlib.md5(f.read()).hexdigest()
+                            exif_data = pyexifinfo.get_json(f.name)[0]
+                            f.close()
+                            if h == imageHash:
+                                imageAlreadySaved = True
+                                self._logger.debug('File already copied {}'.format(dest))
+                                self.append_exif_info(dataToSave, currentFilename, dest_dir, exif_data, imageHash)
+                        except:
+                            while dest in computer_files:
+                                dest = "{0}_{2}.{1}".format(*dest.rsplit(".", 1), "copy")
+                            self._logger.debug('Save as _copy {}'.format(dest))
+                    
+                    # self._logger.debug('Save {} {}'.format(dest, imageAlreadySaved))
+                    try:
+                        if not imageAlreadySaved:
+                            f = open(dest, "wb")
+                            f.write(dataToSave)
+                            exif_data = pyexifinfo.get_json(f.name)[0]
+                            f.close()
+                            self.append_exif_info(dataToSave, currentFilename, dest_dir, exif_data, imageHash)
+                            previewCount = 0
+                            with lock_with_preview:
+                                previewCount = len(self._preview_images_raw)
+                            if previewCount < 3:
+                                if "EXIF:ExifImageWidth" in exif_data and "EXIF:ExifImageHeight" in exif_data:
+                                    self._im_width = exif_data["EXIF:ExifImageWidth"]
+                                    self._im_height = exif_data["EXIF:ExifImageHeight"]
+                                    self._im_aspect_ratio = self._im_width /self._im_height
+                                else:
+                                    self._logger.warning("Cannot set image aspect ration from exif data")
+                                with lock_with_preview:
+                                    self._preview_images_raw.append(dataToSave)
+                            elif self._num_images_copied % 500 == 0:
+                                with lock_with_preview:
+                                    self._preview_images_raw.append(dataToSave)
+                                    self._preview_images_raw.pop(0)
+
+                        with lock_with_copy:
+                            self._to_delete_queue.append(fileToSave)
+                        self._num_images_copied += 1
+                    except:
+                        self._logger.warning("Save exception %s %s -> %s" % (currentFolder, currentFilename, dest))
+                        self._num_images_failed += 1
+            else:
+                # nothing to save
+                sleep(100e-3)
+
+    def load_preview_images(self, lock_with_save):
+        self._logger.debug('Load preview thread started')
+        self._generating_preview = True
+        previewStart = time()
+        previewLen = 0
+        with lock_with_save:
+            previewLen = len(self._preview_images_raw)
+        self._preview_images.clear()
+        for i in range(previewLen):
+            with lock_with_save:
+                previewData = bytes(self._preview_images_raw.pop(0))
+            rawIm = rawpy.imread(BytesIO(previewData))
+            im = Image.fromarray(rawIm.postprocess())
+            bytes_io = BytesIO()
+            im.save(bytes_io, format='JPEG')
+            if len(bytes_io.getvalue()) < 10000000:
+                # avoid memory crash on app
+                self._preview_images.append(base64.b64encode(bytes_io.getvalue()).decode("utf-8"))
+            self._logger.debug(len(bytes_io.getvalue()))
+        self._generating_preview = False
+        self._logger.debug(f"Preview time {time() - previewStart}")
 
     def get_state_as_string(self):
         """Return the state of the camera as a string."""
@@ -645,15 +734,10 @@ class GPhotoCam(AbstractCamera):
 
         return info
 
-    def get_session_dir(self, timestamp, session_id):
-        return "{}/{}".format(timestamp.strftime('%Y_%m_%d'), session_id)
-
-    def get_complete_session_dir(self, mount_point, session_dir):
-        return os.path.join(mount_point, session_dir, str(self.config.eosserialnumber))
-
-    def get_im_target_dir(self, timestamp, mount_point):
-        session_dir = self.get_session_dir(timestamp, self._session_id)
-        return self.get_complete_session_dir(mount_point, session_dir)
+    def get_im_target_dir(self, timestamp, mount_point, serial_num):
+        session_dir = "{}/{}".format(timestamp.strftime('%Y_%m_%d'), self._session_id)
+        complete_dir = os.path.join(mount_point, session_dir, str(serial_num))
+        return complete_dir
 
     def list_camera_files(self, path='/'):
         result = []
@@ -705,7 +789,7 @@ class GPhotoCam(AbstractCamera):
             self._exif_info[dest_dir] = []
         self._exif_info[dest_dir].append(filtered_exif)
 
-    def save_exif_info(self):
+    def save_exif_info(self, serial_number):
         # Save exif info
         for exif_dir in self._exif_info:
             filename = os.path.join(exif_dir, 'exif_cam.json')
@@ -713,7 +797,7 @@ class GPhotoCam(AbstractCamera):
                 # no existing file
                 self._logger.debug('no existing file')
                 new_data = {}
-                new_data['serialNumber'] = str(self.config.eosserialnumber)
+                new_data['serialNumber'] = serial_number
                 new_data['exifInfo'] = self._exif_info[exif_dir]
                 new_data['lensSerialNumber'] = self._lens_serial_number
                 # self._logger.debug('serialNumber {} lens {}'.format(new_data['serialNumber'], new_data['lensSerialNumber']))
@@ -733,76 +817,6 @@ class GPhotoCam(AbstractCamera):
                 exisiting_data['exifInfo'] = exisiting_data['exifInfo'] + self._exif_info[exif_dir]
                 with open(filename, 'w') as f:
                     json.dump(exisiting_data, f, sort_keys=True)   
-
-    def cpy_images(self, computer_files, mount_point, stop_event, pause_event):
-        self._num_images_copied = 0
-        self._num_images_to_copy = 0
-        self._num_images_failed = 0
-        sleep(500e-3)
-        camera_files = self.list_camera_files()
-        self._num_images_to_copy = len(camera_files)
-        paused = False
-        if not camera_files:
-            self._logger.debug('No files found')
-            self._gp_camera.exit()
-            return
-
-        self._logger.debug('Copying %d files to %s' % (len(camera_files), mount_point))
-        for path in camera_files:
-            while pause_event and pause_event.is_set():
-                # wait for all threads to pause before flushing external drive
-                if not paused:
-                    self._logger.debug("Paused")
-                paused = True
-                sleep(500e-3)
-
-            if stop_event and stop_event.is_set():
-                self._gp_camera.exit()
-                return
-
-            if paused:
-                # external drive has been flushed -> delete from SD card
-                paused = False
-                self.delete_images()
-
-            try:
-                info = self.get_camera_file_info(path)
-            except:
-                self._logger.warning('File info failed {}'.format(path))
-                continue
-
-            timestamp = datetime.fromtimestamp(info.file.mtime)
-            folder, name = os.path.split(path)
-            dest_dir = self.get_im_target_dir(timestamp, mount_point)
-            dest = os.path.join(dest_dir, name)
-            if not os.path.isdir(dest_dir):
-                os.makedirs(dest_dir)
-
-            if any(x[0] == folder and x[1] == name for x in self._images_to_delete):
-                # file already copied and waiting to be deleted from SD card
-                if self.get_camera_image_hash(folder, name) == self.get_external_image_hash(dest):
-                    self._logger.warning('File already copied {}/{}'.format(folder, name))
-                    self._images_to_delete.append((folder, name, dest))
-                    continue
-            
-            while dest in computer_files:
-                # file exists -> add in /copy/
-                dest = "{0}_{2}.{1}".format(*dest.rsplit(".", 1), "copy")
-                self._logger.debug('Save as _copy {}'.format(dest))
-            
-            self._logger.debug('%s -> %s' % (path, dest))
-            try:
-                camera_file = self._gp_camera.file_get(folder, name, gp.GP_FILE_TYPE_NORMAL, GPhotoCam._context)
-                gp.check_result(gp.gp_file_save(camera_file, dest))
-                self._images_to_delete.append((folder, name, dest))
-                self.append_exif_info(camera_file, name, dest_dir)
-                self._num_images_copied += 1
-            except:
-                self._logger.warning("Save exception %s %s -> %s" % (folder, name, dest))
-                self._num_images_failed += 1
-
-        self._gp_camera.exit()
-        self._logger.debug('Copy thread completed.')
 
     def get_camera_image_hash(self, folder, name):
         h = "cam"
@@ -829,90 +843,10 @@ class GPhotoCam(AbstractCamera):
                 sleep(1)
         return h
 
-    def delete_images(self):
-        # verify first and last file hash
-        sleep(10e-3)
-        if len(self._images_to_delete) > 0:
-            self._logger.debug("Delete {} files".format(len(self._images_to_delete)))
-            folder, name, dest = self._images_to_delete[0]
-            folderLast, nameLast, destLast = self._images_to_delete[-1]
-
-            if (self.get_camera_image_hash(folder, name) == self.get_external_image_hash(dest) and
-                self.get_camera_image_hash(folderLast, nameLast) == self.get_external_image_hash(destLast)):
-                # first and last image hash match -> delete copied files from SD card
-                self.save_exif_info()
-                for folder, name, _  in self._images_to_delete:
-                    try:
-                        # self._logger.debug("Delete %s %s" % (folder, name))
-                        self._gp_camera.file_delete(folder, name, GPhotoCam._context)
-                    except:
-                        self._logger.warning("Delete exception for %s/%s" % (folder, name))
-            else:
-                self._logger.warning("Hash mismatch")
-            self._logger.debug("Delete done")
-            self._images_to_delete = list()
-            self._exif_info = {}
-
-    def cr2_to_jpeg(self, path):
-        with rawpy.imread(path) as raw:
-            self._im_aspect_ratio = raw.sizes.width / float(raw.sizes.height)
-            rgb = raw.postprocess()
-
-        im = Image.fromarray(rgb)
-
-        bytes_io = BytesIO()
-        im.save(bytes_io, format='JPEG')
-        if len(bytes_io.getvalue()) < 5000000:
-            # avoid memory crash on app
-            self._preview_images.append(base64.b64encode(bytes_io.getvalue()).decode("utf-8"))
-        self._logger.debug(len(bytes_io.getvalue()))
-
-    def load_preview(self, stop_event, index):
-        self._generating_preview = True
-        sleep(3)
-
-        self.refresh_camera()
-        camera_files = self.list_camera_files()
-        if not camera_files:
-            self._logger.debug('No files found')
-            self._gp_camera.exit()
-            return
-
-        im_preview_idxs = list()
-        im_preview_idxs.append((2*len(camera_files)-1) // 10)
-        im_preview_idxs.append((len(camera_files)-1) // 2)
-        im_preview_idxs.append(((8*len(camera_files)-1)) // 10)
-
-        self._preview_images = list()
-        for preview_idx in im_preview_idxs:
-            if stop_event and stop_event.is_set():
-                self._gp_camera.exit()
-                return
-
-            try:
-                folder, name = os.path.split(camera_files[preview_idx])
-                if PREVIEW_FROM_CR2 and len(camera_files) > 30:
-                    camera_file = self._gp_camera.file_get(folder, name, gp.GP_FILE_TYPE_NORMAL , GPhotoCam._context)
-                    file_data = camera_file.get_data_and_size()
-                    data = memoryview(file_data).tobytes()
-                    with open('/tmp/im{}.cr2'.format(index), 'wb') as f:
-                        f.write(memoryview(file_data).tobytes())
-
-                    self.cr2_to_jpeg('/tmp/im{}.cr2'.format(index))
-                else:
-                    camera_file = self._gp_camera.file_get(folder, name, gp.GP_FILE_TYPE_PREVIEW , GPhotoCam._context)
-                    file_data = camera_file.get_data_and_size()
-                    data = memoryview(file_data).tobytes()
-                    self._preview_images.append(base64.b64encode(data).decode("utf-8"))
-            except:
-                self._logger.debug('get_image failed')
-
-        self._generating_preview = False
-
-    def get_preview_images(self):
-        if self._generating_preview:
-            return []
-        return self._preview_images
+    def get_preview_image(self, idx):
+        if idx >= len(self._preview_images) or self._generating_preview:
+            return ''
+        return self._preview_images[idx]
 
     def get_aspect_ratio(self):
         return self._im_aspect_ratio

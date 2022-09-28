@@ -97,7 +97,7 @@ class SMSObserver():
     def update(self, monitor):
         """Update method called by monitor subject."""
         val = str(monitor.value)
-        logging.getLogger('').debug("update SMS {} {}".format(val), self.msg)
+        logging.getLogger('').debug("update SMS {} {}".format(val, self.msg))
 
         if monitor == self.prime_monitor:
             self.msg = monitor.type_id + ' : ' + val + self.msg

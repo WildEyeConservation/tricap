@@ -495,7 +495,11 @@ class GPhotoCam(AbstractCamera):
                     missedCount += 1
 
             # check for new image event
-            code, filepath = self._gp_camera.wait_for_event(1)
+            code = 0
+            try:
+                code, filepath = self._gp_camera.wait_for_event(1)
+            except Exception as e:
+                self._logger.warning(f"Wait for event exception {e}")
             if code == 2:
                 # new image available event
                 self._to_copy_queue.append(os.path.join(filepath.folder, filepath.name))
@@ -513,15 +517,13 @@ class GPhotoCam(AbstractCamera):
                     if len(self._to_delete_queue) > 0:
                         isDeleteRequired = True
                 if offset < len(data):
-                    # copy required
-                    if (start - time() + interval > safetyMargin) or (stop_capture.is_set()):
-                        # do copy
-                        bytesRead = gp.check_result(self._gp_camera.file_read(currentFolder, currentFilename, gp.GP_FILE_TYPE_NORMAL, offset, view[offset:offset + self._chunk_size]))
-                        offset += bytesRead
-                        if bytesRead < self._chunk_size:
-                            # copy done
-                            offset = len(data)                        
-                            # self._logger.debug(f'copy done {fileToCopy}')                                    
+                    # copy required -> do copy
+                    bytesRead = gp.check_result(self._gp_camera.file_read(currentFolder, currentFilename, gp.GP_FILE_TYPE_NORMAL, offset, view[offset:offset + self._chunk_size]))
+                    offset += bytesRead
+                    if bytesRead < self._chunk_size:
+                        # copy done
+                        offset = len(data)
+                        # self._logger.debug(f'copy done {fileToCopy}')
                 elif isDeleteRequired:
                     # delete required
                     try:
@@ -552,18 +554,26 @@ class GPhotoCam(AbstractCamera):
             # check if new copy should start
             if len(self._to_copy_queue) > 0 and copyDone:
                 # done copying and new file in queue
-                fileToCopy = self._to_copy_queue.pop(0)
-                currentFolder, currentFilename = os.path.split(fileToCopy)
-                fi = self._gp_camera.file_get_info(currentFolder, currentFilename, GPhotoCam._context)
-                offset = 0
-                if fi.file.size < MAX_FILE_SIZE and fi.file.size > 0:
-                    data = bytearray(fi.file.size)
-                    view = memoryview(data)
-                    # self._logger.debug(f'start new copy {currentFolder} {currentFilename}')
-                    copyDone = False
-                else:
-                    self._logger.warning(f"*************FILE SIZE ERROR {fi.file.size} *******************")
-                    data = bytearray()
+                saveQueueLen = 0
+                with lock_with_save:
+                    saveQueueLen = len(self._to_save_queue)
+                if saveQueueLen <= 3:
+                    # do not start copy of new file before _to_save_queue has caught up
+                    try:
+                        fileToCopy = self._to_copy_queue.pop(0)
+                        currentFolder, currentFilename = os.path.split(fileToCopy)
+                        fi = self._gp_camera.file_get_info(currentFolder, currentFilename, GPhotoCam._context)
+                        offset = 0
+                        if fi.file.size < MAX_FILE_SIZE and fi.file.size > 0:
+                            data = bytearray(fi.file.size)
+                            view = memoryview(data)
+                            # self._logger.debug(f'start new copy {currentFolder} {currentFilename}')
+                            copyDone = False
+                        else:
+                            self._logger.warning(f"*************FILE SIZE ERROR {fi.file.size} *******************")
+                            data = bytearray()
+                    except Exception as e:
+                        self._logger.warning(f"File get failed")
 
             if not stop_capture.is_set() and stopTriggerInitiated:
                 # restart trigger
@@ -571,9 +581,10 @@ class GPhotoCam(AbstractCamera):
 
             # check of thread is done
             isDeleteDone = False
+            isSaveDone = False
             with lock_with_save:
-                if len(self._to_delete_queue) == 0:
-                    isDeleteDone = True
+                isDeleteDone = len(self._to_delete_queue) == 0
+                isSaveDone = len(self._to_save_queue) == 0
 
             if len(self._to_copy_queue) == 0 and \
                 stop_capture.is_set() and \
@@ -585,7 +596,7 @@ class GPhotoCam(AbstractCamera):
                 self._to_copy_queue = self.list_camera_files()
                 self._num_images_to_copy += len(self._to_copy_queue)
                 self._logger.debug(f"Exit thread 1 {len(self._to_copy_queue)}")
-                if len(self._to_copy_queue) == 0:
+                if len(self._to_copy_queue) == 0 and isSaveDone:
                     # no new files
                     self.save_exif_info(serial_number)
                     self._exif_info = {}

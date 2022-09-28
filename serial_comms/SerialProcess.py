@@ -4,6 +4,12 @@ import serial_comms.out.tricap_pb2 as pb
 import serial, time, subprocess
 import netifaces as ni
 
+import pynmea2
+import serial, os
+from datetime import datetime
+
+from config import MOUNT_POINT
+
 class SerialProcess():
     def __init__(self):
         super().__init__()
@@ -13,7 +19,23 @@ class SerialProcess():
     """
     Rx and Tx functions
     """
-    def processResponse(self, packet):
+    def processGpsResponse(self, packet):
+        try:
+            decoded = packet.decode("utf-8")
+            gpsData = pynmea2.parse(decoded)
+            self._requests.append(gpsData)
+        except serial.SerialException as e:
+            print('Device error: {}'.format(e))
+            return False
+        except pynmea2.ParseError as e:
+            print('Parse error: {}'.format(e))
+            return False
+        except Exception as e:
+            print('Parse error: {}'.format(e))
+            return False
+        return True
+
+    def processProtobufResponse(self, packet):
         try:
             msg = pb.Message()
             msg.ParseFromString(packet)
@@ -66,3 +88,24 @@ class SerialProcess():
             subprocess.check_call(['/home/pi/tricap/alk/wifi_setup.sh', ssid, password])
         finally:
             print('failed')
+
+    def saveGga(self, msg):
+        if(msg.timestamp != None):
+            if os.path.ismount(MOUNT_POINT):
+                complete_dir = os.path.join(MOUNT_POINT, datetime.now().strftime('%Y_%m_%d'))
+                dest = os.path.join(complete_dir, 'gpsData.csv')
+                if not os.path.isdir(complete_dir):
+                    os.makedirs(complete_dir)
+                try:
+                    if msg.timestamp != None and msg.latitude != 0.0 and msg.longitude != 0.0:
+                        alt = 0.0
+                        if msg.altitude != None:
+                            alt = msg.altitude
+                        line=(f"{str(msg.gps_qual)},{msg.timestamp.strftime('%H:%M:%S.%f')},{str(datetime.now().timestamp())},{str(msg.latitude)},{str(msg.lat_dir)},{str(msg.longitude)},{str(msg.lon_dir)},{str(alt)},{str(msg.horizontal_dil)}\n")
+                        with open(dest, 'ta') as f:
+                            f.write(line)
+                    else:
+                        print('No GPS timestamp')
+                except Exception as e:
+                    print("GPS line not saved")
+        return (msg.latitude != 0.0 and msg.longitude != 0.0)

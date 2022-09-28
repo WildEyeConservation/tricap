@@ -5,14 +5,14 @@
 
 import logging
 import threading
-import os
-import exifread
-import copy
+import os, json, csv
 import subprocess, time, shutil
 from datetime import datetime
 import RPi.GPIO as GPIO
+from scipy import interpolate
+import numpy as np
 
-from config import CAM_MANAGER_STATES, SERVER_LOG_DIR, SESSION_ROOT_DIR
+from config import CAM_MANAGER_STATES, SERVER_LOG_DIR, SESSION_ROOT_DIR, MOUNT_POINT
 
 # TODO : Create a camera factory that will import cameras according to its config and make them available via its own
 # autodetect function
@@ -29,7 +29,7 @@ from .dummy_cam import DummyShell, external_dummy_calibrate_func
 from support.basic import RepeatingBarrierPasser
 from statistics import mean
 
-MOUNT_POINT = "/mnt/ext_cam_storage"
+
 RED_PIN = 17
 GREEN_PIN = 27
 
@@ -65,7 +65,7 @@ class TriCapCamsManager:
     supportedCameras = {"Canon EOS 6D", "Dummy Cam", "Canon EOS R"}
     _logger = logging.getLogger(__name__)
 
-    def __init__(self, man_settings: dict, cam_settings: dict, use_dummy_cams=False):
+    def __init__(self, man_settings: dict, cam_settings: dict, use_dummy_cams=False, imu_lock=None):
         """Construct."""
         self.state = CAM_MANAGER_STATES.STOPPED
 
@@ -86,6 +86,9 @@ class TriCapCamsManager:
         self._startupTime = datetime.now()
         self._capture_and_copy_lock = list()
         self._save_and_preview_lock = list()
+        self._imu_lock = imu_lock
+        # stop time sync -> fix pi time to camera time
+        subprocess.run(["timedatectl", "set-ntp", "false"], check=True)
         self._initialise()
 
     def _initialise(self):
@@ -224,13 +227,13 @@ class TriCapCamsManager:
             self._copy_start_time = datetime.now()
             self._capture_threads.clear()
             for index, cam in enumerate(self._cameras):  # self.thread was thread
-                x = threading.Thread(target=cam.capture_and_copy, daemon=True, args=(self._image_capture_interval, global_start_time, self._copy_start_time, cam.serial_num, self._stop_capture, self._capture_and_copy_lock[index], ))
+                x = threading.Thread(target=cam.capture_and_copy, daemon=True, args=(self._image_capture_interval, global_start_time, self._copy_start_time, str(cam.serial_num), self._stop_capture, self._capture_and_copy_lock[index], ))
                 self._capture_threads.append(x)
             
             existing_files = self.list_exisiting_files(MOUNT_POINT)
             self._save_threads.clear()
             for index, cam in enumerate(self._cameras):  # self.thread was thread
-                x = threading.Thread(target=cam.save_to_ssd, daemon=True, args=(MOUNT_POINT, existing_files, cam.serial_num, self._stop_save_to_ssd, self._capture_and_copy_lock[index], self._save_and_preview_lock[index], ))
+                x = threading.Thread(target=cam.save_to_ssd, daemon=True, args=(MOUNT_POINT, existing_files, str(cam.serial_num), self._stop_save_to_ssd, self._capture_and_copy_lock[index], self._save_and_preview_lock[index], ))
                 self._save_threads.append(x)
 
             for t in self._capture_threads:
@@ -250,7 +253,7 @@ class TriCapCamsManager:
             self._copy_start_time = datetime.now()
             self._capture_threads.clear()
             for index, cam in enumerate(self._cameras):
-                x = threading.Thread(target=cam.capture_and_copy, daemon=True, args=(self._image_capture_interval, global_start_time, self._copy_start_time, cam.serial_num, self._stop_capture, self._capture_and_copy_lock[index], ))
+                x = threading.Thread(target=cam.capture_and_copy, daemon=True, args=(self._image_capture_interval, global_start_time, self._copy_start_time, str(cam.serial_num), self._stop_capture, self._capture_and_copy_lock[index], ))
                 self._capture_threads.append(x)
 
             for t in self._capture_threads:
@@ -313,8 +316,9 @@ class TriCapCamsManager:
     def mount_disk(self):
         if not os.path.ismount(MOUNT_POINT):
             try:
-                mount_status = subprocess.run(["mount", "/dev/sda1", MOUNT_POINT], check=True)
-                self._logger.debug(mount_status)
+                with self._imu_lock:
+                    mount_status = subprocess.run(["mount", "/dev/sda1", MOUNT_POINT], check=True)
+                    self._logger.debug(mount_status)
             except:
                 self._logger.warning('Failed to mount')
                 return False
@@ -325,8 +329,9 @@ class TriCapCamsManager:
     def unmount_disk(self):
         if os.path.ismount(MOUNT_POINT):
             try:
-                mount_status = subprocess.run(["umount", MOUNT_POINT], check=True)
-                self._logger.debug(mount_status)
+                with self._imu_lock:
+                    mount_status = subprocess.run(["umount", MOUNT_POINT], check=True)
+                    self._logger.debug(mount_status)
             except:
                 self._logger.warning('Failed to umount')
                 return False
@@ -347,6 +352,9 @@ class TriCapCamsManager:
         if not self.is_save_thread_alive() and self.state == CAM_MANAGER_STATES.COPYING:
             self._logger.debug("Save completed - unmount disk")
             self.state = CAM_MANAGER_STATES.STOPPED
+
+            self.merge_gps_meta_data()
+
             self.unmount_disk()
             self._shutdownEnabled = True
             self._shutdownStartTime = datetime.now()
@@ -356,6 +364,105 @@ class TriCapCamsManager:
         #         GPIO.output(RED_PIN, GPIO.LOW)
         #         GPIO.output(GREEN_PIN, GPIO.LOW)
         #         subprocess.call('poweroff', shell=True)
+
+    def merge_gps_meta_data(self):
+        try:
+            # read gps data
+            imu_dir = os.path.join(MOUNT_POINT, self._copy_start_time.strftime('%Y_%m_%d'))
+            complete_gps_dir = os.path.join(imu_dir, 'gpsData.csv')
+
+            gps_times = []
+            pi_times = []
+            lats = []
+            longs = []
+            alts = []
+            qualities = []
+            gpsLatDir = ''
+            gpsLongDir = ''
+            with self._imu_lock:
+                with open(complete_gps_dir) as csv_file:
+                    csv_reader = csv.reader(csv_file, delimiter=',')
+                    for row in csv_reader:
+                        if len(row) > 8:
+                            qualities.append(float(row[0]))
+                            pi_time = float(row[2])
+                            gps_time = datetime.strptime(row[1], '%H:%M:%S.%f')
+                            gps_datetime = datetime.fromtimestamp(pi_time).replace(hour=gps_time.hour, minute=gps_time.minute, second=gps_time.second, microsecond=gps_time.microsecond)
+                            gps_times.append(float(gps_datetime.timestamp()))
+                            pi_times.append(pi_time)
+                            lats.append(float(row[3]))
+                            longs.append(float(row[5]))
+                            alts.append(float(row[7]))
+                            gpsLatDir = row[4]
+                            gpsLongDir = row[6]
+
+            qualities = np.asarray(qualities)
+            gps_times = np.asarray(gps_times)
+            pi_times = np.asarray(pi_times)
+            lats = np.asarray(lats)
+            longs = np.asarray(longs)
+            alts = np.asarray(alts)
+
+            f_qual = interpolate.interp1d(pi_times, qualities)
+            f_gps_times = interpolate.interp1d(pi_times, gps_times)
+            f_lats = interpolate.interp1d(pi_times, lats)
+            f_longs = interpolate.interp1d(pi_times, longs)
+            f_alts = interpolate.interp1d(pi_times, alts)
+
+            # read accelerometer data
+            complete_accel_dir = os.path.join(imu_dir, 'accelData.csv')
+
+            accX = []
+            accY = []
+            accZ = []
+            pi_times = []
+            with self._imu_lock:
+                with open(complete_accel_dir) as csv_file:
+                    csv_reader = csv.reader(csv_file, delimiter=',')
+                    for row in csv_reader:
+                        if len(row) > 3:
+                            pi_times.append(float(row[0]))
+                            accX.append(float(row[1]))
+                            accY.append(float(row[2]))
+                            accZ.append(float(row[3]))
+
+            accX = np.asarray(accX)
+            accY = np.asarray(accY)
+            accZ = np.asarray(accZ)
+            pi_times = np.asarray(pi_times)
+
+            f_accX = interpolate.interp1d(pi_times, accX)
+            f_accY = interpolate.interp1d(pi_times, accY)
+            f_accZ = interpolate.interp1d(pi_times, accZ)
+
+            cam_session_dir = os.path.join(MOUNT_POINT, self._copy_start_time.strftime('%Y_%m_%d'), self._copy_start_time.strftime('%H_%M_%S'))
+            for cam in self._cameras:
+                cam_dir = os.path.join(cam_session_dir, str(cam.serial_num))
+                complete_cam_dir = os.path.join(cam_dir, 'exif_cam.json')
+                cam_info = {}
+                with open(complete_cam_dir, 'r') as f:
+                    cam_info = json.load(f)
+                images = cam_info['exifInfo']
+                for im in images:
+                    im_time = float(datetime.strptime(im['SubSecDateTimeOriginal'], '%Y:%m:%d %H:%M:%S.%f').timestamp())
+                    try:
+                        im['GPSDateStamp'] = np.array(f_gps_times([im_time]))[0]
+                        im['GPSLatitude'] = np.array(f_lats([im_time]))[0]
+                        im['GPSLongitude'] = np.array(f_longs([im_time]))[0]
+                        im['GPSAltitude'] = np.array(f_alts([im_time]))[0]
+                        im['GPSQuality'] = np.array(f_qual([im_time]))[0]
+                        im['AccX'] = np.array(f_accX([im_time]))[0]     
+                        im['AccY'] = np.array(f_accY([im_time]))[0]     
+                        im['AccZ'] = np.array(f_accZ([im_time]))[0]                        
+                        im['GPSLatitudeDir'] = gpsLatDir
+                        im['GPSLongitudeDir'] = gpsLongDir
+                    except Exception as ex:
+                        self._logger.warning(f"GPS append failed {ex}")
+                cam_info['exifInfo'] = images
+                with open(complete_cam_dir, 'w') as f:
+                    json.dump(cam_info, f, sort_keys=True)   
+        except Exception as e:
+            self._logger.warning(f"Merge GPS data read failed {e}")
 
     def get_image_capture_interval(self):
         return self._man_settings['image_capture_interval']

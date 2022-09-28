@@ -37,6 +37,7 @@ from config import SERVER_LOG_DIR, ALTIMETER_STATE
 from enum import Enum
 
 from serial_comms.SerialInterface import SerialInterface
+from serial_comms.berryIMU import BerryImu
 
 class AltiMeasurementObserver():
     """A custom observer to link the alti to the session logger."""
@@ -170,9 +171,12 @@ else:
     rootlogger.debug('Real cams will be used, in accordance to configuration')
     code_inf = GitData()
 
-ser = SerialInterface('/dev/rfcomm0')
+imu_lock = Lock()
+ser = SerialInterface('/dev/rfcomm0', 9600, True, True)
+gps_ser = SerialInterface('/dev/serial0', 9600, False, False, imu_lock)
+accel_ser = BerryImu(imu_lock)
 
-tricap_manager = TriCapCamsManager(misc_settings, cam_settings, use_dummy_cams)
+tricap_manager = TriCapCamsManager(misc_settings, cam_settings, use_dummy_cams, imu_lock)
 tricap_cameras = tricap_manager.get_cameras_as_list()
 tricap_length = len(tricap_cameras)
 camera_loggers = []
@@ -247,10 +251,10 @@ altimeter.attach(alti_observer)
 # setup a time monitor and the sms sender
 time_mon = TimeMonitor(5*60)  # will emit the time every 5 minutes as primary observer
 cam_img_num_mon = CamImgNumMonitor(5*59, tricap_cameras) # will update just before time_mon
-alti_mon = AltitudeMonitor(5*59, altimeter)
-sms_observer = SMSObserver(time_mon, [cam_img_num_mon, alti_mon], send_on_start=True)
+# alti_mon = AltitudeMonitor(5*59, altimeter)
+# sms_observer = SMSObserver(time_mon, [cam_img_num_mon, alti_mon], send_on_start=True)
 cam_img_num_mon.start()
-alti_mon.start()
+# alti_mon.start()
 time_mon.start()
 
 if use_dummy_cams == False:

@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify
-from app import tricap_manager, use_dummy_cams
+from app import tricap_manager, gps_ser
 import base64, logging, cv2
 import numpy as np
 from random import randint
@@ -8,7 +8,8 @@ from config import CAM_MANAGER_STATES, CAMERA_STATES
 import os, json
 from support.camera_data import ParseData
 from support.configure import TricapConfig
-import subprocess
+import subprocess, csv
+from datetime import datetime
 
 api_bp = Blueprint('api', __name__)
 _logger = logging.getLogger(__name__)
@@ -40,6 +41,13 @@ def images_captured():
   cams = tricap_manager.get_cameras_as_list()
   ret['imageCount'] = [cam.get_cam_image_count() for cam in cams]
 
+  return ret
+
+@api_bp.route('/api/verify_gps')
+def verify_gps():
+  _logger.debug(f'verify_gps {gps_ser.hasGps()}')
+  ret = {}
+  ret['gps'] = gps_ser.hasGps()
   return ret
 
 @api_bp.route('/api/statistics')
@@ -124,14 +132,17 @@ def exif_sessions():
   if tricap_manager.mount_disk():
     for root, dirs, files in os.walk(tricap_manager.mount_point):
       for name in files:
-        if name == 'alk_to_fix.json':
+        if name == 'exif_cam.json':          
           cam_info = {}
           filename = os.path.join(root, name)
-          with open(filename, 'r') as f:
-            cam_info = json.load(f)
-          if 'sessionId' in cam_info:
-            if cam_info['sessionId'] not in ids:
-              ids.append(cam_info['sessionId'])
+          try:
+            with open(filename, 'r') as f:
+              cam_info = json.load(f)
+            if 'sessionId' in cam_info:
+              if cam_info['sessionId'] not in ids:
+                ids.append(cam_info['sessionId'])
+          except Exception as e:
+            _logger.warning(f"Cannot open json file {e}")
 
     tricap_manager.unmount_disk()
   else:
@@ -154,26 +165,29 @@ def exif_info():
   if tricap_manager.mount_disk():
     for root, dirs, files in os.walk(tricap_manager.mount_point):
       for name in files:
-        if name == 'alk_to_fix.json':
+        if name == 'exif_cam.json':
           cam_info = {}
           filename = os.path.join(root, name)
-          with open(filename, 'r') as f:
-            cam_info = json.load(f)
-          if 'sessionId' in cam_info:
-            if cam_info['sessionId'] in data['sessionIds']:
-              # missing session detected
-              if any(cam_info['sessionId'] == s['sessionId'] for s in sessions):
-                # add camera info
-                session_idx = next((index for (index, d) in enumerate(sessions) if d['sessionId'] == cam_info['sessionId']), None)
-                if session_idx >= 0 and session_idx < len(sessions):
-                  sessions[session_idx]['sessionInfo'].append(cam_info)
-              else:
-                # first cam of session
-                new_session = {
-                  'sessionId': cam_info['sessionId'],
-                  'sessionInfo': [cam_info]
-                }
-                sessions.append(new_session)
+          try:
+            with open(filename, 'r') as f:
+              cam_info = json.load(f)
+            if 'sessionId' in cam_info:
+              if cam_info['sessionId'] in data['sessionIds']:
+                # missing session detected
+                if any(cam_info['sessionId'] == s['sessionId'] for s in sessions):
+                  # add camera info
+                  session_idx = next((index for (index, d) in enumerate(sessions) if d['sessionId'] == cam_info['sessionId']), None)
+                  if session_idx >= 0 and session_idx < len(sessions):
+                    sessions[session_idx]['sessionInfo'].append(cam_info)
+                else:
+                  # first cam of session
+                  new_session = {
+                    'sessionId': cam_info['sessionId'],
+                    'sessionInfo': [cam_info]
+                  }
+                  sessions.append(new_session)
+          except Exception as e:
+            _logger.warning(f"Cannot open json file {e}")
     tricap_manager.unmount_disk()
   else:
     return jsonify({'msg': 'Failed to mount external disk'}), 400

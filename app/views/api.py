@@ -32,6 +32,7 @@ def status():
   progress = tricap_manager.copy_eta()
   if progress != "":
     ret['progress'] = progress
+  ret['gps'] = gps_ser.hasGps()
 
   return ret
 
@@ -41,13 +42,6 @@ def images_captured():
   cams = tricap_manager.get_cameras_as_list()
   ret['imageCount'] = [cam.get_cam_image_count() for cam in cams]
 
-  return ret
-
-@api_bp.route('/api/verify_gps')
-def verify_gps():
-  _logger.debug(f'verify_gps {gps_ser.hasGps()}')
-  ret = {}
-  ret['gps'] = gps_ser.hasGps()
   return ret
 
 @api_bp.route('/api/statistics')

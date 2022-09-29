@@ -12,8 +12,8 @@ GET_STATUS = 1
 class SerialInterface(SerialProcess):
   _logger = logging.getLogger(__name__)
 
-  def __init__(self, port, baud, require_release = False, process_protobuf = False, capturing_lock = None):
-    super().__init__()
+  def __init__(self, port, baud, require_release = False, process_protobuf = False, capturing_lock = None, cam_manager = None):
+    super().__init__(cam_manager)
     self.port = port
     self.isConnected = False
     self.killThread = False
@@ -30,7 +30,6 @@ class SerialInterface(SerialProcess):
     self._capturing_lock = capturing_lock
     self.mainThread.start()
     self.rxThread.start()
-    self._hasGps = False
 
   def connect(self):
     """
@@ -122,12 +121,10 @@ class SerialInterface(SerialProcess):
               self.setupWifi(request.wifi.ssid, request.wifi.password)
               msg = self.buildWifiReply()
           elif request.sentence_type == 'GGA':
-            self._logger.debug('Process {}'.format(request.sentence_type))
+#            self._logger.debug('Process {}'.format(request.sentence_type))
             with self._capturing_lock:
               # do not open file while capture and copy has the file open 
-              gpsLocked = self.saveGga(request)
-              with self._lock:
-                self._hasGps = gpsLocked
+              self.saveGga(request)
           if len(msg) > 0:
             self.write(msg)
         except Exception as e:

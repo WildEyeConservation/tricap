@@ -385,16 +385,13 @@ class TriCapCamsManager:
                     for row in csv_reader:
                         if len(row) > 8:
                             qualities.append(float(row[0]))
-                            pi_time = float(row[2])
-                            gps_time = datetime.strptime(row[1], '%H:%M:%S.%f')
-                            gps_datetime = datetime.fromtimestamp(pi_time).replace(hour=gps_time.hour, minute=gps_time.minute, second=gps_time.second, microsecond=gps_time.microsecond)
-                            gps_times.append(float(gps_datetime.timestamp()))
-                            pi_times.append(pi_time)
+                            gps_times.append(float(row[1]))
+                            pi_times.append(float(row[2]))
                             lats.append(float(row[3]))
-                            longs.append(float(row[5]))
-                            alts.append(float(row[7]))
                             gpsLatDir = row[4]
+                            longs.append(float(row[5]))
                             gpsLongDir = row[6]
+                            alts.append(float(row[7]))
 
             qualities = np.asarray(qualities)
             gps_times = np.asarray(gps_times)
@@ -538,6 +535,12 @@ class TriCapCamsManager:
         ret['percentage'] = round(average_percentage, 2)
         ret['timeRemaining'] = "%02dh:%02dm:%02ds" % (hours, minutes % 60, remaining_sec % 60)
         return ret
+
+    def sync_time(self, time_str):
+        subprocess.run(["timedatectl", "set-time", time_str], check=True)
+
+        for cam in self._cameras:
+            cam.sync_time()
         
     @property
     def mount_point(self):

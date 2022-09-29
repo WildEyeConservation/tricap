@@ -878,3 +878,6 @@ class GPhotoCam(AbstractCamera):
     def get_images_copied(self):
         return self._num_images_copied
         
+    def sync_time(self):
+        self.config['syncdatetimeutc'] = 1
+    

@@ -1,20 +1,23 @@
 import struct
-from sys import platform as _platform
+import sys
 import serial_comms.out.tricap_pb2 as pb
-import serial, time, subprocess
+import serial, time, subprocess, pytz
 import netifaces as ni
 
 import pynmea2
 import serial, os
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from config import MOUNT_POINT
 
 class SerialProcess():
-    def __init__(self):
+    def __init__(self, cam_manager = None):
         super().__init__()
         # append valid reponses
         self._requests = []
+        self._hasGps = False
+        self._gpsTimestamp = 0
+        self._cam_manager = cam_manager
 
     """
     Rx and Tx functions
@@ -90,7 +93,23 @@ class SerialProcess():
             print('failed')
 
     def saveGga(self, msg):
-        if(msg.timestamp != None):
+        gps_datetime = datetime.now()
+        pi_time = datetime.now()
+        if msg.timestamp != None and msg.latitude != 0.0 and msg.longitude != 0.0:
+            # calculate gps time with time zone
+            tz = pytz.timezone('CET')
+            tzOffset = tz.utcoffset(datetime.now()).total_seconds()
+            gpsTimeString = msg.timestamp.strftime('%H:%M:%S.%f')
+            gps_time = datetime.strptime(gpsTimeString, '%H:%M:%S.%f')
+            gps_time += timedelta(seconds=tzOffset)
+            gps_datetime = pi_time.replace(hour=gps_time.hour, minute=gps_time.minute, second=gps_time.second, microsecond=gps_time.microsecond)
+            gpsTimeString = gps_datetime.strftime('%H:%M:%S.%f')
+            if not self._hasGps:
+                # first time with gps -> set pi time
+                self._hasGps = True
+                if self._cam_manager != None:
+                    self._cam_manager.sync_time(gpsTimeString)
+                                
             if os.path.ismount(MOUNT_POINT):
                 complete_dir = os.path.join(MOUNT_POINT, datetime.now().strftime('%Y_%m_%d'))
                 dest = os.path.join(complete_dir, 'gpsData.csv')
@@ -101,11 +120,10 @@ class SerialProcess():
                         alt = 0.0
                         if msg.altitude != None:
                             alt = msg.altitude
-                        line=(f"{str(msg.gps_qual)},{msg.timestamp.strftime('%H:%M:%S.%f')},{str(datetime.now().timestamp())},{str(msg.latitude)},{str(msg.lat_dir)},{str(msg.longitude)},{str(msg.lon_dir)},{str(alt)},{str(msg.horizontal_dil)}\n")
+                        line=(f"{str(msg.gps_qual)},{str(gps_datetime.timestamp())},{str(pi_time.timestamp())},{str(msg.latitude)},{str(msg.lat_dir)},{str(msg.longitude)},{str(msg.lon_dir)},{str(alt)},{str(msg.horizontal_dil)}\n")
                         with open(dest, 'ta') as f:
                             f.write(line)
                     else:
                         print('No GPS timestamp')
                 except Exception as e:
                     print("GPS line not saved")
-        return (msg.latitude != 0.0 and msg.longitude != 0.0)

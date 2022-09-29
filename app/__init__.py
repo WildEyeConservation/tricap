@@ -172,14 +172,15 @@ else:
     code_inf = GitData()
 
 imu_lock = Lock()
-ser = SerialInterface('/dev/rfcomm0', 9600, True, True)
-gps_ser = SerialInterface('/dev/serial0', 9600, False, False, imu_lock)
-accel_ser = BerryImu(imu_lock)
 
 tricap_manager = TriCapCamsManager(misc_settings, cam_settings, use_dummy_cams, imu_lock)
 tricap_cameras = tricap_manager.get_cameras_as_list()
 tricap_length = len(tricap_cameras)
 camera_loggers = []
+
+ser = SerialInterface('/dev/rfcomm0', 9600, True, True)
+gps_ser = SerialInterface('/dev/serial0', 9600, False, False, imu_lock, tricap_manager)
+accel_ser = BerryImu(imu_lock)
 
 for index, cam in enumerate(tricap_cameras):
     if use_dummy_cams is True:

@@ -16,6 +16,7 @@ class SerialProcess():
         # append valid reponses
         self._requests = []
         self._hasGps = False
+        self._firstGps = False
         self._gpsTimestamp = 0
         self._cam_manager = cam_manager
 
@@ -97,6 +98,7 @@ class SerialProcess():
         pi_time = datetime.now()
         if msg.timestamp != None and msg.latitude != 0.0 and msg.longitude != 0.0:
             # calculate gps time with time zone
+            self._hasGps = True
             tz = pytz.timezone('CET')
             tzOffset = tz.utcoffset(datetime.now()).total_seconds()
             gpsTimeString = msg.timestamp.strftime('%H:%M:%S.%f')
@@ -104,9 +106,9 @@ class SerialProcess():
             gps_time += timedelta(seconds=tzOffset)
             gps_datetime = pi_time.replace(hour=gps_time.hour, minute=gps_time.minute, second=gps_time.second, microsecond=gps_time.microsecond)
             gpsTimeString = gps_datetime.strftime('%H:%M:%S.%f')
-            if not self._hasGps:
+            if not self._firstGps:
                 # first time with gps -> set pi time
-                self._hasGps = True
+                self._firstGps = True
                 if self._cam_manager != None:
                     self._cam_manager.sync_time(gpsTimeString)
                                 
@@ -127,3 +129,5 @@ class SerialProcess():
                         print('No GPS timestamp')
                 except Exception as e:
                     print("GPS line not saved")
+        else:
+            self._hasGps = False

@@ -63,10 +63,11 @@ class ToggleSwitchObserver(Observer):
         super(ToggleSwitchObserver, self).__init__()
 
         self.toggled_on = False
+        self._log_counter = 0
     
         self.cam_manager = cam_manager
         self.session_logger = session_logger
-        self.sms_sender = SMSSender()
+        # self.sms_sender = SMSSender()
 
         if toggle_switch_monitor is not None:
             toggle_switch_monitor.attach(self)
@@ -74,7 +75,10 @@ class ToggleSwitchObserver(Observer):
         self._logger.info('Toggle switch observer has been instantiated.')
 
     def update(self, subject):      
-        # self._logger.info('Toggle switch - update.')  
+        self._log_counter += 1
+        if self._log_counter == 10:
+            self._log_counter = 0
+            self._logger.info('Toggle switch - update.')  
         if subject.value == 0: # switch is in the off position
             if self.toggled_on: # User has flicked the switch off
                 self._logger.info('Toggle switch - stopping capture.')
@@ -213,7 +217,7 @@ class LEDController(Observer):
 
         self._logger.info('LED Controller has been instantiated.')
 
-        self.sms_sender = SMSSender()
+        # self.sms_sender = SMSSender()
 
     def __del__(self):
         """Destructor."""
@@ -265,8 +269,8 @@ class LEDController(Observer):
                     self._logger.info('LEDController - Capture has started')
                     self.toggled_on = True
 
-        if (self.prev_error_state != self.error_state and self.error_state == 1):
-            # error state changed and in error
-            self.sms_sender.send('Error state entered')
+        # if (self.prev_error_state != self.error_state and self.error_state == 1):
+        #     # error state changed and in error
+        #     self.sms_sender.send('Error state entered')
         
         self.prev_error_state = self.error_state

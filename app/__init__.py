@@ -202,17 +202,17 @@ web_settings = init_config.get_section_dict(TricapConfig.WEB_SECTION_HEADER)
 alti_choice_str = init_config.get('alti_required', TricapConfig.WEB_SECTION_HEADER)
 if alti_choice_str == 'dummy':
     rootlogger.debug('Using a dummy altimeter.')
-    altimeter = SimulatorAlti(alti_settings)  # DummyAlti(alti_settings)
+    # altimeter = SimulatorAlti(alti_settings)  # DummyAlti(alti_settings)
     alti_sim = SimulatorAlti(alti_settings)
 else:
     rootlogger.debug('Using a real altimeter.')
-    altimeter = TrusenseAltimeter(alti_settings)
+    # altimeter = TrusenseAltimeter(alti_settings)
 
 # altimeter_switch = AltiSwitch(altimeter, cam_manager=tricap_manager)
 # altimeter.attach(altimeter_switch)
 
-if altimeter.state != ALTIMETER_STATE.MEASURING:
-    altimeter.start_measuring()
+# if altimeter.state != ALTIMETER_STATE.MEASURING:
+#     altimeter.start_measuring()
 
 rootlogger.debug('Altimeter has been configured.')
 
@@ -246,8 +246,8 @@ for sm in sys_mons:
 log_names_to_track = [rootlogger.name, app.logger.name, wz_log.name]
 log_names_to_track += [cam_log._logger.name for cam_log in camera_loggers]
 session_logger = SessionLogger(log_names_to_track=log_names_to_track)
-alti_observer = AltiMeasurementObserver(session_logger)
-altimeter.attach(alti_observer)
+# alti_observer = AltiMeasurementObserver(session_logger)
+# altimeter.attach(alti_observer)
 
 # setup a time monitor and the sms sender
 time_mon = TimeMonitor(5*60)  # will emit the time every 5 minutes as primary observer
@@ -308,7 +308,7 @@ def stop_all_threads():
             sm.stop()
 
     tricap_manager.stop_capturing()
-    altimeter.stop_measuring()
+    # altimeter.stop_measuring()
 
 
 # Configure the Flask Blueprints

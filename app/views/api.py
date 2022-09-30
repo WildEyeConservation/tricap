@@ -45,6 +45,13 @@ def images_captured():
 
   return ret
 
+@api_bp.route('/api/do_preview')
+def do_preview():
+  ret = {}
+  ret['success'] = tricap_manager.start_preview()
+
+  return ret  
+
 @api_bp.route('/api/statistics')
 def statistics():
   if tricap_manager.state == CAM_MANAGER_STATES.STARTED or tricap_manager.state == CAM_MANAGER_STATES.COPYING:

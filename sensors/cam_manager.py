@@ -266,16 +266,6 @@ class TriCapCamsManager:
         if self.state == CAM_MANAGER_STATES.STARTED:
             self._stop_capture.set()
 
-            if not self.is_preview_thread_alive():
-                self._logger.debug('Cam manager - start preview thread')
-                if len(self._preview_threads) == 0:
-                    for index, cam in enumerate(self._cameras):
-                        x = threading.Thread(target=cam.load_preview_images, daemon=True, args=(self._save_and_preview_lock[index], ))
-                        self._preview_threads.append(x)
-
-                for t in self._preview_threads:
-                    t.start()
-
             self._logger.debug('Cam manager - capture threads stop requested.')
 
     def is_capture_thread_alive(self):
@@ -541,6 +531,22 @@ class TriCapCamsManager:
 
         for cam in self._cameras:
             cam.sync_time()
+
+    def start_preview(self):
+        if not self.is_preview_thread_alive():
+            self._logger.debug('Cam manager - start preview thread')
+            self._preview_threads.clear()
+            for index, cam in enumerate(self._cameras):
+                x = threading.Thread(target=cam.load_preview_images, daemon=True, args=(self._save_and_preview_lock[index], ))
+                self._preview_threads.append(x)
+
+            for t in self._preview_threads:
+                t.start()
+            
+            return True
+        
+        return False
+
         
     @property
     def mount_point(self):

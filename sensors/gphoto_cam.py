@@ -796,9 +796,16 @@ class GPhotoCam(AbstractCamera):
         filtered_exif['md5'] = md5 
         self._lens_serial_number = exif_data['EXIF:LensSerialNumber']
 
+        already_saved = False
         if dest_dir not in self._exif_info:
             self._exif_info[dest_dir] = []
-        self._exif_info[dest_dir].append(filtered_exif)
+        else:
+            # check if image is already saved
+            if any(filtered_exif['md5'] == s['md5'] for s in self._exif_info[dest_dir]):
+                already_saved = True
+                self._logger.debug("File already added to exif info")
+        if not already_saved:
+            self._exif_info[dest_dir].append(filtered_exif)
 
     def save_exif_info(self, serial_number):
         # Save exif info

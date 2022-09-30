@@ -33,6 +33,7 @@ def status():
   if progress != "":
     ret['progress'] = progress
   ret['gps'] = gps_ser.hasGps()
+  # _logger.debug(f"Status {ret}")
 
   return ret
 

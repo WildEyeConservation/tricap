@@ -47,6 +47,9 @@ def images_captured():
 
 @api_bp.route('/api/do_preview')
 def do_preview():
+  if tricap_manager.state == CAM_MANAGER_STATES.STARTED or tricap_manager.state == CAM_MANAGER_STATES.COPYING:
+    return jsonify({'msg': 'Not allowed in started or copying state'}), 400
+
   ret = {}
   ret['success'] = tricap_manager.start_preview()
 
@@ -162,6 +165,8 @@ def exif_info():
   data = request.get_json()
   if not 'sessionIds' in data:
     return jsonify({'msg': 'Invalid session information'}), 400
+
+  _logger.debug(f"Missing ids: {data['sessionIds']}")    
   
   sessions = [] # array of session
   if tricap_manager.mount_disk():

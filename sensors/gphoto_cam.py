@@ -694,16 +694,20 @@ class GPhotoCam(AbstractCamera):
             previewLen = len(self._preview_images_raw)
         self._preview_images.clear()
         for i in range(previewLen):
-            with lock_with_save:
-                previewData = bytes(self._preview_images_raw.pop(0))
-            rawIm = rawpy.imread(BytesIO(previewData))
-            im = Image.fromarray(rawIm.postprocess())
-            bytes_io = BytesIO()
-            im.save(bytes_io, format='JPEG')
-            if len(bytes_io.getvalue()) < 10000000:
-                # avoid memory crash on app
-                self._preview_images.append(base64.b64encode(bytes_io.getvalue()).decode("utf-8"))
-            self._logger.debug(len(bytes_io.getvalue()))
+            try:
+                rawIm = None
+                with lock_with_save:
+                    rawIm = rawpy.imread(BytesIO(bytes(self._preview_images_raw.pop(0))))
+
+                im = Image.fromarray(rawIm.postprocess())
+                bytes_io = BytesIO()
+                im.save(bytes_io, format='JPEG')
+                if len(bytes_io.getvalue()) < 10000000:
+                    # avoid memory crash on app
+                    self._preview_images.append(base64.b64encode(bytes_io.getvalue()).decode("utf-8"))
+                self._logger.debug(len(bytes_io.getvalue()))
+            except Exception as e:
+                self._logger.warning("Failed to generate preview image")
         self._generating_preview = False
         self._logger.debug(f"Preview time {time() - previewStart}")
 

@@ -221,6 +221,7 @@ class TriCapCamsManager:
             if not self.mount_disk():
                 # no disk -> do not copy
                 self.state = CAM_MANAGER_STATES.STOPPED
+                self._logger.warning('Cam manager - no ssd -> do no start capturing')
                 return
 
             global_start_time = time.time() + 0.5
@@ -247,20 +248,6 @@ class TriCapCamsManager:
         elif self.state == CAM_MANAGER_STATES.STARTED:
             self._logger.debug('Cam manager - continue capturing thread')
             self._stop_capture.clear()
-        elif self.state == CAM_MANAGER_STATES.COPYING:
-            self._stop_capture.clear()            
-            global_start_time = time.time() + 0.5
-            self._copy_start_time = datetime.now()
-            self._capture_threads.clear()
-            for index, cam in enumerate(self._cameras):
-                x = threading.Thread(target=cam.capture_and_copy, daemon=True, args=(self._image_capture_interval, global_start_time, self._copy_start_time, str(cam.serial_num), self._stop_capture, self._capture_and_copy_lock[index], ))
-                self._capture_threads.append(x)
-
-            for t in self._capture_threads:
-                t.start()
-            
-            self.state = CAM_MANAGER_STATES.STARTED
-            self._logger.debug('Cam manager - capturing thread restarted')
 
     def stop_capturing(self):
         if self.state == CAM_MANAGER_STATES.STARTED:

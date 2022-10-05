@@ -195,6 +195,9 @@ def exif_info():
                   sessions.append(new_session)
           except Exception as e:
             _logger.warning(f"Cannot open json file {e}")
+    ssd_exif = os.path.join(tricap_manager.mount_point, 'exif_ssd.json')
+    with open(ssd_exif, 'w') as f:
+      json.dump(sessions, f, sort_keys=True)
     tricap_manager.unmount_disk()
   else:
     return jsonify({'msg': 'Failed to mount external disk'}), 400

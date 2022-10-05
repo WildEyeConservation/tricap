@@ -38,6 +38,7 @@ class ToggleSwitchMonitor(PeriodicMonitor):
 
         self.type_id = 'ToggleSwitch'
         self.value = 0
+        self.prev_value = 0
         self.unit = 'boolean'
 
         self._logger.info('Toggle switch monitor has been instantiated.')
@@ -50,9 +51,13 @@ class ToggleSwitchMonitor(PeriodicMonitor):
         """Update the value."""
         if GPIO.input(SWITCH_PIN):
             # toggle switch is high impedance, which we are interpreting as off
-            self.value = 0
+            if self.prev_value == 0:
+                self.value = 0
+            self.prev_value = 0
         else:
-            self.value = 1
+            if self.prev_value == 1:
+                self.value = 1
+            self.prev_value = 1
 
 class ToggleSwitchObserver(Observer):
     """React to the toggle switch status."""
@@ -76,9 +81,13 @@ class ToggleSwitchObserver(Observer):
 
     def update(self, subject):      
         self._log_counter += 1
-        if self._log_counter == 10:
+        if self._log_counter == 50:
             self._log_counter = 0
             self._logger.info('Toggle switch - update.')  
+        try:
+            self.cam_manager.copy_disk_monitor()
+        except Exception as e:
+            self._logger.warning(f"Toggle switch - copy_disk_monitor exception {e}")
         if subject.value == 0: # switch is in the off position
             if self.toggled_on: # User has flicked the switch off
                 self._logger.info('Toggle switch - stopping capture.')
@@ -114,19 +123,6 @@ class CamManagerMonitor(PeriodicMonitor):
             self.value = 1
         else:
             self.value = 0
-
-class CamCopyMonitor(PeriodicMonitor):
-    """Monitor for each camera."""
-    _logger = logging.getLogger(__name__)  # start the logger
-
-    def __init__(self, cam_manager, period=1):
-        """Constructor."""
-        super().__init__(period)
-        self.cam_manager = cam_manager
-
-    def monitor_step(self):
-        """Updat the value."""
-        self.cam_manager.copy_disk_monitor()
 
 class CamErrorMonitor(PeriodicMonitor):
     """Monitor for each camera."""

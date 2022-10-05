@@ -25,7 +25,7 @@ from .base_setting import BaseSetting
 import subprocess, hashlib, json
 
 # Max attempts that can be made to trigger a photo during the capture process
-MAX_TRIGGER_ATTEMPTS = 2
+MAX_TRIGGER_ATTEMPTS = 20
 IMAGE_COUNT_DELTA_FOR_WAIT_FOR_PATH = 10
 IMAGE_COUNT_DELTA_FOR_FETCH = 5
 
@@ -449,7 +449,7 @@ class GPhotoCam(AbstractCamera):
     #     self.state = CAMERA_STATES.UNINITIALISED
     #     self._setup_camera(settings)
 
-    def capture_and_copy(self, interval, init_start, session_start_date, serial_number, stop_capture, lock_with_save):
+    def capture_and_copy(self, interval, init_start, session_start_date, serial_number, stop_capture, lock_with_save, index, capture_done, save_done):
         # empty event buffer
         self._logger.debug(f'capture_and_copy {init_start}')
         # code=0
@@ -476,8 +476,13 @@ class GPhotoCam(AbstractCamera):
 
         # main loop
         while True:
+            if stop_capture.is_set() and not stopTriggerInitiated:
+                # stop trigger
+                stopTriggerInitiated = True
+                capture_done[index].clear()
+
             # check if trigger is required
-            if (time() - start > interval) and (stop_capture and not stop_capture.is_set()):
+            if (time() - start > 0) and (stop_capture and not stop_capture.is_set()):
                 # trigger required
                 if self._trigger_capture():  # Checks to see if something went wrong with the cameras
                     self._image_count += 1
@@ -489,11 +494,11 @@ class GPhotoCam(AbstractCamera):
                     self._logger.warning('Could not successfully trigger a capture.')
                     self.state = CAMERA_STATES.ERROR_CAPTURE
                 start += interval
-                while start - time() + interval < 0.5:
-                    self._logger.warning(f"next capture delayed {start - time() + interval}")
+                while start - time() < 1.0:
+                    self._logger.warning(f"next capture delayed {start - time()}")
                     start += interval
                     missedCount += 1
-
+                stopTriggerInitiated = False
             # check for new image event
             code = 0
             try:
@@ -511,11 +516,11 @@ class GPhotoCam(AbstractCamera):
                         triggers -= 1
             
             # check if copy should happen
-            if (start - time() + interval > safetyMargin) or (stop_capture.is_set()):
-                isDeleteRequired = False
-                with lock_with_save:
-                    if len(self._to_delete_queue) > 0:
-                        isDeleteRequired = True
+            isDeleteRequired = False
+            with lock_with_save:
+                if len(self._to_delete_queue) > 0:
+                    isDeleteRequired = True
+            if (start - time() > safetyMargin) or (stop_capture.is_set()):
                 if offset < len(data):
                     # copy required -> do copy
                     bytesRead = gp.check_result(self._gp_camera.file_read(currentFolder, currentFilename, gp.GP_FILE_TYPE_NORMAL, offset, view[offset:offset + self._chunk_size]))
@@ -536,6 +541,7 @@ class GPhotoCam(AbstractCamera):
                         # self._logger.debug(f'delete done {fileToDelete}')
                     except:
                         self._logger.warning("Delete exception for %s/%s" % (currentFolderDelete, currentFilenameDelete))
+                        sleep(50e-3)
                     deletedCount += 1
 
             # check if copy is done
@@ -550,6 +556,7 @@ class GPhotoCam(AbstractCamera):
                         self._to_save_info_queue.append(info)
                     except:
                         self._logger.warning('File info failed {}'.format(fileToCopy))
+                        sleep(50e-3)
                     
             # check if new copy should start
             if len(self._to_copy_queue) > 0 and copyDone:
@@ -574,55 +581,74 @@ class GPhotoCam(AbstractCamera):
                             data = bytearray()
                     except Exception as e:
                         self._logger.warning(f"File get failed")
-
-            if not stop_capture.is_set() and stopTriggerInitiated:
-                # restart trigger
-                stopTriggerInitiated = False
+                        sleep(50e-3)
 
             # check of thread is done
             isDeleteDone = False
             isSaveDone = False
             with lock_with_save:
                 isDeleteDone = len(self._to_delete_queue) == 0
-                isSaveDone = len(self._to_save_queue) == 0
+                isSaveDone = save_done.is_set()
 
             if len(self._to_copy_queue) == 0 and \
                 stop_capture.is_set() and \
                 copyDone and \
                 isDeleteDone:
                     
-                # all done -> check if any files were missed
-                self._gp_camera.exit()
-                self._to_copy_queue = self.list_camera_files()
-                self._num_images_to_copy += len(self._to_copy_queue)
-                self._logger.debug(f"Exit thread 1 {len(self._to_copy_queue)}")
-                if len(self._to_copy_queue) == 0 and isSaveDone:
+                if not capture_done[index].is_set():
+                    # all done -> check if any files were missed
+                    self._gp_camera.exit()
+                    self._to_copy_queue = self.list_camera_files()
+                    self._num_images_to_copy += len(self._to_copy_queue)
+                    self._logger.debug(f"Exit capture thread 1 {len(self._to_copy_queue)}")
+
+                if len(self._to_copy_queue) == 0 and isSaveDone and stop_capture.is_set():
                     # no new files
-                    self.save_exif_info(serial_number)
-                    self._exif_info = {}
-                    self._logger.debug('Exit thread 2')
-                    return
+                    if not capture_done[index].is_set():
+                        self.save_exif_info(serial_number)
+                        self._exif_info = {}
+                        capture_done[index].set()
+                        self._logger.debug('Exit capture thread 2')     
+
+                    allDone = True
+                    for t in capture_done:
+                        if not t.is_set():
+                            allDone = False
+                    if allDone:
+                        # add final check for stop_capture
+                        self._logger.debug('Exit capture thread 3')
+                        return                                          
 
 
-    def save_to_ssd(self, mount_point, computer_files, serial_num, stop_save, lock_with_copy, lock_with_preview):
+    def save_to_ssd(self, mount_point, computer_files, serial_num, lock_with_copy, lock_with_preview, capture_done, save_done):
         self._logger.debug(f"Save to SSD thread started")
         while True:
             fileToSave = ''
             dataToSave = bytes()
             info = None
             with lock_with_copy:
-                if stop_save.is_set() and len(self._to_save_queue) == 0:
-                    self._logger.debug("Save done")
-                    return
-
                 if len(self._to_save_queue) > 0:
                     fileToSave = self._to_save_queue.pop(0)
                     dataToSave = self._to_save_data_queue.pop(0)
                     info = self._to_save_info_queue.pop(0)
                     # self._logger.debug(f"Do copy {fileToSave} {len(dataToSave)}")
 
-            if fileToSave != '':
+            if fileToSave == '':
+                with lock_with_copy:
+                    save_done.set()
+                allDone = True
+                for t in capture_done:
+                    if not t.is_set():
+                        allDone = False            
+                if allDone:
+                    self._logger.debug('Exit save thread')
+                    return
+                # nothing to save
+                sleep(100e-3)                    
+            else:
                 # save required
+                with lock_with_copy:
+                    save_done.clear()
                 currentFolder, currentFilename = os.path.split(fileToSave)
                 if info != None:
                     timestamp = datetime.fromtimestamp(info.file.mtime)
@@ -681,9 +707,7 @@ class GPhotoCam(AbstractCamera):
                     except:
                         self._logger.warning("Save exception %s %s -> %s" % (currentFolder, currentFilename, dest))
                         self._num_images_failed += 1
-            else:
-                # nothing to save
-                sleep(100e-3)
+
 
     def load_preview_images(self, lock_with_save):
         self._logger.debug('Load preview thread started')
@@ -832,13 +856,23 @@ class GPhotoCam(AbstractCamera):
                     json.dump(new_data, f, sort_keys=True)
             else:
                 # existing file
-                self._logger.debug('existing file')
+                self._logger.debug(f'existing file {exif_dir} {filename}')
                 exisiting_data = {}
-                with open(filename, 'r') as f:
-                    exisiting_data = json.load(f)
-                exisiting_data['exifInfo'] = exisiting_data['exifInfo'] + self._exif_info[exif_dir]
-                with open(filename, 'w') as f:
-                    json.dump(exisiting_data, f, sort_keys=True)   
+                try:
+                    with open(filename, 'r') as f:
+                        exisiting_data = json.load(f)
+                    for item in self._exif_info[exif_dir]:
+                        if any(item['md5'] == s['md5'] for s in exisiting_data['exifInfo']):
+                            # item already added
+                            self._logger.debug(f"item already added {item['FileName']}")
+                        else:
+                            # new item -> add
+                            self._logger.debug(f"new item - append {item['FileName']}")
+                            exisiting_data['exifInfo'].append(item)
+                    with open(filename, 'w') as f:
+                        json.dump(exisiting_data, f, sort_keys=True)
+                except Exception as e:
+                    self._logger.warning(f"Append to existing file failed {e}")
 
     def get_camera_image_hash(self, folder, name):
         h = "cam"

@@ -76,7 +76,8 @@ class TriCapCamsManager:
         self._cameras = None
         self._rate_timer = None
         self._stop_capture = None
-        self._stop_save_to_ssd = None
+        self._save_done = list() # sync finish time between capture and save threads
+        self._capture_threads_done = list() # sync finish time between capture threads
         self._cam_settings = cam_settings
         self._man_settings = man_settings
         self.use_dummy_cams = use_dummy_cams
@@ -87,6 +88,7 @@ class TriCapCamsManager:
         self._capture_and_copy_lock = list()
         self._save_and_preview_lock = list()
         self._imu_lock = imu_lock
+        self._thread_sync_lock = None
         # stop time sync -> fix pi time to camera time
         subprocess.run(["timedatectl", "set-ntp", "false"], check=True)
         self._initialise()
@@ -197,6 +199,13 @@ class TriCapCamsManager:
         """Start the capturing threads of all connected cams."""
         self._shutdownEnabled = False
         self._logger.debug(f"Cam manager - current state {self.state}")
+        if self.state == CAM_MANAGER_STATES.STARTED and (not self.is_capture_thread_alive() or not self.is_save_thread_alive()):
+            # started, but capture threads are not alive -> sleep 
+            self._logger.debug('Cam manager - waiting for threads to end')
+            while self.is_capture_thread_alive() or self.is_save_thread_alive():
+                time.sleep(50e-3)
+            self._logger.debug('Cam manager - threads ended')
+            self.copy_disk_monitor()
         if len(self._cameras) == 0:
             self.state = CAM_MANAGER_STATES.ERROR_NO_CAMS
             self._logger.debug('Tried to start capture threads with no cameras connected.')
@@ -207,16 +216,19 @@ class TriCapCamsManager:
             self._logger.debug('Cam manager - start capturing thread')
             self._stop_capture = threading.Event()
             self._stop_capture.clear()
-            self._stop_save_to_ssd = threading.Event()
-            self._stop_save_to_ssd.clear()
 
-            if len(self._capture_and_copy_lock) == 0:
+            if len(self._capture_and_copy_lock) == 0 and \
+                len(self._save_and_preview_lock) == 0 and \
+                len(self._capture_threads_done) == 0 and \
+                len(self._save_done) == 0:
+                # first time
+                self._logger.debug('Cam manager - create thread interlocks')
+                self._thread_sync_lock = threading.Lock()
                 for cam in self._cameras:
                     self._capture_and_copy_lock.append(threading.Lock())
-
-            if len(self._save_and_preview_lock) == 0:
-                for cam in self._cameras:
-                    self._save_and_preview_lock.append(threading.Lock())  
+                    self._save_and_preview_lock.append(threading.Lock()) 
+                    self._capture_threads_done.append(threading.Event())
+                    self._save_done.append(threading.Event())
 
             if not self.mount_disk():
                 # no disk -> do not copy
@@ -228,13 +240,15 @@ class TriCapCamsManager:
             self._copy_start_time = datetime.now()
             self._capture_threads.clear()
             for index, cam in enumerate(self._cameras):  # self.thread was thread
-                x = threading.Thread(target=cam.capture_and_copy, daemon=True, args=(self._image_capture_interval, global_start_time, self._copy_start_time, str(cam.serial_num), self._stop_capture, self._capture_and_copy_lock[index], ))
+                self._capture_threads_done[index].clear()
+                self._save_done[index].clear()
+                x = threading.Thread(target=cam.capture_and_copy, daemon=True, args=(self._image_capture_interval, global_start_time, self._copy_start_time, str(cam.serial_num), self._stop_capture, self._capture_and_copy_lock[index], index, self._capture_threads_done, self._save_done[index], self._thread_sync_lock, ))
                 self._capture_threads.append(x)
-            
+
             existing_files = self.list_exisiting_files(MOUNT_POINT)
             self._save_threads.clear()
             for index, cam in enumerate(self._cameras):  # self.thread was thread
-                x = threading.Thread(target=cam.save_to_ssd, daemon=True, args=(MOUNT_POINT, existing_files, str(cam.serial_num), self._stop_save_to_ssd, self._capture_and_copy_lock[index], self._save_and_preview_lock[index], ))
+                x = threading.Thread(target=cam.save_to_ssd, daemon=True, args=(MOUNT_POINT, existing_files, str(cam.serial_num), self._capture_and_copy_lock[index], self._save_and_preview_lock[index], self._capture_threads_done, self._save_done[index], self._thread_sync_lock, ))
                 self._save_threads.append(x)
 
             for t in self._capture_threads:
@@ -246,8 +260,8 @@ class TriCapCamsManager:
             self.state = CAM_MANAGER_STATES.STARTED
             self._logger.debug('Cam manager - capture threads started.')
         elif self.state == CAM_MANAGER_STATES.STARTED:
-            self._logger.debug('Cam manager - continue capturing thread')
             self._stop_capture.clear()
+            self._logger.debug('Cam manager - continue capturing thread')
 
     def stop_capturing(self):
         if self.state == CAM_MANAGER_STATES.STARTED:
@@ -321,20 +335,15 @@ class TriCapCamsManager:
         If all threads are done -> unmount the external disk
         """
 
-        if not self.is_capture_thread_alive() and self.state == CAM_MANAGER_STATES.STARTED:
-            self._logger.debug("Capture and copy completed - wait for save to complete")
-            self._stop_save_to_ssd.set()
-            self.state = CAM_MANAGER_STATES.COPYING
-
-        if not self.is_save_thread_alive() and self.state == CAM_MANAGER_STATES.COPYING:
+        if not self.is_save_thread_alive() and self.state == CAM_MANAGER_STATES.STARTED:
             self._logger.debug("Save completed - unmount disk")
-            self.state = CAM_MANAGER_STATES.STOPPED
 
             self.merge_gps_meta_data()
 
             self.unmount_disk()
             self._shutdownEnabled = True
             self._shutdownStartTime = datetime.now()
+            self.state = CAM_MANAGER_STATES.STOPPED
 
         # if self.state == CAM_MANAGER_STATES.STOPPED and self._shutdownEnabled:
         #     if (datetime.now() - self._shutdownStartTime).total_seconds() > 9000:
@@ -525,6 +534,9 @@ class TriCapCamsManager:
             cam.sync_time()
 
     def start_preview(self):
+        if len(self._save_and_preview_lock) == 0:
+            return False
+
         if not self.is_preview_thread_alive():
             self._logger.debug('Cam manager - start preview thread')
             self._preview_threads.clear()

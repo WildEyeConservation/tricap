@@ -69,6 +69,12 @@ class BerryImu(IMU):
 
         self._capturing_lock = capturing_lock
 
+        now = datetime.datetime.now()
+        complete_dir = os.path.join(MOUNT_POINT, now.strftime('%Y_%m_%d'))
+        self._dest = os.path.join(complete_dir, 'accelData.csv')
+        if not os.path.isdir(complete_dir):
+            os.makedirs(complete_dir)
+
         self.detectIMU()     #Detect if BerryIMU is connected.
         if(self._BerryIMUversion == 99):
             print(" No BerryIMU found... exiting ")
@@ -353,13 +359,9 @@ class BerryImu(IMU):
             ##################### END Tilt Compensation ########################
 
             now = datetime.datetime.now()
-            complete_dir = os.path.join(MOUNT_POINT, now.strftime('%Y_%m_%d'))
-            dest = os.path.join(complete_dir, 'accelData.csv')
-            if not os.path.isdir(complete_dir):
-                os.makedirs(complete_dir)
             with self._capturing_lock:
                 if os.path.ismount(MOUNT_POINT):
-                    with open(dest,"ta", buffering=8192) as f:
+                    with open(self._dest,"ta", buffering=8192) as f:
                         f.write(str(now.timestamp())+","+str(ACCx)+","+str(ACCy)+","+str(ACCz)+","+str(rate_gyr_x)+","+str(rate_gyr_y)+","+str(rate_gyr_z)+","+str(gyroXangle)+","+str(gyroYangle)+","+str(gyroZangle)+","+str(MAGx)+","+str(MAGy)+","+str(MAGz)+","+str(heading)+","+str(tiltCompensatedHeading)+","+str(kalmanX)+","+str(kalmanY)+"\n")
             # if 1:                       #Change to '0' to stop showing the angles from the accelerometer
             #     outputString += "#  ACCX Angle %5.2f ACCY Angle %5.2f  #  " % (AccXangle, AccYangle)
@@ -370,11 +372,9 @@ class BerryImu(IMU):
             # # if 1:                       #Change to '0' to stop  showing the angles from the complementary filter
             # #     outputString +="\t#  CFangleX Angle %5.2f   CFangleY Angle %5.2f  #" % (CFangleX,CFangleY)
 
-            # if 1:                       #Change to '0' to stop  showing the heading
-            #     outputString +="\t# HEADING %5.2f  tiltCompensatedHeading %5.2f #" % (heading,tiltCompensatedHeading)
+            # outputString +="\t# HEADING %5.2f  tiltCompensatedHeading %5.2f #" % (heading,tiltCompensatedHeading)
 
-            # if 1:                       #Change to '0' to stop  showing the angles from the Kalman filter
-            #     outputString +="# kalmanX %5.2f   kalmanY %5.2f #" % (kalmanX,kalmanY)
+            # outputString +="# kalmanX %5.2f   kalmanY %5.2f #" % (kalmanX,kalmanY)
             # outputString += "# Raw accelerometer x: %5.2f y: %5.2f z: %5.2f #" % (ACCx,ACCy,ACCz)
             # print(outputString)
 

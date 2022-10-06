@@ -198,7 +198,8 @@ def exif_info():
     ssd_exif = os.path.join(tricap_manager.mount_point, 'exif_ssd.json')
     with open(ssd_exif, 'w') as f:
       json.dump(sessions, f, sort_keys=True)
-    tricap_manager.unmount_disk()
+    if tricap_manager.state != CAM_MANAGER_STATES.STARTED:
+      tricap_manager.unmount_disk()
   else:
     return jsonify({'msg': 'Failed to mount external disk'}), 400
 

@@ -122,7 +122,7 @@ class SerialProcess():
                         alt = 0.0
                         if msg.altitude != None:
                             alt = msg.altitude
-                        line=(f"{str(msg.gps_qual)},{str(gps_datetime.timestamp())},{str(pi_time.timestamp())},{str(msg.latitude)},{str(msg.lat_dir)},{str(msg.longitude)},{str(msg.lon_dir)},{str(alt)},{str(msg.horizontal_dil)}\n")
+                        line=(f"{str(msg.gps_qual)},{str(gps_datetime.timestamp())},{str(pi_time.timestamp())},{str(msg.latitude)},{str(msg.lat_dir)},{str(msg.longitude)},{str(msg.lon_dir)},{str(alt)},{str(msg.horizontal_dil)},{str(msg.geo_sep)}\n")
                         with open(dest, 'ta') as f:
                             f.write(line)
                     else:

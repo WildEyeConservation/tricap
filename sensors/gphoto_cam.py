@@ -449,7 +449,7 @@ class GPhotoCam(AbstractCamera):
     #     self.state = CAMERA_STATES.UNINITIALISED
     #     self._setup_camera(settings)
 
-    def capture_and_copy(self, interval, init_start, session_start_date, serial_number, stop_capture, lock_with_save, index, capture_done, save_done):
+    def capture_and_copy(self, interval, init_start, session_start_date, serial_number, stop_capture, lock_with_save, index, capture_done, save_done, sync_lock):
         # empty event buffer
         self._logger.debug(f'capture_and_copy {init_start}')
         # code=0
@@ -479,7 +479,8 @@ class GPhotoCam(AbstractCamera):
             if stop_capture.is_set() and not stopTriggerInitiated:
                 # stop trigger
                 stopTriggerInitiated = True
-                capture_done[index].clear()
+                with sync_lock:
+                    capture_done[index].clear()
 
             # check if trigger is required
             if (time() - start > 0) and (stop_capture and not stop_capture.is_set()):
@@ -594,8 +595,11 @@ class GPhotoCam(AbstractCamera):
                 stop_capture.is_set() and \
                 copyDone and \
                 isDeleteDone:
-                    
-                if not capture_done[index].is_set():
+                
+                isCaptureDoneSet = False
+                with sync_lock:
+                    isCaptureDoneSet = capture_done[index].is_set()
+                if not isCaptureDoneSet:
                     # all done -> check if any files were missed
                     self._gp_camera.exit()
                     self._to_copy_queue = self.list_camera_files()
@@ -604,23 +608,28 @@ class GPhotoCam(AbstractCamera):
 
                 if len(self._to_copy_queue) == 0 and isSaveDone and stop_capture.is_set():
                     # no new files
-                    if not capture_done[index].is_set():
+                    isCaptureDoneSet = False
+                    with sync_lock:
+                        isCaptureDoneSet = capture_done[index].is_set()               
+                    if not isCaptureDoneSet:
                         self.save_exif_info(serial_number)
                         self._exif_info = {}
-                        capture_done[index].set()
+                        with sync_lock:
+                            capture_done[index].set()
                         self._logger.debug('Exit capture thread 2')     
 
                     allDone = True
-                    for t in capture_done:
-                        if not t.is_set():
-                            allDone = False
+                    with sync_lock:
+                        for t in capture_done:
+                            if not t.is_set():
+                                allDone = False
                     if allDone:
                         # add final check for stop_capture
                         self._logger.debug('Exit capture thread 3')
                         return                                          
 
 
-    def save_to_ssd(self, mount_point, computer_files, serial_num, lock_with_copy, lock_with_preview, capture_done, save_done):
+    def save_to_ssd(self, mount_point, computer_files, serial_num, lock_with_copy, lock_with_preview, capture_done, save_done, sync_lock):
         self._logger.debug(f"Save to SSD thread started")
         while True:
             fileToSave = ''
@@ -637,9 +646,10 @@ class GPhotoCam(AbstractCamera):
                 with lock_with_copy:
                     save_done.set()
                 allDone = True
-                for t in capture_done:
-                    if not t.is_set():
-                        allDone = False            
+                with sync_lock:
+                    for t in capture_done:
+                        if not t.is_set():
+                            allDone = False            
                 if allDone:
                     self._logger.debug('Exit save thread')
                     return

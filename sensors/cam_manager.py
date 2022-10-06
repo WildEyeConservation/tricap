@@ -88,6 +88,7 @@ class TriCapCamsManager:
         self._capture_and_copy_lock = list()
         self._save_and_preview_lock = list()
         self._imu_lock = imu_lock
+        self._thread_sync_lock = None
         # stop time sync -> fix pi time to camera time
         subprocess.run(["timedatectl", "set-ntp", "false"], check=True)
         self._initialise()
@@ -222,6 +223,7 @@ class TriCapCamsManager:
                 len(self._save_done) == 0:
                 # first time
                 self._logger.debug('Cam manager - create thread interlocks')
+                self._thread_sync_lock = threading.Lock()
                 for cam in self._cameras:
                     self._capture_and_copy_lock.append(threading.Lock())
                     self._save_and_preview_lock.append(threading.Lock()) 
@@ -240,13 +242,13 @@ class TriCapCamsManager:
             for index, cam in enumerate(self._cameras):  # self.thread was thread
                 self._capture_threads_done[index].clear()
                 self._save_done[index].clear()
-                x = threading.Thread(target=cam.capture_and_copy, daemon=True, args=(self._image_capture_interval, global_start_time, self._copy_start_time, str(cam.serial_num), self._stop_capture, self._capture_and_copy_lock[index], index, self._capture_threads_done, self._save_done[index], ))
+                x = threading.Thread(target=cam.capture_and_copy, daemon=True, args=(self._image_capture_interval, global_start_time, self._copy_start_time, str(cam.serial_num), self._stop_capture, self._capture_and_copy_lock[index], index, self._capture_threads_done, self._save_done[index], self._thread_sync_lock, ))
                 self._capture_threads.append(x)
 
             existing_files = self.list_exisiting_files(MOUNT_POINT)
             self._save_threads.clear()
             for index, cam in enumerate(self._cameras):  # self.thread was thread
-                x = threading.Thread(target=cam.save_to_ssd, daemon=True, args=(MOUNT_POINT, existing_files, str(cam.serial_num), self._capture_and_copy_lock[index], self._save_and_preview_lock[index], self._capture_threads_done, self._save_done[index], ))
+                x = threading.Thread(target=cam.save_to_ssd, daemon=True, args=(MOUNT_POINT, existing_files, str(cam.serial_num), self._capture_and_copy_lock[index], self._save_and_preview_lock[index], self._capture_threads_done, self._save_done[index], self._thread_sync_lock, ))
                 self._save_threads.append(x)
 
             for t in self._capture_threads:

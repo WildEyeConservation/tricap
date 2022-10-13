@@ -83,8 +83,8 @@ class SerialInterface(SerialProcess):
       if self.isConnected:
         try:
           newData = False
+          bytesWaiting = self.serialPort.inWaiting()
           if self._process_protobuf:
-            bytesWaiting = self.serialPort.inWaiting()
             while bytesWaiting > 0:
               newData = True
               buff += self.serialPort.read(bytesWaiting)
@@ -94,13 +94,13 @@ class SerialInterface(SerialProcess):
             buff = self.serialPort.read_until(b'\n')
             newData = len(buff) > 0
           if newData:
-            # self._logger.debug('rx {} {}'.format(buff, len(buff)))
             with self._lock:
               if self._process_protobuf:
                 if self.processProtobufResponse(buff):
                   # clear buffer
                   buff = bytearray()
               else:
+                self._logger.debug('GPS serial bytes in waiting {}'.format(bytesWaiting))
                 if self.processGpsResponse(buff):
                   # clear buffer
                   buff = bytearray()

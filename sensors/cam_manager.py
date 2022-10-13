@@ -381,16 +381,14 @@ class TriCapCamsManager:
 
             qualities = np.asarray(qualities)
             gps_times = np.asarray(gps_times)
-            pi_times = np.asarray(pi_times)
             lats = np.asarray(lats)
             longs = np.asarray(longs)
             alts = np.asarray(alts)
 
-            f_qual = interpolate.interp1d(pi_times, qualities)
-            f_gps_times = interpolate.interp1d(pi_times, gps_times)
-            f_lats = interpolate.interp1d(pi_times, lats)
-            f_longs = interpolate.interp1d(pi_times, longs)
-            f_alts = interpolate.interp1d(pi_times, alts)
+            f_qual = interpolate.interp1d(gps_times, qualities)
+            f_lats = interpolate.interp1d(gps_times, lats)
+            f_longs = interpolate.interp1d(gps_times, longs)
+            f_alts = interpolate.interp1d(gps_times, alts)
 
             # read accelerometer data
             complete_accel_dir = os.path.join(imu_dir, 'accelData.csv')
@@ -433,7 +431,7 @@ class TriCapCamsManager:
                 for im in images:
                     im_time = float(datetime.strptime(im['SubSecDateTimeOriginal'], '%Y:%m:%d %H:%M:%S.%f').timestamp())
                     try:
-                        im['GPSDateStamp'] = np.array(f_gps_times([im_time]))[0]
+                        im['GPSDateStamp'] = im_time
                         im['GPSLatitude'] = np.array(f_lats([im_time]))[0]
                         im['GPSLongitude'] = np.array(f_longs([im_time]))[0]
                         im['GPSAltitude'] = np.array(f_alts([im_time]))[0]

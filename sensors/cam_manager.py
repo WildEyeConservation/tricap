@@ -370,14 +370,15 @@ class TriCapCamsManager:
                     csv_reader = csv.reader(csv_file, delimiter=',')
                     for row in csv_reader:
                         if len(row) > 8:
-                            qualities.append(float(row[0]))
-                            gps_times.append(float(row[1]))
-                            pi_times.append(float(row[2]))
-                            lats.append(float(row[3]))
-                            gpsLatDir = row[4]
-                            longs.append(float(row[5]))
-                            gpsLongDir = row[6]
-                            alts.append(float(row[7]))
+                            if float(row[1]) != 0 and float(row[2]) != 0 and float(row[3]) != 0 and float(row[5]) != 0 and float(row[7]) != 0:
+                                qualities.append(float(row[0]))
+                                gps_times.append(float(row[1]))
+                                pi_times.append(float(row[2]))
+                                lats.append(float(row[3]))
+                                gpsLatDir = row[4]
+                                longs.append(float(row[5]))
+                                gpsLongDir = row[6]
+                                alts.append(float(row[7]))
 
             qualities = np.asarray(qualities)
             gps_times = np.asarray(gps_times)

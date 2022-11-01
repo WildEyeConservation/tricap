@@ -24,14 +24,15 @@ with open(complete_gps_dir) as csv_file:
     # print(f"row {row}")
     if len(row) > 8:
       try:
-        qualities.append(float(row[0]))
-        gps_times.append(float(row[1]))
-        pi_times.append(float(row[2]))
-        lats.append(float(row[3]))
-        gpsLatDir = row[4]
-        longs.append(float(row[5]))
-        gpsLongDir = row[6]
-        alts.append(float(row[7]))
+        if float(row[1]) != 0 and float(row[2]) != 0 and float(row[3]) != 0 and float(row[5]) != 0 and float(row[7]) != 0:
+          qualities.append(float(row[0]))
+          gps_times.append(float(row[1]))
+          pi_times.append(float(row[2]))
+          lats.append(float(row[3]))
+          gpsLatDir = row[4]
+          longs.append(float(row[5]))
+          gpsLongDir = row[6]
+          alts.append(float(row[7]))
       except:
         print('Read gps error')
 

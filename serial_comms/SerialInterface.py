@@ -100,7 +100,7 @@ class SerialInterface(SerialProcess):
                   # clear buffer
                   buff = bytearray()
               else:
-                self._logger.debug('GPS serial bytes in waiting {}'.format(bytesWaiting))
+                # self._logger.debug('GPS serial bytes in waiting {}'.format(bytesWaiting))
                 if self.processGpsResponse(buff):
                   # clear buffer
                   buff = bytearray()

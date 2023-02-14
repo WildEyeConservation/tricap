@@ -20,6 +20,7 @@ try:
     from .canon_6D import Canon6DCam
     from .gphoto_cam import GPhotoCam as Camera
     from .canon_R import CanonRCam
+    from .gpio_cam import GpioCam as CameraGpio
 except ImportError:
     logging.getLogger(__name__).warning('Could not import gphoto based libs.')
 
@@ -65,7 +66,7 @@ class TriCapCamsManager:
     supportedCameras = {"Canon EOS 6D", "Dummy Cam", "Canon EOS R"}
     _logger = logging.getLogger(__name__)
 
-    def __init__(self, man_settings: dict, cam_settings: dict, use_dummy_cams=False, imu_lock=None):
+    def __init__(self, man_settings: dict, cam_settings: dict, use_dummy_cams=False, imu_lock=None, use_gpio_cams=False):
         """Construct."""
         self.state = CAM_MANAGER_STATES.STOPPED
 
@@ -81,6 +82,7 @@ class TriCapCamsManager:
         self._cam_settings = cam_settings
         self._man_settings = man_settings
         self.use_dummy_cams = use_dummy_cams
+        self.use_gpio_cams = use_gpio_cams
         self.camera_list = ""
         self._shutdownStartTime = None
         self._shutdownEnabled = False
@@ -133,7 +135,10 @@ class TriCapCamsManager:
         # Do not catch exceptions here. If any detected camera fails to instantiate, it is a critical error and we want
         # to halt and catch fire.
 
-        if self.use_dummy_cams:
+        if self.use_gpio_cams:
+            tricap_cam = CameraGpio()
+            self._cameras.append(tricap_cam)
+        elif self.use_dummy_cams:
             for name, address in DummyCam.autodetect():
                 if name in TriCapCamsManager.supportedCameras:
                     self._logger.info('Adding camera %s at address %s ' % (name, address))
@@ -199,69 +204,91 @@ class TriCapCamsManager:
         """Start the capturing threads of all connected cams."""
         self._shutdownEnabled = False
         self._logger.debug(f"Cam manager - current state {self.state}")
-        if self.state == CAM_MANAGER_STATES.STARTED and (not self.is_capture_thread_alive() or not self.is_save_thread_alive()):
-            # started, but capture threads are not alive -> sleep 
-            self._logger.debug('Cam manager - waiting for threads to end')
-            while self.is_capture_thread_alive() or self.is_save_thread_alive():
-                time.sleep(50e-3)
-            self._logger.debug('Cam manager - threads ended')
-            self.copy_disk_monitor()
-        if len(self._cameras) == 0:
-            self.state = CAM_MANAGER_STATES.ERROR_NO_CAMS
-            self._logger.debug('Tried to start capture threads with no cameras connected.')
-        elif self.state == CAM_MANAGER_STATES.STOPPED:
-            for cam in self._cameras:
-                cam._camera._image_count = 0
-            
-            self._logger.debug('Cam manager - start capturing thread')
-            self._stop_capture = threading.Event()
-            self._stop_capture.clear()
 
-            if len(self._capture_and_copy_lock) == 0 and \
-                len(self._save_and_preview_lock) == 0 and \
-                len(self._capture_threads_done) == 0 and \
-                len(self._save_done) == 0:
-                # first time
-                self._logger.debug('Cam manager - create thread interlocks')
-                self._thread_sync_lock = threading.Lock()
+        if not self.use_gpio_cams:
+            if self.state == CAM_MANAGER_STATES.STARTED and (not self.is_capture_thread_alive() or not self.is_save_thread_alive()):
+                # started, but capture threads are not alive -> sleep 
+                self._logger.debug('Cam manager - waiting for threads to end')
+                while self.is_capture_thread_alive() or self.is_save_thread_alive():
+                    time.sleep(50e-3)
+                self._logger.debug('Cam manager - threads ended')
+                self.copy_disk_monitor()
+            if len(self._cameras) == 0:
+                self.state = CAM_MANAGER_STATES.ERROR_NO_CAMS
+                self._logger.debug('Tried to start capture threads with no cameras connected.')
+            elif self.state == CAM_MANAGER_STATES.STOPPED:
                 for cam in self._cameras:
-                    self._capture_and_copy_lock.append(threading.Lock())
-                    self._save_and_preview_lock.append(threading.Lock()) 
-                    self._capture_threads_done.append(threading.Event())
-                    self._save_done.append(threading.Event())
+                    cam._camera._image_count = 0
+                
+                self._logger.debug('Cam manager - start capturing thread')
+                self._stop_capture = threading.Event()
+                self._stop_capture.clear()
 
-            if not self.mount_disk():
-                # no disk -> do not copy
-                self.state = CAM_MANAGER_STATES.STOPPED
-                self._logger.warning('Cam manager - no ssd -> do no start capturing')
-                return
+                if len(self._capture_and_copy_lock) == 0 and \
+                    len(self._save_and_preview_lock) == 0 and \
+                    len(self._capture_threads_done) == 0 and \
+                    len(self._save_done) == 0:
+                    # first time
+                    self._logger.debug('Cam manager - create thread interlocks')
+                    self._thread_sync_lock = threading.Lock()
+                    for cam in self._cameras:
+                        self._capture_and_copy_lock.append(threading.Lock())
+                        self._save_and_preview_lock.append(threading.Lock()) 
+                        self._capture_threads_done.append(threading.Event())
+                        self._save_done.append(threading.Event())
 
-            global_start_time = time.time() + 0.5
-            self._copy_start_time = datetime.now()
-            self._capture_threads.clear()
-            for index, cam in enumerate(self._cameras):  # self.thread was thread
-                self._capture_threads_done[index].clear()
-                self._save_done[index].clear()
-                x = threading.Thread(target=cam.capture_and_copy, daemon=True, args=(self._image_capture_interval, global_start_time, self._copy_start_time, str(cam.serial_num), self._stop_capture, self._capture_and_copy_lock[index], index, self._capture_threads_done, self._save_done[index], self._thread_sync_lock, ))
-                self._capture_threads.append(x)
+                if not self.mount_disk():
+                    # no disk -> do not copy
+                    self.state = CAM_MANAGER_STATES.STOPPED
+                    self._logger.warning('Cam manager - no ssd -> do no start capturing')
+                    return
 
-            existing_files = self.list_exisiting_files(MOUNT_POINT)
-            self._save_threads.clear()
-            for index, cam in enumerate(self._cameras):  # self.thread was thread
-                x = threading.Thread(target=cam.save_to_ssd, daemon=True, args=(MOUNT_POINT, existing_files, str(cam.serial_num), self._capture_and_copy_lock[index], self._save_and_preview_lock[index], self._capture_threads_done, self._save_done[index], self._thread_sync_lock, ))
-                self._save_threads.append(x)
+                global_start_time = time.time() + 0.5
+                self._copy_start_time = datetime.now()
+                self._capture_threads.clear()
+                for index, cam in enumerate(self._cameras):  # self.thread was thread
+                    self._capture_threads_done[index].clear()
+                    self._save_done[index].clear()
+                    x = threading.Thread(target=cam.capture_and_copy, daemon=True, args=(self._image_capture_interval, global_start_time, self._copy_start_time, str(cam.serial_num), self._stop_capture, self._capture_and_copy_lock[index], index, self._capture_threads_done, self._save_done[index], self._thread_sync_lock, ))
+                    self._capture_threads.append(x)
 
-            for t in self._capture_threads:
-                t.start()
+                existing_files = self.list_exisiting_files(MOUNT_POINT)
+                self._save_threads.clear()
+                for index, cam in enumerate(self._cameras):  # self.thread was thread
+                    x = threading.Thread(target=cam.save_to_ssd, daemon=True, args=(MOUNT_POINT, existing_files, str(cam.serial_num), self._capture_and_copy_lock[index], self._save_and_preview_lock[index], self._capture_threads_done, self._save_done[index], self._thread_sync_lock, ))
+                    self._save_threads.append(x)
 
-            for t in self._save_threads:
-                t.start()
+                for t in self._capture_threads:
+                    t.start()
 
-            self.state = CAM_MANAGER_STATES.STARTED
-            self._logger.debug('Cam manager - capture threads started.')
-        elif self.state == CAM_MANAGER_STATES.STARTED:
-            self._stop_capture.clear()
-            self._logger.debug('Cam manager - continue capturing thread')
+                for t in self._save_threads:
+                    t.start()
+
+                self.state = CAM_MANAGER_STATES.STARTED
+                self._logger.debug('Cam manager - capture threads started.')
+            elif self.state == CAM_MANAGER_STATES.STARTED:
+                self._stop_capture.clear()
+                self._logger.debug('Cam manager - continue capturing thread')
+        else: 
+            # use gpio cams
+            if self.state == CAM_MANAGER_STATES.STARTED:
+                # already started -> waitto finish
+                self._logger.debug('Cam manager - waiting for threads to end')
+                while self.is_capture_thread_alive():
+                    time.sleep(50e-3)
+                self._logger.debug('Cam manager - threads ended')
+            elif self.state == CAM_MANAGER_STATES.STOPPED:
+                self._logger.debug('Cam manager - start capturing thread')
+                self._stop_capture = threading.Event()
+                self._stop_capture.clear()
+                barrier = threading.Barrier(2)  # one for the timer and one for the gpio camera
+                self._rate_timer = RepeatingBarrierPasser(self._image_capture_interval, self._stop_capture, barrier, daemon=True)
+                self._rate_timer.start()
+            
+                self._capture_threads = threading.Thread(target=cam.capture, daemon=True, args=(self._stop_capture, barrier, ))
+                
+                for t in self._capture_threads:
+                    t.start()
 
     def stop_capturing(self):
         if self.state == CAM_MANAGER_STATES.STARTED:
@@ -467,6 +494,9 @@ class TriCapCamsManager:
         return len(self._cameras)
 
     def get_cam_ids(self):
+        if self.use_gpio_cams:
+            return []
+
         cam_ids = []
         for cam in self._cameras:
             if cam.serial_num is not None:
@@ -480,6 +510,9 @@ class TriCapCamsManager:
         return MultiConfig(self._cameras)
 
     def external_disk_info(self):
+        if self.use_gpio_cams:
+            return
+
         self._logger.debug('external_disk_info')
         info = {}
         is_mounted = os.path.ismount(MOUNT_POINT)
@@ -496,7 +529,7 @@ class TriCapCamsManager:
         return info
 
     def copy_eta(self):
-        if self._copy_start_time == None:
+        if self._copy_start_time == None or self.use_gpio_cams:
             return ""
         ret = {}
         all_cam_copy_percentage = []
@@ -527,12 +560,18 @@ class TriCapCamsManager:
         return ret
 
     def sync_time(self, time_str):
+        if self.use_gpio_cams:
+            return
+
         subprocess.run(["timedatectl", "set-time", time_str], check=True)
 
         for cam in self._cameras:
             cam.sync_time()
 
     def start_preview(self):
+        if self.use_gpio_cams:
+            return
+
         if len(self._save_and_preview_lock) == 0:
             return False
 

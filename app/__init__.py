@@ -171,9 +171,12 @@ else:
     rootlogger.debug('Real cams will be used, in accordance to configuration')
     code_inf = GitData()
 
+# TODO ALKMAAR Get from config
+use_gpio_cams = True
+
 imu_lock = Lock()
 
-tricap_manager = TriCapCamsManager(misc_settings, cam_settings, use_dummy_cams, imu_lock)
+tricap_manager = TriCapCamsManager(misc_settings, cam_settings, use_dummy_cams, imu_lock, use_gpio_cams)
 tricap_cameras = tricap_manager.get_cameras_as_list()
 tricap_length = len(tricap_cameras)
 camera_loggers = []

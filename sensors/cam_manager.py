@@ -272,29 +272,35 @@ class TriCapCamsManager:
         else: 
             # use gpio cams
             if self.state == CAM_MANAGER_STATES.STARTED:
-                # already started -> waitto finish
-                self._logger.debug('Cam manager - waiting for threads to end')
-                while self.is_capture_thread_alive():
-                    time.sleep(50e-3)
-                self._logger.debug('Cam manager - threads ended')
+                # already started
+                self._logger.debug('Cam manager - continue capturing thread')
             elif self.state == CAM_MANAGER_STATES.STOPPED:
                 self._logger.debug('Cam manager - start capturing thread')
                 self._stop_capture = threading.Event()
                 self._stop_capture.clear()
                 barrier = threading.Barrier(2)  # one for the timer and one for the gpio camera
+            
+                self._capture_threads.clear()
+                for index, cam in enumerate(self._cameras):  # self.thread was thread
+                    self._capture_threads.append(threading.Thread(target=cam.capture, daemon=True, args=(barrier, )))
+                
                 self._rate_timer = RepeatingBarrierPasser(self._image_capture_interval, self._stop_capture, barrier, daemon=True)
                 self._rate_timer.start()
-            
-                self._capture_threads = threading.Thread(target=cam.capture, daemon=True, args=(self._stop_capture, barrier, ))
-                
                 for t in self._capture_threads:
                     t.start()
+
+                self.state = CAM_MANAGER_STATES.STARTED
+                self._logger.debug('Cam manager - capture threads started.')
 
     def stop_capturing(self):
         if self.state == CAM_MANAGER_STATES.STARTED:
             self._stop_capture.set()
 
             self._logger.debug('Cam manager - capture threads stop requested.')
+
+            if self.use_gpio_cams:
+                self.state = CAM_MANAGER_STATES.STOPPED
+                self._logger.debug('Cam manager - capture threads stopped.')
 
     def is_capture_thread_alive(self):
         """ Return true if any cam thread is alive """
@@ -483,6 +489,7 @@ class TriCapCamsManager:
 
     def set_image_capture_interval(self, value):
         self._man_settings['image_capture_interval'] = value
+        self._image_capture_interval = value
 
     def get_calibrate_step(self):
         return self._man_settings['calibrate_step']

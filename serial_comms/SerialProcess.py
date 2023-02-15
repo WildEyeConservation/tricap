@@ -81,7 +81,7 @@ class SerialProcess():
                 currentSsid = currentSsidReq.stdout.rstrip().decode("utf-8")
             print('ssid {} currentSsid {}'.format(ssid, currentSsid))
             if ssid != currentSsid:
-                subprocess.check_call(['/home/pi/tricap/alk/wifi_setup.sh', ssid, password])
+                subprocess.check_call(['/home/pi/tricap/wifi_setup.sh', ssid, password])
             # ret = subprocess.run(["wpa_cli", "add_network"], check=True)
             # print(subprocess.run(["wpa_cli", "set_network", "ssid", ssid], check=True))
             # print(subprocess.run(["wpa_cli", "set_network", "psk", password], check=True))
@@ -89,7 +89,7 @@ class SerialProcess():
             # print(subprocess.run(["wpa_cli", "save_config"], check=True))
             # print(subprocess.run(["wpa_cli", "reconfigure"], check=True))
         except:
-            subprocess.check_call(['/home/pi/tricap/alk/wifi_setup.sh', ssid, password])
+            subprocess.check_call(['/home/pi/tricap/wifi_setup.sh', ssid, password])
         finally:
             print('failed')
 

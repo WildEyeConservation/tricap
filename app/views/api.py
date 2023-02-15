@@ -82,7 +82,7 @@ def statistics():
     else:
       stats['battery'] = sum_battery / battery_count
     config = TricapConfig()
-    stats['captureInterval'] = float(config.get('image_capture_interval', TricapConfig.MISC_SECTION_HEADER)[0])
+    stats['captureInterval'] = float(config.get('image_capture_interval', TricapConfig.MISC_SECTION_HEADER))
     # _logger.debug(stats['captureInterval'])
     return stats
   except Exception as ex:
@@ -206,3 +206,45 @@ def exif_info():
   return {
     'sessions': sessions
   }
+
+@api_bp.route('/api/start_capture')
+def start():
+  _logger.debug("Start req {}".format(tricap_manager.state))
+  if tricap_manager.state == CAM_MANAGER_STATES.STARTED:
+    return jsonify({'msg': 'Already started'}), 400
+  
+  tricap_manager.start_capturing()
+  ret = {}
+  ret['success'] = True
+  return ret  
+
+@api_bp.route('/api/stop_capture')
+def stop():
+  _logger.debug("Stop req {}".format(tricap_manager.state))
+  if tricap_manager.state == CAM_MANAGER_STATES.STOPPED:
+    return jsonify({'msg': 'Already stopped'}), 400
+  
+  tricap_manager.stop_capturing()
+  ret = {}
+  ret['success'] = True
+  return ret  
+
+
+@api_bp.route('/api/capture_interval', methods = ['POST'])
+def set_capture_interval():
+  _logger.debug("set capture interval {}".format(tricap_manager.state))
+
+  data = request.get_json()
+  if not 'interval' in data:
+    return jsonify({'msg': 'Invalid request'}), 400
+
+  tricap_manager.set_image_capture_interval(data['interval'])
+  config = TricapConfig()
+  miscSection = config.get_section_dict(TricapConfig.MISC_SECTION_HEADER)
+  miscSection["image_capture_interval"] = data['interval']
+  config.set_section(miscSection, TricapConfig.MISC_SECTION_HEADER)
+  config.save_to_file()
+
+  ret = {}
+  ret['success'] = True
+  return ret  

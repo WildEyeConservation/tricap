@@ -79,6 +79,8 @@ class RepeatingBarrierPasser(threading.Thread):
     def run(self):
         """Do not invoke this function directly, begin the timer by calling start."""
         while not self._stop_event.wait(self._repeat_rate):
+            if self._stop_event.is_set():
+                return
             self._barrier.wait()
 
 

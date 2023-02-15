@@ -174,6 +174,8 @@ else:
 # TODO ALKMAAR Get from config
 use_gpio_cams = True
 
+subprocess.check_call(['/home/pi/tricap/wifi_setup.sh', "ESS_ops", "dumbo2017"])
+
 imu_lock = Lock()
 
 tricap_manager = TriCapCamsManager(misc_settings, cam_settings, use_dummy_cams, imu_lock, use_gpio_cams)
@@ -181,7 +183,8 @@ tricap_cameras = tricap_manager.get_cameras_as_list()
 tricap_length = len(tricap_cameras)
 camera_loggers = []
 
-ser = SerialInterface('/dev/rfcomm0', 9600, True, True)
+if not use_gpio_cams:
+    ser = SerialInterface('/dev/rfcomm0', 9600, True, True)
 gps_ser = SerialInterface('/dev/serial0', 9600, False, False, imu_lock, tricap_manager)
 accel_ser = BerryImu(imu_lock)
 
@@ -266,27 +269,28 @@ if use_dummy_cams == False:
 else:
     rootlogger.info("Git version: " + "DummyGit1234")
 
-# Toggle switch
-toggle_switch_monitor = ToggleSwitchMonitor(period=0.3)
-toggle_switch_observer = ToggleSwitchObserver(tricap_manager, session_logger, toggle_switch_monitor)
-toggle_switch_monitor.start()
+if not use_gpio_cams:
+    # Toggle switch
+    toggle_switch_monitor = ToggleSwitchMonitor(period=0.3)
+    toggle_switch_observer = ToggleSwitchObserver(tricap_manager, session_logger, toggle_switch_monitor)
+    toggle_switch_monitor.start()
 
-# LED Lights
-cam_man_state_monitor = CamManagerMonitor(tricap_manager, period=0.5)
-cam_error_monitors = []
-cam_capture_monitors = []
-for idx, cam in enumerate(tricap_cameras):
-    cem = CamErrorMonitor(cam, idx)
-    cem.start()
-    cam_error_monitors.append(cem)
+    # LED Lights
+    cam_man_state_monitor = CamManagerMonitor(tricap_manager, period=0.5)
+    cam_error_monitors = []
+    cam_capture_monitors = []
+    for idx, cam in enumerate(tricap_cameras):
+        cem = CamErrorMonitor(cam, idx)
+        cem.start()
+        cam_error_monitors.append(cem)
 
-for idx, cam in enumerate(tricap_cameras):
-    ccm = CamCaptureMonitor(cam, idx)
-    ccm.start()
-    cam_capture_monitors.append(ccm)
+    for idx, cam in enumerate(tricap_cameras):
+        ccm = CamCaptureMonitor(cam, idx)
+        ccm.start()
+        cam_capture_monitors.append(ccm)
 
-led_controller = LEDController(cam_man_state_monitor, cam_error_monitors, cam_capture_monitors)
-cam_man_state_monitor.start()
+    led_controller = LEDController(cam_man_state_monitor, cam_error_monitors, cam_capture_monitors)
+    cam_man_state_monitor.start()
 
 # some glue functions, which use the module level functions
 
@@ -295,7 +299,8 @@ def stop_fetching():
     for cam in tricap_manager.get_cameras_as_list():
         cam._camera.fetch_state = False  # add pass for testing
 
-fetch_stopper = GateCloser(20.0, stop_fetching)
+if not use_gpio_cams:
+    fetch_stopper = GateCloser(20.0, stop_fetching)
 
 
 def stop_all_threads():
@@ -313,13 +318,13 @@ def stop_all_threads():
 
 
 # Configure the Flask Blueprints
-from .views.home import home_bp
+# from .views.home import home_bp
 from .views.showlog import showlog_bp
 from .views.settings import settings_bp
 from .views.camera import camera_bp
 from .views.api import api_bp
 
-app.register_blueprint(home_bp)
+# app.register_blueprint(home_bp)
 app.register_blueprint(showlog_bp)
 app.register_blueprint(settings_bp)
 app.register_blueprint(camera_bp)

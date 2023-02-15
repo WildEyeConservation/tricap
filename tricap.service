@@ -5,13 +5,10 @@ After=network.target
 
 [Service]
 User=root
-Nice=-15
 Restart=always
 ExecStartPre=/home/pi/tricap/get_time_from_camera.sh
 ExecStart=/home/pi/tricap/tricap_launcher.sh
-# ExecStart=/usr/local/bin/uwsgi --ini /home/pi/tricap/tricap.ini
 PermissionsStartOnly=True
 
 [Install]
 WantedBy=multi-user.target
-

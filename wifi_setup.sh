@@ -1,5 +1,15 @@
 #!/bin/bash
 
+ssid=$1
+
+# Check if the network is already added
+if wpa_cli list_networks | grep -q $ssid; then
+    echo "Network $ssid is already added"
+    exit 0
+else
+    echo "Network $ssid is not added"
+fi
+
 NETWORK_ID=$(wpa_cli -i wlan0 add_network)
 echo $NETWORK_ID
 if [ $NETWORK_ID -gt 3 ]

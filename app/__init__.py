@@ -39,6 +39,8 @@ from enum import Enum
 from serial_comms.SerialInterface import SerialInterface
 from serial_comms.berryIMU import BerryImu
 
+import subprocess
+
 class AltiMeasurementObserver():
     """A custom observer to link the alti to the session logger."""
 
@@ -174,7 +176,7 @@ else:
 # TODO ALKMAAR Get from config
 use_gpio_cams = True
 
-subprocess.check_call(['/home/pi/tricap/wifi_setup.sh', "ESS_ops", "dumbo2017"])
+subprocess.check_call(['/home/pi/tricap/wifi_setup.sh', "ESS-ops", "dumbo2017"])
 
 imu_lock = Lock()
 

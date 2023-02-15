@@ -77,8 +77,8 @@ class BerryImu(IMU):
 
         self.detectIMU()     #Detect if BerryIMU is connected.
         if(self._BerryIMUversion == 99):
-            print(" No BerryIMU found... exiting ")
-            sys.exit()
+            print("No BerryIMU found...")
+            return
         self.initIMU()       #Initialise the accelerometer, gyroscope and compass
 
         self.mainThread = Thread(target=self.process, daemon=True)

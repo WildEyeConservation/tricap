@@ -26,6 +26,8 @@ sudo apt-get install git-all
 ```
 cd /home/pi/
 git clone git@bitbucket.org:innoventix/tricap.git
+cd tricap/
+git checkout -b gpio-cam origin/gpio-cam
 ```
 
 ### Change executable scripts
@@ -35,6 +37,14 @@ cd /home/pi/tricap/
 sudo chmod +x tricap_launch_tester.py
 sudo chmod +x wifi_setup.sh
 sudo chmod +x tricap_launcher.sh
+sudo chmod +x python_setup.sh
+```
+
+### Install the required python libraries
+
+```
+cd /home/pi/tricap/
+sudo ./python_setup.sh
 ```
 
 ### Create and start service

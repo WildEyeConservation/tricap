@@ -75,7 +75,8 @@ class GpioCam():
         GPIO.output(TRIGGER_OUT, GPIO.HIGH)
 
         self._trigger_count += 1
-        self._logger.debug(f'cam_trigger {datetime.now().strftime("%Y %m %d %H:%M:%S")}')
+        # self._logger.debug(f'cam_trigger {datetime.now().strftime("%Y %m %d %H:%M:%S")}')
+        sleep(1e-3)
 
     def _trigger_capture(self):
         """Make the camera capture an image but don't wait for it to return.
@@ -102,7 +103,7 @@ class GpioCam():
 
     def capture_detected(self, channel):
         self._image_count += 1
-        self._logger.debug(f'capture_detected {datetime.now().strftime("%Y %m %d %H:%M:%S")} {channel}')
+        # self._logger.debug(f'capture_detected {datetime.now().strftime("%Y %m %d %H:%M:%S")} {channel}')
         GPIO.output(LED_OUT, GPIO.LOW)
         sleep(200e-3)
         GPIO.output(LED_OUT, GPIO.HIGH)

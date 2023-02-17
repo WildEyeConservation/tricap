@@ -4,6 +4,7 @@ from threading import Thread, Lock
 import base64
 import serial_comms.out.tricap_pb2 as pb
 import logging, subprocess
+from datetime import datetime
 
 from .SerialProcess import SerialProcess
 
@@ -30,6 +31,7 @@ class SerialInterface(SerialProcess):
     self._capturing_lock = capturing_lock
     self.mainThread.start()
     self.rxThread.start()
+    self._lastGpsPacketDate = None
 
   def connect(self):
     """
@@ -64,6 +66,12 @@ class SerialInterface(SerialProcess):
     self.connect()
 
   def hasGps(self):
+    if (self._lastGpsPacketDate == None):
+      return False
+
+    if ((datetime.now() - self._lastGpsPacketDate).total_seconds() > 10):
+      return False
+
     with self._lock:
       return self._hasGps
 
@@ -83,27 +91,32 @@ class SerialInterface(SerialProcess):
       if self.isConnected:
         try:
           newData = False
-          bytesWaiting = self.serialPort.inWaiting()
           if self._process_protobuf:
+            # bluetooth
+            bytesWaiting = self.serialPort.inWaiting()
             while bytesWaiting > 0:
               newData = True
               buff += self.serialPort.read(bytesWaiting)
               sleep(1e-3)
               bytesWaiting = self.serialPort.inWaiting()
+            if newData:
+              # self._logger.debug('rx {} {}'.format(buff, len(buff)))
+              with self._lock:
+                if self._process_protobuf:
+                  if self.processProtobufResponse(buff):
+                    # clear buffer
+                    buff = bytearray()
           else:
-            buff = self.serialPort.read_until(b'\n')
-            newData = len(buff) > 0
-          if newData:
-            with self._lock:
-              if self._process_protobuf:
-                if self.processProtobufResponse(buff):
-                  # clear buffer
-                  buff = bytearray()
-              else:
-                # self._logger.debug('GPS serial bytes in waiting {}'.format(bytesWaiting))
-                if self.processGpsResponse(buff):
-                  # clear buffer
-                  buff = bytearray()
+            # gps
+            bytesWaiting = self.serialPort.inWaiting()
+            while bytesWaiting > 0:
+              # self._logger.debug('GPS serial bytes in waiting {}'.format(bytesWaiting))
+              buff = self.serialPort.read_until(b'\n')
+              # self._logger.debug('rx {} {}'.format(buff, len(buff)))
+              if len(buff) > 0:
+                with self._lock:
+                  self.processGpsResponse(buff)
+              bytesWaiting = self.serialPort.inWaiting()
         except:
           self._logger.debug('Serial thread error')
           self._hasGps = False
@@ -125,10 +138,11 @@ class SerialInterface(SerialProcess):
             with self._capturing_lock:
               # do not open file while capture and copy has the file open 
               self.saveGga(request)
+              self._lastGpsPacketDate = datetime.now()
           if len(msg) > 0:
             self.write(msg)
         except Exception as e:
             print(f"Serial process error {e}")
       self._requests = list()
-      sleep(100e-3)
+      sleep(50e-3)
     self._logger.debug('Serial thread stopped')

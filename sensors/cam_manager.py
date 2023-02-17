@@ -92,7 +92,8 @@ class TriCapCamsManager:
         self._imu_lock = imu_lock
         self._thread_sync_lock = None
         # stop time sync -> fix pi time to camera time
-        subprocess.run(["timedatectl", "set-ntp", "false"], check=True)
+        if not use_gpio_cams:
+            subprocess.run(["timedatectl", "set-ntp", "false"], check=True)
         self._initialise()
 
     def _initialise(self):

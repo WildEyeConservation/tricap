@@ -99,7 +99,7 @@ class SerialProcess():
         if msg.timestamp != None and msg.latitude != 0.0 and msg.longitude != 0.0:
             # calculate gps time with time zone
             self._hasGps = True
-            tz = pytz.timezone('CET')
+            tz = pytz.timezone('Africa/Johannesburg')
             tzOffset = tz.utcoffset(datetime.now()).total_seconds()
             gpsTimeString = msg.timestamp.strftime('%H:%M:%S.%f')
             gps_time = datetime.strptime(gpsTimeString, '%H:%M:%S.%f')

@@ -59,13 +59,30 @@ cd /home/pi/tricap/
 sudo ./python_setup.sh
 ```
 
-### Create and start service
+### Other updates
+
+add enable_uart=1 to /boot/cmdline.txt
+
+```
+sudo nano /boot/cmdline.txt
+```
+
+### Create and start tricap service
 
 ```
 sudo cp /home/pi/tricap/tricap.service /etc/systemd/system/tricap.service
 sudo systemctl daemon-reload
 sudo systemctl enable tricap.service
 sudo systemctl start tricap.service
+```
+
+### Create and start udp service
+
+```
+sudo cp /home/pi/tricap/udp-ip.service /etc/systemd/system/udp-ip.service
+sudo systemctl daemon-reload
+sudo systemctl enable udp-ip.service
+sudo systemctl start udp-ip.service
 ```
 
 ## Hardware setup

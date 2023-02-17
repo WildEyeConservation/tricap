@@ -1,0 +1,9 @@
+[Unit]
+After=multi-user.target
+
+[Service]
+ExecStart=/home/pi/tricap/udp_ip.sh
+User=pi
+
+[Install]
+WantedBy=multi-user.target

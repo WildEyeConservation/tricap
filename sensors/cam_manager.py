@@ -12,7 +12,7 @@ import RPi.GPIO as GPIO
 from scipy import interpolate
 import numpy as np
 
-from config import CAM_MANAGER_STATES, SERVER_LOG_DIR, SESSION_ROOT_DIR, MOUNT_POINT
+from config import CAM_MANAGER_STATES, SERVER_LOG_DIR, SESSION_ROOT_DIR, MOUNT_POINT, SONY_TEMPFS_MOUNT_POINT
 
 # TODO : Create a camera factory that will import cameras according to its config and make them available via its own
 # autodetect function
@@ -21,6 +21,7 @@ try:
     from .gphoto_cam import GPhotoCam as Camera
     from .canon_R import CanonRCam
     from .gpio_cam import GpioCam as CameraGpio
+    from .sonySDK_cam import sonySDKcam as CameraSony
 except ImportError:
     logging.getLogger(__name__).warning('Could not import gphoto based libs.')
 
@@ -66,7 +67,7 @@ class TriCapCamsManager:
     supportedCameras = {"Canon EOS 6D", "Dummy Cam", "Canon EOS R"}
     _logger = logging.getLogger(__name__)
 
-    def __init__(self, man_settings: dict, cam_settings: dict, use_dummy_cams=False, imu_lock=None, use_gpio_cams=False):
+    def __init__(self, man_settings: dict, cam_settings: dict, use_dummy_cams=False, imu_lock=None, use_gpio_cams=False, use_sony_cam=False):
         """Construct."""
         self.state = CAM_MANAGER_STATES.STOPPED
 
@@ -83,6 +84,7 @@ class TriCapCamsManager:
         self._man_settings = man_settings
         self.use_dummy_cams = use_dummy_cams
         self.use_gpio_cams = use_gpio_cams
+        self.use_sony_cam = use_sony_cam
         self.camera_list = ""
         self._shutdownStartTime = None
         self._shutdownEnabled = False
@@ -147,6 +149,9 @@ class TriCapCamsManager:
                     tricap_cam._camera.calibrate_func = external_dummy_calibrate_func
                     tricap_cam._camera.calibrate_step = int(self._man_settings['calibrate_step'])
                     self._cameras.append(tricap_cam)
+        elif self.use_sony_cam:
+            tricap_cam = CameraSony(SONY_TEMPFS_MOUNT_POINT)
+            self._cameras.append(tricap_cam)
         else:
             for name, address in Camera.autodetect():
                 self._logger.info('Detected camera %s at address %s ' % (name, address))
@@ -218,8 +223,12 @@ class TriCapCamsManager:
                 self.state = CAM_MANAGER_STATES.ERROR_NO_CAMS
                 self._logger.debug('Tried to start capture threads with no cameras connected.')
             elif self.state == CAM_MANAGER_STATES.STOPPED:
-                for cam in self._cameras:
-                    cam._camera._image_count = 0
+                if self.use_sony_cam:
+                    for cam in self._cameras:
+                        cam._image_count = 0
+                else:
+                    for cam in self._cameras:
+                        cam._camera._image_count = 0
                 
                 self._logger.debug('Cam manager - start capturing thread')
                 self._stop_capture = threading.Event()
@@ -537,7 +546,7 @@ class TriCapCamsManager:
         return info
 
     def copy_eta(self):
-        if self._copy_start_time == None or self.use_gpio_cams:
+        if self._copy_start_time == None or self.use_gpio_cams or self.use_sony_cam:
             return ""
         ret = {}
         all_cam_copy_percentage = []

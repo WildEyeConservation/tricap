@@ -174,13 +174,14 @@ else:
     code_inf = GitData()
 
 # TODO ALKMAAR Get from config
-use_gpio_cams = True
+use_gpio_cams = False
+use_sony_cam = True
 
 subprocess.check_call(['/home/pi/tricap/wifi_setup.sh', "ESS-ops", "dumbo2017"])
 
 imu_lock = Lock()
 
-tricap_manager = TriCapCamsManager(misc_settings, cam_settings, use_dummy_cams, imu_lock, use_gpio_cams)
+tricap_manager = TriCapCamsManager(misc_settings, cam_settings, use_dummy_cams, imu_lock, use_gpio_cams, use_sony_cam)
 tricap_cameras = tricap_manager.get_cameras_as_list()
 tricap_length = len(tricap_cameras)
 camera_loggers = []

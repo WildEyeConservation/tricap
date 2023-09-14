@@ -265,7 +265,10 @@ class TriCapCamsManager:
                 existing_files = self.list_exisiting_files(MOUNT_POINT)
                 self._save_threads.clear()
                 for index, cam in enumerate(self._cameras):  # self.thread was thread
-                    x = threading.Thread(target=cam.save_to_ssd, daemon=True, args=(MOUNT_POINT, existing_files, str(cam.serial_num), self._capture_and_copy_lock[index], self._save_and_preview_lock[index], self._capture_threads_done, self._save_done[index], self._thread_sync_lock, ))
+                    if(not self.use_sony_cam):
+                        x = threading.Thread(target=cam.save_to_ssd, daemon=True, args=(MOUNT_POINT, existing_files, str(cam.serial_num), self._capture_and_copy_lock[index], self._save_and_preview_lock[index], self._capture_threads_done, self._save_done[index], self._thread_sync_lock, ))
+                    else:
+                        x = threading.Thread(target=cam.save_to_ssd, daemon=True, args=(MOUNT_POINT, existing_files, str(cam.serial_num), self._capture_and_copy_lock[index], self._save_and_preview_lock[index], self._capture_threads_done, self._save_done[index], self._thread_sync_lock, self._imu_lock, ))
                     self._save_threads.append(x)
 
                 for t in self._capture_threads:
@@ -395,6 +398,8 @@ class TriCapCamsManager:
         #         subprocess.call('poweroff', shell=True)
 
     def merge_gps_meta_data(self):
+        if(self.use_sony_cam):
+            return
         try:
             # read gps data
             imu_dir = os.path.join(MOUNT_POINT, self._copy_start_time.strftime('%Y_%m_%d'))

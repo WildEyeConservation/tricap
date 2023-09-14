@@ -117,8 +117,8 @@ class SerialInterface(SerialProcess):
                 with self._lock:
                   self.processGpsResponse(buff)
               bytesWaiting = self.serialPort.inWaiting()
-        except:
-          self._logger.debug('Serial thread error')
+        except Exception as e:
+          self._logger.debug(f"Serial thread error {e}")
           self._hasGps = False
           self.reconnect()
           buff = bytearray()

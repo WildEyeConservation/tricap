@@ -9,6 +9,12 @@ import rawpy
 from PIL import Image
 from io import BytesIO
 import base64
+import signal
+import time
+from scipy import interpolate
+import numpy as np
+import csv
+
 
 from time import sleep, time, strftime
 from datetime import datetime
@@ -32,10 +38,20 @@ class sonySDKcam():
     _sonyCamera = None
 
     def imageDownloadCompleteCallback(self, filename):
-        print("Received callback with filename "+str(filename, encoding="utf-8"))
+        # print("Received sony camera download callback with filename "+str(filename, encoding="utf-8"))
+        self._logger.debug("Sony camera transfer callback called with "+str(filename, encoding="utf-8"))
         with self._lock_with_save:
                 self._to_save_queue.append(str(filename, encoding="utf-8"))
                 self._downLoadedCount += 1
+
+    def cameraErrorCallback(self, message):
+        # print("Received an error callback from sony camera SDK "+str(message, encoding="utf-8"))
+        self._logger.error("Received an error callback from sony camera SDK "+str(message, encoding="utf-8"))
+        raise Exception("Received an error callback from sony camera SDK "+str(message, encoding="utf-8"))
+
+    def exitGracefully(self, sig, frame):
+        self._sonyCamera = None
+        sys.exit(sig)
 
     def __init__(self, memoryFsPath):
         """Constructor"""
@@ -44,9 +60,11 @@ class sonySDKcam():
         self._image_count = 0
         self._to_save_queue = []
         self._serial_num = "Default_serial_num"
-        self._preview_images_raw = []
+        self._preview_images_big_jpg = []
         self._num_images_copied = 0
         self._num_images_failed = 0
+        self._disableHashAndPreview = True
+        self._memoryFsPath = memoryFsPath
 
         try:
             mount_status = subprocess.run(["mount", "tmpfs", "-t",  "tmpfs", memoryFsPath], check=True)
@@ -55,13 +73,22 @@ class sonySDKcam():
             raise Exception('Failed to mount ram fs for sony SDK copy, path: ' + memoryFsPath)
             return
         
+        # catch SIGINT and SIGTERM to destroy the sony camera object to not break the SDK when you do a systemctl stop
+        signal.signal(signal.SIGINT, self.exitGracefully)
+        signal.signal(signal.SIGTERM, self.exitGracefully)
+
         self._sonyCamera = sonyCamera()
         numCameras = self._sonyCamera.getNumCameras()
         if (numCameras > 0):
             self._sonyCamera.connectCamera(1)
-
+            
+            # counter = 100
             while (not self._sonyCamera.isConnected()):
                 sleep(0.1)
+                # counter -= 1
+                # if(counter <= 0):
+                #     self._sonyCamera = None
+                #     raise Exception("Sony Camera connection timeout!")
 
             self._sonyCamera.loadProperties()
             sleep(2)
@@ -75,7 +102,9 @@ class sonySDKcam():
             # live view is enabled by default on connection and seems to use USB bandwidth, so toggle it to disable
             self._sonyCamera.toggleLiveView()
 
+            print("Setting download callback")
             self._sonyCamera.setOnDownloadCompleteCallback(self.imageDownloadCompleteCallback)
+            self._sonyCamera.setOnErrorCallBack(self.cameraErrorCallback)
 
             if (not self._sonyCamera.setSaveInfo(memoryFsPath, "IMG3_", 1)):
                 raise Exception("Failed to set the save location. Make sure that the following path exists and has appropriate permissions: " + memoryFsPath)
@@ -274,7 +303,7 @@ class sonySDKcam():
 
         Return True if successful, or False if failed.
         """
-        if(self._sonyCamera.captureImage()):
+        if(self._sonyCamera.isConnected() and self._sonyCamera.captureImage()):
             return True
         else:
             self._logger.warning('Trigger failed')
@@ -307,6 +336,8 @@ class sonySDKcam():
             else:
                 self._logger.error('Could not successfully trigger a capture.')
                 self.state = CAMERA_STATES.ERROR_CAPTURE
+                if not self._sonyCamera.isConnected():
+                    raise Exception("Camera is not connected!")
 
             if not continuous:
                 return
@@ -320,6 +351,7 @@ class sonySDKcam():
         self._lock_with_save = lock_with_save
         # empty event buffer
         self._logger.debug(f'capture_and_copy {init_start}')
+        self._session_start_date = session_start_date
         # code=0
         # while code != 1:
         #     code,filepath=self._gp_camera.wait_for_event(1)
@@ -334,6 +366,17 @@ class sonySDKcam():
         self._logger.debug(f"_session_id {self._session_id}")
         stopTriggerInitiated = False
         self._num_images_failed = 0
+        self._num_images_copied = 0
+        self._image_count = 0
+
+        if (not self._sonyCamera.setSaveInfo(self._memoryFsPath, session_start_date.strftime("%d_%m_%Y_%H_%M_%S")+"_", 1)):
+            with sync_lock:
+                capture_done[index].set()
+            raise Exception("Failed to set the save location. Make sure that the following path exists and has appropriate permissions: " + memoryFsPath)
+
+        sleep(1)
+        # How long to wait for copies from the camera until it is assumed that the photos did not make it.
+        copyWaitTimeout = 20
 
         # main loop
         while True:
@@ -350,9 +393,15 @@ class sonySDKcam():
                     self._image_count += 1
                     self.state = CAMERA_STATES.CAPTURING                    
                     triggers += 1
+                    with self._lock_with_save:
+                        self._logger.info("Waiting for "+str(triggers*2 - self._downLoadedCount )+" images from the camera save queue is: " + str(len(self._to_save_queue)) + " images long.")
                 else:
                     self._logger.warning('Could not successfully trigger a capture.')
                     self.state = CAMERA_STATES.ERROR_CAPTURE
+                    if not self._sonyCamera.isConnected():
+                        with sync_lock:
+                            capture_done[index].set()
+                        raise Exception("Camera is not connected!")
                 start += interval
                 while start - time() < 1.0:
                     self._logger.warning(f"next capture delayed {start - time()}")
@@ -361,9 +410,12 @@ class sonySDKcam():
 
             # check if thread is done
             if stop_capture.is_set() and stopTriggerInitiated:
-                if self._downLoadedCount + self._num_images_failed >= triggers*2:
+                if self._downLoadedCount + self._num_images_failed >= triggers*2 or copyWaitTimeout <=0:
                     # All the triggered images were downloaded by the sony SDK, it downloads a RAW and JPG image for every image taken
 
+                    if copyWaitTimeout <=0:
+                        self._num_images_failed = triggers*2-(self._downLoadedCount+self._num_images_failed)
+                        self._logger.warning('failed to download '+str(self._num_images_failed)+ ' images from the camera')
                     isCaptureDoneSet = False
                     with sync_lock:
                         isCaptureDoneSet = capture_done[index].is_set()               
@@ -374,14 +426,20 @@ class sonySDKcam():
                             capture_done[index].set()
                         self._logger.debug('Exit capture thread 2')
                         return
+                else:
+                    copyWaitTimeout -=1
+                    sleep(1)
             
 
 
-    def save_to_ssd(self, mount_point, computer_files, serial_num, lock_with_copy, lock_with_preview, capture_done, save_done, sync_lock):
+    def save_to_ssd(self, mount_point, computer_files, serial_num, lock_with_copy, lock_with_preview, capture_done, save_done, sync_lock, imu_lock):
         self._logger.debug(f"Save to SSD thread started")
 
         # tagsToGet = ['Composite:SubSecDateTimeOriginal','EXIF:ExifImageHeight','EXIF:ExifImageWidth','Composite:GPSAltitude','EXIF:GPSDateStamp','Composite:GPSLatitude','Composite:GPSLongitude','EXIF:GPSTimeStamp','EXIF:ISO', 'EXIF:ShutterSpeedValue','MakerNotes:FocusMode','MakerNotes:Quality']
-        et = ExifToolHelper()
+        # et = ExifToolHelper()
+        self._dest_dir = self.get_im_target_dir(self._session_start_date, mount_point, serial_num)
+        self._mount_point = mount_point
+        self._imu_lock = imu_lock
 
         while True:
             
@@ -392,7 +450,7 @@ class sonySDKcam():
             if(len(self._to_save_queue) > 0):
                 fileName = self._to_save_queue.pop(0)
                 self._lock_with_save.release()
-                print("popping file " + fileName)
+                print(str(datetime.now())+ " popping file " + fileName)
             else:
                 self._lock_with_save.release()
             # if(fileName != ""):
@@ -411,8 +469,9 @@ class sonySDKcam():
                         if not t.is_set():
                             allDone = False            
                 if allDone:
+                    self._logger.debug('save_to_ssd thread is done, generating exif info...')
+                    self.save_exif_info(serial_num)
                     self._logger.debug('Exit save thread')
-                    print("exiting copy thread")
                     return
                 # nothing to save
                 sleep(100e-3)                    
@@ -420,38 +479,44 @@ class sonySDKcam():
                 # save required
                 with lock_with_copy:
                     save_done.clear()
-                print("Getting file name and exif")
+                # print(str(datetime.now())+ " Getting file name and exif")
                 currentFolder, currentFilename = os.path.split(fileName)
                 # currentFilename = str(currentFilename,encoding="utf-8")
-                exif_data = et.get_tags([fileName], self.KEYS_TO_SAVE)[0]
+                # exif_data = et.get_tags([fileName], self.KEYS_TO_SAVE)[0]
                 # print("read exif data: "+str(exif_data))
-                timestamp = datetime.strptime(exif_data["Composite:SubSecDateTimeOriginal"], "%Y:%m:%d %H:%M:%S%z")
-                dest_dir = self.get_im_target_dir(timestamp, mount_point, serial_num)
+                # timestamp = datetime.strptime(exif_data["Composite:SubSecDateTimeOriginal"], "%Y:%m:%d %H:%M:%S%z")
                 # print("Copying to " + dest_dir + "/"+currentFilename)
-                dest = os.path.join(dest_dir, currentFilename)
-                if not os.path.isdir(dest_dir):
-                    os.makedirs(dest_dir)
+                dest = os.path.join(self._dest_dir, currentFilename)
+                if not os.path.isdir(self._dest_dir):
+                    os.makedirs(self._dest_dir)
                 
-                print("read file for md5")
-                sourceFile = open(fileName,"rb")
-                sourceImageContent = sourceFile.read()
-                imageHash =  hashlib.md5(sourceImageContent).hexdigest() # 170ms for MD5 calc
-                sourceFile.close()
+                if (not self._disableHashAndPreview):
+                    print(str(datetime.now())+ " read file for md5")
+                    sourceFile = open(fileName,"rb")
+                    sourceImageContent = sourceFile.read()
+                    print(str(datetime.now())+ " done reading, calculating hash")
+                    imageHash =  hashlib.md5(sourceImageContent).hexdigest() # 170ms for MD5 calc
+                    sourceFile.close()
                 imageAlreadySaved = False
-                print("Iterate over destination files")
+                print(str(datetime.now())+ " Iterate over destination files")
                 if dest in computer_files:
                     # file exists
                     self._logger.debug('File exists {}'.format(dest))
-                    try:
-                        f = open(dest, "rb")
-                        h = hashlib.md5(f.read()).hexdigest()
-                        # exif_data = pyexifinfo.get_json(f.name)[0]
-                        f.close()
-                        if h == imageHash:
-                            imageAlreadySaved = True
-                            self._logger.debug('File already copied {}'.format(dest))
-                            self.append_exif_info(currentFilename, dest_dir, exif_data, imageHash)
-                    except:
+                    if(not self._disableHashAndPreview):
+                        try:
+                            f = open(dest, "rb")
+                            h = hashlib.md5(f.read()).hexdigest()
+                            # exif_data = pyexifinfo.get_json(f.name)[0]
+                            f.close()
+                            if h == imageHash:
+                                imageAlreadySaved = True
+                                self._logger.debug('File already copied {}'.format(dest))
+                                # self.append_exif_info(currentFilename, self._dest_dir, exif_data, imageHash)
+                        except:
+                            while dest in computer_files:
+                                dest = "{0}_{2}.{1}".format(*dest.rsplit(".", 1), "copy")
+                            self._logger.debug('Save as _copy {}'.format(dest))
+                    else:
                         while dest in computer_files:
                             dest = "{0}_{2}.{1}".format(*dest.rsplit(".", 1), "copy")
                         self._logger.debug('Save as _copy {}'.format(dest))
@@ -459,10 +524,11 @@ class sonySDKcam():
                 # self._logger.debug('Save {} {}'.format(dest, imageAlreadySaved))
                 try:
                     if not imageAlreadySaved:
-                        print("start copy")
+                        print(str(datetime.now())+ " start copy")
                         try:
-                            copy_status = subprocess.run(["mv", fileName, dest_dir+"/"+currentFilename], check=True)
+                            copy_status = subprocess.run(["mv", fileName, self._dest_dir+"/"+currentFilename], check=True)
                             self._logger.debug(copy_status)
+                            self._num_images_copied += 1
                         except:
                             # raise Exception('Failed to copy file')
                             print("Failed to copy file, retrying")
@@ -470,72 +536,63 @@ class sonySDKcam():
                             self._to_save_queue.append(fileName)
                             self._lock_with_save.release()
                             continue
-                        # shutil.move(fileName,dest_dir+"/"+currentFilename)
-                        print("copied to "+ dest_dir+"/"+currentFilename )
-                        self.append_exif_info(currentFilename, dest_dir, exif_data, imageHash)
-                        print("generate preview")
+                        # shutil.move(fileName,self._dest_dir+"/"+currentFilename)
+                        print(str(datetime.now())+ " copied to "+ self._dest_dir+"/"+currentFilename )
+                        # if not self._disableHashAndPreview:
+                        #     self.append_exif_info(currentFilename, self._dest_dir, exif_data, imageHash)
+                        # else:
+                        #     self.append_exif_info(currentFilename, self._dest_dir, exif_data, "")
+                        # self.save_exif_info(serial_num)
+                        # self._exif_info = {}
+                        # if not self._disableHashAndPreview:
+                        #     print(str(datetime.now())+ " generate preview")
                         previewCount = 0
                         with lock_with_preview:
-                            previewCount = len(self._preview_images_raw)
+                            previewCount = len(self._preview_images_big_jpg)
                         if previewCount < 3:
-                            if "EXIF:ExifImageWidth" in exif_data and "EXIF:ExifImageHeight" in exif_data:
-                                self._im_width = exif_data["EXIF:ExifImageWidth"]
-                                self._im_height = exif_data["EXIF:ExifImageHeight"]
-                                self._im_aspect_ratio = self._im_width /self._im_height
-                            else:
-                                self._logger.warning("Cannot set image aspect ration from exif data")
+                            
                             with lock_with_preview:
-                                self._preview_images_raw.append(sourceImageContent)
+                                self._preview_images_big_jpg.append(sourceImageContent)
                         elif self._num_images_copied % 500 == 0:
                             with lock_with_preview:
-                                self._preview_images_raw.append(sourceImageContent)
-                                self._preview_images_raw.pop(0)
-                        print("done with copy thread")
-                    self._num_images_copied += 1
+                                self._preview_images_big_jpg.append(sourceImageContent)
+                                self._preview_images_big_jpg.pop(0)
+                    print(str(datetime.now())+ " done with copy thread")
                 except:
                     self._logger.warning("Save exception %s %s -> %s" % (currentFolder, currentFilename, dest))
                     self._num_images_failed += 1
 
 
     def load_preview_images(self, lock_with_save):
-        self._logger.debug('Load preview thread started')
-        self._generating_preview = True
-        previewStart = time()
-        previewLen = 0
-        with lock_with_save:
-            previewLen = len(self._preview_images_raw)
-        self._preview_images.clear()
-        for i in range(previewLen):
-            try:
-                rawIm = None
-                with lock_with_save:
-                    rawIm = rawpy.imread(BytesIO(bytes(self._preview_images_raw.pop(0))))
+        if not self._disableHashAndPreview:
+            self._logger.debug('Load preview thread started')
+            self._generating_preview = True
+            previewStart = time()
+            previewLen = 0
+            with lock_with_save:
+                previewLen = len(self._preview_images_big_jpg)
+            self._preview_images.clear()
+            for i in range(previewLen):
+                try:
+                    rawIm = None
+                    with lock_with_save:
+                        rawIm = rawpy.imread(BytesIO(bytes(self._preview_images_big_jpg.pop(0))))
 
-                im = Image.fromarray(rawIm.postprocess())
-                bytes_io = BytesIO()
-                im.save(bytes_io, format='JPEG')
-                if len(bytes_io.getvalue()) < 10000000:
-                    # avoid memory crash on app
-                    self._preview_images.append(base64.b64encode(bytes_io.getvalue()).decode("utf-8"))
-                self._logger.debug(len(bytes_io.getvalue()))
-            except Exception as e:
-                self._logger.warning("Failed to generate preview image")
-        self._generating_preview = False
-        self._logger.debug(f"Preview time {time() - previewStart}")
+                    im = Image.fromarray(rawIm.postprocess())
+                    bytes_io = BytesIO()
+                    im.save(bytes_io, format='JPEG')
+                    if len(bytes_io.getvalue()) < 10000000:
+                        # avoid memory crash on app
+                        self._preview_images.append(base64.b64encode(bytes_io.getvalue()).decode("utf-8"))
+                    self._logger.debug(len(bytes_io.getvalue()))
+                except Exception as e:
+                    self._logger.warning("Failed to generate preview image")
+            self._generating_preview = False
+            self._logger.debug(f"Preview time {time() - previewStart}")
 
     def get_state_as_string(self):
         """Return the state of the camera as a string."""
         return self.state.name
-
-    # def get_cam_image_count(self):
-    #     """Return the number of images captured by the camera, as tracked by this object."""
-    #     return self._image_count
-
-    # def get_cam_context(self):
-    #     return GPhotoCam._context
-
-    # def get_cam(self):
-    #     return self._gp_camera
 
     # def get_disk_info(self):
     #     # start_get_storageinfo = datetime.now()
@@ -594,7 +651,7 @@ class sonySDKcam():
     #     except:
     #         pass
 
-    def append_exif_info(self, name, dest_dir, exif_data, md5):
+    def append_exif_info(self, name, dest_dir, exif_data, md5, current_exif_info):
         # self._logger.debug(f'append_exif_info {len(data_bytes)} name {name} dest_dir {dest_dir}')
         filtered_exif = {}
         # if str(self.config.eosserialnumber) == '113053000777':
@@ -608,24 +665,153 @@ class sonySDKcam():
         # do not save temporary filename
         filtered_exif['FileName'] = name
         filtered_exif['FileDir'] = dest_dir
-        filtered_exif['md5'] = md5 
+        if not self._disableHashAndPreview:
+            filtered_exif['md5'] = md5 
         if 'EXIF:LensSerialNumber' in exif_data:
             self._lens_serial_number = exif_data['EXIF:LensSerialNumber']
         else:
             self._lens_serial_number = ''
 
         already_saved = False
-        if dest_dir not in self._exif_info:
-            self._exif_info[dest_dir] = []
+        if dest_dir not in current_exif_info:
+            current_exif_info[dest_dir] = {}
         else:
             # check if image is already saved
-            if any(filtered_exif['md5'] == s['md5'] for s in self._exif_info[dest_dir]):
-                already_saved = True
-                self._logger.debug("File already added to exif info")
+            if not self._disableHashAndPreview:
+                if filtered_exif['md5'] in current_exif_info[dest_dir]:
+                # if any(filtered_exif['md5'] == s['md5'] for s in current_exif_info[dest_dir]):
+                    already_saved = True
+                    self._logger.debug("File already added to exif info")
+            else:
+                if filtered_exif['FileName'] in current_exif_info[dest_dir]:
+                # if any(filtered_exif['md5'] == s['md5'] for s in current_exif_info[dest_dir]):
+                    already_saved = True
+                    self._logger.debug("File already added to exif info")
         if not already_saved:
-            self._exif_info[dest_dir].append(filtered_exif)
+            if not self._disableHashAndPreview:
+                current_exif_info[dest_dir][filtered_exif['md5']] = filtered_exif
+            else:
+                current_exif_info[dest_dir][filtered_exif['FileName']] = filtered_exif
+            # current_exif_info[dest_dir].append(filtered_exif)
+
+    def merge_gps_meta_data(self, gps_session_start_time, cam_serial_num, imu_lock ):
+        try:
+            # read gps data
+            imu_dir = os.path.join(self._mount_point, gps_session_start_time.strftime('%Y_%m_%d'))
+            complete_gps_dir = os.path.join(imu_dir, 'gpsData.csv')
+
+            gps_times = []
+            pi_times = []
+            lats = []
+            longs = []
+            alts = []
+            qualities = []
+            gpsLatDir = ''
+            gpsLongDir = ''
+
+            with imu_lock:
+                with open(complete_gps_dir) as csv_file:
+                    csv_reader = csv.reader(csv_file, delimiter=',')
+                    for row in csv_reader:
+                        if len(row) > 8:
+                            if float(row[1]) != 0 and float(row[2]) != 0 and float(row[3]) != 0 and float(row[5]) != 0 and float(row[7]) != 0:
+                                qualities.append(float(row[0]))
+                                gps_times.append(float(row[1]))
+                                pi_times.append(float(row[2]))
+                                lats.append(float(row[3]))
+                                gpsLatDir = row[4]
+                                longs.append(float(row[5]))
+                                gpsLongDir = row[6]
+                                alts.append(float(row[7]))
+            
+            qualities = np.asarray(qualities)
+            gps_times = np.asarray(gps_times)
+            lats = np.asarray(lats)
+            longs = np.asarray(longs)
+            alts = np.asarray(alts)
+
+            f_qual = interpolate.interp1d(gps_times, qualities)
+            f_lats = interpolate.interp1d(gps_times, lats)
+            f_longs = interpolate.interp1d(gps_times, longs)
+            f_alts = interpolate.interp1d(gps_times, alts)
+
+            # read accelerometer data
+            complete_accel_dir = os.path.join(imu_dir, 'accelData.csv')
+
+            heading = []
+            headingComp = []
+            kalmanX = []
+            kalmanY = []
+            pi_times = []
+            with imu_lock:
+                with open(complete_accel_dir) as csv_file:
+                    csv_reader = csv.reader(csv_file, delimiter=',')
+                    for row in csv_reader:
+                        if len(row) > 16:
+                            pi_times.append(float(row[0]))
+                            heading.append(float(row[13]))
+                            headingComp.append(float(row[14]))
+                            kalmanX.append(float(row[15]))
+                            kalmanY.append(float(row[16]))
+
+            heading = np.asarray(heading)
+            headingComp = np.asarray(headingComp)
+            kalmanX = np.asarray(kalmanX)
+            kalmanY = np.asarray(kalmanY)
+            pi_times = np.asarray(pi_times)
+
+            f_heading = interpolate.interp1d(pi_times, heading)
+            f_headingComp = interpolate.interp1d(pi_times, headingComp)
+            f_kalmanX = interpolate.interp1d(pi_times, kalmanX)
+            f_kalmanY = interpolate.interp1d(pi_times, kalmanY)
+
+            cam_session_dir = os.path.join(self._mount_point, gps_session_start_time.strftime('%Y_%m_%d'), gps_session_start_time.strftime('%H_%M_%S'))
+
+            cam_dir = os.path.join(cam_session_dir, cam_serial_num)
+            complete_cam_dir = os.path.join(cam_dir, 'exif_cam.json')
+            cam_info = {}
+            with open(complete_cam_dir, 'r') as f:
+                cam_info = json.load(f)
+            images = cam_info['exifInfo']
+            for key, im in images.items():
+                im_time = float(datetime.strptime(im['SubSecDateTimeOriginal'], '%Y:%m:%d %H:%M:%S%z').timestamp())
+                try:
+                    im['GPSDateStamp'] = im_time
+                    im['GPSLatitude'] = np.array(f_lats([im_time]))[0]
+                    im['GPSLongitude'] = np.array(f_longs([im_time]))[0]
+                    im['GPSAltitude'] = np.array(f_alts([im_time]))[0]
+                    im['GPSQuality'] = np.array(f_qual([im_time]))[0]
+                    im['Heading'] = np.array(f_heading([im_time]))[0]    
+                    im['HeadingComp'] = np.array(f_headingComp([im_time]))[0]     
+                    im['KalmanX'] = np.array(f_kalmanX([im_time]))[0]     
+                    im['KalmanY'] = np.array(f_kalmanY([im_time]))[0]                        
+                    im['GPSLatitudeDir'] = gpsLatDir
+                    im['GPSLongitudeDir'] = gpsLongDir
+                except Exception as ex:
+                    self._logger.warning(f"sonyCAM GPS append failed {ex}")
+            cam_info['exifInfo'] = images
+            with open(complete_cam_dir, 'w') as f:
+                json.dump(cam_info, f, sort_keys=True)   
+        except Exception as e:
+            self._logger.warning(f"sonyCAM Merge GPS data read failed {e}")
 
     def save_exif_info(self, serial_number):
+        # Iterate through all the folders on the SSD and check that all the exif info is up to date
+
+        et = ExifToolHelper()
+        for dirPath, dirs, files in os.walk(os.path.expanduser(self._mount_point)):
+            if not "exif_cam.json" in files:
+                imageNames = [name for name in files if (".JPG" in name or ".ARW" in name)]
+                if len(imageNames) >0:
+                    self._logger.debug('Generating exif info for directory: ' + dirPath)
+                    for i in range(len(imageNames)):
+                        imageNames[i] = os.path.join(dirPath,imageNames[i])
+                    # print("getting exif info for: " + str(absImageNames))
+                    exifData = et.get_tags(imageNames, self.KEYS_TO_SAVE)
+                    for i in range(len(exifData)):
+                        self.append_exif_info(os.path.split(imageNames[i])[-1],dirPath, exifData[i],"",self._exif_info)
+
+
         # Save exif info
         for exif_dir in self._exif_info:
             filename = os.path.join(exif_dir, 'exif_cam.json')
@@ -651,18 +837,25 @@ class sonySDKcam():
                 try:
                     with open(filename, 'r') as f:
                         exisiting_data = json.load(f)
-                    for item in self._exif_info[exif_dir]:
-                        if any(item['md5'] == s['md5'] for s in exisiting_data['exifInfo']):
+                    # print("current exif info: " + str(self._exif_info[exif_dir].items()))
+                    for key,value in self._exif_info[exif_dir].items():
+                        if key in exisiting_data['exifInfo']:
                             # item already added
-                            self._logger.debug(f"item already added {item['FileName']}")
+                            self._logger.debug(f"item already added {value['FileName']}")
                         else:
                             # new item -> add
-                            self._logger.debug(f"new item - append {item['FileName']}")
-                            exisiting_data['exifInfo'].append(item)
+                            self._logger.debug(f"new item - append {value['FileName']}")
+                            exisiting_data['exifInfo'][key] = value
                     with open(filename, 'w') as f:
                         json.dump(exisiting_data, f, sort_keys=True)
                 except Exception as e:
                     self._logger.warning(f"Append to existing file failed {e}")
+            dir_split = exif_dir.split('/')
+            try:
+                self.merge_gps_meta_data(datetime.strptime(dir_split[-3] +"_"+ dir_split[-2],"%Y_%m_%d_%H_%M_%S"), dir_split[-1], self._imu_lock)
+            except:
+                self._logger.warning("failed to append gps data to exif info in directory "+exif_dir)
+
 
     # def get_camera_image_hash(self, folder, name):
     #     h = "cam"
@@ -714,7 +907,8 @@ class sonySDKcam():
     #     return self._num_images_copied
         
     def sync_time(self):
-        self._sonyCamera.setDateTime(round(time.time()))
+        # print("Syncing time to "+str(round(datetime.now().timestamp())))
+        self._sonyCamera.setDateTime(round(datetime.now().timestamp()))
 
     @property
     def serial_num(self):
@@ -727,3 +921,7 @@ class sonySDKcam():
     def get_cam_image_count(self):
         """Return the number of images captured by the camera, as tracked by this object."""
         return self._image_count
+
+    def get_cam_copy_count(self):
+        """Return the number of images copied from the Raspberry pi memory to the SSD, as tracked by this object."""
+        return self._num_images_copied/2 # div 2 - copy raw and jpeg

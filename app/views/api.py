@@ -42,6 +42,7 @@ def images_captured():
   ret = {}
   cams = tricap_manager.get_cameras_as_list()
   ret['imageCount'] = [cam.get_cam_image_count() for cam in cams]
+  ret['copyCount'] = [cam.get_cam_copy_count() for cam in cams]
 
   return ret
 
@@ -62,25 +63,25 @@ def statistics():
   try:
     camera_data = ParseData()
     stats = {}
-    cameras = []
-    sum_battery = 0.0
-    battery_count = 0
-    for index, cam in enumerate(tricap_manager._cameras):
-      cam_info = cam.get_disk_info()
-      cam_info['id'] = str(cam.serial_num)
-      cameras.append(cam_info)
-      try:
-        _, _, battery_parse = camera_data.parse_camera(index)
-        sum_battery += float(battery_parse)
-        battery_count += 1
-      except Exception as ex:
-        pass
+    # cameras = []
+    # sum_battery = 0.0
+    # battery_count = 0
+    # for index, cam in enumerate(tricap_manager._cameras):
+    #   cam_info = cam.get_disk_info()
+    #   cam_info['id'] = str(cam.serial_num)
+    #   cameras.append(cam_info)
+    #   try:
+    #     _, _, battery_parse = camera_data.parse_camera(index)
+    #     sum_battery += float(battery_parse)
+    #     battery_count += 1
+    #   except Exception as ex:
+    #     pass
     stats['external'] = tricap_manager.external_disk_info()
-    stats['cameras'] = cameras
-    if battery_count == 0:
-      stats['battery'] = 0
-    else:
-      stats['battery'] = sum_battery / battery_count
+    # stats['cameras'] = cameras
+    # if battery_count == 0:
+    #   stats['battery'] = 0
+    # else:
+    #   stats['battery'] = sum_battery / battery_count
     config = TricapConfig()
     stats['captureInterval'] = float(config.get('image_capture_interval', TricapConfig.MISC_SECTION_HEADER))
     # _logger.debug(stats['captureInterval'])

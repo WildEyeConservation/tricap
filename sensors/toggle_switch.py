@@ -239,7 +239,7 @@ class LEDController(Observer):
             self.cam_captures[idx] = subject.value
 
         # self.capture_state = self.cam_captures == [1]*len(self.cam_captures)
-        self.capture_state = self.cam_captures == [1, 1, 1]
+        self.capture_state = self.cam_captures == [1]
 
         if self.error_state == 1:
             GPIO.output(GREEN_PIN, GPIO.HIGH)

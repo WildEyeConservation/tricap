@@ -70,7 +70,8 @@ class BerryImu(IMU):
         self._capturing_lock = capturing_lock
 
         now = datetime.datetime.now()
-        complete_dir = os.path.join(MOUNT_POINT, now.strftime('%Y_%m_%d'))
+        self._startDate = now.strftime('%Y_%m_%d')
+        complete_dir = os.path.join(MOUNT_POINT, self._startDate)
         self._dest = os.path.join(complete_dir, 'accelData.csv')
         if not os.path.isdir(complete_dir):
             os.makedirs(complete_dir)
@@ -359,6 +360,13 @@ class BerryImu(IMU):
             ##################### END Tilt Compensation ########################
 
             now = datetime.datetime.now()
+            # Check if the time has been updated to write to the correct directory
+            if self._startDate != now.strftime('%Y_%m_%d'):
+                self._startDate = now.strftime('%Y_%m_%d')
+                complete_dir = os.path.join(MOUNT_POINT, self._startDate)
+                self._dest = os.path.join(complete_dir, 'accelData.csv')
+                if not os.path.isdir(complete_dir):
+                    os.makedirs(complete_dir)
             with self._capturing_lock:
                 if os.path.ismount(MOUNT_POINT):
                     with open(self._dest,"ta", buffering=8192) as f:

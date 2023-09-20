@@ -139,6 +139,11 @@ class SerialInterface(SerialProcess):
               # do not open file while capture and copy has the file open 
               self.saveGga(request)
               self._lastGpsPacketDate = datetime.now()
+          elif request.sentence_type == 'RMC':
+#            self._logger.debug('Process {}'.format(request.sentence_type))
+            with self._capturing_lock:
+              # do not open file while capture and copy has the file open 
+              self.saveRmc(request)
           if len(msg) > 0:
             self.write(msg)
         except Exception as e:

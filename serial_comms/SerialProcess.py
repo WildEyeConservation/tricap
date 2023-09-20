@@ -96,7 +96,7 @@ class SerialProcess():
     def saveGga(self, msg):
         gps_datetime = datetime.now()
         pi_time = datetime.now()
-        if msg.timestamp != None and msg.latitude != 0.0 and msg.longitude != 0.0:
+        if msg.timestamp != None and msg.latitude != 0.0 and msg.longitude != 0.0 and self._firstGps:
             # calculate gps time with time zone
             self._hasGps = True
             tz = pytz.timezone('Africa/Johannesburg')
@@ -105,13 +105,6 @@ class SerialProcess():
             gps_time = datetime.strptime(gpsTimeString, '%H:%M:%S.%f')
             gps_time += timedelta(seconds=tzOffset)
             gps_datetime = pi_time.replace(hour=gps_time.hour, minute=gps_time.minute, second=gps_time.second, microsecond=gps_time.microsecond)
-            gpsTimeString = gps_datetime.strftime('%H:%M:%S.%f')
-            if not self._firstGps:
-                # first time with gps -> set pi time
-                self._firstGps = True
-                if self._cam_manager != None:
-                    self._cam_manager.sync_time(gpsTimeString)
-                                
             if os.path.ismount(MOUNT_POINT):
                 complete_dir = os.path.join(MOUNT_POINT, datetime.now().strftime('%Y_%m_%d'))
                 dest = os.path.join(complete_dir, 'gpsData.csv')
@@ -131,3 +124,13 @@ class SerialProcess():
                     print("GPS line not saved")
         else:
             self._hasGps = False
+
+    def saveRmc(self, msg):
+        if msg.datetime != None and msg.latitude != 0.0 and msg.longitude != 0.0 and not self._firstGps and self._cam_manager != None:
+            self._firstGps = True
+            # calculate gps time with time zone
+            tz = pytz.timezone('Africa/Johannesburg')
+            tzOffset = tz.utcoffset(datetime.now()).total_seconds()
+            gps_time = msg.datetime
+            gps_time += timedelta(seconds=tzOffset)
+            self._cam_manager.sync_time(gps_time.strftime('%Y-%m-%d %H:%M:%S.%f'))

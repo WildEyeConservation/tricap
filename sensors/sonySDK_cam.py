@@ -65,6 +65,8 @@ class sonySDKcam():
         self._num_images_failed = 0
         self._disableHashAndPreview = True
         self._memoryFsPath = memoryFsPath
+        self._preview_images = []
+        self._im_aspect_ratio = 0
 
         try:
             mount_status = subprocess.run(["mount", "tmpfs", "-t",  "tmpfs", memoryFsPath], check=True)
@@ -368,6 +370,8 @@ class sonySDKcam():
         self._num_images_failed = 0
         self._num_images_copied = 0
         self._image_count = 0
+        self._preview_images_big_jpg = []
+        self._preview_images = []
 
         if (not self._sonyCamera.setSaveInfo(self._memoryFsPath, session_start_date.strftime("%d_%m_%Y_%H_%M_%S")+"_", 1)):
             with sync_lock:
@@ -420,8 +424,8 @@ class sonySDKcam():
                     with sync_lock:
                         isCaptureDoneSet = capture_done[index].is_set()               
                     if not isCaptureDoneSet:
-                        self.save_exif_info(serial_number)
-                        self._exif_info = {}
+                        # self.save_exif_info(serial_number)
+                        # self._exif_info = {}
                         with sync_lock:
                             capture_done[index].set()
                         self._logger.debug('Exit capture thread 2')
@@ -489,14 +493,16 @@ class sonySDKcam():
                 dest = os.path.join(self._dest_dir, currentFilename)
                 if not os.path.isdir(self._dest_dir):
                     os.makedirs(self._dest_dir)
+                if not os.path.isdir(os.path.join(self._dest_dir,"in_progress")):
+                    os.makedirs(os.path.join(self._dest_dir,"in_progress"))
                 
-                if (not self._disableHashAndPreview):
-                    print(str(datetime.now())+ " read file for md5")
-                    sourceFile = open(fileName,"rb")
-                    sourceImageContent = sourceFile.read()
-                    print(str(datetime.now())+ " done reading, calculating hash")
-                    imageHash =  hashlib.md5(sourceImageContent).hexdigest() # 170ms for MD5 calc
-                    sourceFile.close()
+                # if (not self._disableHashAndPreview):
+                #     print(str(datetime.now())+ " read file for md5")
+                #     sourceFile = open(fileName,"rb")
+                #     sourceImageContent = sourceFile.read()
+                #     print(str(datetime.now())+ " done reading, calculating hash")
+                #     imageHash =  hashlib.md5(sourceImageContent).hexdigest() # 170ms for MD5 calc
+                #     sourceFile.close()
                 imageAlreadySaved = False
                 print(str(datetime.now())+ " Iterate over destination files")
                 if dest in computer_files:
@@ -524,9 +530,28 @@ class sonySDKcam():
                 # self._logger.debug('Save {} {}'.format(dest, imageAlreadySaved))
                 try:
                     if not imageAlreadySaved:
+
+                        if(".JPG" in currentFilename):
+                            previewCount = 0
+                            with lock_with_preview:
+                                previewCount = len(self._preview_images_big_jpg)
+                            if previewCount < 3:
+                                sourceFile = open(fileName,"rb")
+                                sourceImageContent = sourceFile.read()
+                                sourceFile.close()
+                                with lock_with_preview:
+                                    self._preview_images_big_jpg.append(sourceImageContent)
+                            elif self._num_images_copied % 500 == 0:
+                                with lock_with_preview:
+                                    self._preview_images_big_jpg.pop(0)
+                                    self._preview_images_big_jpg.append(sourceImageContent)
+
                         print(str(datetime.now())+ " start copy")
                         try:
-                            copy_status = subprocess.run(["mv", fileName, self._dest_dir+"/"+currentFilename], check=True)
+                            # First copy to the SSD, then move from the in_progress folder to the main folder. This is done
+                            # to try to make the copy "atomic" to avoid corrupted files on the SSD due to loss of power or similar.
+                            copy_status = subprocess.run(["mv", fileName, os.path.join(self._dest_dir,"in_progress",currentFilename)], check=True)
+                            copy_status = subprocess.run(["mv", os.path.join(self._dest_dir,"in_progress",currentFilename), os.path.join(self._dest_dir,currentFilename)], check=True)
                             self._logger.debug(copy_status)
                             self._num_images_copied += 1
                         except:
@@ -546,49 +571,43 @@ class sonySDKcam():
                         # self._exif_info = {}
                         # if not self._disableHashAndPreview:
                         #     print(str(datetime.now())+ " generate preview")
-                        previewCount = 0
-                        with lock_with_preview:
-                            previewCount = len(self._preview_images_big_jpg)
-                        if previewCount < 3:
-                            
-                            with lock_with_preview:
-                                self._preview_images_big_jpg.append(sourceImageContent)
-                        elif self._num_images_copied % 500 == 0:
-                            with lock_with_preview:
-                                self._preview_images_big_jpg.append(sourceImageContent)
-                                self._preview_images_big_jpg.pop(0)
+                        
                     print(str(datetime.now())+ " done with copy thread")
-                except:
-                    self._logger.warning("Save exception %s %s -> %s" % (currentFolder, currentFilename, dest))
+                except Exception as e:
+                    self._logger.warning("Save exception %s %s -> %s, error: %s" % (currentFolder, currentFilename, dest, str(e)))
                     self._num_images_failed += 1
 
 
     def load_preview_images(self, lock_with_save):
-        if not self._disableHashAndPreview:
-            self._logger.debug('Load preview thread started')
-            self._generating_preview = True
-            previewStart = time()
-            previewLen = 0
-            with lock_with_save:
-                previewLen = len(self._preview_images_big_jpg)
-            self._preview_images.clear()
-            for i in range(previewLen):
-                try:
-                    rawIm = None
-                    with lock_with_save:
-                        rawIm = rawpy.imread(BytesIO(bytes(self._preview_images_big_jpg.pop(0))))
-
-                    im = Image.fromarray(rawIm.postprocess())
-                    bytes_io = BytesIO()
-                    im.save(bytes_io, format='JPEG')
-                    if len(bytes_io.getvalue()) < 10000000:
-                        # avoid memory crash on app
-                        self._preview_images.append(base64.b64encode(bytes_io.getvalue()).decode("utf-8"))
-                    self._logger.debug(len(bytes_io.getvalue()))
-                except Exception as e:
-                    self._logger.warning("Failed to generate preview image")
+        self._logger.debug('Load preview thread started')
+        self._generating_preview = True
+        previewStart = time()
+        previewLen = 0
+        self._logger.debug('Wait on lock')
+        with lock_with_save:
+            previewLen = len(self._preview_images_big_jpg)
+        if (previewLen < 1):
             self._generating_preview = False
-            self._logger.debug(f"Preview time {time() - previewStart}")
+            return
+        self._logger.debug('Got length')
+        self._preview_images.clear()
+        for i in range(previewLen):
+            try:
+                self._logger.debug('Loading image')
+                with lock_with_save:
+                    im = Image.open(BytesIO(bytes(self._preview_images_big_jpg.pop(0))))
+                bytes_io = BytesIO()
+                self._logger.debug('Saving image')
+                im.save(bytes_io, format='JPEG', quality=20)
+                self._im_aspect_ratio = im.width/im.height
+                if len(bytes_io.getvalue()) < 10000000:
+                    # avoid memory crash on app
+                    self._preview_images.append(base64.b64encode(bytes_io.getvalue()).decode("utf-8"))
+                self._logger.debug(len(bytes_io.getvalue()))
+            except Exception as e:
+                self._logger.warning(f"Failed to generate preview image{e}")
+        self._generating_preview = False
+        self._logger.debug(f"Preview time {time() - previewStart}")
 
     def get_state_as_string(self):
         """Return the state of the camera as a string."""
@@ -800,6 +819,8 @@ class sonySDKcam():
 
         et = ExifToolHelper()
         for dirPath, dirs, files in os.walk(os.path.expanduser(self._mount_point)):
+            if "in_progress" in dirPath:
+                continue
             if not "exif_cam.json" in files:
                 imageNames = [name for name in files if (".JPG" in name or ".ARW" in name)]
                 if len(imageNames) >0:
@@ -807,10 +828,15 @@ class sonySDKcam():
                     for i in range(len(imageNames)):
                         imageNames[i] = os.path.join(dirPath,imageNames[i])
                     # print("getting exif info for: " + str(absImageNames))
-                    exifData = et.get_tags(imageNames, self.KEYS_TO_SAVE)
+                    exifData = []
+                    try:
+                        exifData = et.get_tags(imageNames, self.KEYS_TO_SAVE)
+                    except Exception as e:
+                        self._logger.warning(f"Failed to read exif data for {dirPath}, error: {e}")
+                        # Add an empty json entry for this directory to create an empty exif file, preventing this directory from being processed again
+                        self._exif_info[dirPath] = {}
                     for i in range(len(exifData)):
                         self.append_exif_info(os.path.split(imageNames[i])[-1],dirPath, exifData[i],"",self._exif_info)
-
 
         # Save exif info
         for exif_dir in self._exif_info:
@@ -855,6 +881,7 @@ class sonySDKcam():
                 self.merge_gps_meta_data(datetime.strptime(dir_split[-3] +"_"+ dir_split[-2],"%Y_%m_%d_%H_%M_%S"), dir_split[-1], self._imu_lock)
             except:
                 self._logger.warning("failed to append gps data to exif info in directory "+exif_dir)
+        self._exif_info = {}
 
 
     # def get_camera_image_hash(self, folder, name):

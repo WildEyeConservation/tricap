@@ -71,10 +71,10 @@ class BerryImu(IMU):
 
         now = datetime.datetime.now()
         self._startDate = now.strftime('%Y_%m_%d')
-        complete_dir = os.path.join(MOUNT_POINT, self._startDate)
-        self._dest = os.path.join(complete_dir, 'accelData.csv')
-        if not os.path.isdir(complete_dir):
-            os.makedirs(complete_dir)
+        self.complete_dir = os.path.join(MOUNT_POINT, self._startDate)
+        self._dest = os.path.join(self.complete_dir, 'accelData.csv')
+        if not os.path.isdir(self.complete_dir):
+            os.makedirs(self.complete_dir)
 
         self.detectIMU()     #Detect if BerryIMU is connected.
         if(self._BerryIMUversion == 99):
@@ -363,12 +363,12 @@ class BerryImu(IMU):
             # Check if the time has been updated to write to the correct directory
             if self._startDate != now.strftime('%Y_%m_%d'):
                 self._startDate = now.strftime('%Y_%m_%d')
-                complete_dir = os.path.join(MOUNT_POINT, self._startDate)
-                self._dest = os.path.join(complete_dir, 'accelData.csv')
-                if not os.path.isdir(complete_dir):
-                    os.makedirs(complete_dir)
+                self.complete_dir = os.path.join(MOUNT_POINT, self._startDate)
+                self._dest = os.path.join(self.complete_dir, 'accelData.csv')
             with self._capturing_lock:
                 if os.path.ismount(MOUNT_POINT):
+                    if not os.path.isdir(self.complete_dir):
+                        os.makedirs(self.complete_dir)
                     with open(self._dest,"ta", buffering=8192) as f:
                         f.write(str(now.timestamp())+","+str(ACCx)+","+str(ACCy)+","+str(ACCz)+","+str(rate_gyr_x)+","+str(rate_gyr_y)+","+str(rate_gyr_z)+","+str(gyroXangle)+","+str(gyroYangle)+","+str(gyroZangle)+","+str(MAGx)+","+str(MAGy)+","+str(MAGz)+","+str(heading)+","+str(tiltCompensatedHeading)+","+str(kalmanX)+","+str(kalmanY)+"\n")
             # if 1:                       #Change to '0' to stop showing the angles from the accelerometer

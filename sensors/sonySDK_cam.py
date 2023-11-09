@@ -43,6 +43,11 @@ class sonySDKcam():
         with self._lock_with_save:
                 self._to_save_queue.append(str(filename, encoding="utf-8"))
                 self._downLoadedCount += 1
+                if self._downLoadedCount % 2 == 0:
+                    # self._logger.info("Index: "+ str(round(self._downLoadedCount/2)) + " marginTimers: " + str(self._marginTimers))
+                    self._logger.info("Copy from camera time since trigger: " + str(datetime.now() - self._marginTimers[str(round(self._downLoadedCount/2))]))
+                    self._marginTimers[self._to_save_queue[-1]] = self._marginTimers[str(round(self._downLoadedCount/2))]
+                    del self._marginTimers[str(round(self._downLoadedCount/2))]
 
     def cameraErrorCallback(self, message):
         # print("Received an error callback from sony camera SDK "+str(message, encoding="utf-8"))
@@ -67,6 +72,8 @@ class sonySDKcam():
         self._memoryFsPath = memoryFsPath
         self._preview_images = []
         self._im_aspect_ratio = 0
+        self._triggers = 0
+        self._marginTimers = {}
 
         try:
             mount_status = subprocess.run(["mount", "tmpfs", "-t",  "tmpfs", memoryFsPath], check=True)
@@ -104,6 +111,12 @@ class sonySDKcam():
             # live view is enabled by default on connection and seems to use USB bandwidth, so toggle it to disable
             self._sonyCamera.toggleLiveView()
 
+            # set the camera file types
+            # raw+jpeg
+            # self._sonyCamera.setCameraFileSaveType(3)
+            # raw only
+            # self._sonyCamera.setCameraFileSaveType(2)
+
             print("Setting download callback")
             self._sonyCamera.setOnDownloadCompleteCallback(self.imageDownloadCompleteCallback)
             self._sonyCamera.setOnErrorCallBack(self.cameraErrorCallback)
@@ -123,182 +136,6 @@ class sonySDKcam():
     def is_cam_image_fresh(self):
         """Check if the camera image is new."""
         return False
-
-    # @staticmethod
-    # def autodetect():
-    #     """Run gphoto2 camera autodetection."""
-    #     return GPhotoCam._context.camera_autodetect()
-
-    # @property
-    # def config(self):
-    #     """Return a GPhotoConfig object for the camera."""
-    #     return GPhotoConfig(self._gp_camera, self._context)
-
-    # def _fetch_preview_camera_file(self, file_path: str):
-    #     camera_file = None
-    #     try:
-    #         camera_file = self._gp_camera.file_get(file_path.folder,
-    #                                                file_path.name,
-    #                                                gp.GP_FILE_TYPE_PREVIEW,
-    #                                                GPhotoCam._context)
-    #     except gp.GPhoto2Error:
-    #         self._logger.error('Error retrieving preview, is the capturetarget correctly set?')
-    #         raise
-
-    #     return camera_file
-
-    # def get_current_folder(self):
-    #     """Get the latest folder from the camera."""
-    #     folder = '/'
-    #     done_flag = False
-    #     while done_flag is False:
-    #         cam_folders = self._gp_camera.folder_list_folders(folder, self._context)
-    #         if len(cam_folders) == 0:
-    #             done_flag = True
-    #         else:
-    #             target_folder = cam_folders[-1][0]
-    #             if cam_folders[-1][0] == 'MISC':
-    #                 target_folder = cam_folders[-2][0]
-    #             folder += target_folder + '/'
-    #             for name, value in cam_folders:
-    #                 print(name)
-
-    #     return folder
-
-    # def calibrate_func(self):
-    #     print('running the calibration function.')
-    #     # get the latest folder and file
-    #     # folder = self.get_current_folder()
-    #     # print(folder)
-    #     # cam_files = self._gp_camera.folder_list_files('/', self._context)
-    #     # cam_files = self._gp_camera.folder_list_files(folder, self._context)
-    #     # print(cam_files)
-    #     # print(len(cam_files))
-    #     # fname = cam_files[-1][0]
-    #     # print(fname)
-
-    #     # capturing image
-    #     MAX_FOCUS_ATTEMPTS = 3
-    #     focus_flag = False
-    #     focus_attempts = 0
-    #     while focus_flag is False and focus_attempts < MAX_FOCUS_ATTEMPTS: 
-    #         trigger_attempts = 0
-    #         cam_fp = None
-    #         done_flag = False
-    #         while trigger_attempts < MAX_TRIGGER_ATTEMPTS and done_flag is False:
-    #             try:
-    #                 cam_fp = self._gp_camera.capture(gp.GP_CAPTURE_IMAGE, GPhotoCam._context)
-    #                 done_flag = True
-    #             except gp.GPhoto2Error as ex:
-    #                 self._logger.warning('Exception when trying to trigger a capture: %s', ex)
-    #                 trigger_attempts += 1
-    #                 sleep(1)
-
-    #         if done_flag is False:
-    #             print("could not successfully capture.")                
-    #             self._logger.error('Calibration: could not autofocus.')
-    #             return -1
-
-    #         print("successfully captured.")
-
-    #         # get the exif data from that file
-    #         buf = bytearray(128*1024)
-    #         self._gp_camera.file_read(cam_fp.folder, cam_fp.name, 
-    #                                   gp.GP_FILE_TYPE_NORMAL, 0, 
-    #                                   buf, GPhotoCam._context)
-    #         tfile = tempfile.NamedTemporaryFile('wb', delete=True)
-    #         tfile.write(buf)
-    #         exif_data = pyexifinfo.get_json(tfile.name)[0]
-
-    #         print(exif_data['MakerNotes:FocusDistanceLower'])
-    #         fdl = float(exif_data['MakerNotes:FocusDistanceLower'][:-2])
-    #         if fdl != 11.9:
-    #             print('not in focus')
-    #             focus_attempts += 1
-    #         else:
-    #             print('focussed')
-    #             focus_flag = True
-
-    #     if focus_flag is False:
-    #         print("impossible to focus")
-            
-    #         self._logger.error('Calibration: could not autofocus.')
-    #     else:
-    #         self._logger.info('Calibration: focus a success.')
-    #     # react to it, i.e. use autofocus to correct?
-
-
-    # def _update_image(self, camera_file):
-    #     file_data = camera_file.get_data_and_size()
-    #     # Make a copy, so that we can release the file_data object
-    #     self.data = memoryview(file_data).tobytes()
-    #     self._fresh_capture = True
-
-    # def _run_calibrate_if_needed(self):
-    #     if self.calibrate_func is not None:
-    #         if self.calibrate_step > 0:
-    #             print(self._image_count)
-    #             if self._image_count == 1 or self._image_count % self.calibrate_step == 0:
-    #                 self.calibrate_func()
-
-    # def _wait_for_image_path(self, before_capture_ts=None):
-    #     image_path = None
-
-    #     event = self._gp_camera.wait_for_event(100, GPhotoCam._context)
-    #     count = 0
-
-    #     if before_capture_ts is None:
-    #         while event[0] != gp.GP_EVENT_FILE_ADDED and count < 1000:
-    #             sleep(0.01)
-    #             event = self._gp_camera.wait_for_event(100, GPhotoCam._context)
-    #             count += 1
-    #     else:
-    #         while event[0] != gp.GP_EVENT_FILE_ADDED and (datetime.now() - before_capture_ts).total_seconds() < 1.2:
-    #             sleep(0.01)
-    #             event = self._gp_camera.wait_for_event(100, GPhotoCam._context)
-
-    #     if event[0] == gp.GP_EVENT_FILE_ADDED:
-    #         image_path = event[1]
-
-    #     return image_path
-
-    # def capture_and_read_exif(self):
-    #     """Capture an image and download it."""
-    #     file_path = self._gp_camera.capture(gp.GP_CAPTURE_IMAGE, GPhotoCam._context)
-
-    #     sleep(100e-3)
-
-    #     camera_files = self.list_camera_files()
-    #     exif_data = None
-    #     if len(camera_files) > 0:
-    #         # read last image exif data
-    #         folder, name = os.path.split(camera_files[-1])
-    #         camera_file = self._gp_camera.file_get(folder,
-    #                                             name,
-    #                                             gp.GP_FILE_TYPE_NORMAL,
-    #                                             GPhotoCam._context)
-    #         file_data = camera_file.get_data_and_size()
-    #         data_bytes = memoryview(file_data).tobytes()
-    #         tfile = tempfile.NamedTemporaryFile('wb', delete=True)            
-    #         tfile.write(data_bytes)
-    #         exif_data = pyexifinfo.get_json(tfile.name)[0]
-
-    #     return exif_data
-
-    # def cam_trigger(self):
-    #     """Trigger using either normal function or the eos remote release."""
-    #     if self.calibrate_step > 0:
-    #         # full press (bypass focus)
-    #         config = self._gp_camera.get_config(GPhotoCam._context)
-    #         GPhotoSetting(config.get_child_by_name('eosremoterelease')).set('Press Full')
-    #         self._gp_camera.set_config(config, GPhotoCam._context)
-
-    #         # release full press
-    #         config = self._gp_camera.get_config(GPhotoCam._context)
-    #         GPhotoSetting(config.get_child_by_name('eosremoterelease')).set('Release Full')
-    #         self._gp_camera.set_config(config, GPhotoCam._context)
-    #     else:
-    #         self._gp_camera.trigger_capture(GPhotoCam._context)
 
     def _trigger_capture(self):
         """Make the camera capture an image but don't wait for it to return.
@@ -360,8 +197,9 @@ class sonySDKcam():
 
         # local variables
         start = init_start
-        triggers = 0
+        self._triggers = 0
         missedCount = 0
+        self._marginTimers = {}
         with self._lock_with_save:
             self._downLoadedCount = 0
         self._session_id = session_start_date.strftime("%H_%M_%S")
@@ -396,9 +234,10 @@ class sonySDKcam():
                 if self._trigger_capture(): 
                     self._image_count += 1
                     self.state = CAMERA_STATES.CAPTURING                    
-                    triggers += 1
+                    self._triggers += 1
                     with self._lock_with_save:
-                        self._logger.info("Waiting for "+str(triggers*2 - self._downLoadedCount )+" images from the camera save queue is: " + str(len(self._to_save_queue)) + " images long.")
+                        self._logger.info("Waiting for "+str(self._triggers*2 - self._downLoadedCount )+" images from the camera save queue is: " + str(len(self._to_save_queue)) + " images long.")
+                        self._marginTimers[str(self._triggers)] = datetime.now()
                 else:
                     self._logger.warning('Could not successfully trigger a capture.')
                     self.state = CAMERA_STATES.ERROR_CAPTURE
@@ -414,11 +253,11 @@ class sonySDKcam():
 
             # check if thread is done
             if stop_capture.is_set() and stopTriggerInitiated:
-                if self._downLoadedCount + self._num_images_failed >= triggers*2 or copyWaitTimeout <=0:
+                if self._downLoadedCount + self._num_images_failed >= self._triggers*2 or copyWaitTimeout <=0:
                     # All the triggered images were downloaded by the sony SDK, it downloads a RAW and JPG image for every image taken
 
                     if copyWaitTimeout <=0:
-                        self._num_images_failed = triggers*2-(self._downLoadedCount+self._num_images_failed)
+                        self._num_images_failed = self._triggers*2-(self._downLoadedCount+self._num_images_failed)
                         self._logger.warning('failed to download '+str(self._num_images_failed)+ ' images from the camera')
                     isCaptureDoneSet = False
                     with sync_lock:
@@ -573,6 +412,9 @@ class sonySDKcam():
                         #     print(str(datetime.now())+ " generate preview")
                         
                     print(str(datetime.now())+ " done with copy thread")
+                    if fileName in self._marginTimers:
+                        self._logger.info("Copy to ssd time since trigger: " + str(datetime.now() - self._marginTimers[fileName]))
+                        del self._marginTimers[fileName]
                 except Exception as e:
                     self._logger.warning("Save exception %s %s -> %s, error: %s" % (currentFolder, currentFilename, dest, str(e)))
                     self._num_images_failed += 1

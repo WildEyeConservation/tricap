@@ -249,9 +249,11 @@ class TriCapCamsManager:
 
                 if not self.mount_disk():
                     # no disk -> do not copy
-                    self.state = CAM_MANAGER_STATES.STOPPED
+
+                    # Double cam setup captures to CAM SD cards, so ignore the SSD not mounting and continue anyway
+                    # self.state = CAM_MANAGER_STATES.STOPPED
                     self._logger.warning('Cam manager - no ssd -> do no start capturing')
-                    return
+                    # return
 
                 global_start_time = time.time() + 0.5
                 self._copy_start_time = datetime.now()

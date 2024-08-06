@@ -14,6 +14,7 @@ import time
 from scipy import interpolate
 import numpy as np
 import csv
+import atexit
 
 
 from time import sleep, time, strftime
@@ -54,9 +55,17 @@ class sonySDKcam():
         self._logger.error("Received an error callback from sony camera SDK "+str(message, encoding="utf-8"))
         raise Exception("Received an error callback from sony camera SDK "+str(message, encoding="utf-8"))
 
-    def exitGracefully(self, sig, frame):
+    def exitGracefully(self, *args):
+        print("exiting gracefully")
+        for i in range(1,self.numConnectedCameras+1):
+            self._sonyCamera.setOnErrorCallBack(None,i)
+        # for i in range(1,self.numConnectedCameras+1):
+        #     self._sonyCamera.disconnect(i)
+            # numConnectedCameras -=1
+        # sleep(0.5)
+        del self._sonyCamera
         self._sonyCamera = None
-        sys.exit(sig)
+        sys.exit(143)
 
     def __init__(self, memoryFsPath):
         """Constructor"""
@@ -84,22 +93,30 @@ class sonySDKcam():
             return
         
         # catch SIGINT and SIGTERM to destroy the sony camera object to not break the SDK when you do a systemctl stop
-        signal.signal(signal.SIGINT, self.exitGracefully)
+        # signal.signal(signal.SIGINT, self.exitGracefully)
         signal.signal(signal.SIGTERM, self.exitGracefully)
+        # atexit.register(self.exitGracefully, 1)
 
         self._sonyCamera = sonyCamera()
         numCameras = self._sonyCamera.getNumCameras()
         if (numCameras > 0):
             for i in range(1,numCameras+1):
+                retryCounter = 10
                 self._sonyCamera.connectCamera(i)
                 self.numConnectedCameras = self.numConnectedCameras +1
-                # counter = 100
                 while (not self._sonyCamera.isConnected(i)):
-                    sleep(0.1)
-                    # counter -= 1
-                    # if(counter <= 0):
-                    #     self._sonyCamera = None
-                    #     raise Exception("Sony Camera connection timeout!")
+                    counter = 50
+                    while (not self._sonyCamera.isConnected(i)):
+                        sleep(0.1)
+                        counter -= 1
+                        if(counter <= 0):
+                            self._sonyCamera.disconnect(i)
+                            self._sonyCamera.connectCamera(i)
+                            counter = 100
+                    retryCounter -= 1
+                    if(retryCounter <= 0):
+                        self._sonyCamera = None
+                        raise Exception("Sony Camera connection timeout!")
 
                 self._sonyCamera.loadProperties(i)
                 sleep(2)
@@ -150,11 +167,20 @@ class sonySDKcam():
             return False
         else:
             retval = True
+            # We need to send a shutter down, wait a bit, and send a shutter up command to capture an image. 
+            # To sync the images up in time as close as possible, do all the shutter downs, wait a bit, and do all the shutter up's
             for i in range(1,self.numConnectedCameras+1):
-                if(self._sonyCamera.isConnected(i) and self._sonyCamera.captureImage(i)):
+                if(self._sonyCamera.isConnected(i) and self._sonyCamera.shutterDown(i)):
                     retval = retval and True
                 else:
-                    self._logger.warning('Trigger Camera '+str(i)+' failed')
+                    self._logger.warning('Trigger Camera(shutter down) '+str(i)+' failed')
+                    retval = retval and False
+            sleep(0.035)
+            for i in range(1,self.numConnectedCameras+1):
+                if(self._sonyCamera.isConnected(i) and self._sonyCamera.shutterUp(i)):
+                    retval = retval and True
+                else:
+                    self._logger.warning('Trigger Camera(shutter up) '+str(i)+' failed')
                     retval = retval and False
             return retval
 

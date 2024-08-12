@@ -167,6 +167,21 @@ class sonySDKcam():
             return False
         else:
             retval = True
+            #autofocus first
+            for i in range(1,self.numConnectedCameras+1):
+                if(self._sonyCamera.isConnected(i) and self._sonyCamera.halfPressSet(i)):
+                    retval = retval and True
+                else:
+                    self._logger.warning('Focus Camera(shutter half down) '+str(i)+' failed')
+                    retval = retval and False
+            sleep(0.5)
+            for i in range(1,self.numConnectedCameras+1):
+                if(self._sonyCamera.isConnected(i) and self._sonyCamera.shutterHalfPressRelease(i)):
+                    retval = retval and True
+                else:
+                    self._logger.warning('Focus Camera(shutter half up) '+str(i)+' failed')
+                    retval = retval and False
+
             # We need to send a shutter down, wait a bit, and send a shutter up command to capture an image. 
             # To sync the images up in time as close as possible, do all the shutter downs, wait a bit, and do all the shutter up's
             for i in range(1,self.numConnectedCameras+1):

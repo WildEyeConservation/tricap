@@ -122,6 +122,25 @@ class SerialProcess():
                         print('No GPS timestamp')
                 except Exception as e:
                     print("GPS line not saved")
+            else:
+                complete_dir = os.path.join("/home/pi/GPS_IMU_Data", datetime.now().strftime('%Y_%m_%d'))
+                dest = os.path.join(complete_dir, 'gpsData.csv')
+                if not os.path.isdir(complete_dir):
+                    print("SSD not mounted, falling back to builtin storage GPS_IMU_Data for GPS data")
+                    os.makedirs(complete_dir)
+                try:
+                    if msg.timestamp != None and msg.latitude != 0.0 and msg.longitude != 0.0:
+                        alt = 0.0
+                        if msg.altitude != None:
+                            alt = msg.altitude
+                        line=(f"{str(msg.gps_qual)},{str(gps_datetime.timestamp())},{str(pi_time.timestamp())},{str(msg.latitude)},{str(msg.lat_dir)},{str(msg.longitude)},{str(msg.lon_dir)},{str(alt)},{str(msg.horizontal_dil)},{str(msg.geo_sep)}\n")
+                        with open(dest, 'ta') as f:
+                            f.write(line)
+                    else:
+                        print('No GPS timestamp')
+                except Exception as e:
+                    print("GPS line not saved")
+                
         else:
             self._hasGps = False
 

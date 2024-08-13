@@ -371,6 +371,14 @@ class BerryImu(IMU):
                         os.makedirs(self.complete_dir)
                     with open(self._dest,"ta", buffering=8192) as f:
                         f.write(str(now.timestamp())+","+str(ACCx)+","+str(ACCy)+","+str(ACCz)+","+str(rate_gyr_x)+","+str(rate_gyr_y)+","+str(rate_gyr_z)+","+str(gyroXangle)+","+str(gyroYangle)+","+str(gyroZangle)+","+str(MAGx)+","+str(MAGy)+","+str(MAGz)+","+str(heading)+","+str(tiltCompensatedHeading)+","+str(kalmanX)+","+str(kalmanY)+"\n")
+                else:
+                    self.complete_dir = os.path.join("/home/pi/GPS_IMU_Data", self._startDate)
+                    self._dest = os.path.join(self.complete_dir, 'accelData.csv')
+                    if not os.path.isdir(self.complete_dir):
+                        print("SSD not mounted, falling back to builtin storage GPS_IMU_Data for Accel data")
+                        os.makedirs(self.complete_dir)
+                    with open(self._dest,"ta", buffering=8192) as f:
+                        f.write(str(now.timestamp())+","+str(ACCx)+","+str(ACCy)+","+str(ACCz)+","+str(rate_gyr_x)+","+str(rate_gyr_y)+","+str(rate_gyr_z)+","+str(gyroXangle)+","+str(gyroYangle)+","+str(gyroZangle)+","+str(MAGx)+","+str(MAGy)+","+str(MAGz)+","+str(heading)+","+str(tiltCompensatedHeading)+","+str(kalmanX)+","+str(kalmanY)+"\n")
             # if 1:                       #Change to '0' to stop showing the angles from the accelerometer
             #     outputString += "#  ACCX Angle %5.2f ACCY Angle %5.2f  #  " % (AccXangle, AccYangle)
 

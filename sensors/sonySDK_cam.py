@@ -142,6 +142,9 @@ class sonySDKcam():
                 # self._sonyCamera.setOnDownloadCompleteCallback(self.imageDownloadCompleteCallback)
                 self._sonyCamera.setOnErrorCallBack(self.cameraErrorCallback,i)
 
+                camModel = self._sonyCamera.getModel(i)
+                if 'ILCE-7RM4A' not in camModel: self.cameraToDelay = i
+
                 if (not self._sonyCamera.setSaveInfo(memoryFsPath, "IMG3_"+str(i)+"_", 1,i)):
                     raise Exception("Failed to set the save location. Make sure that the following path exists and has appropriate permissions: " + memoryFsPath)
                 
@@ -167,14 +170,39 @@ class sonySDKcam():
             return False
         else:
             retval = True
+            #autofocus first
+            for i in range(1,self.numConnectedCameras+1):
+                if(self._sonyCamera.isConnected(i) and self._sonyCamera.halfPressSet(i)):
+                    retval = retval and True
+                else:
+                    self._logger.warning('Focus Camera(shutter half down) '+str(i)+' failed')
+                    retval = retval and False
+            sleep(0.25)
+            for i in range(1,self.numConnectedCameras+1):
+                if(self._sonyCamera.isConnected(i) and self._sonyCamera.shutterHalfPressRelease(i)):
+                    retval = retval and True
+                else:
+                    self._logger.warning('Focus Camera(shutter half up) '+str(i)+' failed')
+                    retval = retval and False
+
             # We need to send a shutter down, wait a bit, and send a shutter up command to capture an image. 
             # To sync the images up in time as close as possible, do all the shutter downs, wait a bit, and do all the shutter up's
             for i in range(1,self.numConnectedCameras+1):
+                if i==self.cameraToDelay: continue
                 if(self._sonyCamera.isConnected(i) and self._sonyCamera.shutterDown(i)):
                     retval = retval and True
                 else:
                     self._logger.warning('Trigger Camera(shutter down) '+str(i)+' failed')
                     retval = retval and False
+            
+            # This is a hack
+            sleep(0.665)
+            if(self._sonyCamera.isConnected(self.cameraToDelay) and self._sonyCamera.shutterDown(self.cameraToDelay)):
+                retval = retval and True
+            else:
+                self._logger.warning('Trigger Camera(shutter down) '+str(self.cameraToDelay)+' failed')
+                retval = retval and False    
+
             sleep(0.035)
             for i in range(1,self.numConnectedCameras+1):
                 if(self._sonyCamera.isConnected(i) and self._sonyCamera.shutterUp(i)):

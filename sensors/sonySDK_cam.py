@@ -109,7 +109,7 @@ class sonySDKcam():
 
         self._sonyCamera = sonyCamera()
         numCameras = self._sonyCamera.getNumCameras()
-        self.movieStarted = []
+        self.movieStarted = [False,False,False]
         if (numCameras > 0):
             for i in range(1,numCameras+1):
                 retryCounter = 10

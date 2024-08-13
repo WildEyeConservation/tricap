@@ -204,7 +204,7 @@ class sonySDKcam():
                     else:
                         self._logger.warning('Trigger Camera(movie up) '+str(i)+' failed')
                         retval = retval and False
-            sleep(0.5)
+            sleep(2)
             for i in range(1,self.numConnectedCameras+1):
                 if(self._sonyCamera.isConnected(i) and self._sonyCamera.movieDown(i)):
                     retval = retval and True
@@ -329,11 +329,8 @@ class sonySDKcam():
                     for i in range(1,self.numConnectedCameras+1):
                         # Stop movie recordings if they were started
                         if self.movieStarted[i]:
-                            if(self._sonyCamera.isConnected(i) and self._sonyCamera.movieUp(i)):
-                                retval = retval and True
-                            else:
+                            if not (self._sonyCamera.isConnected(i) and self._sonyCamera.movieUp(i)):
                                 self._logger.warning('Trigger Camera(movie up) '+str(i)+' failed')
-                                retval = retval and False
                             self.movieStarted[i] = False
 
                     # All the triggered images were downloaded by the sony SDK, it downloads a RAW and JPG image for every image taken

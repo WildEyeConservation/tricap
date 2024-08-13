@@ -58,7 +58,23 @@ class sonySDKcam():
     def exitGracefully(self, *args):
         print("exiting gracefully")
         for i in range(1,self.numConnectedCameras+1):
+            # Stop movie recordings if they were started
+            if self.movieStarted[i]:
+                if(self._sonyCamera.isConnected(i) and self._sonyCamera.movieDown(i)):
+                    retval = retval and True
+                else:
+                    self._logger.warning('Trigger Camera(movie down) '+str(i)+' failed')
+                    retval = retval and False
+                sleep(0.035)
+                if(self._sonyCamera.isConnected(i) and self._sonyCamera.movieUp(i)):
+                    retval = retval and True
+                else:
+                    self._logger.warning('Trigger Camera(movie up) '+str(i)+' failed')
+                    retval = retval and False
+                    
+                self.movieStarted[i] = False
             self._sonyCamera.setOnErrorCallBack(None,i)
+            
         # for i in range(1,self.numConnectedCameras+1):
         #     self._sonyCamera.disconnect(i)
             # numConnectedCameras -=1
@@ -99,6 +115,7 @@ class sonySDKcam():
 
         self._sonyCamera = sonyCamera()
         numCameras = self._sonyCamera.getNumCameras()
+        self.movieStarted = []
         if (numCameras > 0):
             for i in range(1,numCameras+1):
                 retryCounter = 10
@@ -146,6 +163,7 @@ class sonySDKcam():
                     raise Exception("Failed to set the save location. Make sure that the following path exists and has appropriate permissions: " + memoryFsPath)
                 
                 self._serial_num = self._sonyCamera.getModel(i).replace("-","_")
+                self.movieStarted[i] = False
 
             # Give the camera a moment to settle before starting to capture images. Prevents the first capture from being missed
             sleep(3)
@@ -185,18 +203,41 @@ class sonySDKcam():
             # We need to send a shutter down, wait a bit, and send a shutter up command to capture an image. 
             # To sync the images up in time as close as possible, do all the shutter downs, wait a bit, and do all the shutter up's
             for i in range(1,self.numConnectedCameras+1):
-                if(self._sonyCamera.isConnected(i) and self._sonyCamera.shutterDown(i)):
+                if(self._sonyCamera.isConnected(i) and self._sonyCamera.movieDown(i)):
                     retval = retval and True
                 else:
-                    self._logger.warning('Trigger Camera(shutter down) '+str(i)+' failed')
+                    self._logger.warning('Trigger Camera(movie down) '+str(i)+' failed')
                     retval = retval and False
             sleep(0.035)
             for i in range(1,self.numConnectedCameras+1):
-                if(self._sonyCamera.isConnected(i) and self._sonyCamera.shutterUp(i)):
+                if(self._sonyCamera.isConnected(i) and self._sonyCamera.movieUp(i)):
                     retval = retval and True
                 else:
-                    self._logger.warning('Trigger Camera(shutter up) '+str(i)+' failed')
+                    self._logger.warning('Trigger Camera(movie up) '+str(i)+' failed')
                     retval = retval and False
+
+            for i in range(1,self.numConnectedCameras+1):
+                # A movie is started by pressing and releasing the movie button. So if we did this loop 
+                # before and we want to stop and start the movie, we need to hit the button a second time here
+                if self.movieStarted[i]:
+                    for i in range(1,self.numConnectedCameras+1):
+                        if(self._sonyCamera.isConnected(i) and self._sonyCamera.movieDown(i)):
+                            retval = retval and True
+                        else:
+                            self._logger.warning('Trigger Camera(movie down) '+str(i)+' failed')
+                            retval = retval and False
+                    sleep(0.035)
+                    for i in range(1,self.numConnectedCameras+1):
+                        if(self._sonyCamera.isConnected(i) and self._sonyCamera.movieUp(i)):
+                            retval = retval and True
+                        else:
+                            self._logger.warning('Trigger Camera(movie up) '+str(i)+' failed')
+                            retval = retval and False
+
+                    self.movieStarted[i] = self.movieStarted[i] and retval
+                else:
+                    self.movieStarted[i] = retval
+                
             return retval
 
     def capture(self, continuous=False, barrier: threading.Barrier = None, stop_event=None):
@@ -308,8 +349,23 @@ class sonySDKcam():
             # check if thread is done
             if stop_capture.is_set() and stopTriggerInitiated:
                 if self._downLoadedCount + self._num_images_failed >= self._triggers*2 or copyWaitTimeout <=0:
-                    # All the triggered images were downloaded by the sony SDK, it downloads a RAW and JPG image for every image taken
+                    for i in range(1,self.numConnectedCameras+1):
+                        # Stop movie recordings if they were started
+                        if self.movieStarted[i]:
+                            if(self._sonyCamera.isConnected(i) and self._sonyCamera.movieDown(i)):
+                                retval = retval and True
+                            else:
+                                self._logger.warning('Trigger Camera(movie down) '+str(i)+' failed')
+                                retval = retval and False
+                            sleep(0.035)
+                            if(self._sonyCamera.isConnected(i) and self._sonyCamera.movieUp(i)):
+                                retval = retval and True
+                            else:
+                                self._logger.warning('Trigger Camera(movie up) '+str(i)+' failed')
+                                retval = retval and False
+                            self.movieStarted[i] = False
 
+                    # All the triggered images were downloaded by the sony SDK, it downloads a RAW and JPG image for every image taken
                     if copyWaitTimeout <=0:
                         self._num_images_failed = self._triggers*2-(self._downLoadedCount+self._num_images_failed)
                         self._logger.warning('failed to download '+str(self._num_images_failed)+ ' images from the camera')

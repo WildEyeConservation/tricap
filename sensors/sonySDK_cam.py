@@ -60,12 +60,6 @@ class sonySDKcam():
         for i in range(1,self.numConnectedCameras+1):
             # Stop movie recordings if they were started
             if self.movieStarted[i]:
-                if(self._sonyCamera.isConnected(i) and self._sonyCamera.movieDown(i)):
-                    retval = retval and True
-                else:
-                    self._logger.warning('Trigger Camera(movie down) '+str(i)+' failed')
-                    retval = retval and False
-                sleep(0.035)
                 if(self._sonyCamera.isConnected(i) and self._sonyCamera.movieUp(i)):
                     retval = retval and True
                 else:
@@ -200,43 +194,24 @@ class sonySDKcam():
                     self._logger.warning('Focus Camera(shutter half up) '+str(i)+' failed')
                     retval = retval and False
 
-            # We need to send a shutter down, wait a bit, and send a shutter up command to capture an image. 
-            # To sync the images up in time as close as possible, do all the shutter downs, wait a bit, and do all the shutter up's
+            # We start a movie by setting movie down. The camera has a max recording length of about 30 minutes, 
+            # so when we go through the loop, stop the recording and start it again
+            for i in range(1,self.numConnectedCameras+1):
+                if self.movieStarted[i]:
+                    if(self._sonyCamera.isConnected(i) and self._sonyCamera.movieUp(i)):
+                        retval = retval and True
+                        self.movieStarted[i] = False
+                    else:
+                        self._logger.warning('Trigger Camera(movie up) '+str(i)+' failed')
+                        retval = retval and False
+            sleep(0.5)
             for i in range(1,self.numConnectedCameras+1):
                 if(self._sonyCamera.isConnected(i) and self._sonyCamera.movieDown(i)):
                     retval = retval and True
+                    self.movieStarted[i] = True
                 else:
                     self._logger.warning('Trigger Camera(movie down) '+str(i)+' failed')
                     retval = retval and False
-            sleep(0.035)
-            for i in range(1,self.numConnectedCameras+1):
-                if(self._sonyCamera.isConnected(i) and self._sonyCamera.movieUp(i)):
-                    retval = retval and True
-                else:
-                    self._logger.warning('Trigger Camera(movie up) '+str(i)+' failed')
-                    retval = retval and False
-
-            for i in range(1,self.numConnectedCameras+1):
-                # A movie is started by pressing and releasing the movie button. So if we did this loop 
-                # before and we want to stop and start the movie, we need to hit the button a second time here
-                if self.movieStarted[i]:
-                    for i in range(1,self.numConnectedCameras+1):
-                        if(self._sonyCamera.isConnected(i) and self._sonyCamera.movieDown(i)):
-                            retval = retval and True
-                        else:
-                            self._logger.warning('Trigger Camera(movie down) '+str(i)+' failed')
-                            retval = retval and False
-                    sleep(0.035)
-                    for i in range(1,self.numConnectedCameras+1):
-                        if(self._sonyCamera.isConnected(i) and self._sonyCamera.movieUp(i)):
-                            retval = retval and True
-                        else:
-                            self._logger.warning('Trigger Camera(movie up) '+str(i)+' failed')
-                            retval = retval and False
-
-                    self.movieStarted[i] = self.movieStarted[i] and retval
-                else:
-                    self.movieStarted[i] = retval
                 
             return retval
 
@@ -314,6 +289,8 @@ class sonySDKcam():
         # How long to wait for copies from the camera until it is assumed that the photos did not make it.
         copyWaitTimeout = 1
 
+        intervalmin = interval *60
+
         # main loop
         while True:
             if stop_capture.is_set() and not stopTriggerInitiated:
@@ -340,10 +317,10 @@ class sonySDKcam():
                             with sync_lock:
                                 capture_done[index].set()
                             raise Exception("Camera "+str(i)+" is not connected!")
-                start += interval
+                start += intervalmin
                 while start - time() < 0.5:
                     self._logger.warning(f"next capture delayed {start - time()}")
-                    start += interval
+                    start += intervalmin
                     missedCount += 1
 
             # check if thread is done
@@ -352,12 +329,6 @@ class sonySDKcam():
                     for i in range(1,self.numConnectedCameras+1):
                         # Stop movie recordings if they were started
                         if self.movieStarted[i]:
-                            if(self._sonyCamera.isConnected(i) and self._sonyCamera.movieDown(i)):
-                                retval = retval and True
-                            else:
-                                self._logger.warning('Trigger Camera(movie down) '+str(i)+' failed')
-                                retval = retval and False
-                            sleep(0.035)
                             if(self._sonyCamera.isConnected(i) and self._sonyCamera.movieUp(i)):
                                 retval = retval and True
                             else:

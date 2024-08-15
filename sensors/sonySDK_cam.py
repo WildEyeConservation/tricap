@@ -115,9 +115,9 @@ class sonySDKcam():
 
         if (not self._sonyCamera.setSaveInfo(self._memoryFsPath, "IMG3_"+str(i)+"_", 1,i)):
             if shouldRaiseException:
-                raise Exception("Failed to set the save location. Make sure that the following path exists and has appropriate permissions: " + self.memoryFsPath)
+                raise Exception("Failed to set the save location. Make sure that the following path exists and has appropriate permissions: " + self._memoryFsPath)
             else: 
-                self._logger.warning("Failed to set the save location for camera "+str(i)+". Make sure that the following path exists and has appropriate permissions: " + self.memoryFsPath)
+                self._logger.warning("Failed to set the save location for camera "+str(i)+". Make sure that the following path exists and has appropriate permissions: " + self._memoryFsPath)
                 return
 
     def __init__(self, memoryFsPath):

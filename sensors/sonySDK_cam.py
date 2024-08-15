@@ -113,7 +113,7 @@ class sonySDKcam():
         # self._sonyCamera.setOnDownloadCompleteCallback(self.imageDownloadCompleteCallback)
         self._sonyCamera.setOnErrorCallBack(self.cameraErrorCallback,i)
 
-        if (not self._sonyCamera.setSaveInfo(self.memoryFsPath, "IMG3_"+str(i)+"_", 1,i)):
+        if (not self._sonyCamera.setSaveInfo(self._memoryFsPath, "IMG3_"+str(i)+"_", 1,i)):
             if shouldRaiseException:
                 raise Exception("Failed to set the save location. Make sure that the following path exists and has appropriate permissions: " + self.memoryFsPath)
             else: 

@@ -67,6 +67,59 @@ class sonySDKcam():
         self._sonyCamera = None
         sys.exit(143)
 
+    def connectAndConfigureCamera(self, i, shouldRaiseException:bool):
+        retryCounter = 10
+        self._sonyCamera.connectCamera(i)
+        self.numConnectedCameras = self.numConnectedCameras +1
+        while (not self._sonyCamera.isConnected(i)):
+            counter = 50
+            while (not self._sonyCamera.isConnected(i)):
+                sleep(0.1)
+                counter -= 1
+                if(counter <= 0):
+                    self._sonyCamera.disconnect(i)
+                    self._sonyCamera.connectCamera(i)
+                    counter = 100
+            retryCounter -= 1
+            if(retryCounter <= 0):
+                self._sonyCamera = None
+                if shouldRaiseException:
+                    raise Exception("Sony Camera connection timeout!")
+                else: 
+                    self._logger.warning('Sony camera '+str(i)+ ' connection timed out!')
+                    return
+
+        self._sonyCamera.loadProperties(i)
+        sleep(2)
+        # This sets the file chunk size for transferring images from the camera to the PI ram fileSystem. The max seems to be 20Mb chunks, as configured here. 
+        # This allows the shutter events sent from the SDK to not be blocked for too long while images are transferred, preventing erratic shutter timing.
+        self._sonyCamera.setTransferBufferSize(20,i)
+
+        # This instructs the camera to save images to the PC only and not on the SD card.
+        # self._sonyCamera.setCameraSaveLocation(1)
+        # Save to memory card only
+        self._sonyCamera.setCameraSaveLocation(2,i)
+
+        # live view is enabled by default on connection and seems to use USB bandwidth, so toggle it to disable
+        self._sonyCamera.toggleLiveView(i)
+
+        # set the camera file types
+        # raw+jpeg
+        # self._sonyCamera.setCameraFileSaveType(3)
+        # raw only
+        # self._sonyCamera.setCameraFileSaveType(2)
+
+        print("Setting download callback")
+        # self._sonyCamera.setOnDownloadCompleteCallback(self.imageDownloadCompleteCallback)
+        self._sonyCamera.setOnErrorCallBack(self.cameraErrorCallback,i)
+
+        if (not self._sonyCamera.setSaveInfo(self.memoryFsPath, "IMG3_"+str(i)+"_", 1,i)):
+            if shouldRaiseException:
+                raise Exception("Failed to set the save location. Make sure that the following path exists and has appropriate permissions: " + self.memoryFsPath)
+            else: 
+                self._logger.warning("Failed to set the save location for camera "+str(i)+". Make sure that the following path exists and has appropriate permissions: " + self.memoryFsPath)
+                return
+
     def __init__(self, memoryFsPath):
         """Constructor"""
         self._exif_info = {}
@@ -101,49 +154,7 @@ class sonySDKcam():
         numCameras = self._sonyCamera.getNumCameras()
         if (numCameras > 0):
             for i in range(1,numCameras+1):
-                retryCounter = 10
-                self._sonyCamera.connectCamera(i)
-                self.numConnectedCameras = self.numConnectedCameras +1
-                while (not self._sonyCamera.isConnected(i)):
-                    counter = 50
-                    while (not self._sonyCamera.isConnected(i)):
-                        sleep(0.1)
-                        counter -= 1
-                        if(counter <= 0):
-                            self._sonyCamera.disconnect(i)
-                            self._sonyCamera.connectCamera(i)
-                            counter = 100
-                    retryCounter -= 1
-                    if(retryCounter <= 0):
-                        self._sonyCamera = None
-                        raise Exception("Sony Camera connection timeout!")
-
-                self._sonyCamera.loadProperties(i)
-                sleep(2)
-                # This sets the file chunk size for transferring images from the camera to the PI ram fileSystem. The max seems to be 20Mb chunks, as configured here. 
-                # This allows the shutter events sent from the SDK to not be blocked for too long while images are transferred, preventing erratic shutter timing.
-                self._sonyCamera.setTransferBufferSize(20,i)
-
-                # This instructs the camera to save images to the PC only and not on the SD card.
-                # self._sonyCamera.setCameraSaveLocation(1)
-                # Save to memory card only
-                self._sonyCamera.setCameraSaveLocation(2,i)
-
-                # live view is enabled by default on connection and seems to use USB bandwidth, so toggle it to disable
-                self._sonyCamera.toggleLiveView(i)
-
-                # set the camera file types
-                # raw+jpeg
-                # self._sonyCamera.setCameraFileSaveType(3)
-                # raw only
-                # self._sonyCamera.setCameraFileSaveType(2)
-
-                print("Setting download callback")
-                # self._sonyCamera.setOnDownloadCompleteCallback(self.imageDownloadCompleteCallback)
-                self._sonyCamera.setOnErrorCallBack(self.cameraErrorCallback,i)
-
-                if (not self._sonyCamera.setSaveInfo(memoryFsPath, "IMG3_"+str(i)+"_", 1,i)):
-                    raise Exception("Failed to set the save location. Make sure that the following path exists and has appropriate permissions: " + memoryFsPath)
+                self.connectAndConfigureCamera(i, True)
                 
                 self._serial_num = self._sonyCamera.getModel(i).replace("-","_")
 
@@ -173,14 +184,14 @@ class sonySDKcam():
                 if(self._sonyCamera.isConnected(i) and self._sonyCamera.shutterDown(i)):
                     retval = retval and True
                 else:
-                    self._logger.warning('Trigger Camera(shutter down) '+str(i)+' failed')
+                    self._logger.warning('Trigger Camera(shutter down) '+ self._sonyCamera.getModel(i).replace("-","_")+ ' index:' +str(i)+' failed')
                     retval = retval and False
             sleep(0.035)
             for i in range(1,self.numConnectedCameras+1):
                 if(self._sonyCamera.isConnected(i) and self._sonyCamera.shutterUp(i)):
                     retval = retval and True
                 else:
-                    self._logger.warning('Trigger Camera(shutter up) '+str(i)+' failed')
+                    self._logger.warning('Trigger Camera(shutter up) '+ self._sonyCamera.getModel(i).replace("-","_")+ ' index:'+str(i)+' failed')
                     retval = retval and False
             return retval
 
@@ -206,6 +217,7 @@ class sonySDKcam():
             before_capture_ts = datetime.now()
 
             if space_available and self._trigger_capture():  # Checks to see if something went wrong with the cameras
+                self.capture_reconnect_retries = 3
                 self._image_count += 1
                 self.state = CAMERA_STATES.CAPTURING
             else:
@@ -213,7 +225,15 @@ class sonySDKcam():
                 self.state = CAMERA_STATES.ERROR_CAPTURE
             for i in range(1,self.numConnectedCameras+1):
                 if not self._sonyCamera.isConnected(i):
-                    raise Exception("Camera "+str(i)+" is not connected!")
+                    if self.capture_reconnect_retries > 0:
+                        self._logger.warning('Camera '+ self._sonyCamera.getModel(i).replace("-","_")+ ' index:' +str(i)+' not connected, attempting reconnection...')
+                        self._sonyCamera.setOnErrorCallBack(None,i)
+                        self._sonyCamera.disconnect(i)
+                        self.connectAndConfigureCamera(i,False)
+                        self.capture_reconnect_retries = self.capture_reconnect_retries-1
+                    else:
+                        self._logger.warning('Camera '+ self._sonyCamera.getModel(i).replace("-","_")+ ' index:'+str(i)+' not connected and reconnects failed, raising exception.')
+                        raise Exception("Camera "+str(i)+" is not connected!")
 
             if not continuous:
                 return

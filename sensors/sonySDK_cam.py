@@ -293,6 +293,7 @@ class sonySDKcam():
                     self._image_count += 1
                     self.state = CAMERA_STATES.CAPTURING                    
                     self._triggers += 1
+                    self.capture_copy_reconnect_retries = 2
                     with self._lock_with_save:
                         self._logger.info("Waiting for "+str(self._triggers*2 - self._downLoadedCount )+" images from the camera save queue is: " + str(len(self._to_save_queue)) + " images long.")
                         self._marginTimers[str(self._triggers)] = datetime.now()
@@ -301,9 +302,17 @@ class sonySDKcam():
                     self.state = CAMERA_STATES.ERROR_CAPTURE
                     for i in range(1,self.numConnectedCameras+1):
                         if not self._sonyCamera.isConnected(i):
-                            with sync_lock:
-                                capture_done[index].set()
-                            raise Exception("Camera "+str(i)+" is not connected!")
+                            if self.capture_copy_reconnect_retries > 0:
+                                self._logger.warning('Camera '+ self._sonyCamera.getModel(i).replace("-","_")+ ' index:' +str(i)+' not connected, attempting reconnection...')
+                                self._sonyCamera.setOnErrorCallBack(None,i)
+                                self._sonyCamera.disconnect(i)
+                                self.connectAndConfigureCamera(i,False)
+                                self.capture_copy_reconnect_retries = self.capture_copy_reconnect_retries-1
+                            else:
+                                self._logger.warning('Camera '+ self._sonyCamera.getModel(i).replace("-","_")+ ' index:'+str(i)+' not connected and reconnects failed, raising exception.')
+                                with sync_lock:
+                                    capture_done[index].set()
+                                    raise Exception("Camera "+str(i)+" is not connected!")              
                 start += interval
                 while start - time() < 0.5:
                     self._logger.warning(f"next capture delayed {start - time()}")

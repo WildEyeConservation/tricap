@@ -68,22 +68,22 @@ class sonySDKcam():
         sys.exit(143)
 
     def connectAndConfigureCamera(self, i, shouldRaiseException:bool):
-        retryCounter = 10
+        retryCounter = 5
         self._sonyCamera.connectCamera(i)
         self.numConnectedCameras = self.numConnectedCameras +1
         while (not self._sonyCamera.isConnected(i)):
-            counter = 50
+            counter = 10
             while (not self._sonyCamera.isConnected(i)):
                 sleep(0.1)
                 counter -= 1
                 if(counter <= 0):
                     self._sonyCamera.disconnect(i)
                     self._sonyCamera.connectCamera(i)
-                    counter = 100
+                    counter = 10
             retryCounter -= 1
             if(retryCounter <= 0):
-                self._sonyCamera = None
                 if shouldRaiseException:
+                    self._sonyCamera = None
                     raise Exception("Sony Camera connection timeout!")
                 else: 
                     self._logger.warning('Sony camera '+str(i)+ ' connection timed out!')
@@ -217,7 +217,7 @@ class sonySDKcam():
             before_capture_ts = datetime.now()
 
             if space_available and self._trigger_capture():  # Checks to see if something went wrong with the cameras
-                self.capture_reconnect_retries = 3
+                self.capture_reconnect_retries = 2
                 self._image_count += 1
                 self.state = CAMERA_STATES.CAPTURING
             else:

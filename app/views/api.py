@@ -6,14 +6,14 @@ import base64, logging, cv2
 import numpy as np
 from random import randint
 from datetime import datetime
-from config import CAM_MANAGER_STATES, CAMERA_STATES, SERVER_LOG_DIR, MOUNT_POINT
+from config import CAM_MANAGER_STATES, CAMERA_STATES, SERVER_LOG_DIR, MOUNT_POINT, MOUNT_POINT_SSD
 import os, json
 from support.camera_data import ParseData
 from support.configure import TricapConfig
 import subprocess, csv
 from pathlib import Path
 from support.backup import manager as backupManager
-import time
+import time, shutil, threading
 
 api_bp = Blueprint('api', __name__)
 _logger = logging.getLogger(__name__)
@@ -83,10 +83,11 @@ def do_preview():
 
 @api_bp.route('/api/statistics')
 def statistics():
+  _logger.debug('statistics called')
   if tricap_manager.state == CAM_MANAGER_STATES.STARTED or tricap_manager.state == CAM_MANAGER_STATES.COPYING:
     return jsonify({'msg': 'Not allowed in started or copying state'}), 400
   try:
-    camera_data = ParseData()
+    # camera_data = ParseData()
     stats = {}
     # cameras = []
     # sum_battery = 0.0
@@ -101,7 +102,8 @@ def statistics():
     #     battery_count += 1
     #   except Exception as ex:
     #     pass
-    stats['external'] = tricap_manager.external_disk_info()
+    stats['internalStorage'] = _internal_disk_info()
+    stats['externalStorage'] = _external_disk_info()
     # stats['cameras'] = cameras
     # if battery_count == 0:
     #   stats['battery'] = 0
@@ -109,7 +111,7 @@ def statistics():
     #   stats['battery'] = sum_battery / battery_count
     config = TricapConfig()
     stats['captureInterval'] = float(config.get('image_capture_interval', TricapConfig.MISC_SECTION_HEADER))
-    # _logger.debug(stats['captureInterval'])
+    _logger.debug(stats)
     return stats
   except Exception as ex:
     return "", 420
@@ -282,12 +284,55 @@ def set_capture_interval():
   ret['success'] = True
   return ret  
 
+@api_bp.route('/api/verify_and_delete')
+def verify_and_delete():
+  _logger.debug("verify_and_delete {}".format(tricap_manager.state))
+  if tricap_manager.state == CAM_MANAGER_STATES.STARTED:
+    return jsonify({'msg': 'Cannot delete while started'}), 400
+
+  ret = {}
+  if tricap_manager.mount_ssd():
+    src = MOUNT_POINT
+    dst = MOUNT_POINT_SSD
+    res = backupManager.verify_now(src, dst, mode="fast", excludes=["*.csv", "*.bin", "*.json"])
+    print(res)
+    if res["ok"]:
+        print("Backup verified. Safe to delete source.")
+        delete_dir_async(src)
+        ret['success'] = True
+    else:
+        print("NOT safe to delete. Differences:")
+        ret['success'] = False
+  else:
+    return jsonify({'msg': 'Failed to mount external disk'}), 400
+
+  return ret
+
+@api_bp.route('/api/force_delete')
+def force_delete():
+  _logger.debug("force_delete {}".format(tricap_manager.state))
+  if tricap_manager.state == CAM_MANAGER_STATES.STARTED:
+    return jsonify({'msg': 'Cannot delete while started'}), 400
+
+  ret = {}
+  src = MOUNT_POINT
+  delete_dir_async(src)
+  ret['success'] = True
+
+  return ret
+
 @api_bp.route('/api/backup_start', methods = ['GET'])
 def backup_start():
   _logger.debug("backup_start req")
-  src = "/home/pi/.vscode-server"
-  dst = "/home/pi/.vscode-server-backup"
-  return jsonify(backupManager.start(src, dst))
+  if tricap_manager.state == CAM_MANAGER_STATES.STARTED:
+    return jsonify({'msg': 'Cannot backup while started'}), 400
+  
+  if tricap_manager.mount_ssd():
+    src = MOUNT_POINT
+    dst = MOUNT_POINT_SSD
+    return jsonify(backupManager.start(src, dst))
+  else:
+    return jsonify({'msg': 'Failed to mount external disk'}), 400
 
 @api_bp.route('/api/backup_stop', methods = ['GET'])
 def backup_stop():
@@ -384,7 +429,7 @@ def download_imu_log():
       log_path = os.path.join(MOUNT_POINT, datetime.now().strftime('%Y_%m_%d'))
   else:
       print("SSD not mounted, falling back to builtin storage GPS_IMU_Data for Accel data")
-      log_path = os.path.join("/home/pi/GPS_IMU_Data", datetime.now().strftime('%Y_%m_%d'))
+      log_path = os.path.join("/home/radxa/GPS_IMU_Data", datetime.now().strftime('%Y_%m_%d'))
   log_path_file = Path(os.path.join(log_path, 'accelData.bin'))
 
   if not log_path_file.exists():
@@ -433,7 +478,7 @@ def download_gps_log():
       log_path = os.path.join(MOUNT_POINT, datetime.now().strftime('%Y_%m_%d'))
   else:
       print("SSD not mounted, falling back to builtin storage GPS_IMU_Data for GPS data")
-      log_path = os.path.join("/home/pi/GPS_IMU_Data", datetime.now().strftime('%Y_%m_%d'))
+      log_path = os.path.join("/home/radxa/GPS_IMU_Data", datetime.now().strftime('%Y_%m_%d'))
   log_path_file = Path(os.path.join(log_path, 'gpsData.csv'))
 
   if not log_path_file.exists():
@@ -486,3 +531,53 @@ def _eta_simple(started_at: float | None, bytes_done: int, bytes_total: int) -> 
         return None
     total_estimated = elapsed / completion
     return max(0.0, total_estimated - elapsed)
+
+def _internal_disk_info():
+    if tricap_manager.use_gpio_cams:
+        return
+
+    _logger.debug(f"_internal_disk_info")
+    info = {}
+    total, used, free = shutil.disk_usage(MOUNT_POINT)
+
+    info['capacityGB'] = round(total / 1073741824, 2)
+    info['usedGB'] = round(used / 1073741824, 2)
+    info['freeGB'] = round(free / 1073741824, 2)
+
+    return info
+
+def _external_disk_info():
+    if tricap_manager.use_gpio_cams:
+        return
+
+    _logger.debug(f"_external_disk_info")
+    info = {}
+    is_mounted = os.path.ismount(MOUNT_POINT_SSD)
+    if tricap_manager.mount_ssd():
+        total, used, free = shutil.disk_usage(MOUNT_POINT_SSD)
+        if not is_mounted:
+            # only unmount if unmounted at the start of this function
+            tricap_manager.unmount_disk()
+
+        info['capacityGB'] = round(total / 1073741824, 2)
+        info['usedGB'] = round(used / 1073741824, 2)
+        info['freeGB'] = round(free / 1073741824, 2)
+    
+    return info
+
+def delete_dir_async(path: str) -> dict:
+    cmd = ['rm', '-rf', '--', path]
+
+    # Spawn and return immediately
+    proc = subprocess.Popen(
+        cmd,
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        start_new_session=True,   # detach from your API handler's process group
+        close_fds=True,
+        text=False,
+    )
+
+    # Reap the child in background to avoid a zombie
+    threading.Thread(target=proc.wait, daemon=True).start()

@@ -146,6 +146,35 @@ class RsyncManager:
 
         return st
 
+
+    def verify_now(self, 
+                   src: str,
+                   dst: str,
+                   mode: str = "checksum", 
+                   sample_limit: int = 25,
+                   excludes: list[str] = [],
+        ) -> dict[str, Any]:
+        """
+        Run verification immediately (synchronous). Returns the verify result dict
+        and updates the status fields.
+        """
+        checksum = (mode == "checksum")
+        res = self._verify_pass(src, dst, excludes, checksum=checksum, sample_limit=sample_limit)
+
+        with self._lock:
+            self._status.verify_mode = mode
+            self._status.verified = res["ok"]
+            self._status.verify_missing = res["missing"]
+            self._status.verify_changed = res["changed"]
+            self._status.verify_extra = res["extra"]
+            self._status.verify_samples = res["samples"]
+            self._status.dst_files = res["dst_files"]
+            self._status.dst_bytes = res["dst_bytes"]
+            self._status.ready_to_delete = res["ok"]
+
+        out = {"success": True}
+        out.update(res)
+        return out
     # ---------------- Internals ----------------
 
     def _run_rsync(self) -> None:
@@ -308,6 +337,110 @@ class RsyncManager:
                         files_done += 1
             return bytes_present, files_done
 
+    def _verify_pass(
+        self,
+        src: Path,
+        dst: Path,
+        excludes: list[str],
+        checksum: bool,
+        sample_limit: int = 25,
+    ) -> dict[str, Any]:
+        """
+        Compare trees and report differences.
+
+        - src->dst dry-run (with --checksum for content if requested):
+            counts files that WOULD be transferred:
+              * '>f+++++++++'  -> missing on dst
+              * other '>f...'  -> changed on dst
+        - dst->src dry-run with --delete -v:
+            counts lines beginning with 'deleting ' -> extra on dst
+        Also scans dest totals for convenience.
+        """
+        env = os.environ.copy()
+        env["LC_ALL"] = "C"
+
+        src_arg = str(src) + os.sep
+        dst_arg = str(dst)
+
+        # 1) src -> dst: missing/changed
+        cmd1 = ["rsync", "-rltH", "--size-only", "--dry-run", "--itemize-changes", "--out-format=%i|%n",
+                 "--no-perms", "--no-owner", "--no-group"]
+        if checksum:
+            cmd1.append("--checksum")
+        for pat in excludes:
+            cmd1 += ["--exclude", pat]
+        cmd1 += [src_arg, dst_arg]
+
+        changed = 0
+        missing = 0
+        samples: list[str] = []
+        try:
+            out1 = subprocess.check_output(cmd1, text=True, stderr=subprocess.STDOUT, env=env)
+            for line in out1.splitlines():
+                # Expect: "<itemize>|<path>"
+                try:
+                    item, path = line.split("|", 1)
+                except ValueError:
+                    continue
+                if len(item) >= 2 and item[0] == ">" and item[1] in ("f", "L", "D"):
+                    # New vs changed: new files usually show as >f+++++++++
+                    is_missing = ("+++++++++" in item)
+                    if is_missing:
+                        missing += 1
+                    else:
+                        changed += 1
+                    if len(samples) < sample_limit:
+                        samples.append(f"{'MISSING' if is_missing else 'CHANGED'}: {path}")
+        except subprocess.CalledProcessError as e:
+            # Treat as verification failure
+            return {
+                "ok": False,
+                "missing": -1,
+                "changed": -1,
+                "extra": -1,
+                "samples": [f"VERIFY ERROR (src->dst): {e}"],
+                "dst_files": 0,
+                "dst_bytes": 0,
+            }
+
+        # 2) dst -> src: extra files (things that would be deleted)
+        cmd2 = ["rsync", "-aH", "--dry-run", "--delete", "-v"]
+        for pat in excludes:
+            cmd2 += ["--exclude", pat]
+        cmd2 += [str(dst) + os.sep, str(src)]
+
+        extra = 0
+        try:
+            out2 = subprocess.check_output(cmd2, text=True, stderr=subprocess.STDOUT, env=env)
+            for line in out2.splitlines():
+                if line.startswith("deleting "):
+                    extra += 1
+                    if len(samples) < sample_limit:
+                        samples.append(f"EXTRA: {line[len('deleting '):]}")
+        except subprocess.CalledProcessError as e:
+            return {
+                "ok": False,
+                "missing": -1,
+                "changed": -1,
+                "extra": -1,
+                "samples": [f"VERIFY ERROR (dst->src): {e}"],
+                "dst_files": 0,
+                "dst_bytes": 0,
+            }
+
+        # 3) quick dst totals
+        dst_bytes, dst_files = self._scan_totals(dst, excludes)
+
+        ok = (missing == 0 and changed == 0 and extra == 0)
+        return {
+            "ok": ok,
+            "missing": missing,
+            "changed": changed,
+            "extra": extra,
+            "samples": samples,
+            "dst_files": dst_files,
+            "dst_bytes": dst_bytes,
+        }
 
 # Singleton for easy import in api.py
 manager = RsyncManager()

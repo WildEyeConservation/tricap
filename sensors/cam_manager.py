@@ -6,13 +6,13 @@
 import logging
 import threading
 import os, json, csv
-import subprocess, time, shutil
+import subprocess, time
 from datetime import datetime
 import RPi.GPIO as GPIO
 from scipy import interpolate
 import numpy as np
 
-from config import CAM_MANAGER_STATES, SERVER_LOG_DIR, SESSION_ROOT_DIR, MOUNT_POINT, SONY_TEMPFS_MOUNT_POINT
+from config import CAM_MANAGER_STATES, SERVER_LOG_DIR, SESSION_ROOT_DIR, MOUNT_POINT, SONY_TEMPFS_MOUNT_POINT, MOUNT_POINT_SSD
 
 # TODO : Create a camera factory that will import cameras according to its config and make them available via its own
 # autodetect function
@@ -102,6 +102,7 @@ class TriCapCamsManager:
         if not use_gpio_cams:
             subprocess.run(["timedatectl", "set-ntp", "false"], check=True)
         self._initialise()
+        self.mount_disk()
 
     def _initialise(self):
         self._find_cameras()
@@ -373,11 +374,24 @@ class TriCapCamsManager:
             self._logger.info('Disk already mounted')
         return True
 
-    def unmount_disk(self):
-        if os.path.ismount(MOUNT_POINT):
+    def mount_ssd(self):
+        if not os.path.ismount(MOUNT_POINT_SSD):
             try:
                 with self._imu_lock:
-                    mount_status = subprocess.run(["umount", MOUNT_POINT], check=True)
+                    mount_status = subprocess.run(["mount", "/dev/sda1", MOUNT_POINT_SSD], check=True)
+                    self._logger.debug(mount_status)
+            except:
+                self._logger.warning('Failed to mount')
+                return False
+        else:
+            self._logger.info('Disk already mounted')
+        return True
+
+    def unmount_disk(self):
+        if os.path.ismount(MOUNT_POINT_SSD):
+            try:
+                with self._imu_lock:
+                    mount_status = subprocess.run(["umount", MOUNT_POINT_SSD], check=True)
                     self._logger.debug(mount_status)
             except:
                 self._logger.warning('Failed to umount')
@@ -396,7 +410,6 @@ class TriCapCamsManager:
 
             self.merge_gps_meta_data()
 
-            self.unmount_disk()
             self._shutdownEnabled = True
             self._shutdownStartTime = datetime.now()
             self.state = CAM_MANAGER_STATES.STOPPED
@@ -542,25 +555,6 @@ class TriCapCamsManager:
     @property
     def config(self):
         return MultiConfig(self._cameras)
-
-    def external_disk_info(self):
-        if self.use_gpio_cams:
-            return
-
-        self._logger.debug('external_disk_info')
-        info = {}
-        is_mounted = os.path.ismount(MOUNT_POINT)
-        if self.mount_disk():
-            total, used, free = shutil.disk_usage(MOUNT_POINT)
-            if not is_mounted:
-                # only unmount if unmounted at the start of this function
-                self.unmount_disk()
-
-            info['capacityGB'] = round(total / 1073741824, 2)
-            info['usedGB'] = round(used / 1073741824, 2)
-            info['freeGB'] = round(free / 1073741824, 2)
-        
-        return info
 
     def copy_eta(self):
         if self._copy_start_time == None or self.use_gpio_cams or self.use_sony_cam:

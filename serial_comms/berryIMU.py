@@ -151,7 +151,7 @@ class BerryImu(IMU):
                 self.complete_dir = os.path.join(MOUNT_POINT, self._startDate)
             else:
                 # print("SSD not mounted, falling back to builtin storage GPS_IMU_Data for Accel data")
-                self.complete_dir = os.path.join("/home/pi/GPS_IMU_Data", self._startDate)
+                self.complete_dir = os.path.join("/home/radxa/GPS_IMU_Data", self._startDate)
             self._dest = os.path.join(self.complete_dir, 'accelData.bin')
 
         # Big write (fewer metadata updates) + fsync for durability

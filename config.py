@@ -29,7 +29,7 @@ ALTI_MEASURE_TIMEOUT = 2
 NUM_DUMMY_CAMS = 3
 
 MOUNT_POINT = "/mnt/ext_cam_storage"
-SONY_TEMPFS_MOUNT_POINT = "/home/pi/SonySDKWrapper/memoryFs/"
+SONY_TEMPFS_MOUNT_POINT = "/home/radxa/SonySDKWrapper/memoryFs"
 
 CAMERA_STATES = Enum("CamState", ["UNINITIALISED", "INITIALISED", "CAPTURING", 
                                   "ERROR_CONFIG", "ERROR_CAPTURE"])

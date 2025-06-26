@@ -7,7 +7,7 @@ import time
 
 import gphoto2 as gp
 
-# PHOTO_DIR = os.path.expanduser('/home/pi/Pictures/from_camera')
+# PHOTO_DIR = os.path.expanduser('/home/radxa/Pictures/from_camera')
 PHOTO_DIR = os.path.expanduser('/mnt/ext_cam_storage')
 
 def get_target_dir(timestamp, index):

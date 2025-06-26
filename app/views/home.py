@@ -331,14 +331,14 @@ def test_focus():
                 directory="C:/Users/Pieter.at.Innoventix/Desktop/Innoventix/SourceTree Innoventix/tests",
                 filename="defaultend.jpg", as_attachment=True)
         else:
-            os.chdir("/home/pi/tricap/")
+            os.chdir("/home/radxa/tricap/")
             camerafile = ParseData()
             for index in range(tricap_length):
                 camerafile.get_last_image(index)
             print("Archiving")
-            shutil.make_archive("focus", 'gztar', "/home/pi/tricap/focus")
+            shutil.make_archive("focus", 'gztar', "/home/radxa/tricap/focus")
             return send_from_directory(
-                directory="/home/pi/tricap/",
+                directory="/home/radxa/tricap/",
                 filename="focus.tar.gz", as_attachment=True)
     else:
         return render_template("/camera/wait.html")

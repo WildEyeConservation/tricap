@@ -21,10 +21,10 @@ from time import sleep, time, strftime
 from datetime import datetime
 
 import sys
-sys.path.append("/home/pi/tricap")
+sys.path.append("/home/radxa/tricap")
 
 from config import CAMERA_STATES
-sys.path.append(os.path.abspath("/home/pi/SonySDKWrapper"))
+sys.path.append(os.path.abspath("/home/radxa/SonySDKWrapper"))
 from sonySDKWrapper import *
 
 import subprocess, hashlib, json
@@ -57,8 +57,7 @@ class sonySDKcam():
 
     def exitGracefully(self, *args):
         print("exiting gracefully")
-        for i in range(1,self.numConnectedCameras+1):
-            self._sonyCamera.setOnErrorCallBack(None,i)
+        self._sonyCamera.setOnErrorCallBack(None,self._cameraID)
         # for i in range(1,self.numConnectedCameras+1):
         #     self._sonyCamera.disconnect(i)
             # numConnectedCameras -=1
@@ -67,7 +66,7 @@ class sonySDKcam():
         self._sonyCamera = None
         sys.exit(143)
 
-    def __init__(self, memoryFsPath):
+    def __init__(self, memoryFsPath, sonySDKInstance, cameraID):
         """Constructor"""
         self._exif_info = {}
         self._camera = None
@@ -83,7 +82,6 @@ class sonySDKcam():
         self._im_aspect_ratio = 0
         self._triggers = 0
         self._marginTimers = {}
-        self.numConnectedCameras = 0
 
         try:
             mount_status = subprocess.run(["mount", "tmpfs", "-t",  "tmpfs", memoryFsPath], check=True)
@@ -97,61 +95,58 @@ class sonySDKcam():
         signal.signal(signal.SIGTERM, self.exitGracefully)
         # atexit.register(self.exitGracefully, 1)
 
-        self._sonyCamera = sonyCamera()
-        numCameras = self._sonyCamera.getNumCameras()
-        if (numCameras > 0):
-            for i in range(1,numCameras+1):
-                retryCounter = 10
-                self._sonyCamera.connectCamera(i)
-                self.numConnectedCameras = self.numConnectedCameras +1
-                while (not self._sonyCamera.isConnected(i)):
-                    counter = 50
-                    while (not self._sonyCamera.isConnected(i)):
-                        sleep(0.1)
-                        counter -= 1
-                        if(counter <= 0):
-                            self._sonyCamera.disconnect(i)
-                            self._sonyCamera.connectCamera(i)
-                            counter = 100
-                    retryCounter -= 1
-                    if(retryCounter <= 0):
-                        self._sonyCamera = None
-                        raise Exception("Sony Camera connection timeout!")
+        self._sonyCamera = sonySDKInstance
+        self._cameraID = cameraID
 
-                self._sonyCamera.loadProperties(i)
-                sleep(2)
-                # This sets the file chunk size for transferring images from the camera to the PI ram fileSystem. The max seems to be 20Mb chunks, as configured here. 
-                # This allows the shutter events sent from the SDK to not be blocked for too long while images are transferred, preventing erratic shutter timing.
-                self._sonyCamera.setTransferBufferSize(20,i)
+        retryCounter = 10
+        self._sonyCamera.connectCamera(self._cameraID)
+        while (not self._sonyCamera.isConnected(self._cameraID)):
+            counter = 50
+            while (not self._sonyCamera.isConnected(self._cameraID)):
+                sleep(0.1)
+                counter -= 1
+                if(counter <= 0):
+                    self._sonyCamera.disconnect(self._cameraID)
+                    self._sonyCamera.connectCamera(self._cameraID)
+                    counter = 100
+            retryCounter -= 1
+            if(retryCounter <= 0):
+                self._sonyCamera = None
+                raise Exception("Sony Camera connection timeout!")
 
-                # This instructs the camera to save images to the PC only and not on the SD card.
-                # self._sonyCamera.setCameraSaveLocation(1)
-                # Save to memory card only
-                self._sonyCamera.setCameraSaveLocation(2,i)
+        self._sonyCamera.loadProperties(self._cameraID)
+        sleep(2)
+        # This sets the file chunk size for transferring images from the camera to the PI ram fileSystem. The max seems to be 20Mb chunks, as configured here. 
+        # This allows the shutter events sent from the SDK to not be blocked for too long while images are transferred, preventing erratic shutter timing.
+        self._sonyCamera.setTransferBufferSize(100,self._cameraID)
 
-                # live view is enabled by default on connection and seems to use USB bandwidth, so toggle it to disable
-                self._sonyCamera.toggleLiveView(i)
+        # This instructs the camera to save images to the PC only and not on the SD card.
+        self._sonyCamera.setCameraSaveLocation(1,self._cameraID)
+        # Save to memory card only
+        # self._sonyCamera.setCameraSaveLocation(2,i)
 
-                # set the camera file types
-                # raw+jpeg
-                # self._sonyCamera.setCameraFileSaveType(3)
-                # raw only
-                # self._sonyCamera.setCameraFileSaveType(2)
+        # live view is enabled by default on connection and seems to use USB bandwidth, so toggle it to disable
+        self._sonyCamera.toggleLiveView(self._cameraID)
 
-                print("Setting download callback")
-                # self._sonyCamera.setOnDownloadCompleteCallback(self.imageDownloadCompleteCallback)
-                self._sonyCamera.setOnErrorCallBack(self.cameraErrorCallback,i)
+        # set the camera file types
+        # raw+jpeg
+        # self._sonyCamera.setCameraFileSaveType(3)
+        # raw only
+        self._sonyCamera.setCameraFileSaveType(2,self._cameraID)
+        # self._sonyCamera.setPCFileSaveType(2,self._cameraID)
 
-                if (not self._sonyCamera.setSaveInfo(memoryFsPath, "IMG3_"+str(i)+"_", 1,i)):
-                    raise Exception("Failed to set the save location. Make sure that the following path exists and has appropriate permissions: " + memoryFsPath)
-                
-                self._serial_num = self._sonyCamera.getModel(i).replace("-","_")
+        print("Setting download callback")
+        self._sonyCamera.setOnDownloadCompleteCallback(self.imageDownloadCompleteCallback,self._cameraID)
+        self._sonyCamera.setOnErrorCallBack(self.cameraErrorCallback,self._cameraID)
 
-            # Give the camera a moment to settle before starting to capture images. Prevents the first capture from being missed
-            sleep(3)
-        else:
-            self.state = CAMERA_STATES.ERROR_CONFIG
-            raise Exception("No Sony SDK cameras were detected")
+        # if (not self._sonyCamera.setSaveInfo(memoryFsPath, "IMG3_"+str(self._cameraID)+"_", 1,self._cameraID)):
+        #     raise Exception("Failed to set the save location. Make sure that the following path exists and has appropriate permissions: " + memoryFsPath)
+        
+        self._serial_num = self._sonyCamera.getModel(self._cameraID).replace("-","_")
+
+        # Give the camera a moment to settle before starting to capture images. Prevents the first capture from being missed
+        sleep(3)
+
         self.state = CAMERA_STATES.INITIALISED
 
     def is_cam_image_fresh(self):
@@ -163,26 +158,21 @@ class sonySDKcam():
 
         Return True if successful, or False if failed.
         """
-        if self.numConnectedCameras<1:
-            return False
+        retval = True
+        # We need to send a shutter down, wait a bit, and send a shutter up command to capture an image. 
+        # To sync the images up in time as close as possible, do all the shutter downs, wait a bit, and do all the shutter up's
+        if(self._sonyCamera.isConnected(self._cameraID) and self._sonyCamera.shutterDown(self._cameraID)):
+            retval = retval and True
         else:
-            retval = True
-            # We need to send a shutter down, wait a bit, and send a shutter up command to capture an image. 
-            # To sync the images up in time as close as possible, do all the shutter downs, wait a bit, and do all the shutter up's
-            for i in range(1,self.numConnectedCameras+1):
-                if(self._sonyCamera.isConnected(i) and self._sonyCamera.shutterDown(i)):
-                    retval = retval and True
-                else:
-                    self._logger.warning('Trigger Camera(shutter down) '+str(i)+' failed')
-                    retval = retval and False
-            sleep(0.035)
-            for i in range(1,self.numConnectedCameras+1):
-                if(self._sonyCamera.isConnected(i) and self._sonyCamera.shutterUp(i)):
-                    retval = retval and True
-                else:
-                    self._logger.warning('Trigger Camera(shutter up) '+str(i)+' failed')
-                    retval = retval and False
-            return retval
+            self._logger.warning('Trigger Camera(shutter down) '+str(i)+' failed')
+            retval = retval and False
+        sleep(0.035)
+        if(self._sonyCamera.isConnected(self._cameraID) and self._sonyCamera.shutterUp(self._cameraID)):
+            retval = retval and True
+        else:
+            self._logger.warning('Trigger Camera(shutter up) '+str(i)+' failed')
+            retval = retval and False
+        return retval
 
     def capture(self, continuous=False, barrier: threading.Barrier = None, stop_event=None):
         """Start capturing photos, typically called by a thread."""
@@ -211,9 +201,8 @@ class sonySDKcam():
             else:
                 self._logger.error('Could not successfully trigger a capture.')
                 self.state = CAMERA_STATES.ERROR_CAPTURE
-            for i in range(1,self.numConnectedCameras+1):
-                if not self._sonyCamera.isConnected(i):
-                    raise Exception("Camera "+str(i)+" is not connected!")
+            if not self._sonyCamera.isConnected(self._cameraID):
+                raise Exception("Camera "+str(self._cameraID)+" is not connected!")
 
             if not continuous:
                 return
@@ -248,15 +237,15 @@ class sonySDKcam():
         self._preview_images_big_jpg = []
         self._preview_images = []
 
-        # We are saving to the SD card, so ignore setting the save path for now
-        # if (not self._sonyCamera.setSaveInfo(self._memoryFsPath, session_start_date.strftime("%d_%m_%Y_%H_%M_%S")+"_", 1)):
-        #     with sync_lock:
-        #         capture_done[index].set()
-        #     raise Exception("Failed to set the save location. Make sure that the following path exists and has appropriate permissions: " + memoryFsPath)
+        self._logger.info("Set save info CAM"+str(self._cameraID)+" to "+self._memoryFsPath)
+        if (not self._sonyCamera.setSaveInfo(self._memoryFsPath, str(self._cameraID)+"_"+session_start_date.strftime("%d_%m_%Y_%H_%M_%S")+"_", 1,self._cameraID)):
+            with sync_lock:
+                capture_done[index].set()
+            raise Exception("Failed to set the save location. Make sure that the following path exists and has appropriate permissions: " + self._memoryFsPath)
 
         sleep(1)
         # How long to wait for copies from the camera until it is assumed that the photos did not make it.
-        copyWaitTimeout = 1
+        copyWaitTimeout = 20
 
         # main loop
         while True:
@@ -274,16 +263,15 @@ class sonySDKcam():
                     self.state = CAMERA_STATES.CAPTURING                    
                     self._triggers += 1
                     with self._lock_with_save:
-                        self._logger.info("Waiting for "+str(self._triggers*2 - self._downLoadedCount )+" images from the camera save queue is: " + str(len(self._to_save_queue)) + " images long.")
+                        self._logger.info(str(serial_number)+": Waiting for "+str(self._triggers - self._downLoadedCount )+" images from the camera save queue is: " + str(len(self._to_save_queue)) + " images long.")
                         self._marginTimers[str(self._triggers)] = datetime.now()
                 else:
                     self._logger.warning('Could not successfully trigger a capture.')
                     self.state = CAMERA_STATES.ERROR_CAPTURE
-                    for i in range(1,self.numConnectedCameras+1):
-                        if not self._sonyCamera.isConnected(i):
-                            with sync_lock:
-                                capture_done[index].set()
-                            raise Exception("Camera "+str(i)+" is not connected!")
+                    if not self._sonyCamera.isConnected(self._cameraID):
+                        with sync_lock:
+                            capture_done[index].set()
+                        raise Exception("Camera "+str(self._cameraID)+" is not connected!")
                 start += interval
                 while start - time() < 0.5:
                     self._logger.warning(f"next capture delayed {start - time()}")
@@ -292,12 +280,12 @@ class sonySDKcam():
 
             # check if thread is done
             if stop_capture.is_set() and stopTriggerInitiated:
-                if self._downLoadedCount + self._num_images_failed >= self._triggers*2 or copyWaitTimeout <=0:
+                if self._downLoadedCount + self._num_images_failed >= self._triggers or copyWaitTimeout <=0:
                     # All the triggered images were downloaded by the sony SDK, it downloads a RAW and JPG image for every image taken
 
                     if copyWaitTimeout <=0:
-                        self._num_images_failed = self._triggers*2-(self._downLoadedCount+self._num_images_failed)
-                        self._logger.warning('failed to download '+str(self._num_images_failed)+ ' images from the camera')
+                        self._num_images_failed = self._triggers-(self._downLoadedCount+self._num_images_failed)
+                        self._logger.warning(str(serial_number)+': failed to download '+str(self._num_images_failed)+ ' images from the camera')
                     isCaptureDoneSet = False
                     with sync_lock:
                         isCaptureDoneSet = capture_done[index].is_set()               
@@ -816,8 +804,7 @@ class sonySDKcam():
         
     def sync_time(self):
         # print("Syncing time to "+str(round(datetime.now().timestamp())))
-        for i in range(1,self.numConnectedCameras+1):
-            self._sonyCamera.setDateTime(round(datetime.now().timestamp()),i)
+        self._sonyCamera.setDateTime(round(datetime.now().timestamp()),self._cameraID)
 
     @property
     def serial_num(self):
@@ -833,4 +820,4 @@ class sonySDKcam():
 
     def get_cam_copy_count(self):
         """Return the number of images copied from the Raspberry pi memory to the SSD, as tracked by this object."""
-        return self._num_images_copied/2 # div 2 - copy raw and jpeg
+        return self._num_images_copied

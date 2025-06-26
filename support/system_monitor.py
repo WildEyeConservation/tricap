@@ -154,7 +154,7 @@ class LinuxDiskUsageMonitor(SystemMonitor):
 
     def monitor_step(self):
         """Update the value with the available space in MB on the root."""
-        with os.popen('df | grep root') as cmd_output:
+        with os.popen('df | grep /$') as cmd_output:
             try:
                 lines = cmd_output.readlines()
                 parts = lines[0].split(' ')

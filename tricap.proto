@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-// cd /home/pi/tricap
+// cd /home/radxa/tricap
 // protoc --python_out=serial_comms/out tricap.proto
 
 // ./protobuf/node_modules/.bin/pbjs -t static-module -w commonjs -o protobuf/out/tricap_pb.js tricap.proto

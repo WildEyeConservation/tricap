@@ -22,8 +22,13 @@ try:
     from .canon_R import CanonRCam
     from .gpio_cam import GpioCam as CameraGpio
     from .sonySDK_cam import sonySDKcam as CameraSony
-except ImportError:
-    logging.getLogger(__name__).warning('Could not import gphoto based libs.')
+    # SonySDKWrapper import must be done after path is added to sys.path
+    import sys
+    sys.path.append("/home/radxa/tricap")
+    sys.path.append(os.path.abspath("/home/radxa/SonySDKWrapper"))
+    from sonySDKWrapper import *
+except ImportError as e:
+    logging.getLogger(__name__).warning(f"Could not import gphoto based libs: {e}")
 
 from .dummy_cam import DummyCam
 from .dummy_cam import DummyShell, external_dummy_calibrate_func
@@ -150,8 +155,11 @@ class TriCapCamsManager:
                     tricap_cam._camera.calibrate_step = int(self._man_settings['calibrate_step'])
                     self._cameras.append(tricap_cam)
         elif self.use_sony_cam:
-            tricap_cam = CameraSony(SONY_TEMPFS_MOUNT_POINT)
-            self._cameras.append(tricap_cam)
+            self._sonySDKInstance = sonyCamera()
+            numCameras = self._sonySDKInstance.getNumCameras()
+            for i in range(1,numCameras+1):
+                tricap_cam = CameraSony(SONY_TEMPFS_MOUNT_POINT,self._sonySDKInstance,i)
+                self._cameras.append(tricap_cam)
         else:
             for name, address in Camera.autodetect():
                 self._logger.info('Detected camera %s at address %s ' % (name, address))
@@ -356,7 +364,7 @@ class TriCapCamsManager:
         if not os.path.ismount(MOUNT_POINT):
             try:
                 with self._imu_lock:
-                    mount_status = subprocess.run(["mount", "/dev/sda1", MOUNT_POINT], check=True)
+                    mount_status = subprocess.run(["mount", "/dev/nvme0n1p1", MOUNT_POINT], check=True)
                     self._logger.debug(mount_status)
             except:
                 self._logger.warning('Failed to mount')

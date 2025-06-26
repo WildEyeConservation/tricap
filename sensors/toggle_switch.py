@@ -49,15 +49,15 @@ class ToggleSwitchMonitor(PeriodicMonitor):
 
     def monitor_step(self):
         """Update the value."""
-        if GPIO.input(SWITCH_PIN):
-            # toggle switch is high impedance, which we are interpreting as off
-            if self.prev_value == 0:
-                self.value = 0
-            self.prev_value = 0
-        else:
-            if self.prev_value == 1:
-                self.value = 1
-            self.prev_value = 1
+        # if GPIO.input(SWITCH_PIN):
+        #     # toggle switch is high impedance, which we are interpreting as off
+        #     if self.prev_value == 0:
+        #         self.value = 0
+        #     self.prev_value = 0
+        # else:
+        #     if self.prev_value == 1:
+        #         self.value = 1
+        #     self.prev_value = 1
 
 class ToggleSwitchObserver(Observer):
     """React to the toggle switch status."""

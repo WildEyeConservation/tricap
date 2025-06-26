@@ -1,5 +1,5 @@
 import smbus
-bus = smbus.SMBus(1)
+bus = smbus.SMBus(7)
 from .LSM9DS0 import *
 from .LSM9DS1 import *
 from .LSM6DSL import *

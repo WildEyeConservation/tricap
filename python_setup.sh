@@ -54,6 +54,7 @@ packages=(
     wheel
     WTForms
     zope
+    pyexifinfo
 )
 
 # Install each package using pip

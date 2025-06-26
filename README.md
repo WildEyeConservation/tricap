@@ -34,7 +34,7 @@ sudo apt-get install libatlas-base-dev
 ### Clone the tricap git repository
 
 ```
-cd /home/pi/
+cd /home/radxa/
 git clone git@bitbucket.org:innoventix/tricap.git
 cd tricap/
 git checkout -b gpio-cam origin/gpio-cam
@@ -43,7 +43,7 @@ git checkout -b gpio-cam origin/gpio-cam
 ### Change executable scripts
 
 ```
-cd /home/pi/tricap/
+cd /home/radxa/tricap/
 sudo chmod +x tricap_launch_tester.py
 sudo chmod +x wifi_setup.sh
 sudo chmod +x tricap_launcher.sh
@@ -55,7 +55,7 @@ cp default.cfg initial.cfg
 ### Install the required python libraries
 
 ```
-cd /home/pi/tricap/
+cd /home/radxa/tricap/
 sudo ./python_setup.sh
 ```
 
@@ -70,7 +70,7 @@ sudo nano /boot/cmdline.txt
 ### Create and start tricap service
 
 ```
-sudo cp /home/pi/tricap/tricap.service /etc/systemd/system/tricap.service
+sudo cp /home/radxa/tricap/tricap.service /etc/systemd/system/tricap.service
 sudo systemctl daemon-reload
 sudo systemctl enable tricap.service
 sudo systemctl start tricap.service
@@ -79,7 +79,7 @@ sudo systemctl start tricap.service
 ### Create and start udp service
 
 ```
-sudo cp /home/pi/tricap/udp-ip.service /etc/systemd/system/udp-ip.service
+sudo cp /home/radxa/tricap/udp-ip.service /etc/systemd/system/udp-ip.service
 sudo systemctl daemon-reload
 sudo systemctl enable udp-ip.service
 sudo systemctl start udp-ip.service

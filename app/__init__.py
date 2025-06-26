@@ -177,7 +177,7 @@ else:
 use_gpio_cams = False
 use_sony_cam = True
 
-subprocess.check_call(['/home/pi/tricap/wifi_setup.sh', "ESS-ops", "dumbo2017"])
+subprocess.check_call(['/home/radxa/tricap/wifi_setup.sh', "ESS-ops", "dumbo2017"])
 
 imu_lock = Lock()
 
@@ -186,7 +186,7 @@ tricap_cameras = tricap_manager.get_cameras_as_list()
 tricap_length = len(tricap_cameras)
 camera_loggers = []
 
-gps_ser = SerialInterface('/dev/serial0', 9600, False, False, imu_lock, tricap_manager)
+gps_ser = SerialInterface('/dev/ttyACM0', 38400, False, False, imu_lock, tricap_manager)
 accel_ser = BerryImu(imu_lock)
 
 for index, cam in enumerate(tricap_cameras):

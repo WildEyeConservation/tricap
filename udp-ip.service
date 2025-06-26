@@ -2,8 +2,8 @@
 After=multi-user.target
 
 [Service]
-ExecStart=/home/pi/tricap/udp_ip.sh
-User=pi
+ExecStart=/home/radxa/tricap/udp_ip.sh
+User=radxa
 
 [Install]
 WantedBy=multi-user.target

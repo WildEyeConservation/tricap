@@ -144,6 +144,10 @@ class SerialInterface(SerialProcess):
             with self._capturing_lock:
               # do not open file while capture and copy has the file open 
               self.saveRmc(request)
+          elif request.sentence_type == 'GSV':
+            self.process_gsv(request)
+          elif request.sentence_type == 'GSA':
+            self.process_gsa(request)
           if len(msg) > 0:
             self.write(msg)
         except Exception as e:

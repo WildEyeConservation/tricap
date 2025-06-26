@@ -3,10 +3,12 @@ import sys
 import serial_comms.out.tricap_pb2 as pb
 import serial, time, subprocess, pytz
 import netifaces as ni
-
+from statistics import mean
 import pynmea2
 import serial, os
 from datetime import datetime, timedelta
+import math
+from threading import Lock
 
 from config import MOUNT_POINT
 
@@ -19,6 +21,29 @@ class SerialProcess():
         self._firstGps = False
         self._gpsTimestamp = 0
         self._cam_manager = cam_manager
+
+        self._lock = Lock()
+        # Public "latest" values you can read at any time
+        self.total_visible = 0
+        self.visible_by_talker = {}    # {'GP': 17, 'GL': 9, ...}
+        self.snr_min = None            # dB-Hz
+        self.snr_avg = None
+        self.snr_max = None
+        self.pdop = None               # from GSA (best/latest valid)
+        self.pdopLastUpdate = None
+
+        # Internal state to assemble multipart GSVs per talker (constellation)
+        # gsv_state[talker] = {
+        #   'expected': int,             # total messages in this cycle
+        #   'received_parts': set[int],  # which parts we have (1-based)
+        #   'snrs': [ints],              # SNRs accumulated this cycle
+        #   'num_in_view': int           # satellites in view reported by this talker
+        # }
+        self._gsv_state = {}
+
+        # Last completed snapshot per talker so we can build a combined latest view
+        # _gsv_complete[talker] = {'snrs':[...], 'num_in_view': int}
+        self._gsv_complete = {}
 
     """
     Rx and Tx functions
@@ -153,3 +178,147 @@ class SerialProcess():
             gps_time = msg.datetime
             gps_time += timedelta(seconds=tzOffset)
             self._cam_manager.sync_time(gps_time.strftime('%Y-%m-%d %H:%M:%S.%f'))
+
+    def process_gsv(self, msg):
+        """
+        Handle a single GSV sentence (multi-part). When the cycle for this talker completes,
+        updates the public latest values (totals and SNR stats).
+        """
+        talker = getattr(msg, 'talker', None)
+        if not talker:
+            return
+
+        # Parts/cycle info
+        try:
+            total_msgs = int(getattr(msg, 'num_messages', 0))
+            this_part  = int(getattr(msg, 'msg_num', 0))
+        except (TypeError, ValueError):
+            return
+
+        # Satellites in view for this constellation (reported on each part)
+        num_in_view = self._safe_int(getattr(msg, 'num_sv_in_view', None))
+
+        # Extract up to 4 SNR fields from this sentence
+        signal_id = self.get_signal_id(msg)
+        snrs = []
+        for i in range(1, 5):
+            s = getattr(msg, f"snr_{i}", None)
+            if s in (None, ''):
+                continue
+            try:
+                snrs.append(int(s))
+            except ValueError:
+                pass  # ignore non-integer SNRs
+
+        with self._lock:
+            st = self._gsv_state.setdefault(talker, {
+                'expected': total_msgs or 0,
+                'received_parts': set(),
+                'snrs': [],
+                'num_in_view': num_in_view if num_in_view is not None else 0
+            })
+
+            # If expected suddenly changes (new cycle), reset the state
+            if st['expected'] and total_msgs and total_msgs != st['expected'] and this_part == 1:
+                st['received_parts'].clear()
+                st['snrs'].clear()
+
+            if total_msgs:
+                st['expected'] = total_msgs
+            if num_in_view is not None:
+                st['num_in_view'] = num_in_view
+
+            if this_part >= 1:
+                st['received_parts'].add(this_part)
+            if snrs:
+                st['snrs'].extend(snrs)
+
+            # Check completion of the cycle for this talker
+            if st['expected'] and len(st['received_parts']) >= st['expected']:
+                # Save a completed snapshot for this constellation
+                self._gsv_complete[talker] = {
+                    'snrs': list(st['snrs']),
+                    'num_in_view': st['num_in_view'] if st['num_in_view'] is not None else 0
+                }
+                # Reset for the next cycle
+                st['received_parts'].clear()
+                if signal_id is None or signal_id == '0':
+                    # only clear here for next cycle
+                    st['snrs'].clear()
+
+                # Recompute combined "latest" view across all talkers
+                self._recompute_latest_from_completed_locked()
+
+    def process_gsa(self, msg):
+        """
+        Handle a single GSA sentence. Updates `pdop` when it’s valid (ignores 0 and 99.99 etc.).
+        """
+        pdop = getattr(msg, 'pdop', None)
+        v = self._valid_pdop(pdop)
+        if v is None:
+            return
+        with self._lock:
+            # Choose the latest valid PDOP; if you prefer best (minimum), swap the logic:
+            # self.pdop = v if self.pdop is None or v < self.pdop else self.pdop
+            self.pdop = v
+            self.pdopLastUpdate = datetime.now()
+
+    # ---------- internal helpers ----------
+
+    def _recompute_latest_from_completed_locked(self):
+        """Combine completed per-constellation snapshots into public latest values."""
+        # Total visible = sum latest num_in_view per talker
+        total_visible = 0
+        visible_by_talker = {}
+        all_snrs = []
+
+        for talker, snap in self._gsv_complete.items():
+            n = snap.get('num_in_view') or 0
+            total_visible += n
+            visible_by_talker[talker] = n
+            snrs = snap.get('snrs') or []
+            all_snrs.extend(s for s in snrs if isinstance(s, int))
+
+        self.total_visible = total_visible
+        # Sorted by talker code for stable reads
+        self.visible_by_talker = dict(sorted(visible_by_talker.items()))
+
+        if all_snrs:
+            self.snr_min = min(all_snrs)
+            self.snr_max = max(all_snrs)
+            self.snr_avg = round(mean(all_snrs), 2)
+            # print(f"min max avg {self.snr_min} {self.snr_max} {self.snr_avg}")
+        else:
+            self.snr_min = self.snr_max = self.snr_avg = None
+
+    @staticmethod
+    def _safe_int(x):
+        try:
+            return int(x)
+        except (TypeError, ValueError):
+            return None
+
+    @staticmethod
+    def _valid_pdop(x):
+        if x is None:
+            return None
+        try:
+            v = float(x)
+        except (TypeError, ValueError):
+            return None
+        # 0 or ~100 are typical "invalid" placeholders
+        if not math.isfinite(v) or v <= 0 or v >= 50:
+            return None
+        return v
+    
+    @staticmethod
+    def get_signal_id(msg):
+        # If parser exposes .data list (pynmea2, etc.)
+        if hasattr(msg, "data") and msg.data:
+            return msg.data[-1] if msg.data[-1] not in ("", None) else None
+
+        # Fallback: parse raw line
+        raw = str(msg).strip()
+        core = raw.split("*", 1)[0]
+        fields = core.split(",")
+        return fields[-1] if fields[-1] not in ("", None) else None

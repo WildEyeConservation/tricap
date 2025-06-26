@@ -24,6 +24,7 @@ from .IMU import IMU
 import datetime
 import os
 from threading import Thread
+import struct
 
 from config import MOUNT_POINT
 
@@ -35,6 +36,8 @@ MAG_LPF_FACTOR = 0.4    # Low pass filter constant magnetometer
 ACC_LPF_FACTOR = 0.4    # Low pass filter constant for accelerometer
 ACC_MEDIANTABLESIZE = 9         # Median filter table size for accelerometer. Higher = smoother but a longer delay
 MAG_MEDIANTABLESIZE = 9         # Median filter table size for magnetometer. Higher = smoother but a longer delay
+SAMPLE_PERIOD_S = 0.01          # your sampling period -> 22 bytes per sample -> ~7.5MB per hour at 100Hz
+FLUSH_INTERVAL_S = 60           # write to SD once per minute
 
 class BerryImu(IMU):
     def __init__(self, capturing_lock = None):
@@ -65,14 +68,14 @@ class BerryImu(IMU):
         self._YP_11 = 0.0
         self._KFangleX = 0.0
         self._KFangleY = 0.0
-        self._samplePeriodS = 0.2
+        self.buffer = bytearray()
 
         self._capturing_lock = capturing_lock
 
         now = datetime.datetime.now()
         self._startDate = now.strftime('%Y_%m_%d')
         self.complete_dir = os.path.join(MOUNT_POINT, self._startDate)
-        self._dest = os.path.join(self.complete_dir, 'accelData.csv')
+        self._dest = os.path.join(self.complete_dir, 'accelData.bin')
         if not os.path.isdir(self.complete_dir):
             os.makedirs(self.complete_dir)
 
@@ -82,7 +85,7 @@ class BerryImu(IMU):
             return
         self.initIMU()       #Initialise the accelerometer, gyroscope and compass
 
-        self.mainThread = Thread(target=self.process, daemon=True)
+        self.mainThread = Thread(target=self.sample_raw_data, daemon=True)
         self.mainThread.start()
 
     def kalmanFilterY (self, accAngle, gyroRate, DT):
@@ -136,8 +139,70 @@ class BerryImu(IMU):
         self._XP_11 = self._XP_11 - ( K_1 * self._XP_01 )
 
         return self._KFangleX
+    
+    def flush_buffer(self):
+        """Write and fsync the RAM buffer to the SD, then clear it."""
+        now = datetime.datetime.now()
+
+        if self._startDate != now.strftime('%Y_%m_%d'):
+            self._startDate = now.strftime('%Y_%m_%d')
+        with self._capturing_lock:
+            if os.path.ismount(MOUNT_POINT):
+                self.complete_dir = os.path.join(MOUNT_POINT, self._startDate)
+            else:
+                # print("SSD not mounted, falling back to builtin storage GPS_IMU_Data for Accel data")
+                self.complete_dir = os.path.join("/home/pi/GPS_IMU_Data", self._startDate)
+            self._dest = os.path.join(self.complete_dir, 'accelData.bin')
+
+        # Big write (fewer metadata updates) + fsync for durability
+        with open(self._dest, "ab", buffering=1024 * 1024) as f:
+            f.write(self.buffer)
+            f.flush()
+            os.fsync(f.fileno())
+        self.buffer.clear()
+
+    def sample_raw_data(self):
+        # Precompile struct for speed & clarity (little-endian; adjust if needed)
+        # 9 x int16 + 1 x double
+        rec = struct.Struct("<9hd")
+        next_flush = time.time() + FLUSH_INTERVAL_S
+
+        while True:
+            #Read the accelerometer,gyroscope and magnetometer values
+            try:
+                ACCx = self.readACCx()
+                ACCy = self.readACCy()
+                ACCz = self.readACCz()
+                GYRx = self.readGYRx()
+                GYRy = self.readGYRy()
+                GYRz = self.readGYRz()
+                MAGx = self.readMAGx()
+                MAGy = self.readMAGy()
+                MAGz = self.readMAGz()
+
+                # Pack directly into bytes and extend the RAM buffer
+                now = datetime.datetime.now()
+                self.buffer += rec.pack(
+                    ACCx, ACCy, ACCz,
+                    GYRx, GYRy, GYRz,
+                    MAGx, MAGy, MAGz,
+                    now.timestamp()
+                )
+
+                # Periodic flush
+                t = time.time()
+                if t >= next_flush:
+                    self.flush_buffer()
+                    # set the next flush time; avoid drift by stepping in 60s chunks
+                    # in case loop ran late
+                    while next_flush <= t:
+                        next_flush += FLUSH_INTERVAL_S
+            except Exception as ex:
+                continue
+            time.sleep(SAMPLE_PERIOD_S)
 
     def process(self):
+        # not used anymore -> replaced with sample_raw_data
         gyroXangle = 0.0
         gyroYangle = 0.0
         gyroZangle = 0.0
@@ -328,7 +393,7 @@ class BerryImu(IMU):
                 accYnorm = ACCy/numerator
             else:
                 print("Cannot divide by zero")
-                time.sleep(self._samplePeriodS)
+                time.sleep(SAMPLE_PERIOD_S)
                 continue
 
             #Calculate pitch and roll
@@ -395,4 +460,4 @@ class BerryImu(IMU):
             # print(outputString)
 
             #slow program down a bit, makes the output more readable
-            time.sleep(self._samplePeriodS)
+            time.sleep(SAMPLE_PERIOD_S)

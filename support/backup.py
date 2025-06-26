@@ -90,8 +90,18 @@ class RsyncManager:
             # --- free-space preflight ---
             try:
                 free_bytes = self._disk_free_bytes(self._dst)
-                need_with_margin = total_bytes + 256*1024*1024 # 256MB margin
-                if free_bytes < need_with_margin:
+
+                # Estimate only the *remaining* bytes that would be sent.
+                remaining_bytes, remaining_files = self._estimate_delta_bytes(
+                    self._src,
+                    self._dst,
+                    self._excludes,
+                    total_bytes,
+                    total_files,
+                )
+
+                need_with_margin = remaining_bytes + 256*1024*1024 # 256MB margin
+                if free_bytes < need_with_margin and remaining_bytes > 0:
                     # Mark status and refuse to start
                     self._status.running = False
                     self._status.phase = "error"
@@ -282,6 +292,78 @@ class RsyncManager:
                 except Exception:
                     pass
         return total_bytes, total_files
+    
+    def _estimate_delta_bytes(
+        self,
+        src: Path,
+        dst: Path,
+        excludes: list[str],
+        total_bytes: int,
+        total_files: int,
+    ) -> tuple[int, int]:
+        """Estimate remaining bytes/files that would be transferred if we ran rsync now.
+
+        Uses the same rsync --dry-run itemization as _snapshot_progress, but returns
+        the *remaining* work instead of derived progress. Falls back to treating the
+        whole dataset as remaining if rsync fails for any reason.
+        """
+        src_arg = str(src) + os.sep  # copy *contents*
+        dst_arg = str(dst)
+
+        cmd: list[str] = [
+            "rsync",
+            "-aH",
+            "--dry-run",
+            "--itemize-changes",
+            "--no-human-readable",
+            "--out-format=%i|%l|%n",
+        ]
+
+        # Optional: if verify==True, we honor that here too (checksum-based diff)
+        if self._verify:
+            cmd.append("--checksum")
+
+        for pat in excludes:
+            cmd += ["--exclude", pat]
+        cmd += [src_arg, dst_arg]
+
+        env = os.environ.copy()
+        env["LC_ALL"] = "C"
+
+        try:
+            out = subprocess.check_output(
+                cmd,
+                text=True,
+                stderr=subprocess.STDOUT,
+                env=env,
+            )
+            remaining_bytes = 0
+            remaining_files = 0
+
+            for line in out.splitlines():
+                # Expect: "<itemize>|<length>|<path>"
+                # Example itemize for a file to be sent: ">f.st......"
+                try:
+                    item, length_str, _path = line.split("|", 2)
+                except ValueError:
+                    continue
+
+                if len(item) >= 2 and item[0] == ">" and item[1] == "f":
+                    # This file would be transferred
+                    remaining_files += 1
+                    try:
+                        remaining_bytes += int(length_str)
+                    except Exception:
+                        pass
+
+            # Clamp to sane bounds relative to totals
+            remaining_bytes = max(0, min(total_bytes, remaining_bytes))
+            remaining_files = max(0, min(total_files, remaining_files))
+            return remaining_bytes, remaining_files
+
+        except Exception:
+            # If rsync inspection fails, fall back to worst-case: everything remaining.
+            return total_bytes, total_files
 
     def _snapshot_progress(self, src: Path, dst: Path, excludes: list[str]) -> tuple[int, int]:
         """

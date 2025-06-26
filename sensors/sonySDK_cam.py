@@ -704,7 +704,7 @@ class sonySDKcam():
 
         et = ExifToolHelper()
         for dirPath, dirs, files in os.walk(os.path.expanduser(self._mount_point)):
-            if "in_progress" in dirPath:
+            if "in_progress" in dirPath or not dirPath.endswith(str(serial_number)):
                 continue
             if not "exif_cam.json" in files:
                 imageNames = [name for name in files if (".JPG" in name or ".ARW" in name)]

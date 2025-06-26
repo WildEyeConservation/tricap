@@ -7,6 +7,7 @@ import signal
 import subprocess
 import threading
 import time
+import shutil
 from dataclasses import dataclass, asdict
 from pathlib import Path
 from typing import Any
@@ -84,6 +85,28 @@ class RsyncManager:
 
             # compute totals once
             total_bytes, total_files = self._scan_totals(self._src, self._excludes)
+
+            # --- free-space preflight ---
+            try:
+                free_bytes = self._disk_free_bytes(self._dst)
+                need_with_margin = total_bytes + 256*1024*1024 # 256MB margin
+                if free_bytes < need_with_margin:
+                    # Mark status and refuse to start
+                    self._status.running = False
+                    self._status.phase = "error"
+                    self._status.message = "Insufficient space"
+                    return {
+                        "success": False,
+                        "msg": "Insufficient space",
+                    }
+            except Exception as e:
+                # If the preflight itself fails, be conservative and refuse to start
+                self._status.running = False
+                self._status.phase = "error"
+                self._status.message = f"Space check failed: {e}"
+                return {"success": False, "msg": f"space_check_failed: {e}"}
+            # --- end free-space preflight ---
+
             self._status = BackupStatus(
                 running=True,
                 phase="copying",
@@ -225,6 +248,12 @@ class RsyncManager:
             self._proc = None
 
     # ---------- helpers ----------
+
+    def _disk_free_bytes(self, path: Path) -> int:
+        try:
+            return shutil.disk_usage(path).free
+        except Exception:
+            return 0
 
     def _excluded(self, rel: str, patterns: list[str]) -> bool:
         r = rel.lower()

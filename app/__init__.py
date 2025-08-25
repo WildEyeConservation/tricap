@@ -186,7 +186,7 @@ tricap_cameras = tricap_manager.get_cameras_as_list()
 tricap_length = len(tricap_cameras)
 camera_loggers = []
 
-gps_ser = SerialInterface('/dev/serial0', 9600, False, False, imu_lock, tricap_manager)
+gps_ser = SerialInterface('/dev/ttyACM0', 38400, False, False, imu_lock, tricap_manager)
 accel_ser = BerryImu(imu_lock)
 
 for index, cam in enumerate(tricap_cameras):

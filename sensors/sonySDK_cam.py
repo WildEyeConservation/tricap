@@ -595,6 +595,8 @@ class sonySDKcam():
             # current_exif_info[dest_dir].append(filtered_exif)
 
     def merge_gps_meta_data(self, gps_session_start_time, cam_serial_num, imu_lock ):
+        # this is outdated -> accelData.csv changed to accelData.bin with raw values only
+        return 
         try:
             # read gps data
             imu_dir = os.path.join(self._mount_point, gps_session_start_time.strftime('%Y_%m_%d'))

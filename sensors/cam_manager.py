@@ -400,6 +400,8 @@ class TriCapCamsManager:
         #         subprocess.call('poweroff', shell=True)
 
     def merge_gps_meta_data(self):
+        # this is outdated -> accelData.csv changed to accelData.bin with raw values only
+        return 
         if(self.use_sony_cam):
             return
         try:

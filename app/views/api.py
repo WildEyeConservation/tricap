@@ -1,15 +1,15 @@
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, Response, request, jsonify, abort
 from app import tricap_manager, gps_ser
 import base64, logging, cv2
 import numpy as np
 from random import randint
 from datetime import datetime
-from config import CAM_MANAGER_STATES, CAMERA_STATES
+from config import CAM_MANAGER_STATES, CAMERA_STATES, SERVER_LOG_DIR, MOUNT_POINT
 import os, json
 from support.camera_data import ParseData
 from support.configure import TricapConfig
 import subprocess, csv
-from datetime import datetime
+from pathlib import Path
 
 api_bp = Blueprint('api', __name__)
 _logger = logging.getLogger(__name__)
@@ -23,6 +23,7 @@ def status():
   cams = tricap_manager.get_cameras_as_list()
 
   ret = {}
+  gps = {}
   ret['mode'] = tricap_manager.state.name
   ret['cams'] = [cam.state.name for cam in cams]
   if CAMERA_STATES.ERROR_CONFIG.name in ret['cams'] or CAMERA_STATES.ERROR_CAPTURE.name in ret['cams']:
@@ -32,7 +33,27 @@ def status():
   progress = tricap_manager.copy_eta()
   if progress != "":
     ret['progress'] = progress
-  ret['gps'] = gps_ser.hasGps()
+  gps["fix"] = gps_ser.hasGps()
+  gps['satellites'] = gps_ser.total_visible
+  gps['pdop'] = gps_ser.pdop if gps_ser.pdop is not None else 0
+  gps['max'] = gps_ser.snr_max if gps_ser.snr_max is not None else 0
+  gps['min'] = gps_ser.snr_min if gps_ser.snr_min is not None else 0
+  gps['avg'] = gps_ser.snr_avg if gps_ser.snr_avg is not None else 0
+  gps['lastUpdate'] = (datetime.now() - gps_ser.pdopLastUpdate).total_seconds() if gps_ser.pdopLastUpdate is not None else -1
+  ret['gps'] = gps
+
+  wifiSignal = 0
+  try:
+    result = subprocess.check_output(
+      ["iw", "dev", "wlan0", "link"], text=True
+    )
+    for line in result.split("\n"):
+      if "signal" in line:
+        wifiSignal = int(line.split()[1])  # dBm value
+  except Exception as e:
+      print("Error:", e)
+
+  ret['wifiSignal'] = wifiSignal
   # _logger.debug(f"Status {ret}")
 
   return ret
@@ -119,6 +140,13 @@ def restart():
   _logger.debug('restart called')
   subprocess.run(['systemctl', 'restart', 'tricap.service'], check=True)
   _logger.debug('restart')
+  return {'success': True}
+
+@api_bp.route('/api/reboot')
+def reboot():
+  _logger.debug('reboot called')
+  subprocess.run(['systemctl', 'reboot'], check=True)
+  _logger.debug('reboot')
   return {'success': True}
 
 @api_bp.route('/api/copy_eta')
@@ -249,3 +277,114 @@ def set_capture_interval():
   ret = {}
   ret['success'] = True
   return ret  
+
+CHUNK_SIZE = 1024 * 1024 # 1 MiB
+
+def file_iterator(path, start=0, end=None):
+  with path.open("rb") as f:
+    f.seek(start)
+    bytes_left = None if end is None else end - start + 1
+    while True:
+      size = CHUNK_SIZE if bytes_left is None else min(CHUNK_SIZE, bytes_left)
+      if size <= 0:
+        break
+      data = f.read(size)
+      if not data:
+        break
+      if bytes_left is not None:
+        bytes_left -= len(data)
+      yield data
+
+
+@api_bp.route('/api/download_logs', methods = ['GET'])
+def download_log():
+  log_path_file = Path(os.path.join(SERVER_LOG_DIR, 'tricap_master.log'))
+  
+  if not log_path_file.exists():
+    abort(404)
+
+  file_size = log_path_file.stat().st_size
+  range_header = request.headers.get("Range", None)
+
+  headers = {
+    "Accept-Ranges": "bytes",
+    "Content-Disposition": f'attachment; filename="{log_path_file.name}"',
+    "Content-Type": "text/plain",
+    "Cache-Control": "no-store",
+  }
+
+  if range_header:
+    try:
+      _, rng = range_header.split("=")
+      start_s, end_s = rng.split("-")
+      start = int(start_s) if start_s else 0
+      end = int(end_s) if end_s else file_size - 1
+      if start < 0 or end >= file_size or start > end:
+        raise ValueError
+    except Exception:
+      abort(416) # invalid Range
+
+    length = end - start + 1
+    headers.update({
+      "Content-Range": f"bytes {start}-{end}/{file_size}",
+      "Content-Length": str(length),
+    })
+    return Response(
+      file_iterator(log_path_file, start, end),
+      status=206,
+      headers=headers,
+    )
+
+  # Full download
+  headers["Content-Length"] = str(file_size)
+  return Response(file_iterator(log_path_file), headers=headers)
+
+@api_bp.route('/api/download_imu_logs', methods = ['GET'])
+def download_imu_log():
+  log_path = ''
+  if os.path.ismount(MOUNT_POINT):
+      log_path = os.path.join(MOUNT_POINT, datetime.now().strftime('%Y_%m_%d'))
+  else:
+      print("SSD not mounted, falling back to builtin storage GPS_IMU_Data for Accel data")
+      log_path = os.path.join("/home/pi/GPS_IMU_Data", datetime.now().strftime('%Y_%m_%d'))
+  log_path_file = Path(os.path.join(log_path, 'accelData.bin'))
+
+  if not log_path_file.exists():
+    abort(404)
+
+  file_size = log_path_file.stat().st_size
+  range_header = request.headers.get("Range", None)
+
+  headers = {
+    "Accept-Ranges": "bytes",
+    "Content-Disposition": f'attachment; filename="{log_path_file.name}"',
+    "Content-Type": "text/plain",
+    "Cache-Control": "no-store",
+  }
+
+  if range_header:
+    try:
+      _, rng = range_header.split("=")
+      start_s, end_s = rng.split("-")
+      start = int(start_s) if start_s else 0
+      end = int(end_s) if end_s else file_size - 1
+      if start < 0 or end >= file_size or start > end:
+        raise ValueError
+    except Exception:
+      abort(416) # invalid Range
+
+    length = end - start + 1
+    headers.update({
+      "Content-Range": f"bytes {start}-{end}/{file_size}",
+      "Content-Length": str(length),
+    })
+    return Response(
+      file_iterator(log_path_file, start, end),
+      status=206,
+      headers=headers,
+    )
+
+  # Full download
+  headers["Content-Length"] = str(file_size)
+  return Response(file_iterator(log_path_file), headers=headers)
+

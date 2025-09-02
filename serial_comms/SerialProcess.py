@@ -199,6 +199,7 @@ class SerialProcess():
         num_in_view = self._safe_int(getattr(msg, 'num_sv_in_view', None))
 
         # Extract up to 4 SNR fields from this sentence
+        signal_id = self.get_signal_id(msg)
         snrs = []
         for i in range(1, 5):
             s = getattr(msg, f"snr_{i}", None)
@@ -241,9 +242,10 @@ class SerialProcess():
                 }
                 # Reset for the next cycle
                 st['received_parts'].clear()
-                st['snrs'].clear()
+                if signal_id is None or signal_id == '0':
+                    # only clear here for next cycle
+                    st['snrs'].clear()
 
-                print(f"st {st}")
                 # Recompute combined "latest" view across all talkers
                 self._recompute_latest_from_completed_locked()
 
@@ -285,6 +287,7 @@ class SerialProcess():
             self.snr_min = min(all_snrs)
             self.snr_max = max(all_snrs)
             self.snr_avg = round(mean(all_snrs), 2)
+            # print(f"min max avg {self.snr_min} {self.snr_max} {self.snr_avg}")
         else:
             self.snr_min = self.snr_max = self.snr_avg = None
 
@@ -307,3 +310,15 @@ class SerialProcess():
         if not math.isfinite(v) or v <= 0 or v >= 50:
             return None
         return v
+    
+    @staticmethod
+    def get_signal_id(msg):
+        # If parser exposes .data list (pynmea2, etc.)
+        if hasattr(msg, "data") and msg.data:
+            return msg.data[-1] if msg.data[-1] not in ("", None) else None
+
+        # Fallback: parse raw line
+        raw = str(msg).strip()
+        core = raw.split("*", 1)[0]
+        fields = core.split(",")
+        return fields[-1] if fields[-1] not in ("", None) else None

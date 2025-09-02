@@ -388,3 +388,51 @@ def download_imu_log():
   headers["Content-Length"] = str(file_size)
   return Response(file_iterator(log_path_file), headers=headers)
 
+@api_bp.route('/api/download_gps_logs', methods = ['GET'])
+def download_gps_log():
+  log_path = ''
+  if os.path.ismount(MOUNT_POINT):
+      log_path = os.path.join(MOUNT_POINT, datetime.now().strftime('%Y_%m_%d'))
+  else:
+      print("SSD not mounted, falling back to builtin storage GPS_IMU_Data for GPS data")
+      log_path = os.path.join("/home/pi/GPS_IMU_Data", datetime.now().strftime('%Y_%m_%d'))
+  log_path_file = Path(os.path.join(log_path, 'gpsData.csv'))
+
+  if not log_path_file.exists():
+    abort(404)
+
+  file_size = log_path_file.stat().st_size
+  range_header = request.headers.get("Range", None)
+
+  headers = {
+    "Accept-Ranges": "bytes",
+    "Content-Disposition": f'attachment; filename="{log_path_file.name}"',
+    "Content-Type": "text/plain",
+    "Cache-Control": "no-store",
+  }
+
+  if range_header:
+    try:
+      _, rng = range_header.split("=")
+      start_s, end_s = rng.split("-")
+      start = int(start_s) if start_s else 0
+      end = int(end_s) if end_s else file_size - 1
+      if start < 0 or end >= file_size or start > end:
+        raise ValueError
+    except Exception:
+      abort(416) # invalid Range
+
+    length = end - start + 1
+    headers.update({
+      "Content-Range": f"bytes {start}-{end}/{file_size}",
+      "Content-Length": str(length),
+    })
+    return Response(
+      file_iterator(log_path_file, start, end),
+      status=206,
+      headers=headers,
+    )
+
+  # Full download
+  headers["Content-Length"] = str(file_size)
+  return Response(file_iterator(log_path_file), headers=headers)

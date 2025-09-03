@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from flask import Blueprint, Response, request, jsonify, abort
 from app import tricap_manager, gps_ser
 import base64, logging, cv2
@@ -10,6 +12,7 @@ from support.camera_data import ParseData
 from support.configure import TricapConfig
 import subprocess, csv
 from pathlib import Path
+from support.backup import manager as backupManager
 
 api_bp = Blueprint('api', __name__)
 _logger = logging.getLogger(__name__)
@@ -277,6 +280,23 @@ def set_capture_interval():
   ret = {}
   ret['success'] = True
   return ret  
+
+@api_bp.route('/api/backup_start', methods = ['GET'])
+def backup_start():
+  _logger.debug("backup_start req")
+  src = "/home/pi/.vscode-server"
+  dst = "/home/pi/.vscode-server-backup"
+  return jsonify(backupManager.start(src, dst))
+
+@api_bp.route('/api/backup_stop', methods = ['GET'])
+def backup_stop():
+  _logger.debug("backup_stop req")
+  return jsonify(backupManager.stop())
+
+@api_bp.route('/api/backup_status', methods = ['GET'])
+def backup_status():
+  _logger.debug("backup_status req")
+  return jsonify(backupManager.status())
 
 CHUNK_SIZE = 1024 * 1024 # 1 MiB
 

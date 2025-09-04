@@ -13,6 +13,7 @@ from support.configure import TricapConfig
 import subprocess, csv
 from pathlib import Path
 from support.backup import manager as backupManager
+import time
 
 api_bp = Blueprint('api', __name__)
 _logger = logging.getLogger(__name__)
@@ -296,7 +297,24 @@ def backup_stop():
 @api_bp.route('/api/backup_status', methods = ['GET'])
 def backup_status():
   _logger.debug("backup_status req")
-  return jsonify(backupManager.status())
+  st = backupManager.status() or {}
+  total = int(st.get("total_bytes") or 0)
+  done = int(st.get("bytes_copied") or 0)
+  percent = round((done / total) * 100, 2) if total > 0 else 0.0
+  eta = _eta_simple(st.get("started_at"), done, total)
+
+  return {
+      "running": bool(st.get("running")),
+      "phase": st.get("phase") or "idle",
+      "message": st.get("message") or "",
+      "percent": percent,                 # 0..100 with 2 decimals
+      "bytes_done": done,
+      "bytes_total": total,
+      "files_done": int(st.get("files_done") or 0),
+      "files_total": int(st.get("total_files") or 0),
+      "eta_seconds": 0 if eta is None else float(eta),
+      # current file name isn't parsed from rsync; snapshot doesn't need it
+  }
 
 CHUNK_SIZE = 1024 * 1024 # 1 MiB
 
@@ -456,3 +474,15 @@ def download_gps_log():
   # Full download
   headers["Content-Length"] = str(file_size)
   return Response(file_iterator(log_path_file), headers=headers)
+
+def _eta_simple(started_at: float | None, bytes_done: int, bytes_total: int) -> float | None:
+    """ETA using only start time + completion fraction."""
+    if not started_at or bytes_total <= 0 or bytes_done <= 0:
+        return None
+    now = time.time()
+    elapsed = max(0.0, now - started_at)
+    completion = bytes_done / bytes_total
+    if completion <= 0.0:
+        return None
+    total_estimated = elapsed / completion
+    return max(0.0, total_estimated - elapsed)

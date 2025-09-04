@@ -169,34 +169,36 @@ class BerryImu(IMU):
 
         while True:
             #Read the accelerometer,gyroscope and magnetometer values
-            ACCx = self.readACCx()
-            ACCy = self.readACCy()
-            ACCz = self.readACCz()
-            GYRx = self.readGYRx()
-            GYRy = self.readGYRy()
-            GYRz = self.readGYRz()
-            MAGx = self.readMAGx()
-            MAGy = self.readMAGy()
-            MAGz = self.readMAGz()
+            try:
+                ACCx = self.readACCx()
+                ACCy = self.readACCy()
+                ACCz = self.readACCz()
+                GYRx = self.readGYRx()
+                GYRy = self.readGYRy()
+                GYRz = self.readGYRz()
+                MAGx = self.readMAGx()
+                MAGy = self.readMAGy()
+                MAGz = self.readMAGz()
 
-            # Pack directly into bytes and extend the RAM buffer
-            now = datetime.datetime.now()
-            self.buffer += rec.pack(
-                ACCx, ACCy, ACCz,
-                GYRx, GYRy, GYRz,
-                MAGx, MAGy, MAGz,
-                now.timestamp()
-            )
+                # Pack directly into bytes and extend the RAM buffer
+                now = datetime.datetime.now()
+                self.buffer += rec.pack(
+                    ACCx, ACCy, ACCz,
+                    GYRx, GYRy, GYRz,
+                    MAGx, MAGy, MAGz,
+                    now.timestamp()
+                )
 
-            # Periodic flush
-            t = time.time()
-            if t >= next_flush:
-                self.flush_buffer()
-                # set the next flush time; avoid drift by stepping in 60s chunks
-                # in case loop ran late
-                while next_flush <= t:
-                    next_flush += FLUSH_INTERVAL_S
-
+                # Periodic flush
+                t = time.time()
+                if t >= next_flush:
+                    self.flush_buffer()
+                    # set the next flush time; avoid drift by stepping in 60s chunks
+                    # in case loop ran late
+                    while next_flush <= t:
+                        next_flush += FLUSH_INTERVAL_S
+            except Exception as ex:
+                continue
             time.sleep(SAMPLE_PERIOD_S)
 
     def process(self):

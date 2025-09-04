@@ -1,235 +1,314 @@
+# backup.py
+# Minimal rsync-backed backup engine with simple filesystem-snapshot progress.
 from __future__ import annotations
 
 import os
-import time
-import hashlib
+import signal
+import subprocess
 import threading
+import time
 from dataclasses import dataclass, asdict
 from pathlib import Path
-from typing import Any, Dict, List, Optional
-
-
-CHUNK_SIZE = 40 * 1024 * 1024  # 40 MiB
+from typing import Any
 
 @dataclass
 class BackupStatus:
     running: bool = False
-    phase: str = "idle"  # idle | scanning | copying | stopping | finished | error
+    phase: str = "idle"                # idle | copying | stopping | finished | error
     message: str = ""
-    started_at: Optional[float] = None
-    finished_at: Optional[float] = None
+    started_at: float | None = None
+    finished_at: float | None = None
 
+    # Totals (computed once at start)
     total_files: int = 0
-    files_done: int = 0
-
     total_bytes: int = 0
+
+    # Snapshotted progress (recomputed on status())
+    files_done: int = 0
     bytes_copied: int = 0
 
-    current_relpath: Optional[str] = None
-    current_bytes_total: int = 0
-    current_bytes_done: int = 0
-
-    # computed on demand by .status()
-    bytes_per_sec: float = 0.0
-    eta_seconds: Optional[float] = None
-
-
-class BackupManager:
-    """Threaded file copy with resumable per-file progress and global status."""
-
+class RsyncManager:
+    """
+    Runs rsync in a background thread. Progress is derived by scanning:
+      bytes_copied = Σ min(dst_size, src_size) over all source files
+      files_done   = count(dst_size >= src_size)
+    This is robust for 20s polling and avoids parsing rsync output.
+    """
     def __init__(self) -> None:
         self._lock = threading.Lock()
-        self._thread: Optional[threading.Thread] = None
-        self._stop_evt = threading.Event()
         self._status = BackupStatus()
-        self._cfg: Dict[str, Any] = {}
+        self._thread: threading.Thread | None = None
+        self._proc: subprocess.Popen[str] | subprocess.Popen[bytes] | None = None
 
-    # ---------- Public API used by Flask ----------
+        # job config for snapshotting
+        self._src: Path | None = None
+        self._dst: Path | None = None
+        self._excludes: list[str] = []
+        self._verify: bool = False
+        self._delete: bool = False
 
-    def start(self, src: str, dst: str, excludes: List[str] | None = None, verify: bool = False) -> Dict[str, Any]:
+        # cache totals
+        self._totals_ready = False
+
+        # tiny cache to avoid re-scanning too often (not strictly needed for 20s poll)
+        self._snap_cache_ts = 0.0
+        self._snap_cache: tuple[int, int] = (0, 0)  # (bytes_copied, files_done)
+
+    # ---------------- Public API ----------------
+
+    def start(
+        self,
+        src: str,
+        dst: str,
+        excludes: list[str] | None = None,
+        verify: bool = False,
+        delete: bool = False,
+    ) -> dict[str, Any]:
         excludes = excludes or []
+        src_p = Path(src)
+        dst_p = Path(dst)
+
+        if not src_p.exists() or not src_p.is_dir():
+            return {"success": False}
+        dst_p.mkdir(parents=True, exist_ok=True)
+
         with self._lock:
             if self._status.running:
                 return {"success": False}
-            src_p, dst_p = Path(src), Path(dst)
-            if not src_p.exists() or not src_p.is_dir():
-                return {"success": False}
-            dst_p.mkdir(parents=True, exist_ok=True)
 
-            self._cfg = {
-                "src": str(src_p.resolve()),
-                "dst": str(dst_p.resolve()),
-                "excludes": excludes,
-                "verify": bool(verify),
-            }
-            self._stop_evt.clear()
+            self._src = src_p.resolve()
+            self._dst = dst_p.resolve()
+            self._excludes = excludes
+            self._verify = bool(verify)
+            self._delete = bool(delete)
+
+            # compute totals once
+            total_bytes, total_files = self._scan_totals(self._src, self._excludes)
             self._status = BackupStatus(
-                running=True, phase="scanning", message="Scanning files...", started_at=time.time()
+                running=True,
+                phase="copying",
+                message="Copying...",
+                started_at=time.time(),
+                total_files=total_files,
+                total_bytes=total_bytes,
             )
-            self._thread = threading.Thread(target=self._run_backup, daemon=True)
+            self._totals_ready = True
+            self._snap_cache_ts = 0.0
+
+            self._thread = threading.Thread(target=self._run_rsync, daemon=True)
             self._thread.start()
             return {"success": True}
 
-    def stop(self) -> Dict[str, Any]:
+    def stop(self) -> dict[str, Any]:
         with self._lock:
             if not self._status.running:
                 return {"success": False}
             self._status.phase = "stopping"
-            self._stop_evt.set()
-            return {"success": True}
+            self._status.message = "Stopping..."
+            proc = self._proc
 
-    def status(self) -> Dict[str, Any]:
+        # Try graceful stop
+        try:
+            if proc and proc.poll() is None:
+                proc.send_signal(signal.SIGINT)
+        except Exception:
+            try:
+                if proc and proc.poll() is None:
+                    proc.terminate()
+            except Exception:
+                pass
+        return {"success": True}
+
+    def status(self) -> dict[str, Any]:
         with self._lock:
             st = asdict(self._status)
-            # compute speed/eta
-            if self._status.running and self._status.started_at and self._status.bytes_copied > 0:
-                elapsed = max(1e-6, time.time() - self._status.started_at)
-                bps = self._status.bytes_copied / elapsed
-                st["bytes_per_sec"] = bps
-                if self._status.total_bytes > 0:
-                    remain = self._status.total_bytes - self._status.bytes_copied
-                    st["eta_seconds"] = max(0.0, remain / max(1e-6, bps))
-            return st
+            src = self._src
+            dst = self._dst
+            excludes = list(self._excludes)
 
-    # ---------- Internal implementation ----------
+        # If a job is configured, compute a fresh (or cached) snapshot
+        if src and dst and self._totals_ready:
+            now = time.time()
+            if now - self._snap_cache_ts >= 1.5:  # throttle a little
+                bytes_copied, files_done = self._snapshot_progress(src, dst, excludes)
+                with self._lock:
+                    self._status.bytes_copied = bytes_copied
+                    self._status.files_done = files_done
+                    self._snap_cache = (bytes_copied, files_done)
+                    self._snap_cache_ts = now
+                st["bytes_copied"] = bytes_copied
+                st["files_done"] = files_done
+            else:
+                # use cached
+                bc, fd = self._snap_cache
+                st["bytes_copied"] = bc
+                st["files_done"] = fd
 
-    def _is_excluded(self, rel: str, patterns: List[str]) -> bool:
-        if not patterns:
-            return False
-        low = rel.lower()
-        return any(p.lower() in low for p in patterns)
+        return st
 
-    def _scan(self, src: Path, excludes: List[str]) -> List[Path]:
-        files: List[Path] = []
-        for root, dirs, fnames in os.walk(src):
-            root_p = Path(root)
-            # prune excluded dirs
-            dirs[:] = [d for d in dirs if not self._is_excluded(str(Path(root_p, d).relative_to(src)), excludes)]
-            for f in fnames:
-                rel = str(Path(root_p, f).relative_to(src))
-                if self._is_excluded(rel, excludes):
-                    continue
-                fp = root_p / f
-                try:
-                    if fp.is_file():
-                        files.append(fp)
-                except Exception:
-                    continue
-        return files
+    # ---------------- Internals ----------------
 
-    def _hash_file(self, path: Path) -> str:
-        h = hashlib.md5()
-        with path.open("rb") as r:
-            while True:
-                chunk = r.read(8 * 1024 * 1024)
-                if not chunk:
-                    break
-                h.update(chunk)
-        return h.hexdigest()
-
-    def _copy_streaming(self, src: Path, dst: Path, can_resume: bool, verify: bool) -> None:
-        dst.parent.mkdir(parents=True, exist_ok=True)
-
-        src_sz = src.stat().st_size
-        self._status.current_bytes_total = src_sz
-        done = 0
-
-        mode = "wb"
-        offset = 0
-
-        if dst.exists():
-            dst_sz = dst.stat().st_size
-            if dst_sz >= src_sz:
-                self._status.current_bytes_done = src_sz
-                return
-            if can_resume:
-                mode = "r+b"
-                offset = dst_sz
-                done = dst_sz
-
-        with src.open("rb") as rs:
-            if offset:
-                rs.seek(offset)
-            with dst.open(mode) as ws:
-                if offset:
-                    ws.seek(offset)
-                while not self._stop_evt.is_set():
-                    buf = rs.read(CHUNK_SIZE)
-                    if not buf:
-                        break
-                    ws.write(buf)
-                    done += len(buf)
-                    # hot path stats (ok without lock in CPython)
-                    self._status.bytes_copied += len(buf)
-                    self._status.current_bytes_done = done
-
-        if verify and not self._stop_evt.is_set():
-            if self._hash_file(src) != self._hash_file(dst):
-                raise IOError("MD5 mismatch after copy")
-
-    def _run_backup(self) -> None:
-        src = Path(self._cfg["src"])
-        dst = Path(self._cfg["dst"])
-        excludes: List[str] = self._cfg["excludes"]
-        verify: bool = self._cfg["verify"]
+    def _run_rsync(self) -> None:
+        assert self._src is not None and self._dst is not None
+        src_arg = str(self._src) + os.sep  # copy *contents*
+        cmd: list[str] = [
+            "rsync",
+            "-aH",                # archive + preserve hardlinks
+            "--partial",
+            "--append-verify",    # safe resume
+        ]
+        if self._verify:
+            cmd.append("--checksum")    # slower; content-verify
+        if self._delete:
+            cmd.append("--delete-after")
+        for pat in self._excludes:
+            cmd += ["--exclude", pat]
+        cmd += [src_arg, str(self._dst)]
 
         try:
-            files = self._scan(src, excludes)
-            total_bytes = 0
-            for f in files:
-                try:
-                    total_bytes += f.stat().st_size
-                except Exception:
-                    pass
-
+            self._proc = subprocess.Popen(
+                cmd,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                text=False,
+            )
+            rc = self._proc.wait()
             with self._lock:
-                self._status.total_files = len(files)
-                self._status.total_bytes = total_bytes
-                self._status.phase = "copying"
-                self._status.message = "Copying..."
-
-            for i, f in enumerate(files, start=1):
-                if self._stop_evt.is_set():
-                    break
-                rel = str(f.relative_to(src))
-                with self._lock:
-                    self._status.current_relpath = rel
-                    self._status.current_bytes_done = 0
-                    try:
-                        self._status.current_bytes_total = f.stat().st_size
-                    except Exception:
-                        self._status.current_bytes_total = 0
-
-                try:
-                    self._copy_streaming(f, dst / rel, can_resume=True, verify=verify)
-                except Exception as e:
-                    with self._lock:
-                        self._status.phase = "error"
-                        self._status.message = f"Error copying {rel}: {e}"
-                    break
-
-                with self._lock:
-                    self._status.files_done = i
-
-            with self._lock:
-                if self._stop_evt.is_set():
+                self._status.running = False
+                self._status.finished_at = time.time()
+                if self._status.phase == "stopping":
+                    # treat as user-stopped regardless of rc
                     self._status.phase = "finished"
                     self._status.message = "Stopped by user."
-                elif self._status.phase != "error":
+                elif rc == 0:
                     self._status.phase = "finished"
                     self._status.message = "Completed."
-                self._status.running = False
-                self._status.finished_at = time.time()
-
+                else:
+                    self._status.phase = "error"
+                    self._status.message = f"exited with code {rc}"
         except Exception as e:
             with self._lock:
-                self._status.phase = "error"
-                self._status.message = f"Fatal error: {e}"
                 self._status.running = False
                 self._status.finished_at = time.time()
+                self._status.phase = "error"
+                self._status.message = f"Error: {e}"
+        finally:
+            self._proc = None
+
+    # ---------- helpers ----------
+
+    def _excluded(self, rel: str, patterns: list[str]) -> bool:
+        r = rel.lower()
+        return any(p.lower() in r for p in patterns)
+
+    def _scan_totals(self, src: Path, excludes: list[str]) -> tuple[int, int]:
+        total_bytes = 0
+        total_files = 0
+        for root, dirs, files in os.walk(src):
+            root_p = Path(root)
+            # prune excluded dirs
+            dirs[:] = [d for d in dirs if not self._excluded(str((root_p / d).relative_to(src)), excludes)]
+            for f in files:
+                rel = (root_p / f).relative_to(src)
+                if self._excluded(str(rel), excludes):
+                    continue
+                try:
+                    total_bytes += (root_p / f).stat().st_size
+                    total_files += 1
+                except Exception:
+                    pass
+        return total_bytes, total_files
+
+    def _snapshot_progress(self, src: Path, dst: Path, excludes: list[str]) -> tuple[int, int]:
+        """
+        Progress snapshot using rsync's own difference engine:
+
+        - Run: rsync --dry-run -aH --itemize-changes --out-format '%i|%l|%n' SRC/ DST/
+        - Sum %l (size) for lines where %i indicates a file that WOULD be sent (>'f...)
+        - Remaining bytes/files = those sums
+        - bytes_copied = total_bytes - remaining_bytes
+        - files_done   = total_files - remaining_files
+
+        Falls back to filesystem-based snapshot if rsync errors out.
+        """
+        # Read totals computed at start()
+        with self._lock:
+            total_bytes = int(self._status.total_bytes or 0)
+            total_files = int(self._status.total_files or 0)
+
+        src_arg = str(src) + os.sep  # copy *contents*
+        cmd: list[str] = [
+            "rsync",
+            "-aH",
+            "--dry-run",
+            "--itemize-changes",
+            "--no-human-readable",          # numeric sizes in stats
+            "--out-format=%i|%l|%n",        # itemize code | length | path
+        ]
+        # Be careful enabling --checksum here: it would re-hash everything every poll.
+        # Use the manager's verify flag only if you *really* want content-compare.
+        if self._verify:
+            cmd.append("--checksum")
+        for pat in excludes:
+            cmd += ["--exclude", pat]
+        cmd += [src_arg, str(dst)]
+
+        env = os.environ.copy()
+        env["LC_ALL"] = "C"  # stable parse
+
+        try:
+            out = subprocess.check_output(cmd, text=True, stderr=subprocess.STDOUT, env=env)
+            remaining_bytes = 0
+            remaining_files = 0
+
+            for line in out.splitlines():
+                # Expect: "<itemize>|<length>|<path>"
+                # Example itemize for a file to be sent: ">f.st......"
+                try:
+                    item, length_str, _path = line.split("|", 2)
+                except ValueError:
+                    continue
+
+                if len(item) >= 2 and item[0] == ">" and item[1] == "f":
+                    # This file would be transferred
+                    remaining_files += 1
+                    try:
+                        remaining_bytes += int(length_str)
+                    except Exception:
+                        pass
+
+            # Compute progress from totals – clamp to sane bounds
+            bytes_copied = max(0, min(total_bytes, total_bytes - remaining_bytes))
+            files_done = max(0, min(total_files, total_files - remaining_files))
+            return bytes_copied, files_done
+
+        except Exception:
+            # Fallback: filesystem snapshot (min(dst_size, src_size))
+            bytes_present = 0
+            files_done = 0
+            for root, dirs, files in os.walk(src):
+                root_p = Path(root)
+                dirs[:] = [d for d in dirs if not self._excluded(str((root_p / d).relative_to(src)), excludes)]
+                for f in files:
+                    rel = (root_p / f).relative_to(src)
+                    if self._excluded(str(rel), excludes):
+                        continue
+                    sp = root_p / f
+                    try:
+                        ssz = sp.stat().st_size
+                    except Exception:
+                        continue
+                    dp = dst / rel
+                    try:
+                        dsz = dp.stat().st_size
+                    except FileNotFoundError:
+                        dsz = 0
+                    bytes_present += min(ssz, dsz)
+                    if dsz >= ssz:
+                        files_done += 1
+            return bytes_present, files_done
 
 
-# Option A: expose a singleton manager for easy imports across the app
-manager = BackupManager()
-
-__all__ = ["BackupStatus", "BackupManager", "manager"]
+# Singleton for easy import in api.py
+manager = RsyncManager()
+__all__ = ["BackupStatus", "RsyncManager", "manager"]

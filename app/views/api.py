@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from flask import Blueprint, Response, request, jsonify, abort
+from flask import Blueprint, Response, request, jsonify, abort, send_file
 from app import tricap_manager, gps_ser
 import base64, logging, cv2
 import numpy as np
@@ -13,7 +13,7 @@ from support.configure import TricapConfig
 import subprocess, csv
 from pathlib import Path
 from support.backup import manager as backupManager
-import time, shutil, threading
+import time, shutil, threading, re, io
 
 api_bp = Blueprint('api', __name__)
 _logger = logging.getLogger(__name__)
@@ -49,7 +49,7 @@ def status():
   wifiSignal = 0
   try:
     result = subprocess.check_output(
-      ["iw", "dev", "wlan0", "link"], text=True
+      ["iw", "dev", "wlx5c628bcde76d", "link"], text=True
     )
     for line in result.split("\n"):
       if "signal" in line:
@@ -133,6 +133,54 @@ def get_image(cam_idx, im_idx):
 
   _logger.debug(len(im['image']))
   return im
+
+NAME_RE = re.compile(
+    r"^(?P<cam>\d+)_(?P<dd>\d{2})_(?P<mm>\d{2})_(?P<yyyy>\d{4})_(?P<hh>\d{2})_(?P<mi>\d{2})_(?P<ss>\d{2})_(?P<frame>\d+)\.[A-Za-z0-9]+$",
+    re.IGNORECASE
+)
+
+def sort_key_from_name(p: Path):
+  m = NAME_RE.match(p.name)
+  if not m:
+    # Fallback: mtime if name doesn't match pattern
+    return ("mtime", p.stat().st_mtime, p.name.lower())
+  return ("pat",
+          int(m["yyyy"]), int(m["mm"]), int(m["dd"]),
+          int(m["hh"]), int(m["mi"]), int(m["ss"]),
+          int(m["frame"]))
+
+@api_bp.get("/api/get_images/<cam_idx>")
+def get_images(cam_idx):
+  if tricap_manager._copy_start_time is None:
+    abort(404)
+
+  camIdx = int(cam_idx)
+
+  if camIdx >= len(tricap_manager._cameras):
+    return jsonify({'msg': 'Invalid camera index'}), 400
+
+  cam_session_dir = os.path.join(MOUNT_POINT, tricap_manager._copy_start_time.strftime('%Y_%m_%d'), tricap_manager._copy_start_time.strftime('%H_%M_%S'))
+  # cam_session_dir = os.path.join(MOUNT_POINT, "2025_09_19", "00_26_29")
+  image_dir = os.path.join(cam_session_dir, str(tricap_manager._cameras[camIdx].serial_num))
+
+  if not Path(image_dir).is_dir():
+    abort(404)
+
+  # Top-level only for speed; swap to base.rglob("**/*") if you need recursion
+  candidates = [p for p in Path(image_dir).iterdir() if p.is_file() and p.suffix.lower() == ".arw"]
+
+  if not candidates:
+    abort(404)
+
+  # Sort by parsed timestamp→frame; fallback entries (if any) by mtime
+  candidates.sort(key=sort_key_from_name)
+
+  idx = len(candidates) // 2
+  path = candidates[idx]
+
+  _logger.debug(f"get_images called {image_dir} {cam_idx} {path}")
+
+  return send_file(path, conditional=True)
 
 @api_bp.route('/api/lensNumber')
 def lens_number():

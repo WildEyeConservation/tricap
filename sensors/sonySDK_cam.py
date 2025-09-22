@@ -118,7 +118,7 @@ class sonySDKcam():
         sleep(2)
         # This sets the file chunk size for transferring images from the camera to the PI ram fileSystem. The max seems to be 20Mb chunks, as configured here. 
         # This allows the shutter events sent from the SDK to not be blocked for too long while images are transferred, preventing erratic shutter timing.
-        self._sonyCamera.setTransferBufferSize(100,self._cameraID)
+        self._sonyCamera.setTransferBufferSize(70,self._cameraID)
 
         # This instructs the camera to save images to the PC only and not on the SD card.
         self._sonyCamera.setCameraSaveLocation(1,self._cameraID)
@@ -815,6 +815,10 @@ class sonySDKcam():
     @property
     def captureCount(self):
         return self._image_count
+
+    @property
+    def sessionStartDate(self):
+        return self._session_start_date
     
     def get_cam_image_count(self):
         """Return the number of images captured by the camera, as tracked by this object."""

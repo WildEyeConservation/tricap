@@ -351,6 +351,7 @@ def verify_and_delete():
     else:
         print("NOT safe to delete. Differences:")
         ret['success'] = False
+    tricap_manager.unmount_disk()
   else:
     return jsonify({'msg': 'Failed to mount external disk'}), 400
 

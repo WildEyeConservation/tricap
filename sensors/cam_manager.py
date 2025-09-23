@@ -377,9 +377,8 @@ class TriCapCamsManager:
     def mount_ssd(self):
         if not os.path.ismount(MOUNT_POINT_SSD):
             try:
-                with self._imu_lock:
-                    mount_status = subprocess.run(["mount", "/dev/sda1", MOUNT_POINT_SSD], check=True)
-                    self._logger.debug(mount_status)
+                mount_status = subprocess.run(["mount", "/dev/sda1", MOUNT_POINT_SSD], check=True)
+                self._logger.debug(mount_status)
             except:
                 self._logger.warning('Failed to mount')
                 return False
@@ -390,9 +389,8 @@ class TriCapCamsManager:
     def unmount_disk(self):
         if os.path.ismount(MOUNT_POINT_SSD):
             try:
-                with self._imu_lock:
-                    mount_status = subprocess.run(["umount", MOUNT_POINT_SSD], check=True)
-                    self._logger.debug(mount_status)
+                mount_status = subprocess.run(["umount", MOUNT_POINT_SSD], check=True)
+                self._logger.debug(mount_status)
             except:
                 self._logger.warning('Failed to umount')
                 return False

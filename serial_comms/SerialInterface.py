@@ -5,7 +5,7 @@ import base64
 import serial_comms.out.tricap_pb2 as pb
 import logging, subprocess
 from datetime import datetime
-
+import re
 from .SerialProcess import SerialProcess
 
 GET_STATUS = 1
@@ -46,7 +46,7 @@ class SerialInterface(SerialProcess):
   def open(self):
     with self._lock:
       try:
-        # self._logger.debug('Serial port try connect')
+        self._logger.debug('Serial port try connect')
         self.serialPort = serial.Serial(port=self.port, baudrate=self._baud)
         sleep(10e-3)
         bytesWaiting = self.serialPort.inWaiting()
@@ -109,14 +109,23 @@ class SerialInterface(SerialProcess):
           else:
             # gps
             bytesWaiting = self.serialPort.inWaiting()
+            newData = False
             while bytesWaiting > 0:
               # self._logger.debug('GPS serial bytes in waiting {}'.format(bytesWaiting))
-              buff = self.serialPort.read_until(b'\n')
-              # self._logger.debug('rx {} {}'.format(buff, len(buff)))
-              if len(buff) > 0:
-                with self._lock:
-                  self.processGpsResponse(buff)
+              newData = True
+              buff += self.serialPort.read(bytesWaiting)
+              sleep(1e-3)
               bytesWaiting = self.serialPort.inWaiting()
+            if newData:
+              # self._logger.debug('rx {} {}'.format(buff, len(buff)))
+              with self._lock:
+                  # items = buff.split('\n')
+                  items = re.split(b'(?=\n)', buff)
+                  # clear buffer
+                  buff = bytearray()
+                  for item in items:
+                    if(len(item) > 1):
+                      self.processGpsResponse(item)   
         except Exception as e:
           self._logger.debug(f"Serial thread error {e}")
           self._hasGps = False

@@ -118,12 +118,12 @@ class sonySDKcam():
         sleep(2)
         # This sets the file chunk size for transferring images from the camera to the PI ram fileSystem. The max seems to be 20Mb chunks, as configured here. 
         # This allows the shutter events sent from the SDK to not be blocked for too long while images are transferred, preventing erratic shutter timing.
-        self._sonyCamera.setTransferBufferSize(70,self._cameraID)
+        self._sonyCamera.setTransferBufferSize(20,self._cameraID)
 
         # This instructs the camera to save images to the PC only and not on the SD card.
         self._sonyCamera.setCameraSaveLocation(1,self._cameraID)
         # Save to memory card only
-        # self._sonyCamera.setCameraSaveLocation(2,i)
+        # self._sonyCamera.setCameraSaveLocation(2,self._cameraID)
 
         # live view is enabled by default on connection and seems to use USB bandwidth, so toggle it to disable
         self._sonyCamera.toggleLiveView(self._cameraID)
@@ -164,13 +164,13 @@ class sonySDKcam():
         if(self._sonyCamera.isConnected(self._cameraID) and self._sonyCamera.shutterDown(self._cameraID)):
             retval = retval and True
         else:
-            self._logger.warning('Trigger Camera(shutter down) '+str(i)+' failed')
+            self._logger.warning('Trigger Camera(shutter down) '+str(self._cameraID)+' failed')
             retval = retval and False
         sleep(0.035)
         if(self._sonyCamera.isConnected(self._cameraID) and self._sonyCamera.shutterUp(self._cameraID)):
             retval = retval and True
         else:
-            self._logger.warning('Trigger Camera(shutter up) '+str(i)+' failed')
+            self._logger.warning('Trigger Camera(shutter up) '+str(self._cameraID)+' failed')
             retval = retval and False
         return retval
 

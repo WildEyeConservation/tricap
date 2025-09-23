@@ -11,6 +11,7 @@ import shutil
 from dataclasses import dataclass, asdict
 from pathlib import Path
 from typing import Any
+from app import tricap_manager
 
 @dataclass
 class BackupStatus:
@@ -225,6 +226,11 @@ class RsyncManager:
                 text=False,
             )
             rc = self._proc.wait()
+            while True:
+                if not tricap_manager.unmount_disk():
+                    time.sleep(2.0)
+                else:
+                    break
             with self._lock:
                 self._status.running = False
                 self._status.finished_at = time.time()

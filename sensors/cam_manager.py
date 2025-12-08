@@ -158,8 +158,9 @@ class TriCapCamsManager:
         elif self.use_sony_cam:
             self._sonySDKInstance = sonyCamera()
             numCameras = self._sonySDKInstance.getNumCameras()
+            self._sonySDKCamCaptureLock = threading.Lock()
             for i in range(1,numCameras+1):
-                tricap_cam = CameraSony(SONY_TEMPFS_MOUNT_POINT,self._sonySDKInstance,i)
+                tricap_cam = CameraSony(SONY_TEMPFS_MOUNT_POINT,self._sonySDKInstance,i, self._sonySDKCamCaptureLock)
                 self._cameras.append(tricap_cam)
         else:
             for name, address in Camera.autodetect():
@@ -270,7 +271,10 @@ class TriCapCamsManager:
                 for index, cam in enumerate(self._cameras):  # self.thread was thread
                     self._capture_threads_done[index].clear()
                     self._save_done[index].clear()
-                    x = threading.Thread(target=cam.capture_and_copy, daemon=True, args=(self._image_capture_interval, global_start_time, self._copy_start_time, str(cam.serial_num), self._stop_capture, self._capture_and_copy_lock[index], index, self._capture_threads_done, self._save_done[index], self._thread_sync_lock, ))
+                    if(not self.use_sony_cam):
+                        x = threading.Thread(target=cam.capture_and_copy, daemon=True, args=(self._image_capture_interval, global_start_time, self._copy_start_time, str(cam.serial_num), self._stop_capture, self._capture_and_copy_lock[index], index, self._capture_threads_done, self._save_done[index], self._thread_sync_lock, ))
+                    else:
+                        x = threading.Thread(target=cam.capture_and_copy, daemon=True, args=(MOUNT_POINT, self._image_capture_interval, global_start_time, self._copy_start_time, str(cam.serial_num), self._stop_capture, self._capture_and_copy_lock[index], index, self._capture_threads_done, self._save_done[index], self._thread_sync_lock, ))
                     self._capture_threads.append(x)
 
                 existing_files = self.list_exisiting_files(MOUNT_POINT)

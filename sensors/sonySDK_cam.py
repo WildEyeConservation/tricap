@@ -42,13 +42,14 @@ class sonySDKcam():
         # print("Received sony camera download callback with filename "+str(filename, encoding="utf-8"))
         self._logger.debug("Sony camera transfer callback called with "+str(filename, encoding="utf-8"))
         with self._lock_with_save:
-                self._to_save_queue.append(str(filename, encoding="utf-8"))
+                # self._to_save_queue.append(str(filename, encoding="utf-8"))
                 self._downLoadedCount += 1
-                if self._downLoadedCount % 2 == 0:
-                    # self._logger.info("Index: "+ str(round(self._downLoadedCount/2)) + " marginTimers: " + str(self._marginTimers))
-                    self._logger.info("Copy from camera time since trigger: " + str(datetime.now() - self._marginTimers[str(round(self._downLoadedCount/2))]))
-                    self._marginTimers[self._to_save_queue[-1]] = self._marginTimers[str(round(self._downLoadedCount/2))]
-                    del self._marginTimers[str(round(self._downLoadedCount/2))]
+                self._num_images_copied += 1
+                # if self._downLoadedCount % 2 == 0:
+                #     # self._logger.info("Index: "+ str(round(self._downLoadedCount/2)) + " marginTimers: " + str(self._marginTimers))
+                #     self._logger.info("Copy from camera time since trigger: " + str(datetime.now() - self._marginTimers[str(round(self._downLoadedCount/2))]))
+                #     self._marginTimers[self._to_save_queue[-1]] = self._marginTimers[str(round(self._downLoadedCount/2))]
+                #     del self._marginTimers[str(round(self._downLoadedCount/2))]
 
     def cameraErrorCallback(self, message):
         # print("Received an error callback from sony camera SDK "+str(message, encoding="utf-8"))
@@ -66,7 +67,7 @@ class sonySDKcam():
         self._sonyCamera = None
         sys.exit(143)
 
-    def __init__(self, memoryFsPath, sonySDKInstance, cameraID):
+    def __init__(self, memoryFsPath, sonySDKInstance, cameraID, capture_lock):
         """Constructor"""
         self._exif_info = {}
         self._camera = None
@@ -82,6 +83,7 @@ class sonySDKcam():
         self._im_aspect_ratio = 0
         self._triggers = 0
         self._marginTimers = {}
+        self._capture_lock = capture_lock
 
         try:
             mount_status = subprocess.run(["mount", "tmpfs", "-t",  "tmpfs", memoryFsPath], check=True)
@@ -118,7 +120,7 @@ class sonySDKcam():
         sleep(2)
         # This sets the file chunk size for transferring images from the camera to the PI ram fileSystem. The max seems to be 20Mb chunks, as configured here. 
         # This allows the shutter events sent from the SDK to not be blocked for too long while images are transferred, preventing erratic shutter timing.
-        self._sonyCamera.setTransferBufferSize(20,self._cameraID)
+        self._sonyCamera.setTransferBufferSize(16,self._cameraID)
 
         # This instructs the camera to save images to the PC only and not on the SD card.
         self._sonyCamera.setCameraSaveLocation(1,self._cameraID)
@@ -161,13 +163,19 @@ class sonySDKcam():
         retval = True
         # We need to send a shutter down, wait a bit, and send a shutter up command to capture an image. 
         # To sync the images up in time as close as possible, do all the shutter downs, wait a bit, and do all the shutter up's
-        if(self._sonyCamera.isConnected(self._cameraID) and self._sonyCamera.shutterDown(self._cameraID)):
+        sonyCommandResult = False
+        with self._capture_lock:
+            sonyCommandResult = self._sonyCamera.isConnected(self._cameraID) and self._sonyCamera.shutterDown(self._cameraID)
+        if(sonyCommandResult):
             retval = retval and True
         else:
             self._logger.warning('Trigger Camera(shutter down) '+str(self._cameraID)+' failed')
             retval = retval and False
         sleep(0.035)
-        if(self._sonyCamera.isConnected(self._cameraID) and self._sonyCamera.shutterUp(self._cameraID)):
+        sonyCommandResult = False
+        with self._capture_lock:
+            sonyCommandResult = self._sonyCamera.isConnected(self._cameraID) and self._sonyCamera.shutterUp(self._cameraID)
+        if(sonyCommandResult):
             retval = retval and True
         else:
             self._logger.warning('Trigger Camera(shutter up) '+str(self._cameraID)+' failed')
@@ -212,7 +220,7 @@ class sonySDKcam():
     #     self.state = CAMERA_STATES.UNINITIALISED
     #     self._setup_camera(settings)
 
-    def capture_and_copy(self, interval, init_start, session_start_date, serial_number, stop_capture, lock_with_save, index, capture_done, save_done, sync_lock):
+    def capture_and_copy(self, mount_point, interval, init_start, session_start_date, serial_number, stop_capture, lock_with_save, index, capture_done, save_done, sync_lock):
         self._lock_with_save = lock_with_save
         # empty event buffer
         self._logger.debug(f'capture_and_copy {init_start}')
@@ -220,6 +228,7 @@ class sonySDKcam():
         # code=0
         # while code != 1:
         #     code,filepath=self._gp_camera.wait_for_event(1)
+
 
         # local variables
         start = init_start
@@ -237,8 +246,13 @@ class sonySDKcam():
         self._preview_images_big_jpg = []
         self._preview_images = []
 
+        self._dest_dir = self.get_im_target_dir(self._session_start_date, mount_point, serial_number)
+        self._mount_point = mount_point
+        if not os.path.isdir(self._dest_dir):
+            os.makedirs(self._dest_dir)
+
         self._logger.info("Set save info CAM"+str(self._cameraID)+" to "+self._memoryFsPath)
-        if (not self._sonyCamera.setSaveInfo(self._memoryFsPath, str(self._cameraID)+"_"+session_start_date.strftime("%d_%m_%Y_%H_%M_%S")+"_", 1,self._cameraID)):
+        if (not self._sonyCamera.setSaveInfo(self._dest_dir, str(self._cameraID)+"_"+session_start_date.strftime("%d_%m_%Y_%H_%M_%S")+"_", 1,self._cameraID)):
             with sync_lock:
                 capture_done[index].set()
             raise Exception("Failed to set the save location. Make sure that the following path exists and has appropriate permissions: " + self._memoryFsPath)
@@ -264,7 +278,7 @@ class sonySDKcam():
                     self._triggers += 1
                     with self._lock_with_save:
                         self._logger.info(str(serial_number)+": Waiting for "+str(self._triggers - self._downLoadedCount )+" images from the camera save queue is: " + str(len(self._to_save_queue)) + " images long.")
-                        self._marginTimers[str(self._triggers)] = datetime.now()
+                        # self._marginTimers[str(self._triggers)] = datetime.now()
                 else:
                     self._logger.warning('Could not successfully trigger a capture.')
                     self.state = CAMERA_STATES.ERROR_CAPTURE
@@ -439,9 +453,9 @@ class sonySDKcam():
                         #     print(str(datetime.now())+ " generate preview")
                         
                     print(str(datetime.now())+ " done with copy thread")
-                    if fileName in self._marginTimers:
-                        self._logger.info("Copy to ssd time since trigger: " + str(datetime.now() - self._marginTimers[fileName]))
-                        del self._marginTimers[fileName]
+                    # if fileName in self._marginTimers:
+                    #     self._logger.info("Copy to ssd time since trigger: " + str(datetime.now() - self._marginTimers[fileName]))
+                    #     del self._marginTimers[fileName]
                 except Exception as e:
                     self._logger.warning("Save exception %s %s -> %s, error: %s" % (currentFolder, currentFilename, dest, str(e)))
                     self._num_images_failed += 1

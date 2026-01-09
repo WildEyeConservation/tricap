@@ -4,9 +4,11 @@ from threading import Thread, Lock
 import base64
 import serial_comms.out.tricap_pb2 as pb
 import logging, subprocess
-from datetime import datetime
+from datetime import datetime, timedelta
 import re
 from .SerialProcess import SerialProcess
+import ntplib
+from .ubloxAgps import UBXAgps
 
 GET_STATUS = 1
 
@@ -29,9 +31,13 @@ class SerialInterface(SerialProcess):
     self.mainThread = Thread(target=self.connect, daemon=True)
     self._lock = Lock()
     self._capturing_lock = capturing_lock
+    self._lastGpsPacketDate = None
+    self._AGPS_sent = False
+    self._cam_manager = cam_manager
+    self._AGPS_max_retries = 3
+    self._ubxAgps = UBXAgps(self.serialPort,self._requests)
     self.mainThread.start()
     self.rxThread.start()
-    self._lastGpsPacketDate = None
 
   def connect(self):
     """
@@ -119,8 +125,7 @@ class SerialInterface(SerialProcess):
             if newData:
               # self._logger.debug('rx {} {}'.format(buff, len(buff)))
               with self._lock:
-                  # items = buff.split('\n')
-                  items = re.split(b'(?=\n)', buff)
+                  items = buff.splitlines(True) 
                   # clear buffer
                   buff = bytearray()
                   for item in items:
@@ -142,25 +147,41 @@ class SerialInterface(SerialProcess):
             elif request.msgType == pb.Message.MessageType.WIFI_SETUP:
               self.setupWifi(request.wifi.ssid, request.wifi.password)
               msg = self.buildWifiReply()
-          elif request.sentence_type == 'GGA':
+          elif request.identity == 'GNGGA':
 #            self._logger.debug('Process {}'.format(request.sentence_type))
             with self._capturing_lock:
               # do not open file while capture and copy has the file open 
               self.saveGga(request)
               self._lastGpsPacketDate = datetime.now()
-          elif request.sentence_type == 'RMC':
+          elif request.identity == 'GNRMC':
 #            self._logger.debug('Process {}'.format(request.sentence_type))
             with self._capturing_lock:
               # do not open file while capture and copy has the file open 
               self.saveRmc(request)
-          elif request.sentence_type == 'GSV':
+          elif 'GSV' in request.identity:
             self.process_gsv(request)
-          elif request.sentence_type == 'GSA':
+          elif request.identity == 'GNGSA':
             self.process_gsa(request)
           if len(msg) > 0:
             self.write(msg)
         except Exception as e:
             print(f"Serial process error {e}")
       self._requests = list()
+      # Send AGPS data to the GPS if we have'nt yet and we have an internet connection
+      if(self._AGPS_max_retries > 0 and self.isConnected and (not self._lastGpsPacketDate == None) and (not self.hasGps()) and (not self._AGPS_sent) and self._ubxAgps.has_internet()):
+        try:
+          if(self._cam_manager):
+            # To be able to connect to the AGPS server we need to have the system time set correctly. So query an NTP server and set the time
+            ntp_client = ntplib.NTPClient()
+            ntp_response = ntp_client.request('pool.ntp.org')
+            time_to_set = datetime.now() + timedelta(seconds=ntp_response.offset) 
+            self._cam_manager.sync_time(time_to_set.strftime('%Y-%m-%d %H:%M:%S.%f'))
+          else:
+            self._logger.warning("No cam manager, cannot sync time before AGPS download. Connection to AGPS server may fail.")
+          self._ubxAgps.download_and_send_agps(self.serialPort)
+          self._AGPS_sent = True
+        except Exception as e:
+          print(f"Failed to upload AGPS data: {e}")
+          self._AGPS_max_retries -= 1
       sleep(50e-3)
     self._logger.debug('Serial thread stopped')

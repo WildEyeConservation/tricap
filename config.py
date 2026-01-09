@@ -31,6 +31,7 @@ NUM_DUMMY_CAMS = 3
 MOUNT_POINT = "/mnt/ext_cam_storage"
 MOUNT_POINT_SSD = "/mnt/ssd_cam_storage"
 SONY_TEMPFS_MOUNT_POINT = "/home/radxa/SonySDKWrapper/memoryFs"
+SECRETS_FILE = "/home/radxa/tricap/secrets.json"
 
 CAMERA_STATES = Enum("CamState", ["UNINITIALISED", "INITIALISED", "CAPTURING", 
                                   "ERROR_CONFIG", "ERROR_CAPTURE"])

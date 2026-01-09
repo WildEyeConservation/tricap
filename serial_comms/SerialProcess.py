@@ -4,7 +4,22 @@ import serial_comms.out.tricap_pb2 as pb
 import serial, time, subprocess, pytz
 import netifaces as ni
 from statistics import mean
-import pynmea2
+from io import BytesIO
+from pyubx2 import (
+    POLL_LAYER_RAM,
+    SET_LAYER_RAM,
+    TXN_NONE,
+    UBX_CLASSES,
+    UBX_MSGIDS,
+    NMEA_PROTOCOL,
+    UBX_PROTOCOL,
+    UBXMessage,
+    UBXReader,
+    POLL,
+    SET,
+    UBXStreamError,
+    UBXParseError,
+)
 import serial, os
 from datetime import datetime, timedelta
 import math
@@ -50,14 +65,14 @@ class SerialProcess():
     """
     def processGpsResponse(self, packet):
         try:
-            decoded = packet.decode("utf-8")
-            gpsData = pynmea2.parse(decoded)
-            self._requests.append(gpsData)
+            bio = BytesIO(packet)
+            # Parse UBX and NMEA messages from the blob
+            ubr = UBXReader(bio, protfilter=UBX_PROTOCOL | NMEA_PROTOCOL)
+            raw, parsed = ubr.read()
+            if parsed:
+                self._requests.append(parsed)
         except serial.SerialException as e:
             print('Device error: {}'.format(e))
-            return False
-        except pynmea2.ParseError as e:
-            print('Parse error: {}'.format(e))
             return False
         except Exception as e:
             print('Parse error: {}'.format(e))
@@ -121,12 +136,12 @@ class SerialProcess():
     def saveGga(self, msg):
         gps_datetime = datetime.now()
         pi_time = datetime.now()
-        if msg.timestamp != None and msg.latitude != 0.0 and msg.longitude != 0.0 and self._firstGps:
+        if msg.time != None and msg.lat != '' and msg.lon != '' and self._firstGps:
             # calculate gps time with time zone
             self._hasGps = True
             tz = pytz.timezone('Africa/Johannesburg')
             tzOffset = tz.utcoffset(datetime.now()).total_seconds()
-            gpsTimeString = msg.timestamp.strftime('%H:%M:%S.%f')
+            gpsTimeString = msg.time.strftime('%H:%M:%S.%f')
             gps_time = datetime.strptime(gpsTimeString, '%H:%M:%S.%f')
             gps_time += timedelta(seconds=tzOffset)
             gps_datetime = pi_time.replace(hour=gps_time.hour, minute=gps_time.minute, second=gps_time.second, microsecond=gps_time.microsecond)
@@ -136,11 +151,11 @@ class SerialProcess():
                 if not os.path.isdir(complete_dir):
                     os.makedirs(complete_dir)
                 try:
-                    if msg.timestamp != None and msg.latitude != 0.0 and msg.longitude != 0.0:
+                    if msg.time != None and msg.lat != '' and msg.lon != '':
                         alt = 0.0
-                        if msg.altitude != None:
-                            alt = msg.altitude
-                        line=(f"{str(msg.gps_qual)},{str(gps_datetime.timestamp())},{str(pi_time.timestamp())},{str(msg.latitude)},{str(msg.lat_dir)},{str(msg.longitude)},{str(msg.lon_dir)},{str(alt)},{str(msg.horizontal_dil)},{str(msg.geo_sep)}\n")
+                        if msg.alt != None:
+                            alt = msg.alt
+                        line=(f"{str(msg.quality)},{str(gps_datetime.timestamp())},{str(pi_time.timestamp())},{str(msg.lat)},{msg.NS},{str(msg.lon)},{msg.EW},{str(alt)},{str(msg.HDOP)},{str(msg.sep)}\n")
                         with open(dest, 'ta') as f:
                             f.write(line)
                     else:
@@ -154,11 +169,11 @@ class SerialProcess():
                     print("SSD not mounted, falling back to builtin storage GPS_IMU_Data for GPS data")
                     os.makedirs(complete_dir)
                 try:
-                    if msg.timestamp != None and msg.latitude != 0.0 and msg.longitude != 0.0:
+                    if msg.time != None and msg.lat != '' and msg.lon != '':
                         alt = 0.0
-                        if msg.altitude != None:
-                            alt = msg.altitude
-                        line=(f"{str(msg.gps_qual)},{str(gps_datetime.timestamp())},{str(pi_time.timestamp())},{str(msg.latitude)},{str(msg.lat_dir)},{str(msg.longitude)},{str(msg.lon_dir)},{str(alt)},{str(msg.horizontal_dil)},{str(msg.geo_sep)}\n")
+                        if msg.alt != None:
+                            alt = msg.alt
+                        line=(f"{str(msg.quality)},{str(gps_datetime.timestamp())},{str(pi_time.timestamp())},{str(msg.lat)},{msg.NS},{str(msg.lon)},{msg.EW},{str(alt)},{str(msg.HDOP)},{str(msg.sep)}\n")
                         with open(dest, 'ta') as f:
                             f.write(line)
                     else:
@@ -170,12 +185,12 @@ class SerialProcess():
             self._hasGps = False
 
     def saveRmc(self, msg):
-        if msg.datetime != None and msg.latitude != 0.0 and msg.longitude != 0.0 and not self._firstGps and self._cam_manager != None:
+        if msg.date != None and msg.time != None and msg.lat != '' and msg.lon != '' and not self._firstGps and self._cam_manager != None:
             self._firstGps = True
             # calculate gps time with time zone
             tz = pytz.timezone('Africa/Johannesburg')
             tzOffset = tz.utcoffset(datetime.now()).total_seconds()
-            gps_time = msg.datetime
+            gps_time = datetime.combine(msg.date, msg.time, msg.time.tzinfo)
             gps_time += timedelta(seconds=tzOffset)
             self._cam_manager.sync_time(gps_time.strftime('%Y-%m-%d %H:%M:%S.%f'))
 
@@ -190,19 +205,19 @@ class SerialProcess():
 
         # Parts/cycle info
         try:
-            total_msgs = int(getattr(msg, 'num_messages', 0))
-            this_part  = int(getattr(msg, 'msg_num', 0))
+            total_msgs = int(getattr(msg, 'numMsg', 0))
+            this_part  = int(getattr(msg, 'msgNum', 0))
         except (TypeError, ValueError):
             return
 
         # Satellites in view for this constellation (reported on each part)
-        num_in_view = self._safe_int(getattr(msg, 'num_sv_in_view', None))
+        num_in_view = self._safe_int(getattr(msg, 'numSV', None))
 
         # Extract up to 4 SNR fields from this sentence
-        signal_id = self.get_signal_id(msg)
+        signal_id = getattr(msg, 'signalID', None)
         snrs = []
         for i in range(1, 5):
-            s = getattr(msg, f"snr_{i}", None)
+            s = getattr(msg, f"cno_0{i}", None)
             if s in (None, ''):
                 continue
             try:
@@ -253,7 +268,7 @@ class SerialProcess():
         """
         Handle a single GSA sentence. Updates `pdop` when it’s valid (ignores 0 and 99.99 etc.).
         """
-        pdop = getattr(msg, 'pdop', None)
+        pdop = getattr(msg, 'PDOP', None)
         v = self._valid_pdop(pdop)
         if v is None:
             return
@@ -310,15 +325,3 @@ class SerialProcess():
         if not math.isfinite(v) or v <= 0 or v >= 50:
             return None
         return v
-    
-    @staticmethod
-    def get_signal_id(msg):
-        # If parser exposes .data list (pynmea2, etc.)
-        if hasattr(msg, "data") and msg.data:
-            return msg.data[-1] if msg.data[-1] not in ("", None) else None
-
-        # Fallback: parse raw line
-        raw = str(msg).strip()
-        core = raw.split("*", 1)[0]
-        fields = core.split(",")
-        return fields[-1] if fields[-1] not in ("", None) else None

@@ -46,3 +46,4 @@ delete_log_files.py
 SD_card_reader.spec
 setup.py
 *.coverage
+secrets.json

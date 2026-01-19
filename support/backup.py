@@ -5,9 +5,13 @@ from __future__ import annotations
 import os
 import signal
 import subprocess
+from collections import defaultdict
 import threading
 import time
 import shutil
+import tempfile
+import hashlib
+import concurrent.futures
 from dataclasses import dataclass, asdict
 from pathlib import Path
 from typing import Any
@@ -29,6 +33,22 @@ class BackupStatus:
     files_done: int = 0
     bytes_copied: int = 0
 
+    # Verification / deletion helpers
+    verify_mode: str = "none"           # none | checksum | sha256
+    verified: bool = False
+    verify_missing: int = 0
+    verify_changed: int = 0
+    verify_extra: int = 0
+    verify_samples: list[str] | None = None
+    dst_files: int = 0
+    dst_bytes: int = 0
+    ready_to_delete: bool = False
+
+
+    def __post_init__(self) -> None:
+        if self.verify_samples is None:
+            self.verify_samples = []
+
 class RsyncManager:
     """
     Runs rsync in a background thread. Progress is derived by scanning:
@@ -45,7 +65,7 @@ class RsyncManager:
         # job config for snapshotting
         self._src: Path | None = None
         self._dst: Path | None = None
-        self._excludes: list[str] = []
+        self._files_from: Path | None = None
         self._verify: bool = False
         self._delete: bool = False
 
@@ -55,6 +75,13 @@ class RsyncManager:
         # tiny cache to avoid re-scanning too often (not strictly needed for 20s poll)
         self._snap_cache_ts = 0.0
         self._snap_cache: tuple[int, int] = (0, 0)  # (bytes_copied, files_done)
+        
+        # These are used to benchmark the hashing performance during verification for 
+        # deletion. Not to be used in production, as it slows the hashing process down.
+        # self.fingerprint_counts = defaultdict(int)
+        # self.fingerprint_repeats = 0
+        # self.fingerprint_names = []
+        # self.fingerprint_lock = threading.Lock()
 
     # ---------------- Public API ----------------
 
@@ -62,11 +89,10 @@ class RsyncManager:
         self,
         src: str,
         dst: str,
-        excludes: list[str] | None = None,
+        files_from: str | None = None,
         verify: bool = False,
         delete: bool = False,
     ) -> dict[str, Any]:
-        excludes = excludes or []
         src_p = Path(src)
         dst_p = Path(dst)
 
@@ -77,15 +103,14 @@ class RsyncManager:
         with self._lock:
             if self._status.running:
                 return {"success": False}
-
             self._src = src_p.resolve()
             self._dst = dst_p.resolve()
-            self._excludes = excludes
+            self._files_from = Path(files_from).resolve() if files_from else None
             self._verify = bool(verify)
             self._delete = bool(delete)
 
             # compute totals once
-            total_bytes, total_files = self._scan_totals(self._src, self._excludes)
+            total_bytes, total_files = self._scan_totals(self._src, self._files_from)
 
             # --- free-space preflight ---
             try:
@@ -95,7 +120,7 @@ class RsyncManager:
                 remaining_bytes, remaining_files = self._estimate_delta_bytes(
                     self._src,
                     self._dst,
-                    self._excludes,
+                    self._files_from,
                     total_bytes,
                     total_files,
                 )
@@ -158,13 +183,13 @@ class RsyncManager:
             st = asdict(self._status)
             src = self._src
             dst = self._dst
-            excludes = list(self._excludes)
+            files_from = self._files_from
 
         # If a job is configured, compute a fresh (or cached) snapshot
         if src and dst and self._totals_ready:
             now = time.time()
             if now - self._snap_cache_ts >= 1.5:  # throttle a little
-                bytes_copied, files_done = self._snapshot_progress(src, dst, excludes)
+                bytes_copied, files_done = self._snapshot_progress(src, dst, files_from)
                 with self._lock:
                     self._status.bytes_copied = bytes_copied
                     self._status.files_done = files_done
@@ -209,11 +234,413 @@ class RsyncManager:
         out = {"success": True}
         out.update(res)
         return out
+
+
+    def _sample_fingerprint(
+        self,
+        path: Path,
+        block_size: int = 1024 * 1024,
+        blocks: int = 4,
+    ) -> str:
+        """
+        Deterministic sampled fingerprint for fast, high-confidence equality checks.
+
+        Reads at most (block_size * blocks) bytes:
+        - first block
+        - last block
+        - (blocks-2) interior blocks at deterministic offsets derived from file size
+
+        NOTE: This is not a full-file cryptographic proof of equality, but for large, immutable
+        camera RAW files it is usually an excellent speed/safety tradeoff.
+        """
+        st = path.stat()
+        size = st.st_size
+        if size <= 0:
+            return "0:empty"
+
+        # blake2b is fast in Python stdlib; digest_size=16 is plenty for fingerprinting
+        hash = hashlib.blake2b(digest_size=16)
+        with path.open("rb") as file:
+            # first block
+            file.seek(0)
+            hash.update(file.read(min(block_size, size)))
+
+            if size > block_size:
+                # last block
+                last_off = max(0, size - block_size)
+                file.seek(last_off)
+                hash.update(file.read(block_size))
+
+            # interior blocks
+            if blocks > 2 and size > 2 * block_size:
+                interior = blocks - 2
+                span = size - 2 * block_size
+                step = max(block_size, span // (interior + 1))
+                for i in range(1, interior + 1):
+                    off = block_size + i * step
+                    if off >= size - block_size:
+                        break
+                    file.seek(off)
+                    hash.update(file.read(block_size))
+        return f"{size}:{hash.hexdigest()}"
+
+    def list_matched_files_sampled(
+        self,
+        src_root: str,
+        dst_root: str,
+        block_size: int = 1024 * 1024,
+        blocks: int = 2,
+        require_mtime_equal: bool = True,
+        exclude_names: list[str] | None = None,
+        workers: int | None = 16,
+        queue_limit: int = 2000,
+    ) -> dict[str, Any]:
+        """
+        Produce an explicit list of files that match between SRC and DST without hashing whole files.
+
+        We only examine files that exist on DST (candidates for deletion). For each candidate:
+        1) size must match
+        2) (optional) mtime_ns must match
+        3) sampled fingerprint must match (fast partial read)
+
+        Returns:
+            {
+            "success": bool,
+            "matched": [rel, ...],        # safe-to-delete candidates
+            "different": [rel, ...],      # present but doesn't match
+            "missing_on_src": [rel, ...], # present on dst but missing on src
+            "checked": int,
+            "errors": [str, ...],
+            "workers": int,
+            }
+        """
+        src_p = Path(src_root).resolve()
+        dst_p = Path(dst_root).resolve()
+
+        if not src_p.is_dir():
+            return {"success": False, "errors": ["src_not_dir"]}
+        if not dst_p.is_dir():
+            return {"success": False, "errors": ["dst_not_dir"]}
+
+        exclude_set = set(exclude_names or [])
+
+        matched: list[str] = []
+        different: list[str] = []
+        missing: list[str] = []
+        errors: list[str] = []
+        checked = 0
+
+        # IO-bound. More threads can help overlap src/dst reads, but don't overdo it.
+        if workers is None:
+            cpu = os.cpu_count() or 4
+            workers = min(16, max(4, cpu * 2))
+
+        def iter_dst_candidates():
+            # Candidates are only files that exist on DST; we further filter by name.
+            for root, _dirs, files in os.walk(dst_p):
+                root_path = Path(root)
+                for fn in files:
+                    rel = (root_path / fn).relative_to(dst_p).as_posix()
+                    if fn in exclude_set:
+                        continue
+                    yield rel
+
+        def check_one(rel: str) -> tuple[str, str]:
+            """
+            Returns (status, payload):
+              status in {"matched","different","missing","error"}
+            """
+            source_path = src_p / rel
+            destination_path = dst_p / rel
+            try:
+                if not source_path.is_file():
+                    return ("missing", rel)
+
+                # Stat first (no reads)
+                sst = source_path.stat()
+                dstst = destination_path.stat()
+
+                if sst.st_size != dstst.st_size:
+                    return ("different", rel)
+
+                if require_mtime_equal and (sst.st_mtime_ns != dstst.st_mtime_ns):
+                    return ("different", rel)
+
+                # Sampled fingerprints (limited reads)
+                source_fingerprint = self._sample_fingerprint(source_path, block_size=block_size, blocks=blocks)
+                destination_fingerprint = self._sample_fingerprint(destination_path, block_size=block_size, blocks=blocks)
+
+                # hashstring = source_fingerprint.split(':')[1]
+                # with self.fingerprint_lock:
+                #     self.fingerprint_counts[hashstring] += 1
+                #     if self.fingerprint_counts[hashstring] > 1:
+                #         self.fingerprint_repeats += 1
+                #         self.fingerprint_names.append(source_path)
+                if source_fingerprint == destination_fingerprint:
+                    return ("matched", rel)
+                return ("different", rel)
+
+            except Exception as e:
+                return ("error", f"{rel}: {e}")
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as ex:
+            in_flight: set[concurrent.futures.Future] = set()
+
+            def drain() -> None:
+                nonlocal checked
+                done, _ = concurrent.futures.wait(
+                    in_flight,
+                    return_when=concurrent.futures.FIRST_COMPLETED,
+                )
+                for fut in done:
+                    in_flight.remove(fut)
+                    status, payload = fut.result()
+                    if status == "matched":
+                        matched.append(payload)
+                        checked += 1
+                    elif status == "different":
+                        # different.append(payload)
+                        checked += 1
+                    # elif status == "missing":
+                        # missing.append(payload)
+                    elif status == "error":
+                        errors.append(payload)
+
+            for rel in iter_dst_candidates():
+                in_flight.add(ex.submit(check_one, rel))
+                if len(in_flight) >= int(queue_limit):
+                    drain()
+
+            while in_flight:
+                drain()
+
+        return {
+            "success": len(errors) == 0,
+            "matched": matched,
+            # "different": different,
+            # "missing_on_src": missing,
+            "checked": checked,
+            "errors": errors[:50],
+            "workers": int(workers),
+        }
+
+    def delete_matched_files(
+        self,
+        src_root: str,
+        matched_rel_paths: list[str],
+        exclude_names: list[str] | None = None,
+        dry_run: bool = False,
+        prune_empty_dirs: bool = True,
+    ) -> dict[str, Any]:
+        """Delete the given relative paths from src_root (best-effort)."""
+        exclude_names = exclude_names or []
+        src_p = Path(src_root).resolve()
+        deleted = 0
+        missing = 0
+        errors: list[str] = []
+
+        for rel in matched_rel_paths:
+            parts = Path(rel).parts
+            # Never delete continuously-updated files directly under /{date}/
+            if len(parts) == 2 and parts[1] in exclude_names:
+                continue
+
+            sp = src_p / rel
+            try:
+                if not sp.exists():
+                    missing += 1
+                    continue
+                if dry_run:
+                    deleted += 1
+                    continue
+                sp.unlink()
+                deleted += 1
+            except Exception as e:
+                errors.append(f"{rel}: {e}")
+
+        if prune_empty_dirs and not dry_run:
+            for dirpath, _, _ in os.walk(src_p, topdown=False):
+                p = Path(dirpath)
+                try:
+                    if not any(p.iterdir()):
+                        p.rmdir()
+                except Exception:
+                    pass
+
+        return {
+            "success": len(errors) == 0,
+            "deleted": deleted,
+            "missing": missing,
+            "errors": errors[:50],
+            "dry_run": dry_run,
+        }
+
+
+    def verify_and_delete_matched_sampled(
+        self,
+        src_root: str,
+        dst_root: str,
+        dry_run: bool = False,
+        exclude_names: list[str] | None = None,
+        block_size: int = 1024 * 1024,
+        blocks: int = 2,
+        require_mtime_equal: bool = True,
+    ) -> dict[str, Any]:
+        """
+        Verify using sampled fingerprinting and then delete *only* the explicitly matched files from source.
+        """
+        res = self.list_matched_files_sampled(
+            src_root=src_root,
+            dst_root=dst_root,
+            block_size=block_size,
+            blocks=blocks,
+            require_mtime_equal=require_mtime_equal,
+            exclude_names=exclude_names,
+        )
+        if not res.get("success"):
+            return res
+
+        delres = self.delete_matched_files(
+            src_root=src_root,
+            matched_rel_paths=res.get("matched", []),
+            dry_run=dry_run,
+        )
+        out = {"success": delres.get("success", False)}
+        out.update(res)
+        out.update({"delete": delres})
+        return out
+    
+    def generate_partial_files_from(
+        self,
+        src_root: str,
+        dst_root: str,
+        margin_bytes: int = 256 * 1024 * 1024,
+        out_file: str | None = None,
+        max_transfer_bytes: int | None = None,
+    ) -> dict[str, Any]:
+        """
+        Generate a files-from list (newline-delimited relative paths) for a *partial backup*.
+
+        This uses rsync's dry-run to determine which files would be transferred from SRC -> DST,
+        then selects a prefix that fits in the available free space on DST (minus margin).
+
+        Typical usage:
+          1) Normal backup attempt (full rsync)
+          2) If insufficient space -> call this helper to create a files-from list
+          3) Re-run start(..., files_from=<generated_path>)
+
+        Args:
+            src_root: Source root (e.g. NVMe mount)
+            dst_root: Destination root (e.g. external SSD mount)
+            margin_bytes: Safety margin to leave free on destination
+            out_file: Optional explicit output file path. If None, a temp file is created.
+            max_transfer_bytes: Optional cap; if provided, will not plan more than this many bytes.
+
+        Returns:
+            {
+              "success": bool,
+              "files_from": str,          # path written
+              "planned_files": int,
+              "planned_bytes": int,
+              "budget_bytes": int,
+              "free_bytes": int,
+              "remaining_bytes": int,     # estimated total delta if full backup
+              "remaining_files": int,
+            }
+        """
+        src_p = Path(src_root).resolve()
+        dst_p = Path(dst_root).resolve()
+
+        if not src_p.is_dir():
+            return {"success": False, "msg": "src_not_dir"}
+        if not dst_p.exists():
+            dst_p.mkdir(parents=True, exist_ok=True)
+
+        free_bytes = self._disk_free_bytes(dst_p)
+        budget = max(0, free_bytes - int(margin_bytes))
+        if max_transfer_bytes is not None:
+            budget = min(budget, int(max_transfer_bytes))
+
+        if budget <= 0:
+            return {
+                "success": False,
+                "msg": "no_space_after_margin",
+                "free_bytes": free_bytes,
+                "budget_bytes": budget,
+            }
+
+        env = os.environ.copy()
+        env["LC_ALL"] = "C"
+
+        src_arg = str(src_p) + os.sep  # copy contents
+        cmd: list[str] = [
+            "rsync",
+            "-aH",
+            "--dry-run",
+            "--itemize-changes",
+            "--no-human-readable",
+            "--out-format=%i|%l|%n",
+        ]
+        if self._verify:
+            cmd.append("--checksum")
+
+        cmd += [src_arg, str(dst_p)]
+
+        try:
+            out = subprocess.check_output(cmd, text=True, stderr=subprocess.STDOUT, env=env)
+        except Exception as e:
+            return {"success": False, "msg": f"rsync_dry_run_failed: {e}"}
+
+        planned_rels: list[str] = []
+        planned_bytes = 0
+        remaining_bytes = 0
+        remaining_files = 0
+
+        for line in out.splitlines():
+            try:
+                item, length_str, rel = line.split("|", 2)
+            except ValueError:
+                continue
+
+            if len(item) >= 2 and item[0] == ">" and item[1] == "f":
+                remaining_files += 1
+                try:
+                    sz = int(length_str)
+                except Exception:
+                    sz = 0
+                remaining_bytes += sz
+
+                if planned_bytes + sz <= budget:
+                    planned_rels.append(rel)
+                    planned_bytes += sz
+                else:
+                    break
+
+        if out_file is None:
+            ts = time.strftime("%Y%m%d_%H%M%S")
+            out_file = str(Path(tempfile.gettempdir()) / f"rsync_files_from_partial_{ts}.txt")
+
+        out_path = Path(out_file).resolve()
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        out_path.write_text("".join(r + "\n" for r in planned_rels), encoding="utf-8")
+
+        return {
+            "success": True,
+            "files_from": str(out_path),
+            "planned_files": len(planned_rels),
+            "planned_bytes": planned_bytes,
+            "budget_bytes": budget,
+            "free_bytes": free_bytes,
+            "remaining_bytes": remaining_bytes,
+            "remaining_files": remaining_files,
+        }
+
+
     # ---------------- Internals ----------------
 
     def _run_rsync(self) -> None:
         assert self._src is not None and self._dst is not None
-        src_arg = str(self._src) + os.sep  # copy *contents*
+
         cmd: list[str] = [
             "rsync",
             "-aH",                # archive + preserve hardlinks
@@ -224,8 +651,18 @@ class RsyncManager:
             cmd.append("--checksum")    # slower; content-verify
         if self._delete:
             cmd.append("--delete-after")
-        for pat in self._excludes:
-            cmd += ["--exclude", pat]
+
+        # If files-from is provided, copy only those relative paths.
+        # The files list is expected to be newline-delimited (relative to src).
+        cwd = None
+        src_arg: str
+        if self._files_from is not None:
+            cmd += [f"--files-from={self._files_from}"]
+            src_arg = "./"
+            cwd = str(self._src)
+        else:
+            src_arg = str(self._src) + os.sep  # copy *contents*
+
         cmd += [src_arg, str(self._dst)]
 
         try:
@@ -234,6 +671,7 @@ class RsyncManager:
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
                 text=False,
+                cwd=cwd,
             )
             rc = self._proc.wait()
             while True:
@@ -263,6 +701,7 @@ class RsyncManager:
         finally:
             self._proc = None
 
+
     # ---------- helpers ----------
 
     def _disk_free_bytes(self, path: Path) -> int:
@@ -271,33 +710,45 @@ class RsyncManager:
         except Exception:
             return 0
 
-    def _excluded(self, rel: str, patterns: list[str]) -> bool:
-        r = rel.lower()
-        return any(p.lower() in r for p in patterns)
-
-    def _scan_totals(self, src: Path, excludes: list[str]) -> tuple[int, int]:
+    def _scan_totals(self, src: Path, files_from: Path | None) -> tuple[int, int]:
+        """Compute totals for whole tree or only for files listed in files_from."""
         total_bytes = 0
         total_files = 0
-        for root, dirs, files in os.walk(src):
-            root_p = Path(root)
-            # prune excluded dirs
-            dirs[:] = [d for d in dirs if not self._excluded(str((root_p / d).relative_to(src)), excludes)]
-            for f in files:
-                rel = (root_p / f).relative_to(src)
-                if self._excluded(str(rel), excludes):
-                    continue
-                try:
-                    total_bytes += (root_p / f).stat().st_size
+
+        if files_from is None:
+            for root, _dirs, files in os.walk(src):
+                root_p = Path(root)
+                for f in files:
+                    fp = root_p / f
+                    try:
+                        total_bytes += fp.stat().st_size
+                        total_files += 1
+                    except Exception:
+                        pass
+            return total_bytes, total_files
+
+        # files-from mode: paths are relative to src
+        try:
+            rels = [ln.strip() for ln in files_from.read_text().splitlines() if ln.strip()]
+        except Exception:
+            rels = []
+
+        for rel in rels:
+            fp = src / rel
+            try:
+                if fp.is_file():
+                    total_bytes += fp.stat().st_size
                     total_files += 1
-                except Exception:
-                    pass
+            except Exception:
+                pass
+
         return total_bytes, total_files
-    
+
     def _estimate_delta_bytes(
         self,
         src: Path,
         dst: Path,
-        excludes: list[str],
+        files_from: Path | None,
         total_bytes: int,
         total_files: int,
     ) -> tuple[int, int]:
@@ -307,8 +758,14 @@ class RsyncManager:
         the *remaining* work instead of derived progress. Falls back to treating the
         whole dataset as remaining if rsync fails for any reason.
         """
-        src_arg = str(src) + os.sep  # copy *contents*
         dst_arg = str(dst)
+
+        cwd = None
+        if files_from is not None:
+            cmd_src = "./"
+            cwd = str(src)
+        else:
+            cmd_src = str(src) + os.sep  # copy *contents*
 
         cmd: list[str] = [
             "rsync",
@@ -323,9 +780,10 @@ class RsyncManager:
         if self._verify:
             cmd.append("--checksum")
 
-        for pat in excludes:
-            cmd += ["--exclude", pat]
-        cmd += [src_arg, dst_arg]
+        if files_from is not None:
+            cmd += [f"--files-from={files_from}"]
+
+        cmd += [cmd_src, dst_arg]
 
         env = os.environ.copy()
         env["LC_ALL"] = "C"
@@ -336,6 +794,7 @@ class RsyncManager:
                 text=True,
                 stderr=subprocess.STDOUT,
                 env=env,
+                cwd=cwd,
             )
             remaining_bytes = 0
             remaining_files = 0
@@ -365,7 +824,7 @@ class RsyncManager:
             # If rsync inspection fails, fall back to worst-case: everything remaining.
             return total_bytes, total_files
 
-    def _snapshot_progress(self, src: Path, dst: Path, excludes: list[str]) -> tuple[int, int]:
+    def _snapshot_progress(self, src: Path, dst: Path, files_from: Path | None) -> tuple[int, int]:
         """
         Progress snapshot using rsync's own difference engine:
 
@@ -382,7 +841,15 @@ class RsyncManager:
             total_bytes = int(self._status.total_bytes or 0)
             total_files = int(self._status.total_files or 0)
 
-        src_arg = str(src) + os.sep  # copy *contents*
+        dst_arg = str(dst)
+
+        cwd = None
+        if files_from is not None:
+            src_arg = "./"
+            cwd = str(src)
+        else:
+            src_arg = str(src) + os.sep  # copy *contents*
+
         cmd: list[str] = [
             "rsync",
             "-aH",
@@ -395,15 +862,15 @@ class RsyncManager:
         # Use the manager's verify flag only if you *really* want content-compare.
         if self._verify:
             cmd.append("--checksum")
-        for pat in excludes:
-            cmd += ["--exclude", pat]
-        cmd += [src_arg, str(dst)]
+        if files_from is not None:
+            cmd += [f"--files-from={files_from}"]
+        cmd += [src_arg, dst_arg]
 
         env = os.environ.copy()
         env["LC_ALL"] = "C"  # stable parse
 
         try:
-            out = subprocess.check_output(cmd, text=True, stderr=subprocess.STDOUT, env=env)
+            out = subprocess.check_output(cmd, text=True, stderr=subprocess.STDOUT, env=env, cwd=cwd)
             remaining_bytes = 0
             remaining_files = 0
 
@@ -432,26 +899,47 @@ class RsyncManager:
             # Fallback: filesystem snapshot (min(dst_size, src_size))
             bytes_present = 0
             files_done = 0
-            for root, dirs, files in os.walk(src):
-                root_p = Path(root)
-                dirs[:] = [d for d in dirs if not self._excluded(str((root_p / d).relative_to(src)), excludes)]
-                for f in files:
-                    rel = (root_p / f).relative_to(src)
-                    if self._excluded(str(rel), excludes):
+
+            if files_from is None:
+                for root, _dirs, files in os.walk(src):
+                    root_p = Path(root)
+                    for f in files:
+                        sp = root_p / f
+                        try:
+                            rel = sp.relative_to(src)
+                            ssz = sp.stat().st_size
+                        except Exception:
+                            continue
+                        dp = dst / rel
+                        try:
+                            dsz = dp.stat().st_size
+                        except FileNotFoundError:
+                            dsz = 0
+                        bytes_present += min(ssz, dsz)
+                        if dsz >= ssz:
+                            files_done += 1
+                return bytes_present, files_done
+
+            try:
+                rels = [ln.strip() for ln in files_from.read_text().splitlines() if ln.strip()]
+            except Exception:
+                rels = []
+            for rel_s in rels:
+                sp = src / rel_s
+                try:
+                    if not sp.is_file():
                         continue
-                    sp = root_p / f
-                    try:
-                        ssz = sp.stat().st_size
-                    except Exception:
-                        continue
-                    dp = dst / rel
-                    try:
-                        dsz = dp.stat().st_size
-                    except FileNotFoundError:
-                        dsz = 0
-                    bytes_present += min(ssz, dsz)
-                    if dsz >= ssz:
-                        files_done += 1
+                    ssz = sp.stat().st_size
+                except Exception:
+                    continue
+                dp = dst / rel_s
+                try:
+                    dsz = dp.stat().st_size
+                except FileNotFoundError:
+                    dsz = 0
+                bytes_present += min(ssz, dsz)
+                if dsz >= ssz:
+                    files_done += 1
             return bytes_present, files_done
 
     def _verify_pass(

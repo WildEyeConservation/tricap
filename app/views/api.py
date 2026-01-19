@@ -342,14 +342,15 @@ def verify_and_delete():
   if tricap_manager.mount_ssd():
     src = MOUNT_POINT
     dst = MOUNT_POINT_SSD
-    res = backupManager.verify_now(src, dst, mode="fast", excludes=["*.csv", "*.bin", "*.json"])
-    print(res)
-    if res["ok"]:
-        print("Backup verified. Safe to delete source.")
-        delete_dir_async(src)
+    res= backupManager.verify_and_delete_matched_sampled(src,dst)
+    # res = backupManager.verify_now(src, dst, mode="fast", excludes=["*.csv", "*.bin", "*.json"])
+    _logger.debug(res)
+    if res["success"] and (res["delete"]["deleted"] > 0):
+        _logger.debug("Backup verified. Deleted matched sources.")
+        # delete_dir_async(src)
         ret['success'] = True
     else:
-        print("NOT safe to delete. Differences:")
+        _logger.debug("Verify and delete failed.")
         ret['success'] = False
     tricap_manager.unmount_disk()
   else:
@@ -379,7 +380,21 @@ def backup_start():
   if tricap_manager.mount_ssd():
     src = MOUNT_POINT
     dst = MOUNT_POINT_SSD
-    return jsonify(backupManager.start(src, dst))
+    res = backupManager.start(src, dst)
+
+    plan = {}
+    if (not res.get("success")) and res.get("msg") and res.get("msg") == "Insufficient space" :
+        _logger.debug("Not enough free space. Starting partial backup")
+        plan = backupManager.generate_partial_files_from(
+            src_root=src,
+            dst_root=dst,
+            margin_bytes=256 * 1024 * 1024
+        )
+
+        res2 = backupManager.start(src, dst, files_from=plan["files_from"])
+        return jsonify(res2)
+    else:
+      return jsonify(res)
   else:
     return jsonify({'msg': 'Failed to mount external disk'}), 400
 

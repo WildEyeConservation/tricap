@@ -425,6 +425,209 @@ def backup_status():
       # current file name isn't parsed from rsync; snapshot doesn't need it
   }
 
+@api_bp.route('/api/netbird_key', methods=['POST'])
+def set_netbird_key():
+    _logger.debug("set_netbird_key {}".format(tricap_manager.state))
+
+    data = request.get_json()
+    if not data or 'key' not in data:
+        return jsonify({'msg': 'Invalid request', 'success': False}), 400
+    
+    key = data.get('key', '').strip()
+    if not key:
+        return jsonify({'msg': 'Key cannot be empty', 'success': False}), 400
+    
+    try:
+        # Execute: sudo netbird up --setup-key <key>
+        cmd = ['sudo', 'netbird', 'up', '--setup-key', key]
+        _logger.info("Executing: {}".format(' '.join(cmd)))
+        
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=30  # 30 second timeout
+        )
+        
+        if result.returncode != 0:
+            error_msg = result.stderr or result.stdout or 'Unknown error'
+            _logger.error("netbird up --setup-key failed: {}".format(error_msg))
+            return jsonify({
+                'msg': 'Failed to set netbird key: {}'.format(error_msg),
+                'success': False
+            }), 500
+        
+        _logger.info("netbird up --setup-key succeeded")
+        ret = {
+            'success': True,
+            'msg': 'Netbird key set successfully'
+        }
+        return jsonify(ret), 200
+        
+    except subprocess.TimeoutExpired:
+        _logger.error("netbird command timed out")
+        return jsonify({
+            'msg': 'Command timed out',
+            'success': False
+        }), 500
+    except Exception as e:
+        _logger.error("Error setting netbird key: {}".format(str(e)))
+        return jsonify({
+            'msg': 'Error: {}'.format(str(e)),
+            'success': False
+        }), 500
+
+
+@api_bp.route('/api/netbird_connect', methods=['POST'])
+def netbird_connect():
+    """Connect to netbird (without setup key)"""
+    _logger.debug("netbird_connect {}".format(tricap_manager.state))
+    
+    try:
+        # Execute: sudo netbird up
+        cmd = ['sudo', 'netbird', 'up']
+        _logger.info("Executing: {}".format(' '.join(cmd)))
+        
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=30
+        )
+        
+        if result.returncode != 0:
+            error_msg = result.stderr or result.stdout or 'Unknown error'
+            _logger.error("netbird up failed: {}".format(error_msg))
+            return jsonify({
+                'msg': 'Failed to connect: {}'.format(error_msg),
+                'success': False
+            }), 500
+        
+        _logger.info("netbird up succeeded")
+        ret = {
+            'success': True,
+            'msg': 'Netbird connected successfully'
+        }
+        return jsonify(ret), 200
+        
+    except subprocess.TimeoutExpired:
+        _logger.error("netbird connect command timed out")
+        return jsonify({
+            'msg': 'Command timed out',
+            'success': False
+        }), 500
+    except Exception as e:
+        _logger.error("Error connecting netbird: {}".format(str(e)))
+        return jsonify({
+            'msg': 'Error: {}'.format(str(e)),
+            'success': False
+        }), 500
+
+
+@api_bp.route('/api/netbird_disconnect', methods=['POST'])
+def netbird_disconnect():
+    """Disconnect from netbird"""
+    _logger.debug("netbird_disconnect {}".format(tricap_manager.state))
+    
+    try:
+        # Execute: sudo netbird down
+        cmd = ['sudo', 'netbird', 'down']
+        _logger.info("Executing: {}".format(' '.join(cmd)))
+        
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=30
+        )
+        
+        if result.returncode != 0:
+            error_msg = result.stderr or result.stdout or 'Unknown error'
+            _logger.error("netbird down failed: {}".format(error_msg))
+            return jsonify({
+                'msg': 'Failed to disconnect: {}'.format(error_msg),
+                'success': False
+            }), 500
+        
+        _logger.info("netbird down succeeded")
+        ret = {
+            'success': True,
+            'msg': 'Netbird disconnected successfully'
+        }
+        return jsonify(ret), 200
+        
+    except subprocess.TimeoutExpired:
+        _logger.error("netbird disconnect command timed out")
+        return jsonify({
+            'msg': 'Command timed out',
+            'success': False
+        }), 500
+    except Exception as e:
+        _logger.error("Error disconnecting netbird: {}".format(str(e)))
+        return jsonify({
+            'msg': 'Error: {}'.format(str(e)),
+            'success': False
+        }), 500
+
+@api_bp.route('/api/netbird_status', methods=['GET'])
+def netbird_status():
+    """Get netbird connection status"""
+    _logger.debug("netbird_status {}".format(tricap_manager.state))
+    
+    try:
+        # Execute: sudo netbird status
+        cmd = ['sudo', 'netbird', 'status']
+        _logger.info("Executing: {}".format(' '.join(cmd)))
+        
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=10
+        )
+        
+        # Parse the output to determine if connected
+        # Check for "Management: Connected" and "Signal: Connected"
+        output = result.stdout
+        is_connected = False
+        
+        if output:
+            # Check if both Management and Signal are Connected
+            lines = output.split('\n')
+            management_connected = False
+            signal_connected = False
+            
+            for line in lines:
+                line_lower = line.lower().strip()
+                if line_lower.startswith('management:'):
+                    if 'connected' in line_lower and 'disconnected' not in line_lower:
+                        management_connected = True
+                elif line_lower.startswith('signal:'):
+                    if 'connected' in line_lower and 'disconnected' not in line_lower:
+                        signal_connected = True
+            
+            # Consider connected if both Management and Signal are Connected
+            is_connected = management_connected and signal_connected
+        
+        ret = {
+            'success': True,
+            'connected': is_connected,
+        }
+        return jsonify(ret), 200
+        
+    except subprocess.TimeoutExpired:
+        _logger.error("netbird status command timed out")
+        return jsonify({
+            'success': False,
+            'connected': False,
+        }), 500
+    except Exception as e:
+        _logger.error("Error getting netbird status: {}".format(str(e)))
+        return jsonify({
+            'success': False,
+            'connected': False,
+        }), 500
+
 CHUNK_SIZE = 1024 * 1024 # 1 MiB
 
 def file_iterator(path, start=0, end=None):

@@ -156,7 +156,7 @@ class RsyncManager:
 
             self._thread = threading.Thread(target=self._run_rsync, daemon=True)
             self._thread.start()
-            return {"success": True}
+            return {"success": True, "msg": "Complete backup" if self._files_from is None else "Partial backup"}
 
     def stop(self) -> dict[str, Any]:
         with self._lock:

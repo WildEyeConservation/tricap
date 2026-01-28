@@ -391,8 +391,8 @@ def backup_start():
             margin_bytes=256 * 1024 * 1024
         )
 
-        res2 = backupManager.start(src, dst, files_from=plan["files_from"])
-        return jsonify(res2)
+        res = backupManager.start(src, dst, files_from=plan["files_from"])
+        return jsonify(res)
     else:
       return jsonify(res)
   else:
@@ -439,7 +439,7 @@ def set_netbird_key():
     
     try:
         # Execute: sudo netbird up --setup-key <key>
-        cmd = ['sudo', 'netbird', 'up', '--setup-key', key]
+        cmd = ['sudo', 'netbird', 'up', '--setup-key', key, '--disable-auto-connect']
         _logger.info("Executing: {}".format(' '.join(cmd)))
         
         result = subprocess.run(
@@ -457,7 +457,7 @@ def set_netbird_key():
                 'success': False
             }), 500
         
-        _logger.info("netbird up --setup-key succeeded")
+        _logger.info(f"netbird up --setup-key succeeded, return code {result.returncode}")
         ret = {
             'success': True,
             'msg': 'Netbird key set successfully'

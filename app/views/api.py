@@ -124,11 +124,14 @@ def _mjpeg_placeholder_frame():
   return jpeg.tobytes()
 
 
+STREAM_PREVIEW_TIMEOUT_SEC = 300  # Stop live stream after 5 minutes
+
+
 def _stream_preview_frames(cam_idx: int):
   """Generate MJPEG frames for a camera.
 
   For Sony cameras uses SDK live view; otherwise uses preview images.
-  Stops when the manager enters STARTED/COPYING to avoid unnecessary CPU usage.
+  Stops after 5 minutes or when the manager enters STARTED/COPYING.
   """
   boundary = b'frame'
   if cam_idx >= len(tricap_manager._cameras):
@@ -137,8 +140,14 @@ def _stream_preview_frames(cam_idx: int):
   cam = tricap_manager._cameras[cam_idx]
   placeholder = _mjpeg_placeholder_frame()
   use_sony_live_view = getattr(tricap_manager, 'use_sony_cam', False) and hasattr(cam, 'get_live_view_frame')
+  stream_start = time.monotonic()
 
+  _logger.debug(f'stream_preview_frames called {use_sony_live_view}')
   while True:
+    # Stop after 2 minutes
+    if time.monotonic() - stream_start >= STREAM_PREVIEW_TIMEOUT_SEC:
+      _logger.debug('stream_preview_frames ended (5 min timeout)')
+      break
     # Stop streaming while system is capturing or copying
     if tricap_manager.state in (CAM_MANAGER_STATES.STARTED, CAM_MANAGER_STATES.COPYING):
       break
@@ -169,6 +178,7 @@ def _stream_preview_frames(cam_idx: int):
     )
     yield part
     time.sleep(0.1)
+  _logger.debug('stream_preview_frames ended')
 
 
 @api_bp.route('/api/stream/<int:cam_idx>')
@@ -229,6 +239,9 @@ def sort_key_from_name(p: Path):
 def get_images(cam_idx):
   if tricap_manager._copy_start_time is None:
     abort(404)
+
+  if tricap_manager.state in (CAM_MANAGER_STATES.STARTED, CAM_MANAGER_STATES.COPYING):
+    return jsonify({'msg': 'Not allowed in started or copying state'}), 400
 
   camIdx = int(cam_idx)
 
@@ -434,8 +447,8 @@ def set_capture_interval():
 @api_bp.route('/api/verify_and_delete')
 def verify_and_delete():
   _logger.debug("verify_and_delete {}".format(tricap_manager.state))
-  if tricap_manager.state == CAM_MANAGER_STATES.STARTED:
-    return jsonify({'msg': 'Cannot delete while started'}), 400
+  if tricap_manager.state in (CAM_MANAGER_STATES.STARTED, CAM_MANAGER_STATES.COPYING):
+    return jsonify({'msg': 'Not allowed in started or copying state'}), 400
 
   ret = {}
   if tricap_manager.mount_ssd():
@@ -460,8 +473,8 @@ def verify_and_delete():
 @api_bp.route('/api/force_delete')
 def force_delete():
   _logger.debug("force_delete {}".format(tricap_manager.state))
-  if tricap_manager.state == CAM_MANAGER_STATES.STARTED:
-    return jsonify({'msg': 'Cannot delete while started'}), 400
+  if tricap_manager.state in (CAM_MANAGER_STATES.STARTED, CAM_MANAGER_STATES.COPYING):
+    return jsonify({'msg': 'Not allowed in started or copying state'}), 400
 
   ret = {}
   src = MOUNT_POINT
@@ -473,8 +486,8 @@ def force_delete():
 @api_bp.route('/api/backup_start', methods = ['GET'])
 def backup_start():
   _logger.debug("backup_start req")
-  if tricap_manager.state == CAM_MANAGER_STATES.STARTED:
-    return jsonify({'msg': 'Cannot backup while started'}), 400
+  if tricap_manager.state in (CAM_MANAGER_STATES.STARTED, CAM_MANAGER_STATES.COPYING):
+    return jsonify({'msg': 'Not allowed in started or copying state'}), 400
   
   if tricap_manager.mount_ssd():
     src = MOUNT_POINT
@@ -500,11 +513,17 @@ def backup_start():
 @api_bp.route('/api/backup_stop', methods = ['GET'])
 def backup_stop():
   _logger.debug("backup_stop req")
+  if tricap_manager.state in (CAM_MANAGER_STATES.STARTED, CAM_MANAGER_STATES.COPYING):
+    return jsonify({'msg': 'Not allowed in started or copying state'}), 400
+
   return jsonify(backupManager.stop())
 
 @api_bp.route('/api/backup_status', methods = ['GET'])
 def backup_status():
   _logger.debug("backup_status req")
+  if tricap_manager.state in (CAM_MANAGER_STATES.STARTED, CAM_MANAGER_STATES.COPYING):
+    return jsonify({'msg': 'Not allowed in started or copying state'}), 400
+
   st = backupManager.status() or {}
   total = int(st.get("total_bytes") or 0)
   done = int(st.get("bytes_copied") or 0)
@@ -527,6 +546,8 @@ def backup_status():
 @api_bp.route('/api/netbird_key', methods=['POST'])
 def set_netbird_key():
     _logger.debug("set_netbird_key {}".format(tricap_manager.state))
+    if tricap_manager.state in (CAM_MANAGER_STATES.STARTED, CAM_MANAGER_STATES.COPYING):
+      return jsonify({'msg': 'Not allowed in started or copying state'}), 400
 
     data = request.get_json()
     if not data or 'key' not in data:
@@ -581,7 +602,10 @@ def set_netbird_key():
 def netbird_connect():
     """Connect to netbird (without setup key)"""
     _logger.debug("netbird_connect {}".format(tricap_manager.state))
-    
+
+    if tricap_manager.state in (CAM_MANAGER_STATES.STARTED, CAM_MANAGER_STATES.COPYING):
+      return jsonify({'msg': 'Not allowed in started or copying state'}), 400
+
     try:
         # Execute: sudo netbird up
         cmd = ['sudo', 'netbird', 'up']
@@ -627,7 +651,10 @@ def netbird_connect():
 def netbird_disconnect():
     """Disconnect from netbird"""
     _logger.debug("netbird_disconnect {}".format(tricap_manager.state))
-    
+
+    if tricap_manager.state in (CAM_MANAGER_STATES.STARTED, CAM_MANAGER_STATES.COPYING):
+      return jsonify({'msg': 'Not allowed in started or copying state'}), 400
+
     try:
         # Execute: sudo netbird down
         cmd = ['sudo', 'netbird', 'down']
@@ -672,7 +699,10 @@ def netbird_disconnect():
 def netbird_status():
     """Get netbird connection status"""
     _logger.debug("netbird_status {}".format(tricap_manager.state))
-    
+
+    if tricap_manager.state in (CAM_MANAGER_STATES.STARTED, CAM_MANAGER_STATES.COPYING):
+      return jsonify({'msg': 'Not allowed in started or copying state'}), 400
+
     try:
         # Execute: sudo netbird status
         cmd = ['sudo', 'netbird', 'status']
@@ -747,6 +777,9 @@ def file_iterator(path, start=0, end=None):
 
 @api_bp.route('/api/download_logs', methods = ['GET'])
 def download_log():
+  if tricap_manager.state in (CAM_MANAGER_STATES.STARTED, CAM_MANAGER_STATES.COPYING):
+    return jsonify({'msg': 'Not allowed in started or copying state'}), 400
+
   log_path_file = Path(os.path.join(SERVER_LOG_DIR, 'tricap_master.log'))
   
   if not log_path_file.exists():
@@ -790,6 +823,9 @@ def download_log():
 
 @api_bp.route('/api/download_imu_logs', methods = ['GET'])
 def download_imu_log():
+  if tricap_manager.state in (CAM_MANAGER_STATES.STARTED, CAM_MANAGER_STATES.COPYING):
+    return jsonify({'msg': 'Not allowed in started or copying state'}), 400
+
   log_path = ''
   if os.path.ismount(MOUNT_POINT):
       log_path = os.path.join(MOUNT_POINT, datetime.now().strftime('%Y_%m_%d'))
@@ -839,6 +875,9 @@ def download_imu_log():
 
 @api_bp.route('/api/download_gps_logs', methods = ['GET'])
 def download_gps_log():
+  if tricap_manager.state in (CAM_MANAGER_STATES.STARTED, CAM_MANAGER_STATES.COPYING):
+    return jsonify({'msg': 'Not allowed in started or copying state'}), 400
+
   log_path = ''
   if os.path.ismount(MOUNT_POINT):
       log_path = os.path.join(MOUNT_POINT, datetime.now().strftime('%Y_%m_%d'))

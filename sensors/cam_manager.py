@@ -380,6 +380,9 @@ class TriCapCamsManager:
 
     def mount_ssd(self):
         if not os.path.ismount(MOUNT_POINT_SSD):
+            if not os.path.exists("/dev/sda1"):
+                self._logger.warning('SSD not connected')
+                return False
             try:
                 mount_status = subprocess.run(["mount", "/dev/sda1", MOUNT_POINT_SSD], check=True)
                 self._logger.debug(mount_status)

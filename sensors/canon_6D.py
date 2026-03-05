@@ -29,6 +29,7 @@ class Canon6DCam():
         self.get_images_to_copy = self._camera.get_images_to_copy
         self.get_images_copied = self._camera.get_images_copied
         self.sync_time = self._camera.sync_time
+        self.test_capture = self._camera.test_capture
 
     def focus_infinity(self):
         """Change the focus of the lens to infinity using series of manual focus events."""

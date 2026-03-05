@@ -27,7 +27,8 @@ from config import CAMERA_STATES
 sys.path.append(os.path.abspath("/home/radxa/SonySDKWrapper"))
 from sonySDKWrapper import *
 
-import subprocess, hashlib, json
+import subprocess, hashlib, json, tempfile
+from pathlib import Path
 
 # noinspection PyUnresolvedReferences
 class sonySDKcam():
@@ -214,6 +215,42 @@ class sonySDKcam():
 
             if not continuous:
                 return
+
+    def test_capture(self):
+        """Capture a single image and return its raw bytes and filename."""
+        download_done = threading.Event()
+        downloaded_name = [None]
+
+        def _on_download(filename):
+            downloaded_name[0] = str(filename, encoding="utf-8")
+            download_done.set()
+
+        self._sonyCamera.setOnDownloadCompleteCallback(_on_download, self._cameraID)
+        temp_dir = tempfile.mkdtemp(dir=self._memoryFsPath)
+        try:
+            if not self._sonyCamera.setSaveInfo(temp_dir, "test_", 1, self._cameraID):
+                raise RuntimeError("Failed to set save location for test capture")
+
+            self._trigger_capture()
+
+            if not download_done.wait(timeout=30):
+                raise TimeoutError("Test capture timed out waiting for image download")
+
+            name = Path(downloaded_name[0]).name if downloaded_name[0] else None
+            fpath = Path(temp_dir) / name if name else None
+
+            if not fpath or not fpath.exists():
+                files = [f for f in Path(temp_dir).iterdir() if f.is_file()]
+                if not files:
+                    raise RuntimeError("No image file found after test capture")
+                fpath = files[0]
+
+            return fpath.read_bytes(), fpath.name
+        finally:
+            shutil.rmtree(temp_dir, ignore_errors=True)
+            self._sonyCamera.setOnDownloadCompleteCallback(
+                self.imageDownloadCompleteCallback, self._cameraID
+            )
 
     # def reset(self, settings: dict):
     #     """Reset the camera."""
@@ -801,6 +838,19 @@ class sonySDKcam():
 
     def get_aspect_ratio(self):
         return self._im_aspect_ratio
+
+    def get_live_view_frame(self):
+        """Return a single live-view JPEG frame from the Sony SDK, or None on failure.
+
+        Ensures the camera is connected and live view is enabled before requesting
+        a frame from the underlying SDK wrapper.
+        """
+        with self._capture_lock:
+            if not self._sonyCamera.isConnected(self._cameraID):
+                return None
+            if not self._sonyCamera.isLiveViewEnabled(self._cameraID):
+                self._sonyCamera.toggleLiveView(self._cameraID)
+            return self._sonyCamera.getLiveViewFrame(self._cameraID)
 
     # def get_copy_percentage(self):
     #     if self._num_images_to_copy == 0:

@@ -116,6 +116,82 @@ def statistics():
   except Exception as ex:
     return "", 420
 
+def _mjpeg_placeholder_frame():
+  """Single grey JPEG frame for 'no signal' when no preview is available."""
+  img = np.zeros((80, 80, 3), dtype=np.uint8)
+  img[:] = (48, 48, 48)
+  _, jpeg = cv2.imencode('.jpg', img)
+  return jpeg.tobytes()
+
+
+def _stream_preview_frames(cam_idx: int):
+  """Generate MJPEG frames for a camera.
+
+  For Sony cameras uses SDK live view; otherwise uses preview images.
+  Stops when the manager enters STARTED/COPYING to avoid unnecessary CPU usage.
+  """
+  boundary = b'frame'
+  if cam_idx >= len(tricap_manager._cameras):
+    return
+
+  cam = tricap_manager._cameras[cam_idx]
+  placeholder = _mjpeg_placeholder_frame()
+  use_sony_live_view = getattr(tricap_manager, 'use_sony_cam', False) and hasattr(cam, 'get_live_view_frame')
+
+  while True:
+    # Stop streaming while system is capturing or copying
+    if tricap_manager.state in (CAM_MANAGER_STATES.STARTED, CAM_MANAGER_STATES.COPYING):
+      break
+
+    try:
+      if use_sony_live_view:
+        frame_bytes = cam.get_live_view_frame()
+        frame = frame_bytes if frame_bytes else placeholder
+      else:
+        # Fall back to latest preview image
+        frame_b64 = ''
+        for idx in (2, 1, 0):
+          try:
+            frame_b64 = cam.get_preview_image(idx)
+            if frame_b64:
+              break
+          except Exception:
+            continue
+        frame = base64.b64decode(frame_b64) if frame_b64 else placeholder
+    except Exception as e:
+      _logger.debug('stream frame error: %s', e)
+      frame = placeholder
+
+    part = (
+      b'--' + boundary +
+      b'\r\nContent-Type: image/jpeg\r\nContent-Length: %d\r\n\r\n' % len(frame) +
+      frame + b'\r\n'
+    )
+    yield part
+    time.sleep(0.1)
+
+
+@api_bp.route('/api/stream/<int:cam_idx>')
+def stream_preview(cam_idx):
+  """Stream live preview as MJPEG for the given camera index.
+
+  Not available while capturing or copying.
+  """
+  if cam_idx < 0 or cam_idx >= len(tricap_manager._cameras):
+    return jsonify({'msg': 'Invalid camera index'}), 400
+  if tricap_manager.state in (CAM_MANAGER_STATES.STARTED, CAM_MANAGER_STATES.COPYING):
+    return jsonify({'msg': 'Stream not available while capturing or copying'}), 503
+
+  return Response(
+    _stream_preview_frames(cam_idx),
+    mimetype='multipart/x-mixed-replace; boundary=frame',
+    headers={
+      'Cache-Control': 'no-store, no-cache, must-revalidate',
+      'Pragma': 'no-cache',
+    },
+  )
+
+
 @api_bp.route('/api/image/<cam_idx>/<im_idx>')
 def get_image(cam_idx, im_idx):
   # if tricap_manager.state == CAM_MANAGER_STATES.STARTED:
@@ -311,6 +387,29 @@ def stop():
   ret = {}
   ret['success'] = True
   return ret  
+
+
+@api_bp.route('/api/test_capture', methods=['POST'])
+def test_capture():
+  if tricap_manager.state in (CAM_MANAGER_STATES.STARTED, CAM_MANAGER_STATES.COPYING):
+    return jsonify({'msg': 'Not allowed in started or copying state'}), 400
+
+  data = request.get_json()
+  if data is None or 'cam' not in data:
+    return jsonify({'msg': 'Missing cam index'}), 400
+
+  cam_idx = int(data['cam'])
+  if cam_idx >= len(tricap_manager._cameras):
+    return jsonify({'msg': 'Invalid camera index'}), 400
+
+  try:
+    img_bytes, filename = tricap_manager._cameras[cam_idx].test_capture()
+  except Exception as e:
+    _logger.error(f"test_capture failed for cam {cam_idx}: {e}")
+    return jsonify({'msg': f'Capture failed: {e}'}), 500
+
+  return send_file(io.BytesIO(img_bytes), mimetype='application/octet-stream',
+                   download_name=filename, as_attachment=True)
 
 
 @api_bp.route('/api/capture_interval', methods = ['POST'])

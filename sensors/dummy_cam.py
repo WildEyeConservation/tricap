@@ -170,6 +170,12 @@ class DummyCam(AbstractCamera):
 
         return target_fp
 
+    def test_capture(self):
+        """Return the current dummy image as bytes and a filename."""
+        data = self._imgs[self._counter % len(self._imgs)]
+        self._counter += 1
+        return data, 'test_capture.jpg'
+
     def capture(self, continuous=False, barrier: threading.Barrier = None, stop_event=None):
         """Start capturing photos, typically called by a thread."""
         while True:
@@ -249,6 +255,7 @@ class DummyShell():
         self.config.reviewtime = 'None'
         self.capture = self._camera.capture        
         self.capture_and_read_exif = self._camera.capture_and_read_exif
+        self.test_capture = self._camera.test_capture
         self.get_state_as_string = self._camera.get_state_as_string
         self.is_cam_image_fresh = self._camera.is_cam_image_fresh
         self.get_disk_info = self._camera.get_disk_info

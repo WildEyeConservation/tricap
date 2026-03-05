@@ -345,6 +345,15 @@ class GPhotoCam(AbstractCamera):
 
         return exif_data
 
+    def test_capture(self):
+        """Capture a single image and return its raw bytes and filename."""
+        file_path = self._gp_camera.capture(gp.GP_CAPTURE_IMAGE, GPhotoCam._context)
+        camera_file = self._gp_camera.file_get(
+            file_path.folder, file_path.name, gp.GP_FILE_TYPE_NORMAL, GPhotoCam._context
+        )
+        file_data = camera_file.get_data_and_size()
+        return memoryview(file_data).tobytes(), file_path.name
+
     def cam_trigger(self):
         """Trigger using either normal function or the eos remote release."""
         if self.calibrate_step > 0:

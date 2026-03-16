@@ -429,6 +429,9 @@ def test_capture():
 def set_capture_interval():
   _logger.debug("set capture interval {}".format(tricap_manager.state))
 
+  if tricap_manager.state in (CAM_MANAGER_STATES.STARTED, CAM_MANAGER_STATES.COPYING):
+    return jsonify({'msg': 'Not allowed in started or copying state'}), 400
+
   data = request.get_json()
   if not 'interval' in data:
     return jsonify({'msg': 'Invalid request'}), 400

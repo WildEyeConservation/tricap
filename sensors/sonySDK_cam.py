@@ -391,7 +391,7 @@ class sonySDKcam():
                             allDone = False            
                 if allDone:
                     self._logger.debug('save_to_ssd thread is done, generating exif info...')
-                    self.save_exif_info(serial_num)
+                    # self.save_exif_info(serial_num)
                     self._logger.debug('Exit save thread')
                     return
                 # nothing to save

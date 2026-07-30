@@ -1,0 +1,15 @@
+[Unit]
+Description=SkySeeker standalone AP interface address
+After=NetworkManager.service
+Before=hostapd.service dnsmasq.service skyseeker-portal.service
+Wants=NetworkManager.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+EnvironmentFile=/etc/default/skyseeker-standalone
+ExecStart=/bin/sh -c '/usr/sbin/ip link set "$AP_IFACE" up && /usr/sbin/ip addr replace "$SUBNET_IP/24" dev "$AP_IFACE"'
+ExecStop=/bin/sh -c '/usr/sbin/ip addr flush dev "$AP_IFACE" || true'
+
+[Install]
+WantedBy=multi-user.target

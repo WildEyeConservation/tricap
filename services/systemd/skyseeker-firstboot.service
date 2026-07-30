@@ -1,0 +1,14 @@
+[Unit]
+Description=SkySeeker first-boot per-device identity regeneration
+DefaultDependencies=no
+After=systemd-remount-fs.service
+Before=sysinit.target ssh.socket ssh.service
+ConditionPathIsReadWrite=/etc
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/sbin/skyseeker-firstboot.sh
+
+[Install]
+WantedBy=sysinit.target

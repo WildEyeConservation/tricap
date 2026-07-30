@@ -1,0 +1,11 @@
+[Unit]
+Description=Periodically scan for the SkySeeker phone recovery AP
+
+[Timer]
+OnBootSec=30s
+OnUnitInactiveSec=30s
+RandomizedDelaySec=5s
+AccuracySec=5s
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,15 @@
+[Unit]
+Description=SkySeeker standalone control + captive portal (:80)
+After=network.target
+# In production this can simply proxy/redirect to the existing tricap Flask app on :5000,
+# or tricap can host these routes itself and bind :80 directly.
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 /home/radxa/tricap/skyseeker-standalone/captive_portal.py --port 80 --host 0.0.0.0
+Restart=always
+RestartSec=2
+User=root
+
+[Install]
+WantedBy=multi-user.target

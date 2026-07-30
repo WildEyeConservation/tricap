@@ -1,0 +1,10 @@
+[Unit]
+Description=SkySeeker onboard-radio recovery AP scan
+After=NetworkManager.service
+Wants=NetworkManager.service
+
+[Service]
+Type=oneshot
+Environment=SKYSEEKER_RECOVERY_PROFILE=skyseeker-rescue
+Environment=SKYSEEKER_RECOVERY_SSID=skyseeker-rescue
+ExecStart=/usr/local/sbin/skyseeker-recovery-scan

@@ -1,0 +1,63 @@
+#!/bin/bash
+# Periodically connect the onboard Broadcom radio to the phone recovery AP.
+# The USB RTL8192EU adapter is reserved for the skyseeker access point.
+set -u
+
+export PATH=/usr/sbin:/sbin:/usr/bin:/bin
+PROFILE="${SKYSEEKER_RECOVERY_PROFILE:-skyseeker-rescue}"
+SSID="${SKYSEEKER_RECOVERY_SSID:-skyseeker-rescue}"
+LOG_TAG=skyseeker-recovery-scan
+
+log() {
+    logger -t "$LOG_TAG" "$1" 2>/dev/null || true
+    echo "$LOG_TAG: $1"
+}
+
+detect_onboard_iface() {
+    local path driver
+    for path in /sys/class/net/*; do
+        [ -d "$path/wireless" ] || continue
+        driver=$(basename "$(readlink -f "$path/device/driver" 2>/dev/null)" 2>/dev/null)
+        [ "$driver" != "brcmfmac" ] || {
+            basename "$path"
+            return 0
+        }
+    done
+    return 1
+}
+
+command -v nmcli >/dev/null 2>&1 || {
+    log "NetworkManager is unavailable"
+    exit 0
+}
+
+iface=$(detect_onboard_iface || true)
+[ -n "$iface" ] || {
+    log "onboard Broadcom Wi-Fi interface not found"
+    exit 0
+}
+
+nmcli -t -f NAME connection show 2>/dev/null | grep -Fxq "$PROFILE" || {
+    log "recovery profile '$PROFILE' is not provisioned"
+    exit 0
+}
+
+if nmcli -t -f NAME,DEVICE connection show --active 2>/dev/null |
+        grep -Fxq "$PROFILE:$iface"; then
+    exit 0
+fi
+
+nmcli device set "$iface" managed yes 2>/dev/null || true
+nmcli device wifi rescan ifname "$iface" ssid "$SSID" 2>/dev/null || true
+
+if ! nmcli -t -f SSID device wifi list ifname "$iface" --rescan no 2>/dev/null |
+        grep -Fxq "$SSID"; then
+    exit 0
+fi
+
+if nmcli connection up "$PROFILE" ifname "$iface" >/dev/null 2>&1; then
+    log "connected $iface to recovery AP '$SSID'"
+else
+    log "recovery AP '$SSID' is visible but connection failed"
+fi
+exit 0

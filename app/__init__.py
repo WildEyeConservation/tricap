@@ -40,8 +40,6 @@ from enum import Enum
 from serial_comms.SerialInterface import SerialInterface
 from serial_comms.berryIMU import BerryImu
 
-import subprocess
-
 class AltiMeasurementObserver():
     """A custom observer to link the alti to the session logger."""
 
@@ -223,12 +221,6 @@ else:
 # TODO ALKMAAR Get from config
 use_gpio_cams = False
 use_sony_cam = True
-
-try:
-    subprocess.check_call(['/home/radxa/tricap/wifi_setup.sh', "ESS-ops", "dumbo2017"])
-except Exception as exc:
-    # Standalone/AP operation must remain available without an uplink network.
-    rootlogger.warning('Wi-Fi uplink setup failed; continuing in standalone mode: %s', exc)
 
 imu_lock = Lock()
 

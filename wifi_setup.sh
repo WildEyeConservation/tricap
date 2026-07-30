@@ -31,7 +31,7 @@ export PATH=/usr/sbin:/sbin:/usr/bin:/bin
 
 # Return the name of any active Wi-Fi connection. The onboard radio may already
 # be using a recovery or operator-supplied hotspot, which must take precedence
-# over the legacy ESS-ops default requested by app/__init__.py.
+# over a manually requested fallback network.
 active_wifi_name() {
     nmcli -t -f NAME,TYPE,STATE connection show --active 2>/dev/null |
         awk -F: '$2 == "802-11-wireless" && $3 == "activated" { print $1; exit }'

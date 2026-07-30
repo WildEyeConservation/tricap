@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """skyseeker-diag - out-of-band field status page for the tricap Rock Pi rig.
 
-Served over the always-on 'SkySeeker' rescue access point so you can see *why* a
-unit will not join the ESS-ops hotspot, even when its hotspot link is completely
-down. Connect a phone/laptop to the SkySeeker AP and open http://192.168.50.1:8080/
+Served over the always-on 'SkySeeker' rescue access point so you can diagnose
+the internet uplink even when that link is completely down. Connect a
+phone/laptop to the SkySeeker AP and open http://192.168.50.1:8080/
 
 This is READ-ONLY: it only reports state, it never changes the network. It runs
 as its own systemd service (skyseeker-diag), independent of tricap, so the page
@@ -43,11 +43,10 @@ CHECKS = [
      "for i in $(ls /sys/class/net | grep -E '^wl'); do echo \"== $i ==\"; "
      "iw dev \"$i\" link 2>/dev/null | grep -E 'Connected|SSID|signal|bitrate' "
      "|| echo '  (not connected)'; done"),
-    ("ESS-ops visible in a scan?",
+    ("Visible Wi-Fi networks",
      # --rescan no: use cached scan results so the page renders fast and does
      # not kick off a fresh scan (which can disturb the radios) on every load.
-     "nmcli --rescan no -f SSID,SIGNAL,CHAN device wifi list 2>/dev/null | "
-     "grep -E 'SSID|ESS-ops' | head"),
+     "nmcli --rescan no -f SSID,SIGNAL,CHAN device wifi list 2>/dev/null | head"),
     ("High-gain USB adapter present?",
      "lsusb | grep -i '2357:0108' || echo 'NOT DETECTED (TP-Link TL-WN822N missing!)'"),
     ("Wi-Fi drivers loaded",
@@ -66,7 +65,7 @@ CHECKS = [
 def headline():
     """A few one-glance booleans for the coloured banner at the top."""
     ssid = run("iwgetid -r")
-    on_essops = ssid == "ESS-ops"
+    uplink_connected = bool(ssid)
     # which driver is carrying the client link?
     client_dev = run("iwgetid | awk '{print $1}'")
     client_drv = run(f"basename $(readlink /sys/class/net/{client_dev}/device/driver "
@@ -75,18 +74,18 @@ def headline():
     ap_up = "skyseeker" in run(
         "nmcli -t -f NAME connection show --active").lower()
     tricap_up = run("systemctl is-active tricap.service") == "active"
-    return ssid, on_essops, client_drv, on_highgain, ap_up, tricap_up
+    return ssid, uplink_connected, client_drv, on_highgain, ap_up, tricap_up
 
 
 def render():
-    ssid, on_essops, client_drv, on_highgain, ap_up, tricap_up = headline()
+    ssid, uplink_connected, client_drv, on_highgain, ap_up, tricap_up = headline()
 
     def chip(ok, good, bad):
         cls = "ok" if ok else "bad"
         return f'<span class="chip {cls}">{html.escape(good if ok else bad)}</span>'
 
     banner = (
-        chip(on_essops, f"Hotspot: {ssid or '-'}", "Hotspot: NOT CONNECTED")
+        chip(uplink_connected, f"Hotspot: {ssid or '-'}", "Hotspot: NOT CONNECTED")
         + chip(on_highgain, "Link radio: high-gain USB",
                f"Link radio: {client_drv or 'none'} (weak/onboard!)")
         + chip(ap_up, "Rescue AP: up", "Rescue AP: down")

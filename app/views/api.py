@@ -697,7 +697,7 @@ def set_netbird_key():
     
     try:
         # Execute: sudo netbird up --setup-key <key>
-        cmd = ['sudo', 'netbird', 'up', '--setup-key', key, '--disable-auto-connect']
+        cmd = ['sudo', 'netbird', 'up', '--setup-key', key, '--disable-auto-connect=false']
         _logger.info("Executing: {}".format(' '.join(cmd)))
         
         result = subprocess.run(

@@ -29,10 +29,24 @@ fi
 
 export PATH=/usr/sbin:/sbin:/usr/bin:/bin
 
+# Return the name of any active Wi-Fi connection. The onboard radio may already
+# be using a recovery or operator-supplied hotspot, which must take precedence
+# over the legacy ESS-ops default requested by app/__init__.py.
+active_wifi_name() {
+    nmcli -t -f NAME,TYPE,STATE connection show --active 2>/dev/null |
+        awk -F: '$2 == "802-11-wireless" && $3 == "activated" { print $1; exit }'
+}
+
 # Is the named connection currently active (connected)?
 is_active() {
     nmcli -t -f NAME,STATE connection show --active 2>/dev/null | grep -Fxq "$ssid:activated"
 }
+
+active_wifi="$(active_wifi_name)"
+if [ -n "$active_wifi" ] && [ "$active_wifi" != "$ssid" ]; then
+    echo "wifi_setup: '$active_wifi' already connected — preserving current uplink"
+    exit 0
+fi
 
 if nmcli -t -f NAME connection show | grep -Fxq "$ssid"; then
     # Profile exists. Only touch the PSK if it has actually changed — re-writing

@@ -545,8 +545,12 @@ button:disabled,.pill-btn[disabled]{opacity:.5;cursor:not-allowed}
 .component-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
 .component-item{display:flex;align-items:flex-start;gap:8px;color:var(--sub);font-size:12.5px;line-height:1.45}
 .component-item .dot{margin-top:5px;background:#d97706}
-.toast{position:fixed;left:50%;bottom:88px;transform:translateX(-50%);max-width:calc(100% - 28px);padding:11px 15px;background:var(--primary-bg);color:var(--primary-ink);border-radius:9px;font-size:13px;box-shadow:0 12px 30px rgba(0,0,0,.25);opacity:0;pointer-events:none;transition:opacity .16s ease;z-index:50}
+.toast{position:fixed;left:50%;bottom:88px;transform:translateX(-50%);max-width:calc(100% - 28px);padding:11px 15px;background:var(--primary-bg);color:var(--primary-ink);border-radius:9px;font-size:13px;box-shadow:0 12px 30px rgba(0,0,0,.25);opacity:0;pointer-events:none;transition:opacity .16s ease;z-index:50;display:flex;align-items:center;gap:9px}
 .toast.show{opacity:1}
+.toast-spinner{width:14px;height:14px;flex:0 0 auto;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;animation:toast-spin .7s linear infinite}
+.action-busy{pointer-events:none}
+@keyframes toast-spin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.toast{transition:none}.toast-spinner{animation-duration:1.4s}}
 .connection-warning{position:fixed;inset:0;z-index:1000;display:none;align-items:center;justify-content:center;text-align:center;padding:24px;background:#b00000;color:#fff}
 .connection-warning.show{display:flex}
 .connection-warning-inner{max-width:680px}
@@ -606,7 +610,22 @@ COMMON_JS = r'''
 const el=id=>document.getElementById(id);
 const fmt=(v,f="--")=>(v===null||v===undefined||v==="")?f:v;
 const nf=v=>Number(v||0).toLocaleString();
-function toast(m){const t=el("toast");t.textContent=m;t.classList.add("show");clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove("show"),2800)}
+function toast(m){const t=el("toast");t.textContent=m;t.classList.remove("loading");t.classList.add("show");clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove("show"),2800)}
+function loadingToast(m){const t=el("toast"),s=document.createElement("span"),label=document.createElement("span");s.className="toast-spinner";s.setAttribute("aria-hidden","true");label.textContent=m;t.textContent="";t.append(s,label);t.classList.add("show","loading");clearTimeout(t._t)}
+function hideLoadingToast(){const t=el("toast");if(t.classList.contains("loading")){t.classList.remove("show","loading")}}
+function beginAction(control,message){
+  if(!control||control.disabled||control.dataset.actionBusy==="true")return null;
+  control.dataset.actionBusy="true";control.classList.add("action-busy");control.setAttribute("aria-busy","true");
+  if("disabled" in control)control.disabled=true;else control.setAttribute("aria-disabled","true");
+  loadingToast(message);
+  let finished=false;
+  return keepLoading=>{
+    if(finished)return;finished=true;
+    delete control.dataset.actionBusy;control.classList.remove("action-busy");control.removeAttribute("aria-busy");control.removeAttribute("aria-disabled");
+    if("disabled" in control)control.disabled=false;
+    if(!keepLoading)hideLoadingToast();
+  };
+}
 async function fetchJson(path,opt){const r=await fetch(path,Object.assign({cache:"no-store"},opt||{}));const text=await r.text();let data={};if(text){try{data=JSON.parse(text)}catch(_){data={msg:text}}}if(!r.ok){const e=new Error(data.msg||`${r.status} ${r.statusText}`);e.data=data;e.status=r.status;throw e}return data}
 async function postJson(path,body){return fetchJson(path,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body||{})})}
 function downloadBlob(blob,name){const u=URL.createObjectURL(blob),a=document.createElement("a");a.href=u;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),4000)}
@@ -815,22 +834,32 @@ async function pollStorage(){
   renderStorage(lastStats||{},lastStorageEstimate||{});
   el("storageNote").textContent=statsResult.status==="fulfilled"?"":"Storage usage refreshes while capture is stopped.";
 }
-async function doToggle(){
+async function doToggle(control){
   if(!latest||busy)return;
-  const capturing=latest.mode==="STARTED";busy=true;el("captureButton").disabled=true;el("flightStop").disabled=true;
+  const capturing=latest.mode==="STARTED";
+  const finish=beginAction(control,capturing?"Stopping capture...":"Starting capture...");
+  if(!finish)return;
+  busy=true;el("captureButton").disabled=true;el("flightStop").disabled=true;
   try{
     await fetchJson(capturing?"/api/stop_capture":"/api/start_capture");
     toast(capturing?"Capture stopped":"Capture started");
   }
-  catch(e){toast(e.message)}finally{busy=false;poll();pollStorage()}
+  catch(e){toast(e.message)}finally{busy=false;finish();poll();pollStorage()}
 }
-function toggle(){
+function toggle(event){
   if(!latest||busy)return;
+  const control=event.currentTarget;
   const starting=latest.mode!=="STARTED";
-  if(!starting){el("stopConfirmModal").classList.add("open");return}
-  doToggle();
+  if(!starting){
+    const finish=beginAction(control,"Opening confirmation...");
+    if(!finish)return;
+    el("stopConfirmModal").classList.add("open");
+    requestAnimationFrame(finish);
+    return;
+  }
+  doToggle(control);
 }
-el("stopConfirmYes").addEventListener("click",()=>{el("stopConfirmModal").classList.remove("open");doToggle()});
+el("stopConfirmYes").addEventListener("click",event=>{el("stopConfirmModal").classList.remove("open");doToggle(event.currentTarget)});
 el("stopConfirmNo").addEventListener("click",()=>el("stopConfirmModal").classList.remove("open"));
 el("captureButton").addEventListener("click",toggle);
 el("flightStop").addEventListener("click",toggle);
@@ -842,20 +871,20 @@ setInterval(pollStorage,15000);
 '''
 
 SETUP_JS = COMMON_JS + r'''
-let currentInterval=null,capturing=false,backupRunning=false,backupTimer=null,camCount=-1,externalConnected=false;
+let currentInterval=null,currentImageFormat=null,capturing=false,backupRunning=false,backupTimer=null,camCount=-1,externalConnected=false;
 let verifyRunning=false,verifyTimer=null,verifyAnnounce=false;
 let deleteMode="verify";
 function setControlsEnabled(){
   const lock=capturing||backupRunning||verifyRunning;
-  document.querySelectorAll("[data-locks]").forEach(b=>{b.disabled=lock});
+  document.querySelectorAll("[data-locks]").forEach(b=>{b.disabled=lock||b.dataset.actionBusy==="true"});
   el("lockNote").textContent=lock?"Some controls are disabled while capture or copy is running.":"";
 }
 function renderImageButtons(n){
   if(n===camCount)return;camCount=n;
   const c=el("imageButtons");c.innerHTML="";
   if(!n){el("imageNote").textContent="No cameras detected. Connect cameras and run a copy, then sample images appear here.";return}
-  el("imageNote").textContent="Downloads a representative .ARW from the most recent copy session.";
-  for(let i=0;i<n;i++){const b=document.createElement("button");b.className="pill-btn";b.type="button";b.textContent=`Camera ${i+1}`;b.addEventListener("click",()=>downloadImage(i));c.appendChild(b)}
+  el("imageNote").textContent="Downloads a representative image from the most recent copy session.";
+  for(let i=0;i<n;i++){const b=document.createElement("button");b.className="pill-btn";b.type="button";b.textContent=`Camera ${i+1}`;b.addEventListener("click",()=>downloadImage(i,b));c.appendChild(b)}
 }
 async function loadSensors(){
   try{
@@ -878,21 +907,49 @@ async function loadStats(){
     if(stats.captureInterval!==undefined){currentInterval=Number(stats.captureInterval);el("interval").textContent=currentInterval.toFixed(1)+" s"}
   }catch(e){/* blocked while capturing */}
 }
-async function setIntervalValue(delta){
+function renderImageFormat(value){
+  currentImageFormat=value;
+  [["imageFormatDefault","Default"],["imageFormatRaw","RAW"],["imageFormatJpeg","JPEG"]].forEach(([id,choice])=>{
+    const button=el(id),active=value===choice;
+    button.className="seg-btn"+(active?" active":"");
+    button.setAttribute("aria-pressed",active?"true":"false");
+  });
+  el("imageFormatValue").textContent=value||"--";
+}
+async function loadImageFormat(){
+  try{const result=await fetchJson("/api/sony_image_format");renderImageFormat(result.value)}
+  catch(e){el("imageFormatValue").textContent="--"}
+}
+async function setImageFormat(value,control){
+  if(value===currentImageFormat)return;
+  const finish=beginAction(control,"Saving image format...");
+  if(!finish)return;
+  try{
+    const result=await postJson("/api/sony_image_format",{value});
+    renderImageFormat(result.value);
+    toast(`Image format set to ${result.value}`);
+  }catch(e){toast(e.message)}
+  finally{finish();setControlsEnabled()}
+}
+async function setIntervalValue(delta,control){
   if(currentInterval===null||Number.isNaN(currentInterval)){toast("Current interval is not available");return}
   const next=Math.max(.1,Math.round((currentInterval+delta)*10)/10);
+  const finish=beginAction(control,"Saving capture interval...");
+  if(!finish)return;
   try{await postJson("/api/capture_interval",{interval:next});currentInterval=next;el("interval").textContent=currentInterval.toFixed(1)+" s";toast("Capture interval set to "+next.toFixed(1)+"s")}
   catch(e){toast(e.message)}
+  finally{finish();setControlsEnabled()}
 }
 function renderBackup(st){
-  const running=!!st.running,pct=Number(st.percent||0);
+  const wasRunning=backupRunning,running=!!st.running,pct=Number(st.percent||0);
   backupRunning=running;setControlsEnabled();
   if(verifyRunning)return;
   el("backupFill").style.width=Math.max(0,Math.min(100,pct))+"%";
   let line=st.phase||"Idle";
   if(running){line=`${st.phase||"copying"} - ${pct.toFixed(1)}%`;
     if(st.files_total)line+=` (${st.files_done}/${st.files_total} files)`;
-    if(st.eta_seconds>0)line+=` - ETA ${formatDuration(st.eta_seconds)}`;}
+    if(st.eta_seconds>0)line+=` - ETA ${formatDuration(st.eta_seconds)}`;
+    loadingToast(`Copying to SSD... ${pct.toFixed(0)}%`);}
   else if(st.message)line=st.message;
   el("backupState").textContent=line;
   if(!running&&st.elapsed_seconds>0){
@@ -903,6 +960,7 @@ function renderBackup(st){
   }
   if(running&&!backupTimer)backupTimer=setInterval(pollBackup,2000);
   if(!running&&backupTimer){clearInterval(backupTimer);backupTimer=null}
+  if(wasRunning&&!running)toast(st.message||"Backup complete");
 }
 async function pollBackup(){try{renderBackup(await fetchJson("/api/backup_status"))}catch(e){if(backupTimer){clearInterval(backupTimer);backupTimer=null}}}
 function formatDuration(seconds){
@@ -921,6 +979,7 @@ function renderVerify(st){
     verifyAnnounce=true;
     const action=st.phase==="deleting"?"Deleting":"Verifying";
     el("backupState").textContent=total?`${action} ${done}/${total} files...`:(st.message||`${action}...`);
+    loadingToast(total?`${action} files... ${done}/${total}`:`${action} files...`);
     if(!verifyTimer)verifyTimer=setInterval(pollVerify,1000);
   }else{
     if(st.phase!=="idle"&&st.message)el("backupState").textContent=st.message;
@@ -936,9 +995,17 @@ async function pollVerify(){
   try{renderVerify(await fetchJson(path))}
   catch(e){if(verifyTimer){clearInterval(verifyTimer);verifyTimer=null};verifyRunning=false;setControlsEnabled()}
 }
-async function startBackup(){
-  try{const r=await fetchJson("/api/backup_start");toast(r&&r.success===false?(r.msg||"Backup failed to start"):"Backup started");pollBackup();}
+async function startBackup(control){
+  const finish=beginAction(control,"Starting backup...");
+  if(!finish)return;
+  try{
+    const r=await fetchJson("/api/backup_start");
+    if(r&&r.success===false)toast(r.msg||"Backup failed to start");
+    else{backupRunning=true;loadingToast("Copying to SSD...")}
+    pollBackup();
+  }
   catch(e){toast(e.message)}
+  finally{finish(backupRunning);setControlsEnabled()}
 }
 function openDeleteDialog(){
   el("deleteDecisionTitle").textContent=externalConnected?"Clear internal storage?":"External SSD not connected";
@@ -948,14 +1015,19 @@ function openDeleteDialog(){
   el("deleteDecisionVerify").hidden=!externalConnected;
   el("deleteDecisionModal").classList.add("open");
 }
-async function deleteBackup(){
+async function deleteBackup(control){
+  const finish=beginAction(control,"Checking storage...");
+  if(!finish)return;
   try{
     const stats=await fetchJson("/api/statistics");
     externalConnected=!!(stats.externalStorage&&Number(stats.externalStorage.capacityGB)>0);
   }catch(e){/* use the most recent storage state */}
   openDeleteDialog();
+  finish();setControlsEnabled();
 }
-async function verifyDeleteMatched(){
+async function verifyDeleteMatched(control){
+  const finish=beginAction(control,"Starting verification...");
+  if(!finish)return;
   el("deleteDecisionModal").classList.remove("open");
   try{
     deleteMode="verify";
@@ -967,8 +1039,11 @@ async function verifyDeleteMatched(){
     if(e.data&&e.data.code==="external_not_connected"){externalConnected=false;openDeleteDialog()}
     else toast(e.message);
   }
+  finally{finish(verifyRunning);setControlsEnabled()}
 }
-async function forceDeleteAll(){
+async function forceDeleteAll(control){
+  const finish=beginAction(control,"Clearing internal storage...");
+  if(!finish)return;
   el("deleteDecisionModal").classList.remove("open");
   try{
     deleteMode="force";
@@ -976,6 +1051,7 @@ async function forceDeleteAll(){
     if(r&&r.success){verifyRunning=true;verifyAnnounce=true;setControlsEnabled();el("backupState").textContent="Preparing to clear internal storage...";pollVerify()}
     else toast((r&&r.msg)||"Internal storage could not be cleared");
   }catch(e){toast(e.message)}
+  finally{finish(verifyRunning);setControlsEnabled()}
 }
 async function netbirdStatus(announce){
   try{const r=await fetchJson("/api/netbird_status");const ok=!!r.connected;
@@ -983,24 +1059,31 @@ async function netbirdStatus(announce){
     if(announce)toast(ok?"Remote support is available":"Remote support is off");}
   catch(e){el("nbDot").className="dot bad";el("nbState").textContent="Unavailable";if(announce)toast(e.message)}
 }
-async function downloadImage(idx){
+async function downloadImage(idx,control){
   const name=`Camera ${idx+1}`;
+  const finish=beginAction(control,`Preparing ${name} sample...`);
+  if(!finish)return;
   try{const r=await fetch(`/api/get_images/${idx}`,{cache:"no-store"});
     if(r.status===404){toast(`No sample image for ${name} yet (run a copy first).`);return}
     if(!r.ok)throw new Error(`${r.status} ${r.statusText}`);
-    const blob=await r.blob();downloadBlob(blob,`camera${idx+1}_sample.arw`);toast(`Downloading ${name} sample`);}
+    const blob=await r.blob(),serverName=r.headers.get("X-SkySeeker-Filename");
+    downloadBlob(blob,serverName||`camera${idx+1}_sample`);toast(`Downloading ${name} sample`);}
   catch(e){toast(e.message)}
+  finally{finish()}
 }
-document.querySelectorAll("[data-delta]").forEach(b=>b.addEventListener("click",()=>setIntervalValue(Number(b.dataset.delta))));
-el("restartService").addEventListener("click",async()=>{if(!confirm("Restart the tricap capture service? Capture pauses briefly."))return;try{await fetchJson("/api/restart");toast("tricap restart requested")}catch(e){toast(e.message)}});
-el("rebootDevice").addEventListener("click",async()=>{if(!confirm("Reboot the SkySeeker device? It will be offline for ~30-60s and you may need to rejoin Wi-Fi."))return;try{await fetchJson("/api/reboot");toast("Reboot requested - rejoin skyseeker when it returns")}catch(e){toast(e.message)}});
-el("backupStart").addEventListener("click",startBackup);
-el("backupDelete").addEventListener("click",deleteBackup);
+document.querySelectorAll("[data-delta]").forEach(b=>b.addEventListener("click",()=>setIntervalValue(Number(b.dataset.delta),b)));
+el("imageFormatDefault").addEventListener("click",event=>setImageFormat("Default",event.currentTarget));
+el("imageFormatRaw").addEventListener("click",event=>setImageFormat("RAW",event.currentTarget));
+el("imageFormatJpeg").addEventListener("click",event=>setImageFormat("JPEG",event.currentTarget));
+el("restartService").addEventListener("click",async event=>{if(!confirm("Restart the tricap capture service? Capture pauses briefly."))return;const finish=beginAction(event.currentTarget,"Restarting tricap...");if(!finish)return;try{await fetchJson("/api/restart");toast("tricap restart requested")}catch(e){toast(e.message)}finally{finish();setControlsEnabled()}});
+el("rebootDevice").addEventListener("click",async event=>{if(!confirm("Reboot the SkySeeker device? It will be offline for ~30-60s and you may need to rejoin Wi-Fi."))return;const finish=beginAction(event.currentTarget,"Requesting reboot...");if(!finish)return;try{await fetchJson("/api/reboot");toast("Reboot requested - rejoin skyseeker when it returns")}catch(e){toast(e.message)}finally{finish();setControlsEnabled()}});
+el("backupStart").addEventListener("click",event=>startBackup(event.currentTarget));
+el("backupDelete").addEventListener("click",event=>deleteBackup(event.currentTarget));
 el("deleteDecisionCancel").addEventListener("click",()=>el("deleteDecisionModal").classList.remove("open"));
-el("deleteDecisionVerify").addEventListener("click",verifyDeleteMatched);
-el("deleteDecisionContinue").addEventListener("click",forceDeleteAll);
-el("nbConnect").addEventListener("click",async()=>{try{await postJson("/api/netbird_connect",{});netbirdStatus(true)}catch(e){toast(e.message)}});
-el("nbDisconnect").addEventListener("click",async()=>{if(!confirm("Turn off remote support? Support will not be able to reach this rig until it is reconnected."))return;try{await postJson("/api/netbird_disconnect",{});netbirdStatus(true)}catch(e){toast(e.message)}});
+el("deleteDecisionVerify").addEventListener("click",event=>verifyDeleteMatched(event.currentTarget));
+el("deleteDecisionContinue").addEventListener("click",event=>forceDeleteAll(event.currentTarget));
+el("nbConnect").addEventListener("click",async event=>{const finish=beginAction(event.currentTarget,"Connecting remote support...");if(!finish)return;try{await postJson("/api/netbird_connect",{});await netbirdStatus(true)}catch(e){toast(e.message)}finally{finish()}});
+el("nbDisconnect").addEventListener("click",async event=>{if(!confirm("Turn off remote support? Support will not be able to reach this rig until it is reconnected."))return;const finish=beginAction(event.currentTarget,"Turning off remote support...");if(!finish)return;try{await postJson("/api/netbird_disconnect",{});await netbirdStatus(true)}catch(e){toast(e.message)}finally{finish()}});
 async function uplinkStatus(){
   try{
     const r=await fetchJson("/portal/uplink_status");
@@ -1014,7 +1097,8 @@ async function uplinkStatus(){
   }catch(e){el("ulDot").className="dot bad";el("ulState").textContent="--"}
 }
 async function connectUplink(custom){
-  const b=el(custom?"ulConnectCustom":"ulConnect");b.disabled=true;b.textContent="Connecting…";
+  const b=el(custom?"ulConnectCustom":"ulConnect"),finish=beginAction(b,"Connecting internet...");
+  if(!finish)return;
   try{
     const body={};
     if(custom){
@@ -1025,14 +1109,17 @@ async function connectUplink(custom){
     const r=await postJson("/portal/uplink_connect",body);
     toast(r.msg||"Internet connected");uplinkStatus();
   }catch(e){toast(e.message)}
-  finally{b.disabled=false;b.textContent=custom?"Use different hotspot":"Reconnect internet"}
+  finally{finish()}
 }
 el("ulConnect").addEventListener("click",()=>connectUplink(false));
 el("ulConnectCustom").addEventListener("click",()=>connectUplink(true));
-el("ulDisconnect").addEventListener("click",async()=>{
+el("ulDisconnect").addEventListener("click",async event=>{
   if(!confirm("Disconnect SkySeeker from the phone hotspot? The dashboard remains available through the USB skyseeker Wi-Fi network."))return;
+  const finish=beginAction(event.currentTarget,"Disconnecting internet...");
+  if(!finish)return;
   try{const r=await postJson("/portal/uplink_disconnect");toast(r.msg||"Internet disconnected");uplinkStatus()}
   catch(e){toast(e.message)}
+  finally{finish()}
 });
 function altUnit(){let u="ft";try{u=localStorage.getItem("ss-alt-unit")||"ft"}catch(_){}return u==="m"?"m":"ft"}
 function renderAltBand(){
@@ -1072,9 +1159,10 @@ el("themeDefault").addEventListener("click",()=>applyTheme("default",true));
 el("themeLight").addEventListener("click",()=>applyTheme("light",true));
 el("themeDark").addEventListener("click",()=>applyTheme("dark",true));
 applyTheme(["default","light","dark"].includes(document.documentElement.getAttribute("data-theme"))?document.documentElement.getAttribute("data-theme"):"default",false);
-loadSensors();loadStats();pollBackup();pollVerify();netbirdStatus();uplinkStatus();
+loadSensors();loadStats();loadImageFormat();pollBackup();pollVerify();netbirdStatus();uplinkStatus();
 setInterval(loadSensors,2000);
 setInterval(loadStats,15000);
+setInterval(loadImageFormat,15000);
 setInterval(()=>netbirdStatus(false),20000);
 setInterval(uplinkStatus,10000);
 '''
@@ -1203,7 +1291,7 @@ HOME_HTML = f'''{_HEAD}<title>SkySeeker Control</title><style>{STYLE}</style></h
 <div class="connection-warning" id="connectionWarning" role="alert" aria-live="assertive">
   <div class="connection-warning-inner"><div class="connection-warning-title">Connection lost</div><p class="connection-warning-text">Reconnect this screen to the skyseeker Wi-Fi network immediately.</p></div>
 </div>
-<div class="toast" id="toast" role="status"></div>
+<div class="toast" id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <script>document.getElementById("host2").textContent=location.host||"control.skyseeker";</script>
 <script>{HOME_JS}</script>
 </body></html>'''
@@ -1219,6 +1307,15 @@ SETUP_HTML = f'''{_HEAD}<title>SkySeeker Setup</title><style>{STYLE}</style></he
     <button class="step-btn mono" type="button" data-delta="0.1" data-locks>+0.1</button>
     <button class="step-btn mono" type="button" data-delta="0.5" data-locks>+0.5</button>
   </div>
+</section>
+<section class="card pad">
+  <div class="row-between mb"><div class="card-h">Camera image format</div><div class="theme-val mono" id="imageFormatValue">--</div></div>
+  <div class="seg" role="group" aria-label="Camera image format">
+    <button class="seg-btn" id="imageFormatDefault" type="button" data-locks>Default</button>
+    <button class="seg-btn" id="imageFormatRaw" type="button" data-locks>RAW</button>
+    <button class="seg-btn" id="imageFormatJpeg" type="button" data-locks>JPEG</button>
+  </div>
+  <p class="muted small mt">Default leaves each camera at the image format selected on the camera.</p>
 </section>
 <section class="card pad">
   <div class="row-between mb"><div class="card-h">Flight altitude</div><div class="interval-val mono" id="altBand">--</div></div>
@@ -1243,7 +1340,7 @@ SETUP_HTML = f'''{_HEAD}<title>SkySeeker Setup</title><style>{STYLE}</style></he
 <div class="section-label">More</div>
 <section class="card acc">
   <div class="acc-head"><div class="acc-title">Download images</div><div class="acc-right"><span class="chev">{CHEV}</span></div></div>
-  <div class="acc-body"><div class="grid3" id="imageButtons"></div><p class="muted small" id="imageNote" style="margin-top:10px">Downloads a representative .ARW from the most recent copy session.</p></div>
+  <div class="acc-body"><div class="grid3" id="imageButtons"></div><p class="muted small" id="imageNote" style="margin-top:10px">Downloads a representative image from the most recent copy session.</p></div>
 </section>
 <section class="card acc">
   <div class="acc-head"><div class="acc-title">Sensor check</div><div class="acc-right"><span class="acc-sum mono" id="setupMode">--</span><span class="chev">{CHEV}</span></div></div>
@@ -1312,7 +1409,7 @@ SETUP_HTML = f'''{_HEAD}<title>SkySeeker Setup</title><style>{STYLE}</style></he
 <div class="connection-warning" id="connectionWarning" role="alert" aria-live="assertive">
   <div class="connection-warning-inner"><div class="connection-warning-title">Connection lost</div><p class="connection-warning-text">Reconnect this screen to the skyseeker Wi-Fi network immediately.</p></div>
 </div>
-<div class="toast" id="toast" role="status"></div>
+<div class="toast" id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <script>{SETUP_JS}</script>
 </body></html>'''
 

@@ -146,10 +146,11 @@ function changeMainStatus(colour, msg) {
 // hoisted as var a = undefined. So watch out.
 
 var buttonClick = function(buttonCode){
+    var request = null;
     if (buttonCode === tricap.BUTTON_CODES.START || buttonCode === tricap.BUTTON_CODES.STOP ||
         buttonCode === tricap.BUTTON_CODES.STARTSTOP){
         // If we are starting a new session, get a new description
-        $.getJSON($SCRIPT_ROOT + '/_button_click', {buttonCode: buttonCode }, startStopFollowUp);
+        request = $.getJSON($SCRIPT_ROOT + '/_button_click', {buttonCode: buttonCode }, startStopFollowUp);
 
         //if ($('[name="btn_startstop"]').html() === 'Start Manual'){ // Add modal for manual start
         //    $('#input_modal_session_description').val(defaultSessionDescription);
@@ -159,8 +160,8 @@ var buttonClick = function(buttonCode){
         //}
 
     } else if (buttonCode === tricap.BUTTON_CODES.RESET){
-        $.getJSON($SCRIPT_ROOT + '/_button_click', {buttonCode: buttonCode },
-                  function(){location.reload(); return false;});
+        request = $.getJSON($SCRIPT_ROOT + '/_button_click', {buttonCode: buttonCode },
+                            function(){location.reload(); return false;});
     } else if (buttonCode === tricap.BUTTON_CODES.TEST){
         // TODO When we think of other tests to do on the server side, send a test code through
         $.getJSON($SCRIPT_ROOT + '/_button_click', {buttonCode: tricap.BUTTON_CODES.START},
@@ -170,7 +171,7 @@ var buttonClick = function(buttonCode){
                       startStopFollowUp);
         }, stateRefreshRate*3);
     }
-    return false;
+    return request;
 };
 
 var startStopFollowUp = function (data) {
@@ -458,7 +459,22 @@ $(function(){
     });
 
     // Set the specific button functions
-    $('[name="btn_startstop"]').on('click', function(event){buttonClick(tricap.BUTTON_CODES.STARTSTOP);});
+    $('[name="btn_startstop"]').on('click', function(event){
+        event.preventDefault();
+        var actions = window.SkySeekerActions;
+        var finish = actions ? actions.begin(this, $(this).text() === 'Stop' ? 'Stopping capture...' : 'Starting capture...') : function(){};
+        if (!finish){ return false; }
+        var request = buttonClick(tricap.BUTTON_CODES.STARTSTOP);
+        if (request && request.fail){
+            request.fail(function(xhr){
+                var message = (xhr.responseJSON && xhr.responseJSON.msg) || 'Capture request failed';
+                if (actions){ actions.toast(message); }
+            }).always(function(){ finish(); });
+        } else {
+            finish();
+        }
+        return false;
+    });
 
     //modal submit button click code
     $('#btn_modal_session_description_submit').on('click', function(event){

@@ -9,6 +9,15 @@
       <div class="interval-controls"><button class="button interval-minus-large" data-interval-delta="-0.5">-0.5</button><button class="button interval-minus-small" data-interval-delta="-0.1">-0.1</button><button class="button interval-plus-small" data-interval-delta="0.1">+0.1</button><button class="button interval-plus-large" data-interval-delta="0.5">+0.5</button></div>
       <p class="muted action-status" id="interval-status"></p>
     </section>
+    <section class="card format-card">
+      <div class="card-head"><h2>Camera image format</h2><span class="pill" id="camera-format-value">--</span></div>
+      <div class="format-choice-row" role="group" aria-label="Camera image format">
+        <button class="button" type="button" data-image-format="Default">Default</button>
+        <button class="button" type="button" data-image-format="RAW">RAW</button>
+        <button class="button" type="button" data-image-format="JPEG">JPEG</button>
+      </div>
+      <p class="muted">Default leaves each camera at the image format selected on the camera.</p>
+    </section>
 
     <div class="stack">
       <section class="card"><h2>Backup to SSD</h2><div class="button-row"><button class="button green" id="backup-start">Start backup</button><button class="button red" id="backup-verify-delete">Verify &amp; delete</button></div><div class="progress-track"><div class="progress-fill" id="backup-progress"></div></div><p class="muted" id="backup-status">idle</p></section>
@@ -30,7 +39,7 @@
       <summary>Advanced settings</summary>
       <form action="" method="post" name="add_im_set" class="form-horizontal" id="form" enctype="multipart/form-data">
         {{form.hidden_tag()}}
-        <div class="form-section"><h2>Camera Settings</h2><div class="form-grid">{% for string_setting in form.cam_strings %}<div class="form-field">{{string_setting.label}}{{string_setting(class='form-control', id=string_setting.id+'_'+string_setting.label)}}{{render_errors(string_setting)}}</div>{% endfor %}{% for select_setting in form.cam_selects %}<div class="form-field">{{select_setting.label}}{{select_setting(class='form-control', id=select_setting.id+'_'+select_setting.label)}}{{render_errors(select_setting)}}</div>{% endfor %}</div></div>
+        <div class="form-section"><h2>Camera Settings</h2><div class="form-grid">{% for string_setting in form.cam_strings %}<div class="form-field">{{string_setting.label}}{{string_setting(class='form-control', id=string_setting.id+'_'+string_setting.label)}}{{render_errors(string_setting)}}</div>{% endfor %}{% for select_setting in form.cam_selects %}<div class="form-field">{% if select_setting.label == 'sony_image_format' %}Sony image format{% else %}{{select_setting.label}}{% endif %}{{select_setting(class='form-control', id=select_setting.id+'_'+select_setting.label)}}{{render_errors(select_setting)}}{% if select_setting.label == 'sony_image_format' %}<p class="muted">Default leaves each camera at the image format selected on the camera.</p>{% endif %}</div>{% endfor %}</div></div>
         <div class="form-section"><h2>Altimeter Settings</h2><div class="form-grid">{% for string_setting in form.alti_strings %}<div class="form-field">{{string_setting.label}}{{string_setting(class='form-control', id=string_setting.id+'_'+string_setting.label)}}{{render_errors(string_setting)}}</div>{% endfor %}{% for select_setting in form.alti_selects %}<div class="form-field">{{select_setting.label}}{{select_setting(class='form-control', id=select_setting.id+'_'+select_setting.label)}}{{render_errors(select_setting)}}</div>{% endfor %}</div></div>
         <div class="form-section"><h2>Miscellaneous Settings</h2><div class="form-grid">{% for string_setting in form.misc_strings %}<div class="form-field">{{string_setting.label}}{{string_setting(class='form-control', id=string_setting.id+'_'+string_setting.label)}}{{render_errors(string_setting)}}</div>{% endfor %}{% for select_setting in form.misc_selects %}<div class="form-field">{{select_setting.label}}{{select_setting(class='form-control', id=select_setting.id+'_'+select_setting.label)}}{{render_errors(select_setting)}}</div>{% endfor %}</div></div>
         <div class="form-section"><h2>Web Settings</h2><div class="form-grid">{% for string_setting in form.web_strings %}<div class="form-field">{{string_setting.label}}{{string_setting(class='form-control', id=string_setting.id+'_'+string_setting.label)}}{{render_errors(string_setting)}}</div>{% endfor %}{% for select_setting in form.web_selects %}<div class="form-field">{{select_setting.label}}{{select_setting(class='form-control', id=select_setting.id+'_'+select_setting.label)}}{{render_errors(select_setting)}}</div>{% endfor %}</div></div>

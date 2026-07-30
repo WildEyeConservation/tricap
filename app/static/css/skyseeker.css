@@ -49,6 +49,13 @@ h2 { margin:0; font-size:16px; letter-spacing:.06em; text-transform:uppercase; }
 .button { border:1px solid #c6d3cb; background:var(--field); color:var(--green-deep); border-radius:7px; min-height:44px; padding:0 14px; font:inherit; font-weight:850; cursor:pointer; }
 .button.green { background:var(--green); border-color:var(--green); color:#fff; }
 .button.red { background:var(--red); border-color:var(--red); color:#fff; }
+.button:disabled,.primary-action:disabled,.sky-action-busy { opacity:.55; cursor:not-allowed; }
+.sky-action-busy { pointer-events:none; }
+.sky-toast { position:fixed; left:50%; bottom:24px; z-index:1100; display:flex; align-items:center; gap:9px; max-width:calc(100% - 28px); padding:11px 15px; border-radius:8px; background:var(--green-deep); color:#fff; box-shadow:0 12px 30px rgba(0,0,0,.25); opacity:0; pointer-events:none; transform:translateX(-50%); transition:opacity .16s ease; font-size:13px; font-weight:700; }
+.sky-toast.show { opacity:1; }
+.sky-toast-spinner { width:14px; height:14px; flex:0 0 auto; border:2px solid currentColor; border-right-color:transparent; border-radius:50%; animation:sky-toast-spin .7s linear infinite; }
+@keyframes sky-toast-spin { to { transform:rotate(360deg); } }
+@media (prefers-reduced-motion:reduce) { .sky-toast { transition:none; } .sky-toast-spinner { animation-duration:1.4s; } }
 .input-row { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:10px; margin-top:12px; }
 .sky-app input,.sky-app select,.sky-app textarea { min-height:44px; border:1px solid #cfd7d0; border-radius:7px; padding:0 14px; font:inherit; background:#fff; color:var(--ink); }
 .sky-app textarea { padding-top:10px; }
@@ -56,6 +63,9 @@ h2 { margin:0; font-size:16px; letter-spacing:.06em; text-transform:uppercase; }
 .interval-head { display:flex; align-items:center; gap:10px; margin-bottom:14px; line-height:1.1; }
 .interval-value { color:var(--green-deep); font-size:16px; font-weight:850; white-space:nowrap; }
 .interval-controls { display:grid; grid-template-columns:repeat(4,minmax(120px,1fr)); gap:10px; }
+.format-card { grid-column:1 / -1; }
+.format-choice-row { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; margin:14px 0 10px; }
+.format-choice-row .button.active { background:var(--green); border-color:var(--green); color:#fff; }
 .progress-track { height:10px; overflow:hidden; background:var(--field); border-radius:999px; margin:12px 0 4px; }
 .progress-fill { height:100%; width:0; background:var(--green-action); transition:width .2s ease; }
 .action-status { min-height:20px; }

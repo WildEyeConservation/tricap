@@ -4,7 +4,12 @@ import logging
 import os
 import configparser
 
-from config import CONFIG_FP, SERVER_LOG_DIR
+from config import (
+    CONFIG_FP,
+    SERVER_LOG_DIR,
+    SONY_IMAGE_FORMAT_CAMERA_SETTING,
+    SONY_IMAGE_FORMAT_CONFIG_KEY,
+)
 from support.configure import TricapConfig, TricapConfigError
 
 from .tricap_tempfile_test_case import TriCapTempFilerTestCase
@@ -26,6 +31,22 @@ class TestConfigure(TriCapTempFilerTestCase):
         """Test if the config can read from file, instantiate itself correctly."""
         config = TricapConfig()
         self.assertEqual(config.is_ready(), True)
+
+    def test_old_config_defaults_to_camera_image_format(self):
+        """Older configs should leave the Sony camera's format untouched."""
+        old_config_fp = os.path.join(self.tempdir, 'old.cfg')
+        with open(old_config_fp, 'w') as old_config:
+            old_config.write('[Camera]\nshutterspeed = 1/2500\n')
+
+        config = TricapConfig(config_fp_to_read=old_config_fp)
+
+        self.assertEqual(
+            config.get(
+                SONY_IMAGE_FORMAT_CONFIG_KEY,
+                TricapConfig.CAMERA_SECTION_HEADER,
+            ),
+            SONY_IMAGE_FORMAT_CAMERA_SETTING,
+        )
 
     def test_bad_config_fp(self):
         """Test whether an exception is thrown when file reading/writing error occurs."""

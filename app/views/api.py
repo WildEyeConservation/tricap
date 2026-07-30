@@ -6,7 +6,15 @@ import base64, logging, cv2
 import numpy as np
 from random import randint
 from datetime import datetime
-from config import CAM_MANAGER_STATES, CAMERA_STATES, SERVER_LOG_DIR, MOUNT_POINT, MOUNT_POINT_SSD
+from config import (
+  CAM_MANAGER_STATES,
+  CAMERA_STATES,
+  SERVER_LOG_DIR,
+  MOUNT_POINT,
+  MOUNT_POINT_SSD,
+  SONY_IMAGE_FORMAT_CHOICES,
+  SONY_IMAGE_FORMAT_CONFIG_KEY,
+)
 import os, json
 from support.camera_data import ParseData
 from support.configure import TricapConfig
@@ -297,7 +305,11 @@ def get_images(cam_idx):
     abort(404)
 
   # Top-level only for speed; swap to base.rglob("**/*") if you need recursion
-  candidates = [p for p in Path(image_dir).iterdir() if p.is_file() and p.suffix.lower() == ".arw"]
+  image_extensions = {".arw", ".jpg", ".jpeg"}
+  candidates = [
+    p for p in Path(image_dir).iterdir()
+    if p.is_file() and p.suffix.lower() in image_extensions
+  ]
 
   if not candidates:
     abort(404)
@@ -310,7 +322,9 @@ def get_images(cam_idx):
 
   _logger.debug(f"get_images called {image_dir} {cam_idx} {path}")
 
-  return send_file(path, conditional=True)
+  response = send_file(path, conditional=True)
+  response.headers['X-SkySeeker-Filename'] = path.name
+  return response
 
 @api_bp.route('/api/lensNumber')
 def lens_number():
@@ -491,6 +505,43 @@ def set_capture_interval():
   ret = {}
   ret['success'] = True
   return ret  
+
+@api_bp.route('/api/sony_image_format', methods=['GET', 'POST'])
+def sony_image_format():
+  """Read or update the Sony capture format used by the rig."""
+  if request.method == 'GET':
+    return jsonify({
+      'value': tricap_manager.get_sony_image_format(),
+      'choices': list(SONY_IMAGE_FORMAT_CHOICES),
+    })
+
+  if tricap_manager.state in (CAM_MANAGER_STATES.STARTED, CAM_MANAGER_STATES.COPYING):
+    return jsonify({'msg': 'Stop capture or backup before changing image format'}), 400
+
+  data = request.get_json(silent=True) or {}
+  image_format = data.get('value')
+  if image_format not in SONY_IMAGE_FORMAT_CHOICES:
+    return jsonify({
+      'msg': 'Invalid image format',
+      'choices': list(SONY_IMAGE_FORMAT_CHOICES),
+    }), 400
+
+  try:
+    tricap_manager.set_sony_image_format(image_format)
+    config = TricapConfig()
+    camera_section = config.get_section_dict(TricapConfig.CAMERA_SECTION_HEADER)
+    camera_section[SONY_IMAGE_FORMAT_CONFIG_KEY] = image_format
+    config.set_section(camera_section, TricapConfig.CAMERA_SECTION_HEADER)
+    config.save_to_file()
+  except Exception as exc:
+    _logger.exception('Failed to set Sony image format to %s', image_format)
+    return jsonify({'msg': str(exc) or 'Could not set image format'}), 500
+
+  return jsonify({
+    'success': True,
+    'value': image_format,
+    'choices': list(SONY_IMAGE_FORMAT_CHOICES),
+  })
 
 @api_bp.route('/api/verify_and_delete')
 def verify_and_delete():

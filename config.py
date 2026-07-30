@@ -22,6 +22,22 @@ CE6D_CAP_TARGET_SD_CARD = 'Memory card'
 
 CE6D_FORMAT_RAW = 'RAW'
 
+# Sony Camera Remote SDK image formats. Default deliberately does not write
+# the SDK property, leaving the format selected on each camera untouched.
+SONY_IMAGE_FORMAT_CONFIG_KEY = 'sony_image_format'
+SONY_IMAGE_FORMAT_CAMERA_SETTING = 'Default'
+SONY_IMAGE_FORMAT_JPEG = 'JPEG'
+SONY_IMAGE_FORMAT_RAW = 'RAW'
+SONY_IMAGE_FORMAT_CHOICES = (
+    SONY_IMAGE_FORMAT_CAMERA_SETTING,
+    SONY_IMAGE_FORMAT_RAW,
+    SONY_IMAGE_FORMAT_JPEG,
+)
+SONY_IMAGE_FORMAT_FILE_TYPES = {
+    SONY_IMAGE_FORMAT_JPEG: 1,
+    SONY_IMAGE_FORMAT_RAW: 2,
+}
+
 # Altimeter default configs
 ALTI_NUM_AVG_FRAMES = 2
 ALTI_MEASURE_TIMEOUT = 2

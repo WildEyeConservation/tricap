@@ -50,6 +50,14 @@ class TestSettings(TriCapAppTestCase):
             iso_choices = [ct[1] for ct in choices]
             self.assertEqual('100' in iso_choices, True)
 
+            self.assertEqual('sony_image_format' in labels, True)
+            choices = form.cam_selects[labels.index('sony_image_format')].choices
+            image_format_choices = [ct[1] for ct in choices]
+            self.assertEqual(
+                image_format_choices,
+                ['Default', 'RAW', 'JPEG'],
+            )
+
             labels = [misc_string.label for misc_string in form.misc_strings]
             self.assertEqual('session_description' in labels, True)
 

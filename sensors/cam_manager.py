@@ -12,7 +12,17 @@ import RPi.GPIO as GPIO
 from scipy import interpolate
 import numpy as np
 
-from config import CAM_MANAGER_STATES, SERVER_LOG_DIR, SESSION_ROOT_DIR, MOUNT_POINT, SONY_TEMPFS_MOUNT_POINT, MOUNT_POINT_SSD
+from config import (
+    CAM_MANAGER_STATES,
+    SERVER_LOG_DIR,
+    SESSION_ROOT_DIR,
+    MOUNT_POINT,
+    SONY_TEMPFS_MOUNT_POINT,
+    MOUNT_POINT_SSD,
+    SONY_IMAGE_FORMAT_CAMERA_SETTING,
+    SONY_IMAGE_FORMAT_CHOICES,
+    SONY_IMAGE_FORMAT_CONFIG_KEY,
+)
 
 # TODO : Create a camera factory that will import cameras according to its config and make them available via its own
 # autodetect function
@@ -32,6 +42,7 @@ except ImportError as e:
 
 from .dummy_cam import DummyCam
 from .dummy_cam import DummyShell, external_dummy_calibrate_func
+from .base_setting import BaseSetting, SettingSpec
 
 from support.basic import RepeatingBarrierPasser
 from statistics import mean
@@ -41,14 +52,22 @@ RED_PIN = 17
 GREEN_PIN = 27
 
 class MultiConfig:
-    dictkeys = ["_cameras", "_context"]
+    dictkeys = ["_cameras", "_context", "_manager"]
 
-    def __init__(self, cameras):
+    def __init__(self, cameras, manager=None):
         self._cameras = cameras
+        self._manager = manager
 
     def __setattr__(self, key, value):
         if key in self.dictkeys:
             self.__dict__[key] = value
+        elif key == SONY_IMAGE_FORMAT_CONFIG_KEY and self._manager is not None:
+            self._manager.set_sony_image_format(value)
+        elif self._manager is not None and self._manager.use_sony_cam:
+            # The Sony wrapper does not expose the generic gPhoto config tree.
+            # Retain unrelated Camera-section values without trying to apply
+            # Canon-specific settings to a Sony camera.
+            self._manager._cam_settings[key] = value
         else:
             for camera in self._cameras:
                 camera.config[key] = value
@@ -56,6 +75,14 @@ class MultiConfig:
     def __getattr__(self, key):
         if key in self.dictkeys:
             return self.__dict__[key]
+        elif key == SONY_IMAGE_FORMAT_CONFIG_KEY and self._manager is not None:
+            return BaseSetting(SettingSpec(
+                choices=SONY_IMAGE_FORMAT_CHOICES,
+                get_value=self._manager.get_sony_image_format,
+                set_value=self._manager.set_sony_image_format,
+            ))
+        elif self._manager is not None and self._manager.use_sony_cam:
+            return self._manager._cam_settings.get(key)
         else:
             return self._cameras[0].config[key]
 
@@ -164,7 +191,8 @@ class TriCapCamsManager:
                     try:
                         tricap_cam = CameraSony(
                             SONY_TEMPFS_MOUNT_POINT, self._sonySDKInstance, i,
-                            self._sonySDKCamCaptureLock)
+                            self._sonySDKCamCaptureLock,
+                            self.get_sony_image_format())
                         self._cameras.append(tricap_cam)
                     except Exception as exc:
                         self._logger.warning(
@@ -588,7 +616,28 @@ class TriCapCamsManager:
 
     @property
     def config(self):
-        return MultiConfig(self._cameras)
+        return MultiConfig(self._cameras, self)
+
+    def get_sony_image_format(self):
+        """Return the configured Sony image-format behavior."""
+        return self._cam_settings.get(
+            SONY_IMAGE_FORMAT_CONFIG_KEY,
+            SONY_IMAGE_FORMAT_CAMERA_SETTING,
+        )
+
+    def set_sony_image_format(self, image_format):
+        """Store the value and apply explicit overrides to Sony cameras."""
+        if image_format not in SONY_IMAGE_FORMAT_CHOICES:
+            raise ValueError(
+                "Unsupported Sony image format {!r}; expected one of {}".format(
+                    image_format, SONY_IMAGE_FORMAT_CHOICES
+                )
+            )
+
+        if self.use_sony_cam:
+            for camera in self._cameras:
+                camera.set_image_format(image_format)
+        self._cam_settings[SONY_IMAGE_FORMAT_CONFIG_KEY] = image_format
 
     def copy_eta(self):
         if self._copy_start_time == None or self.use_gpio_cams or self.use_sony_cam:

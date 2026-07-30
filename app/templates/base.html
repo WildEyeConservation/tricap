@@ -48,6 +48,7 @@
 
   {% block base_js %}<script type="text/javascript">{% include 'js/base.js' %}</script>{% endblock %}
   <main class="shell page">{% block content %}{% endblock %}</main>
+  <div class="sky-toast" id="sky-action-toast" role="status" aria-live="polite" aria-atomic="true"></div>
   <script src="{{ url_for('static', filename='js/skyseeker.js') }}" type="text/javascript"></script>
 </body>
 </html>

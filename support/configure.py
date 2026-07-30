@@ -3,7 +3,11 @@
 import configparser
 import logging
 import pdb
-from config import CONFIG_FP
+from config import (
+    CONFIG_FP,
+    SONY_IMAGE_FORMAT_CAMERA_SETTING,
+    SONY_IMAGE_FORMAT_CONFIG_KEY,
+)
 
 
 class TricapConfigError(Exception):
@@ -15,7 +19,7 @@ class TricapConfig:
         translation from machine code to human readable format, and back again. Uses the
         configparser to do most of the heavy lifting.
         - TricapConfig assumes that the only settings that exist are those listed in the config
-          file. No new settings can be added during run-time.
+          file. New optional settings may supply a backwards-compatible default for older files.
         - Note that keys in sections are case-insensitive and stored in lowercase, and that all keys
           in sections are accessible in a case-insensitive manner.
         - The TricapConfig is treated as a flight critical component, and therefore any exceptions
@@ -48,6 +52,23 @@ class TricapConfig:
             config_file = open(self._config_fp, 'r')
             self._parser.read_file(config_file)
             config_file.close()
+            # Deployed initial.cfg files predate this option. Keep their
+            # behavior safe by leaving the physical camera setting untouched.
+            if not self._parser.has_option(
+                    self.CAMERA_SECTION_HEADER, SONY_IMAGE_FORMAT_CONFIG_KEY):
+                self._parser.set(
+                    self.CAMERA_SECTION_HEADER,
+                    SONY_IMAGE_FORMAT_CONFIG_KEY,
+                    SONY_IMAGE_FORMAT_CAMERA_SETTING,
+                )
+            elif self._parser.get(
+                    self.CAMERA_SECTION_HEADER,
+                    SONY_IMAGE_FORMAT_CONFIG_KEY) == 'Camera setting':
+                self._parser.set(
+                    self.CAMERA_SECTION_HEADER,
+                    SONY_IMAGE_FORMAT_CONFIG_KEY,
+                    SONY_IMAGE_FORMAT_CAMERA_SETTING,
+                )
             self._ready_flag = True
         except (configparser.Error, IOError, OSError) as ex:
             self._logger.error('Error reading from config file %s', self._config_fp)

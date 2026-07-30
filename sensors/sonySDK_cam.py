@@ -23,7 +23,12 @@ from datetime import datetime
 import sys
 sys.path.append("/home/radxa/tricap")
 
-from config import CAMERA_STATES
+from config import (
+    CAMERA_STATES,
+    SONY_IMAGE_FORMAT_CAMERA_SETTING,
+    SONY_IMAGE_FORMAT_CHOICES,
+    SONY_IMAGE_FORMAT_FILE_TYPES,
+)
 sys.path.append(os.path.abspath("/home/radxa/SonySDKWrapper"))
 from sonySDKWrapper import *
 
@@ -68,7 +73,13 @@ class sonySDKcam():
         self._sonyCamera = None
         sys.exit(143)
 
-    def __init__(self, memoryFsPath, sonySDKInstance, cameraID, capture_lock):
+    def __init__(
+            self,
+            memoryFsPath,
+            sonySDKInstance,
+            cameraID,
+            capture_lock,
+            image_format=SONY_IMAGE_FORMAT_CAMERA_SETTING):
         """Constructor"""
         self._exif_info = {}
         self._camera = None
@@ -131,12 +142,7 @@ class sonySDKcam():
         # live view is enabled by default on connection and seems to use USB bandwidth, so toggle it to disable
         self._sonyCamera.toggleLiveView(self._cameraID)
 
-        # set the camera file types
-        # raw+jpeg
-        # self._sonyCamera.setCameraFileSaveType(3)
-        # raw only
-        self._sonyCamera.setCameraFileSaveType(2,self._cameraID)
-        # self._sonyCamera.setPCFileSaveType(2,self._cameraID)
+        self.set_image_format(image_format)
 
         print("Setting download callback")
         self._sonyCamera.setOnDownloadCompleteCallback(self.imageDownloadCompleteCallback,self._cameraID)
@@ -151,6 +157,32 @@ class sonySDKcam():
         sleep(3)
 
         self.state = CAMERA_STATES.INITIALISED
+
+    def set_image_format(self, image_format):
+        """Apply an explicit Sony format, or leave the camera untouched."""
+        if image_format not in SONY_IMAGE_FORMAT_CHOICES:
+            raise ValueError(
+                "Unsupported Sony image format {!r}; expected one of {}".format(
+                    image_format, SONY_IMAGE_FORMAT_CHOICES
+                )
+            )
+
+        if image_format == SONY_IMAGE_FORMAT_CAMERA_SETTING:
+            self._logger.info(
+                "Camera %s image format left unchanged", self._cameraID
+            )
+            return
+
+        file_type = SONY_IMAGE_FORMAT_FILE_TYPES[image_format]
+        if not self._sonyCamera.setCameraFileSaveType(file_type, self._cameraID):
+            raise RuntimeError(
+                "Failed to set camera {} image format to {}".format(
+                    self._cameraID, image_format
+                )
+            )
+        self._logger.info(
+            "Camera %s image format set to %s", self._cameraID, image_format
+        )
 
     def is_cam_image_fresh(self):
         """Check if the camera image is new."""
@@ -332,7 +364,7 @@ class sonySDKcam():
             # check if thread is done
             if stop_capture.is_set() and stopTriggerInitiated:
                 if self._downLoadedCount + self._num_images_failed >= self._triggers or copyWaitTimeout <=0:
-                    # All the triggered images were downloaded by the sony SDK, it downloads a RAW and JPG image for every image taken
+                    # All triggered images have downloaded.
 
                     if copyWaitTimeout <=0:
                         self._num_images_failed = self._triggers-(self._downLoadedCount+self._num_images_failed)

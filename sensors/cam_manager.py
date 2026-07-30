@@ -156,12 +156,24 @@ class TriCapCamsManager:
                     tricap_cam._camera.calibrate_step = int(self._man_settings['calibrate_step'])
                     self._cameras.append(tricap_cam)
         elif self.use_sony_cam:
-            self._sonySDKInstance = sonyCamera()
-            numCameras = self._sonySDKInstance.getNumCameras()
-            self._sonySDKCamCaptureLock = threading.Lock()
-            for i in range(1,numCameras+1):
-                tricap_cam = CameraSony(SONY_TEMPFS_MOUNT_POINT,self._sonySDKInstance,i, self._sonySDKCamCaptureLock)
-                self._cameras.append(tricap_cam)
+            try:
+                self._sonySDKInstance = sonyCamera()
+                numCameras = self._sonySDKInstance.getNumCameras()
+                self._sonySDKCamCaptureLock = threading.Lock()
+                for i in range(1, numCameras + 1):
+                    try:
+                        tricap_cam = CameraSony(
+                            SONY_TEMPFS_MOUNT_POINT, self._sonySDKInstance, i,
+                            self._sonySDKCamCaptureLock)
+                        self._cameras.append(tricap_cam)
+                    except Exception as exc:
+                        self._logger.warning(
+                            'Camera %s could not be initialised; continuing without it: %s',
+                            i, exc, exc_info=True)
+            except Exception as exc:
+                self._logger.warning(
+                    'Sony camera subsystem is unavailable; continuing with no cameras: %s',
+                    exc, exc_info=True)
         else:
             for name, address in Camera.autodetect():
                 self._logger.info('Detected camera %s at address %s ' % (name, address))
@@ -233,6 +245,11 @@ class TriCapCamsManager:
                 self.state = CAM_MANAGER_STATES.ERROR_NO_CAMS
                 self._logger.debug('Tried to start capture threads with no cameras connected.')
             elif self.state == CAM_MANAGER_STATES.STOPPED:
+                try:
+                    if getattr(self, 'altimeter', None) is not None:
+                        self.altimeter.start_measuring()
+                except Exception as e:
+                    self._logger.warning(f"Cam manager - altimeter start failed: {e}")
                 if self.use_sony_cam:
                     for cam in self._cameras:
                         cam._image_count = 0
@@ -321,6 +338,11 @@ class TriCapCamsManager:
                 self._logger.debug('Cam manager - capture threads started.')
 
     def stop_capturing(self):
+        try:
+            if getattr(self, 'altimeter', None) is not None:
+                self.altimeter.stop_measuring()
+        except Exception as e:
+            self._logger.warning(f"Cam manager - altimeter stop failed: {e}")
         if self.state == CAM_MANAGER_STATES.STARTED:
             self._stop_capture.set()
 
@@ -418,6 +440,13 @@ class TriCapCamsManager:
             self._shutdownEnabled = True
             self._shutdownStartTime = datetime.now()
             self.state = CAM_MANAGER_STATES.STOPPED
+
+            # A successful trigger leaves each camera in CAPTURING. Once all
+            # capture/save threads have finished, return successful cameras to
+            # their ready state without masking a genuine error state.
+            for cam in self._cameras:
+                if cam.state.name == 'CAPTURING':
+                    cam.state = type(cam.state).INITIALISED
 
         # if self.state == CAM_MANAGER_STATES.STOPPED and self._shutdownEnabled:
         #     if (datetime.now() - self._shutdownStartTime).total_seconds() > 9000:

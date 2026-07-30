@@ -96,8 +96,14 @@ class SerialProcess():
         msg.msgType = pb.Message.MessageType.IP_ADDRESS
         _ip = pb.IpAddress()
         try:
-            ni.ifaddresses('wlan0')
-            ip = ni.ifaddresses('wlan0')[ni.AF_INET][0]['addr']
+            _dev = subprocess.check_output(["nmcli", "-t", "-f", "DEVICE,TYPE,STATE", "device"], text=True)
+            _iface = "wlan0"
+            for _line in _dev.split("\n"):
+                _p = _line.split(":")
+                if len(_p) >= 3 and _p[1] == "wifi" and _p[2] == "connected":
+                    _iface = _p[0]
+                    break
+            ip = ni.ifaddresses(_iface)[ni.AF_INET][0]['addr']
             print(ip)
             _ip.ip = ip
         except:

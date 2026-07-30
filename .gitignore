@@ -1,4 +1,5 @@
 # Folders
+/deploy-backups
 /notes
 /downloads
 /tmp
@@ -30,6 +31,8 @@ node_modules
 *.log
 *.log.*
 *.bak
+*.bak-*
+*.pre-*
 *.swp
 *.save
 *.tags

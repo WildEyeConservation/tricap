@@ -1,0 +1,62 @@
+"""Build a stable, JSON-friendly view of optional rig component health."""
+
+
+def _entry(connected, message, **extra):
+    value = {
+        'connected': bool(connected),
+        'state': 'connected' if connected else 'not_connected',
+        'message': message,
+    }
+    value.update(extra)
+    return value
+
+
+def component_health(camera_manager, gps, altimeter, imu, storage_mounted):
+    """Return component availability without probing or changing hardware."""
+    try:
+        camera_count = len(camera_manager.get_cameras_as_list() or [])
+    except Exception:
+        camera_count = 0
+
+    gps_connected = bool(getattr(gps, 'isConnected', False))
+    gps_fix = False
+    try:
+        gps_fix = bool(gps.hasGps())
+    except Exception:
+        pass
+
+    altimeter_connected = bool(getattr(altimeter, 'available', False))
+    imu_connected = getattr(imu, '_BerryIMUversion', 99) != 99
+
+    configured_altimeter = getattr(altimeter, 'configured_type', 'altimeter')
+    if configured_altimeter == 'grf500':
+        altimeter_name = 'GRF-500 altimeter'
+    elif configured_altimeter == 'dummy':
+        altimeter_name = 'Simulated altimeter'
+    else:
+        altimeter_name = 'Altimeter'
+
+    return {
+        'cameras': _entry(
+            camera_count > 0,
+            (f'{camera_count} camera' + ('' if camera_count == 1 else 's') + ' connected.')
+            if camera_count else 'No cameras connected. Capture is unavailable.',
+            count=camera_count),
+        'gps': _entry(
+            gps_connected,
+            ('GPS connected with a position fix.' if gps_fix else 'GPS connected; waiting for a position fix.')
+            if gps_connected else 'GPS is not connected. Capture can continue without location data.',
+            fix=gps_fix),
+        'altimeter': _entry(
+            altimeter_connected,
+            f'{altimeter_name} connected.' if altimeter_connected
+            else f'{altimeter_name} is not connected. Capture can continue without altitude data.'),
+        'imu': _entry(
+            imu_connected,
+            'IMU connected.' if imu_connected
+            else 'IMU is not connected. Capture can continue without motion data.'),
+        'storage': _entry(
+            storage_mounted,
+            'Internal storage mounted.' if storage_mounted
+            else 'Internal storage is not mounted. Check storage before capturing.'),
+    }

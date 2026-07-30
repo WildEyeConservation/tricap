@@ -1,166 +1,44 @@
 {% extends "base.html" %}
+{% block body_attrs %}data-page="setup"{% endblock %}
 {% block content %}
-
 {% from "settings/_macros.html" import render_errors, render_field %}
+  <div class="view-title"><h1>Setup</h1><div class="timestamp" id="setup-updated">Live rig controls</div></div>
+  <section id="setup" class="setup-grid" aria-label="Setup page">
+    <section class="card interval-card">
+      <div class="interval-head"><h2>Capture interval</h2><div class="interval-value"><span id="capture-interval-value">--</span> s</div></div>
+      <div class="interval-controls"><button class="button interval-minus-large" data-interval-delta="-0.5">-0.5</button><button class="button interval-minus-small" data-interval-delta="-0.1">-0.1</button><button class="button interval-plus-small" data-interval-delta="0.1">+0.1</button><button class="button interval-plus-large" data-interval-delta="0.5">+0.5</button></div>
+      <p class="muted action-status" id="interval-status"></p>
+    </section>
 
-<div class='container'>
-    <form action="" method="post" name="add_im_set" class="form-horizontal" id='form' enctype=multipart/form-data>
+    <div class="stack">
+      <section class="card"><h2>Backup to SSD</h2><div class="button-row"><button class="button green" id="backup-start">Start backup</button><button class="button red" id="backup-verify-delete">Verify &amp; delete</button></div><div class="progress-track"><div class="progress-fill" id="backup-progress"></div></div><p class="muted" id="backup-status">idle</p></section>
+      <section class="card"><div class="card-head"><h2>Download images</h2><span class="pill">last copy</span></div><p class="muted">Downloads remain available through the copy session tools.</p></section>
+      <section class="card"><h2>Download logs</h2><div class="button-row"><button class="button" data-download-url="/api/download_logs">Main</button><button class="button" data-download-url="/api/download_imu_logs">IMU</button><button class="button" data-download-url="/api/download_gps_logs">GPS</button></div></section>
+    </div>
+
+    <div class="stack">
+      <section class="card">
+        <div class="card-head"><h2>Sensor check</h2><span class="pill" id="sensor-pill">--</span></div>
+        <div class="metric-grid"><div class="metric"><div class="label">Wi-Fi</div><strong id="setup-wifi">-- dBm</strong></div><div class="metric"><div class="label">Satellites</div><strong id="setup-satellites">--</strong></div><div class="metric"><div class="label">PDOP</div><strong id="setup-pdop">--</strong></div><div class="metric"><div class="label">GPS age</div><strong id="setup-gps-age">--</strong></div><div class="metric"><div class="label">SNR min</div><strong id="setup-snr-min">--</strong></div><div class="metric"><div class="label">SNR avg</div><strong id="setup-snr-avg">--</strong></div><div class="metric"><div class="label">SNR max</div><strong id="setup-snr-max">--</strong></div><div class="metric"><div class="label">Lens</div><strong id="setup-lens">--</strong></div></div>
+      </section>
+      <section class="card"><h2>Restart</h2><div class="button-row"><button class="button" id="restart-tricap">Tricap service</button><button class="button red" id="reboot-device">Reboot device</button></div><p class="muted" id="restart-status">Tricap service restarts capture only. Reboot device power-cycles the whole rig.</p></section>
+      <section class="card"><div class="card-head"><h2>NetBird remote access</h2><span class="pill" id="netbird-pill">--</span></div><div class="input-row"><input value="" placeholder="Setup key" aria-label="Setup key" id="netbird-key"><button class="button" id="netbird-set-key">Set key</button></div><div class="button-row"><button class="button" id="netbird-connect">Connect</button><button class="button" id="netbird-disconnect">Disconnect</button></div><p class="muted" id="netbird-status">Checking status.</p></section>
+    </div>
+
+    {% if form %}
+    <details class="card advanced-settings">
+      <summary>Advanced settings</summary>
+      <form action="" method="post" name="add_im_set" class="form-horizontal" id="form" enctype="multipart/form-data">
         {{form.hidden_tag()}}
-
-        <div class="row lead">
-            <div class="col-md-12">
-                <h2>Camera Settings</h2>
-            </div>
-        </div>
-
-        {% for string_setting in form.cam_strings %}
-            <div class="row lead">
-                <div class="col-md-12">
-                    {{string_setting.label}}
-                    {{string_setting(class='form-control',
-                                     id=string_setting.id+'_'+string_setting.label)}}
-                    {{render_errors(string_setting)}}
-                </div>
-            </div>
-        {% endfor %}
-
-        {% for select_setting in form.cam_selects %}
-            <div class="row lead">
-                <div class="col-md-12">
-                    {{select_setting.label}}
-                    {{select_setting(class='form-control',
-                                     id=select_setting.id+'_'+select_setting.label)}}
-                    {{render_errors(select_setting)}}
-                </div>
-            </div>
-        {% endfor %}
-
-        <div class="row lead">
-            <div class="col-md-12">
-                <h2>Altimeter Settings</h2>
-            </div>
-        </div>
-
-        {% for string_setting in form.alti_strings %}
-            <div class="row lead">
-                <div class="col-md-12">
-                    {{string_setting.label}}
-                    {{string_setting(class='form-control',
-                                     id=string_setting.id+'_'+string_setting.label)}}
-                    {{render_errors(string_setting)}}
-                </div>
-            </div>
-        {% endfor %}
-
-        {% for select_setting in form.alti_selects %}
-            <div class="row lead">
-                <div class="col-md-12">
-                    {{select_setting.label}}
-                    {{select_setting(class='form-control',
-                                     id=select_setting.id+'_'+select_setting.label)}}
-                    {{render_errors(select_setting)}}
-                </div>
-            </div>
-        {% endfor %}
-
-        <div class="row lead">
-            <div class="col-md-12">
-                <h2>Miscellaneous Settings</h2>
-            </div>
-        </div>
-
-        {% for string_setting in form.misc_strings %}
-            <div class="row lead">
-                <div class="col-md-12">
-                    {{string_setting.label}}
-                    {{string_setting(class='form-control',
-                                     id=string_setting.id+'_'+string_setting.label)}}
-                    {{render_errors(string_setting)}}
-                </div>
-            </div>
-        {% endfor %}
-
-        {% for select_setting in form.misc_selects %}
-            <div class="row lead">
-                <div class="col-md-12">
-                    {{select_setting.label}}
-                    {{select_setting(class='form-control',
-                                     id=select_setting.id+'_'+select_setting.label)}}
-                    {{render_errors(select_setting)}}
-                </div>
-            </div>
-        {% endfor %}
-
-        <div class="row lead">
-            <div class="col-md-12">
-                <h2>Web Settings</h2>
-            </div>
-        </div>
-
-        {% for string_setting in form.web_strings %}
-            <div class="row lead">
-                <div class="col-md-12">
-                    {{string_setting.label}}
-                    {{string_setting(class='form-control',
-                                     id=string_setting.id+'_'+string_setting.label)}}
-                    {{render_errors(string_setting)}}
-                </div>
-            </div>
-        {% endfor %}
-
-        {% for select_setting in form.web_selects %}
-            <div class="row lead">
-                <div class="col-md-12">
-                    {{select_setting.label}}
-                    {{select_setting(class='form-control',
-                                     id=select_setting.id+'_'+select_setting.label)}}
-                    {{render_errors(select_setting)}}
-                </div>
-            </div>
-        {% endfor %}
-
-        <div class="row lead">
-            <div class="col-md-12">
-                <h2>SMS Settings</h2>
-            </div>
-        </div>
-
-        {% for string_setting in form.sms_strings %}
-            <div class="row lead">
-                <div class="col-md-12">
-                    {{string_setting.label}}
-                    {{string_setting(class='form-control',
-                                     id=string_setting.id+'_'+string_setting.label)}}
-                    {{render_errors(string_setting)}}
-                </div>
-            </div>
-        {% endfor %}
-
-        {% for select_setting in form.sms_selects %}
-            <div class="row lead">
-                <div class="col-md-12">
-                    {{select_setting.label}}
-                    {{select_setting(class='form-control',
-                                     id=select_setting.id+'_'+select_setting.label)}}
-                    {{render_errors(select_setting)}}
-                </div>
-            </div>
-        {% endfor %}
-
-        <div class="row lead">
-            <div class="col-md-6">
-                {{ form.save(class='btn btn-block btn-primary btn-lg', id='btn_save') }}
-            </div>
-            <div class="col-md-6">
-                {{ form.revert(class='btn btn-block btn-danger btn-lg', id='btn_revert') }}
-            </div>
-        </div>
-
-    </form>
-</div>
-
-<script type="text/javascript">
-  window.get_form = function(){return $("form").serialize();}
-</script>
-
+        <div class="form-section"><h2>Camera Settings</h2><div class="form-grid">{% for string_setting in form.cam_strings %}<div class="form-field">{{string_setting.label}}{{string_setting(class='form-control', id=string_setting.id+'_'+string_setting.label)}}{{render_errors(string_setting)}}</div>{% endfor %}{% for select_setting in form.cam_selects %}<div class="form-field">{{select_setting.label}}{{select_setting(class='form-control', id=select_setting.id+'_'+select_setting.label)}}{{render_errors(select_setting)}}</div>{% endfor %}</div></div>
+        <div class="form-section"><h2>Altimeter Settings</h2><div class="form-grid">{% for string_setting in form.alti_strings %}<div class="form-field">{{string_setting.label}}{{string_setting(class='form-control', id=string_setting.id+'_'+string_setting.label)}}{{render_errors(string_setting)}}</div>{% endfor %}{% for select_setting in form.alti_selects %}<div class="form-field">{{select_setting.label}}{{select_setting(class='form-control', id=select_setting.id+'_'+select_setting.label)}}{{render_errors(select_setting)}}</div>{% endfor %}</div></div>
+        <div class="form-section"><h2>Miscellaneous Settings</h2><div class="form-grid">{% for string_setting in form.misc_strings %}<div class="form-field">{{string_setting.label}}{{string_setting(class='form-control', id=string_setting.id+'_'+string_setting.label)}}{{render_errors(string_setting)}}</div>{% endfor %}{% for select_setting in form.misc_selects %}<div class="form-field">{{select_setting.label}}{{select_setting(class='form-control', id=select_setting.id+'_'+select_setting.label)}}{{render_errors(select_setting)}}</div>{% endfor %}</div></div>
+        <div class="form-section"><h2>Web Settings</h2><div class="form-grid">{% for string_setting in form.web_strings %}<div class="form-field">{{string_setting.label}}{{string_setting(class='form-control', id=string_setting.id+'_'+string_setting.label)}}{{render_errors(string_setting)}}</div>{% endfor %}{% for select_setting in form.web_selects %}<div class="form-field">{{select_setting.label}}{{select_setting(class='form-control', id=select_setting.id+'_'+select_setting.label)}}{{render_errors(select_setting)}}</div>{% endfor %}</div></div>
+        <div class="form-section"><h2>SMS Settings</h2><div class="form-grid">{% for string_setting in form.sms_strings %}<div class="form-field">{{string_setting.label}}{{string_setting(class='form-control', id=string_setting.id+'_'+string_setting.label)}}{{render_errors(string_setting)}}</div>{% endfor %}{% for select_setting in form.sms_selects %}<div class="form-field">{{select_setting.label}}{{select_setting(class='form-control', id=select_setting.id+'_'+select_setting.label)}}{{render_errors(select_setting)}}</div>{% endfor %}</div></div>
+        <div class="button-row">{{ form.save(class='button green', id='btn_save') }}{{ form.revert(class='button red', id='btn_revert') }}</div>
+      </form>
+    </details>
+    {% endif %}
+  </section>
+  <script type="text/javascript">window.get_form = function(){return $("form").serialize();}</script>
 {% endblock %}

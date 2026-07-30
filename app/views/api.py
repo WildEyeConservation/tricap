@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from flask import Blueprint, Response, request, jsonify, abort, send_file
-from app import tricap_manager, gps_ser
+from app import tricap_manager, gps_ser, altimeter, accel_ser
 import base64, logging, cv2
 import numpy as np
 from random import randint
@@ -13,10 +13,22 @@ from support.configure import TricapConfig
 import subprocess, csv
 from pathlib import Path
 from support.backup import manager as backupManager
+from support.component_health import component_health
 import time, shutil, threading, re, io
 
 api_bp = Blueprint('api', __name__)
 _logger = logging.getLogger(__name__)
+_FORCE_DELETE_CONFIRMATION = 'delete-unbacked-internal-data'
+_force_delete_lock = threading.Lock()
+_force_delete_status = {
+  'running': False,
+  'phase': 'idle',
+  'success': False,
+  'completed': 0,
+  'total': 0,
+  'message': 'Idle',
+  'errors': [],
+}
 
 @api_bp.route('/api')
 def api():
@@ -45,19 +57,48 @@ def status():
   gps['avg'] = gps_ser.snr_avg if gps_ser.snr_avg is not None else 0
   gps['lastUpdate'] = (datetime.now() - gps_ser.pdopLastUpdate).total_seconds() if gps_ser.pdopLastUpdate is not None else -1
   ret['gps'] = gps
+  live_height = altimeter.measurement
+  ret['altimeter'] = {
+      # Height remains the backwards-compatible dashboard field and now
+      # intentionally represents the last/farthest reflection.
+      'height': live_height,
+      'firstReturn': getattr(altimeter, 'first_return', live_height),
+      'lastReturn': getattr(altimeter, 'last_return', live_height),
+      'firstStrength': getattr(altimeter, 'first_strength',
+                               getattr(altimeter, 'strength', 0)),
+      'lastStrength': getattr(altimeter, 'last_strength',
+                              getattr(altimeter, 'strength', 0)),
+      'state': altimeter.get_state_as_string(),
+      'unit': getattr(altimeter, 'unit', 'm'),
+      'error': str(altimeter.get_error() or ''),
+  }
 
   wifiSignal = 0
   try:
-    result = subprocess.check_output(
-      ["iw", "dev", "wlx5c628bcde76d", "link"], text=True
-    )
-    for line in result.split("\n"):
-      if "signal" in line:
-        wifiSignal = int(line.split()[1])  # dBm value
+    # Detect an upstream Wi-Fi station link. The USB radio serves the rescue AP
+    # outside NetworkManager, while the onboard Broadcom radio may join the
+    # phone recovery hotspot. Query every connected station and use the one
+    # which actually reports a signal.
+    _dev = subprocess.check_output(["nmcli", "-t", "-f", "DEVICE,TYPE,STATE", "device"], text=True)
+    for _line in _dev.split("\n"):
+      _p = _line.split(":")
+      if len(_p) >= 3 and _p[1] == "wifi" and _p[2] == "connected":
+        try:
+          result = subprocess.check_output(["/usr/sbin/iw", "dev", _p[0], "link"], text=True)
+        except Exception:
+          continue
+        if "signal:" in result:
+          for line in result.split("\n"):
+            if "signal:" in line:
+              wifiSignal = int(line.split()[1])  # dBm value
+          break
   except Exception as e:
       print("Error:", e)
 
   ret['wifiSignal'] = wifiSignal
+  ret['components'] = component_health(
+      tricap_manager, gps_ser, altimeter, accel_ser,
+      os.path.ismount(MOUNT_POINT))
   # _logger.debug(f"Status {ret}")
 
   return ret
@@ -384,6 +425,10 @@ def start():
   _logger.debug("Start req {}".format(tricap_manager.state))
   if tricap_manager.state == CAM_MANAGER_STATES.STARTED:
     return jsonify({'msg': 'Already started'}), 400
+  if not tricap_manager.get_cameras_as_list():
+    return jsonify({
+        'msg': 'No cameras connected. Connect at least one camera to start capture.'
+    }), 409
   
   tricap_manager.start_capturing()
   ret = {}
@@ -453,38 +498,65 @@ def verify_and_delete():
   if tricap_manager.state in (CAM_MANAGER_STATES.STARTED, CAM_MANAGER_STATES.COPYING):
     return jsonify({'msg': 'Not allowed in started or copying state'}), 400
 
-  ret = {}
+  current = backupManager.verify_delete_status()
+  if current.get("running"):
+    return jsonify({'success': True, 'started': False, 'msg': 'Verification is already running'})
+
   if tricap_manager.mount_ssd():
     src = MOUNT_POINT
     dst = MOUNT_POINT_SSD
-    res= backupManager.verify_and_delete_matched_sampled(src,dst)
-    # res = backupManager.verify_now(src, dst, mode="fast", excludes=["*.csv", "*.bin", "*.json"])
-    _logger.debug(res)
-    if res["success"] and (res["delete"]["deleted"] > 0):
-        _logger.debug("Backup verified. Deleted matched sources.")
-        # delete_dir_async(src)
-        ret['success'] = True
-    else:
-        _logger.debug("Verify and delete failed.")
-        ret['success'] = False
-    tricap_manager.unmount_disk()
+    res = backupManager.start_verify_and_delete(src, dst)
+    if not res.get("success"):
+      tricap_manager.unmount_disk()
+      return jsonify(res), 409
+    return jsonify(res), 202
+  elif not os.path.exists("/dev/sda1") and not os.path.ismount(MOUNT_POINT_SSD):
+    return jsonify({
+      'code': 'external_not_connected',
+      'msg': 'No external SSD is connected',
+    }), 409
   else:
-    return jsonify({'msg': 'Failed to mount external disk'}), 400
+    return jsonify({
+      'code': 'external_mount_failed',
+      'msg': 'The external SSD could not be mounted',
+    }), 409
 
-  return ret
+@api_bp.route('/api/verify_and_delete_status')
+def verify_and_delete_status():
+  return jsonify(backupManager.verify_delete_status())
 
-@api_bp.route('/api/force_delete')
+@api_bp.route('/api/force_delete', methods=['POST'])
 def force_delete():
   _logger.debug("force_delete {}".format(tricap_manager.state))
   if tricap_manager.state in (CAM_MANAGER_STATES.STARTED, CAM_MANAGER_STATES.COPYING):
     return jsonify({'msg': 'Not allowed in started or copying state'}), 400
 
-  ret = {}
-  src = MOUNT_POINT
-  delete_dir_async(src)
-  ret['success'] = True
+  if (backupManager.status() or {}).get('running'):
+    return jsonify({'msg': 'Not allowed while a backup is running'}), 409
+  if backupManager.verify_delete_status().get('running'):
+    return jsonify({'msg': 'Not allowed while verification is running'}), 409
 
-  return ret
+  payload = request.get_json(silent=True) or {}
+  if payload.get('confirmation') != _FORCE_DELETE_CONFIRMATION:
+    return jsonify({
+      'code': 'confirmation_required',
+      'msg': 'Explicit confirmation is required to delete unbacked-up data',
+    }), 400
+
+  if not os.path.ismount(MOUNT_POINT):
+    return jsonify({
+      'code': 'internal_not_mounted',
+      'msg': 'Internal storage is not mounted; nothing was deleted',
+    }), 409
+
+  res = delete_dir_async(MOUNT_POINT)
+  return jsonify(res), (202 if res.get('success') else 409)
+
+
+@api_bp.route('/api/force_delete_status')
+def force_delete_status():
+  with _force_delete_lock:
+    return jsonify(dict(_force_delete_status))
 
 @api_bp.route('/api/backup_start', methods = ['GET'])
 def backup_start():
@@ -495,7 +567,7 @@ def backup_start():
   if tricap_manager.mount_ssd():
     src = MOUNT_POINT
     dst = MOUNT_POINT_SSD
-    res = backupManager.start(src, dst)
+    res = backupManager.start(src, dst, tag_gps=False)
 
     plan = {}
     if (not res.get("success")) and res.get("msg") and res.get("msg") == "Insufficient space" :
@@ -506,7 +578,7 @@ def backup_start():
             margin_bytes=256 * 1024 * 1024
         )
 
-        res = backupManager.start(src, dst, files_from=plan["files_from"])
+        res = backupManager.start(src, dst, files_from=plan["files_from"], tag_gps=False)
         return jsonify(res)
     else:
       return jsonify(res)
@@ -543,7 +615,19 @@ def backup_status():
       "files_done": int(st.get("files_done") or 0),
       "files_total": int(st.get("total_files") or 0),
       "eta_seconds": 0 if eta is None else float(eta),
-      # current file name isn't parsed from rsync; snapshot doesn't need it
+      "current_file": st.get("current_file") or "",
+      "gps_tagged": int(st.get("gps_tagged") or 0),
+      "gps_interpolated": int(st.get("gps_interpolated") or 0),
+      "gps_nearest": int(st.get("gps_nearest") or 0),
+      "gps_unresolved": int(st.get("gps_unresolved") or 0),
+      "gps_failed": int(st.get("gps_failed") or 0),
+      "tag_gps": bool(st.get("tag_gps")),
+      "planned_bytes": int(st.get("planned_bytes") or 0),
+      "planned_files": int(st.get("planned_files") or 0),
+      "elapsed_seconds": float(st.get("elapsed_seconds") or 0),
+      "copy_seconds": float(st.get("copy_seconds") or 0),
+      "tag_seconds": float(st.get("tag_seconds") or 0),
+      "throughput_mib_s": float(st.get("throughput_mib_s") or 0),
   }
 
 @api_bp.route('/api/netbird_key', methods=['POST'])
@@ -973,19 +1057,89 @@ def _external_disk_info():
     
     return info
 
+def _run_delete_dir_contents(root: Path) -> None:
+    errors = []
+    try:
+        # lost+found belongs to the ext4 filesystem rather than to a flight.
+        entries = [p for p in root.iterdir() if p.name != 'lost+found']
+        with _force_delete_lock:
+            _force_delete_status.update(
+                total=len(entries),
+                completed=0,
+                message='Deleting all data from internal storage...',
+            )
+
+        for completed, entry in enumerate(entries, start=1):
+            try:
+                if entry.is_symlink() or entry.is_file():
+                    entry.unlink()
+                elif entry.is_dir():
+                    shutil.rmtree(entry)
+                else:
+                    entry.unlink()
+            except Exception as exc:
+                errors.append(f'{entry.name}: {exc}')
+                _logger.exception('Failed to delete %s from internal storage', entry)
+            finally:
+                with _force_delete_lock:
+                    _force_delete_status['completed'] = completed
+
+        with _force_delete_lock:
+            _force_delete_status.update(
+                running=False,
+                phase='finished' if not errors else 'error',
+                success=not errors,
+                message=(
+                    'Internal storage cleared.'
+                    if not errors
+                    else 'Internal storage could not be completely cleared.'
+                ),
+                errors=errors[:50],
+            )
+    except Exception as exc:
+        _logger.exception('Failed to clear internal storage')
+        with _force_delete_lock:
+            _force_delete_status.update(
+                running=False,
+                phase='error',
+                success=False,
+                message=f'Internal storage could not be cleared: {exc}',
+                errors=[str(exc)],
+            )
+
+
 def delete_dir_async(path: str) -> dict:
-    cmd = ['rm', '-rf', '--', path]
+    root = Path(path).resolve()
+    expected_root = Path(MOUNT_POINT).resolve()
+    if root != expected_root or not os.path.ismount(root):
+        return {
+            'success': False,
+            'msg': 'Internal storage is not safely mounted; nothing was deleted',
+        }
 
-    # Spawn and return immediately
-    proc = subprocess.Popen(
-        cmd,
-        stdin=subprocess.DEVNULL,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-        start_new_session=True,   # detach from your API handler's process group
-        close_fds=True,
-        text=False,
-    )
+    with _force_delete_lock:
+        if _force_delete_status.get('running'):
+            return {
+                'success': False,
+                'msg': 'Internal storage deletion is already running',
+            }
+        _force_delete_status.update(
+            running=True,
+            phase='deleting',
+            success=False,
+            completed=0,
+            total=0,
+            message='Preparing to clear internal storage...',
+            errors=[],
+        )
 
-    # Reap the child in background to avoid a zombie
-    threading.Thread(target=proc.wait, daemon=True).start()
+    threading.Thread(
+        target=_run_delete_dir_contents,
+        args=(root,),
+        daemon=True,
+    ).start()
+    return {
+        'success': True,
+        'started': True,
+        'msg': 'Internal storage deletion started',
+    }

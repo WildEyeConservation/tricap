@@ -67,7 +67,8 @@ class LinuxNetworkMonitor(NetworkMonitor):
 
         try:
             if self.network_name is not None:
-                with os.popen('iwconfig wlan0 | grep "Link Quality" ') as cmd_output:
+                _iface = os.popen("iwgetid | awk '{print $1}'").read().strip() or 'wlan0'
+                with os.popen('iwconfig %s | grep "Link Quality" ' % _iface) as cmd_output:
                     ss = cmd_output.readline().split('Signal level')[0].split('=')[1].strip()
                     self.signal_strength = str(float(ss.split('/')[0])/float(ss.split('/')[1])*100)+'%'
                 self.status = 'connected'

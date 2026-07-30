@@ -13,6 +13,7 @@ from flask import Flask
 
 from sensors.cam_manager import TriCapCamsManager
 from sensors.trusense_altimeter import TrusenseAltimeter
+from sensors.unavailable_altimeter import UnavailableAltimeter
 #from sensors.dummy_alti import DummyAlti
 from sensors.alti_simulator import SimulatorAlti
 from sensors.camera_logger import cameraLoggingObserver
@@ -50,7 +51,53 @@ class AltiMeasurementObserver():
 
     def update(self, alti):
         """Update."""
-        self.session_logger.log('Alti Measurement: %f' % alti.measurement)
+        if alti.measurement is not None:
+            self.session_logger.log('Alti Measurement: %f' % alti.measurement)
+
+
+class AltitudeLogObserver():
+    """Log available altitude readings beside the GPS data."""
+    _logger = logging.getLogger(__name__)
+
+    def update(self, alti):
+        legacy_strength = getattr(alti, 'strength', 0)
+        first_return = getattr(alti, 'first_return', alti.measurement)
+        last_return = getattr(alti, 'last_return', alti.measurement)
+        first_strength = getattr(alti, 'first_strength', legacy_strength)
+        last_strength = getattr(alti, 'last_strength', legacy_strength)
+        if first_return is None and last_return is None:
+            return
+        try:
+            from datetime import datetime
+            from config import MOUNT_POINT
+            now = datetime.now()
+            day = now.strftime('%Y_%m_%d')
+            if os.path.ismount(MOUNT_POINT):
+                log_dir = os.path.join(MOUNT_POINT, day)
+            else:
+                log_dir = os.path.join('/home/radxa/GPS_IMU_Data', day)
+            if not os.path.isdir(log_dir):
+                os.makedirs(log_dir)
+            dest = os.path.join(log_dir, 'altitudeData.csv')
+            new_file = not os.path.exists(dest)
+            with open(dest, 'ta') as f:
+                if new_file:
+                    f.write('pi_timestamp,altitude_m,strength_db,'
+                            'first_return_m,last_return_m,'
+                            'first_strength_db,last_strength_db\n')
+                values = (
+                    now.timestamp(),
+                    last_return,
+                    last_strength,
+                    first_return,
+                    last_return,
+                    first_strength,
+                    last_strength,
+                )
+                f.write(','.join('' if value is None else str(value)
+                                 for value in values) + '\n')
+        except Exception as e:
+            self._logger.debug(f"altitude log failed: {e}")
 
 
 class AltitudeMonitor(PeriodicMonitor):
@@ -177,7 +224,11 @@ else:
 use_gpio_cams = False
 use_sony_cam = True
 
-subprocess.check_call(['/home/radxa/tricap/wifi_setup.sh', "ESS-ops", "dumbo2017"])
+try:
+    subprocess.check_call(['/home/radxa/tricap/wifi_setup.sh', "ESS-ops", "dumbo2017"])
+except Exception as exc:
+    # Standalone/AP operation must remain available without an uplink network.
+    rootlogger.warning('Wi-Fi uplink setup failed; continuing in standalone mode: %s', exc)
 
 imu_lock = Lock()
 
@@ -186,7 +237,7 @@ tricap_cameras = tricap_manager.get_cameras_as_list()
 tricap_length = len(tricap_cameras)
 camera_loggers = []
 
-gps_ser = SerialInterface('/dev/ttyACM0', 921600, False, False, imu_lock, tricap_manager)
+gps_ser = SerialInterface('/dev/gps', 921600, False, False, imu_lock, tricap_manager)
 accel_ser = BerryImu(imu_lock)
 
 for index, cam in enumerate(tricap_cameras):
@@ -207,13 +258,23 @@ alti_settings = init_config.get_section_dict(TricapConfig.ALTI_SECTION_HEADER)
 web_settings = init_config.get_section_dict(TricapConfig.WEB_SECTION_HEADER)
 
 alti_choice_str = init_config.get('alti_required', TricapConfig.WEB_SECTION_HEADER)
-if alti_choice_str == 'dummy':
-    rootlogger.debug('Using a dummy altimeter.')
-    altimeter = SimulatorAlti(alti_settings)  # DummyAlti(alti_settings)
-    alti_sim = SimulatorAlti(alti_settings)
-else:
-    rootlogger.debug('Using a real altimeter.')
-    altimeter = TrusenseAltimeter(alti_settings)
+try:
+    if alti_choice_str == 'dummy':
+        rootlogger.debug('Using a dummy altimeter.')
+        altimeter = SimulatorAlti(alti_settings)  # DummyAlti(alti_settings)
+    elif alti_choice_str == 'grf500':
+        rootlogger.debug('Using a GRF-500 altimeter.')
+        from sensors.grf500_altimeter import Grf500Altimeter
+        altimeter = Grf500Altimeter(alti_settings)
+    else:
+        rootlogger.debug('Using a real altimeter.')
+        altimeter = TrusenseAltimeter(alti_settings)
+    altimeter.available = True
+except Exception as exc:
+    rootlogger.warning(
+        'Configured altimeter %s is unavailable; continuing without altitude data: %s',
+        alti_choice_str, exc, exc_info=True)
+    altimeter = UnavailableAltimeter(alti_choice_str, exc)
 
 # altimeter_switch = AltiSwitch(altimeter, cam_manager=tricap_manager)
 # altimeter.attach(altimeter_switch)
@@ -255,6 +316,11 @@ log_names_to_track += [cam_log._logger.name for cam_log in camera_loggers]
 session_logger = SessionLogger(log_names_to_track=log_names_to_track)
 alti_observer = AltiMeasurementObserver(session_logger)
 altimeter.attach(alti_observer)
+altimeter.attach(AltitudeLogObserver())
+
+# Capture controls measurement when an altimeter is present. The unavailable
+# placeholder implements the same no-op interface, so capture remains usable.
+tricap_manager.altimeter = altimeter
 
 # setup a time monitor and the sms sender
 time_mon = TimeMonitor(5*60)  # will emit the time every 5 minutes as primary observer

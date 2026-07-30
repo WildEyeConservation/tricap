@@ -1,175 +1,70 @@
 {% extends "base.html" %}
+{% block body_attrs %}data-page="home"{% endblock %}
 {% block content %}
+  <div id="modal_session_description" class="modal fade" role="dialog">
+    <div class="modal-dialog"><div class="modal-content"><div class="modal-header"><button type="button" class="close" data-dismiss="modal">&times;</button><h3 class="modal-title">Session Description</h3></div><div class="modal-body"><form class="form-horizontal"><div class="form-group"><div class="col-md-12"><input id="input_modal_session_description" type="text" class="form-control"></div></div><div class="form-group"><div class="col-md-6"><button id="btn_modal_session_description_submit" type="submit" class="btn btn-info" data-dismiss="modal">Submit</button><button type="reset" class="btn btn-default" data-dismiss="modal">Cancel</button></div></div></form></div></div></div>
+  </div>
+  <div id="modal_logs_download" class="modal fade" role="dialog">
+    <div class="modal-dialog"><div class="modal-content"><div class="modal-header"><button type="button" class="close" data-dismiss="modal">&times;</button><h3 class="modal-title">Downloading Logs</h3></div><div class="modal-body"><h5 id="hDownloadStatus">Sending Request</h5><div class="progress"><div id="progress_logs_download" class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" style="width:0%"></div></div><button type="reset" class="btn btn-default" data-dismiss="modal">Dismiss</button></div></div></div>
+  </div>
 
-    <!-- modal for session description prompt -->
-    <div id="modal_session_description" class="modal fade" role="dialog">
-      <div class="modal-dialog">
-
-        <!-- Modal content-->
-        <div class="modal-content">
-            <div class="modal-header">
-              <button type="button" class="close" data-dismiss="modal">&times;</button>
-              <h3 class="modal-title">Session Description</h3>
-            </div>
-
-            <div class="modal-body">
-                <form class='form-horizontal'>
-                    <div class = "form-group">
-                        <div class="col-md-12">
-                            <input id="input_modal_session_description" type="text" class="form-control">
-                        </div>
-                    </div>
-                    <div class = "form-group">
-                        <div class="col-md-6">
-                            <button id="btn_modal_session_description_submit" type="submit" class="btn btn-info"
-                                data-dismiss="modal">Submit</button>
-                            <button id="btn_modal_session_description_submit" type="reset" class="btn btn-default"
-                                data-dismiss="modal">Cancel</button>
-                        </div>
-                    </div>
-                </form>
-            </div>
-        </div>
-
-      </div>
+  <section id="home">
+    <div class="view-title"><h1>Home</h1><div class="timestamp" id="sky-updated">Live rig status</div></div>
+    <div class="stats" aria-label="Rig summary">
+      <div class="tile" id="alt_main_status"><div class="label">Status</div><div class="value" id="h_main_status">Loading</div></div>
+      <div class="tile"><div class="label">Captured</div><div class="value" id="sky-captured">0</div></div>
+      <div class="tile"><div class="label">Copied</div><div class="value" id="sky-copied">0</div></div>
+      <div class="tile"><div class="label">Wi-Fi</div><div class="value" id="sky-wifi">-- dBm</div></div>
     </div>
 
-    <!-- modal for session description prompt -->
-    <div id="modal_logs_download" class="modal fade" role="dialog">
-      <div class="modal-dialog">
-
-        <!-- Modal content-->
-        <div class="modal-content">
-            <div class="modal-header">
-              <button type="button" class="close" data-dismiss="modal">&times;</button>
-              <h3 class="modal-title">Downloading Logs</h3>
-            </div>
-
-            <div class="modal-body">
-
-							<div class='row'>
-								<div class='col-md-12'>
-									<h5 id='hDownloadStatus'>Sending Request</h5>
-								</div>
-							</div>
-
-							<div class='row'>
-								<div class='col-md-12'>
-									<div class="progress">
-										<div id='progress_logs_download' 
-											class="progress-bar progress-bar-striped progress-bar-animated" 
-											role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" 
-											style="width: 0%">
-										</div>
-									</div>
-								</div>
+    <div class="dashboard-grid">
+      <div class="stack">
+        <div class="capture-panel">
+          <div class="capture-state"><div class="label">Capture</div><div class="state-word"><span class="dot" id="sky-capture-dot"></span><span id="sky-capture-state">Stopped</span></div><p class="muted">Live data from the rig.</p></div>
+          <button class="primary-action" id="btn_startstop_m" name="btn_startstop">Start Manual</button>
+        </div>
+        <section class="card" id="con_cam">
+          <div class="card-head"><h2>Cameras</h2><span class="pill" id="sky-camera-count">{{ num_cams }} cameras</span></div>
+          <div id="alt_cam_overall">
+            {% if num_cams == 0 %}<p class="muted">No cameras detected.</p>{% else %}
+            <div class="camera-grid">
+              {% for cam_num in range(num_cams) %}
+              <div class="camera-preview" id="alt_cam{{cam_num}}">
+                {% if num_cams == 3 %}<div class="label">{{serial_numbers[cam_num]}} camera</div>{% else %}<div class="label">Camera {{cam_num + 1}}</div>{% endif %}
+                <img src="{{url_for('static', filename='img/default.jpg')}}" class="img-responsive" id="img_cam{{cam_num}}" alt="Camera {{cam_num + 1}} preview">
               </div>
-
-							<div class='row'>
-								<div class='col-md-12'>
-									<button id="btn_modal_session_description_submit" type="reset" 
-									 class="btn btn-default" data-dismiss="modal">Dismiss</button>
-								</div>
-							</div>
+              {% endfor %}
             </div>
-        </div>
-
-      </div>
-    </div>
-    <!-- actual webpage -->
-    <div class="section">
-      <div class="container">
-        <div class="alert alert-success" id="alt_msgs">
-          <div class="row">
-            <div class="col-xs-6">
-              <div class="alert alert-info" id="alt_msgs_sys">Error Messages</div>
-            </div>
-            <div class="col-xs-6">
-              <div class="alert alert-info" id="alt_msgs_talkbox">TalkBox
-                  <input class="form-control" id="input_talkbox" type="text">
-              </div>
-            </div>
+            {% endif %}
           </div>
-        </div>
-      </div>
-    </div>
-    <div class="section">
-      <div class="container">
-        <div class="alert alert-tricap-dark-grey">
-          <div class="row">
-            <div class="col-xs-2"></div>
-            <div class="col-xs-8">
-            <div class="btn-group hidden-xs btn-group-lg btn-group-justified">
-                <a href="#" class="btn btn-info btn-lg" style="text-decoration: none" id="btn_startstop_m" name="btn_startstop">Start Manual</a>
-                <a href="#" data-toggle='collapse' data-target='#con_alti' class="btn btn-warning btn-lg" style="text-decoration: none" id="btn_alti_m" name="btn_alti">Altimeter</a>
-                <a href="#" data-toggle='collapse' data-target='#con_cam' class="btn btn-warning btn-lg" style="text-decoration: none" id="btn_cam_m" name="btn_cam">Camera</a>
-            </div>
-            <div class="btn-group-vertical visible-xs">
-                <a href="#" class="btn btn-info btn-lg" style="text-decoration: none" id="btn_startstop_xs" name="btn_startstop">Start Manual</a>
-                <a href="#" data-toggle='collapse' data-target='#con_alti' class="btn btn-warning btn-lg" style="text-decoration: none" id="btn_alti_xs" name="btn_alti">Altimeter</a>
-                <a href="#" data-toggle='collapse' data-target='#con_cam' class="btn btn-warning btn-lg" style="text-decoration: none" id="btn_cam_xs" name="btn_cam">Camera</a>
-            </div>
-              <!-- <div class="btn-group btn-group-lg btn-group-justified">
-                <a href="#" class="btn btn-info" style="text-decoration: none" id="btn_startstop">Start</a>
-                <a href="#" data-toggle='collapse' data-target='#con_alti' class="btn btn-warning" style="text-decoration: none" id="btn_alti">Altimeter</a>
-                <a href="#" data-toggle='collapse' data-target='#con_cam' class="btn btn-warning" style="text-decoration: none" id="btn_cam">Camera</a>
-              </div> -->
-            </div>
-            <div class="col-xs-2"></div>
+        </section>
+        <section class="card">
+          <div class="card-head"><h2>Storage</h2><span class="pill">GB</span></div>
+          <div class="table">
+            <div class="rowline"><span></span><span>Free</span><span>Used</span><span>Capacity</span></div>
+            <div class="rowline"><strong>Internal</strong><span data-label="Free" id="sky-int-free">--</span><span data-label="Used" id="sky-int-used">--</span><span data-label="Capacity" id="sky-int-capacity">--</span></div>
+            <div class="rowline"><strong>External</strong><span data-label="Free" id="sky-ext-free">--</span><span data-label="Used" id="sky-ext-used">--</span><span data-label="Capacity" id="sky-ext-capacity">--</span></div>
           </div>
-        </div>
+        </section>
       </div>
-    </div>
-    <div class="section">
-      {% if alti_start_display == 'closed' %}
-      <div class="container collapse" id="con_alti">
-      {% else %}
-      <div class="container collapse in" id="con_alti">
-      {% endif %}
-        <div class="alert alert-warning" id="alt_alti">
-          <div class="row">
-            <div class="col-xs-6">
-                <div class="alert alert-warning" id="alt_alti_inner">
-                    <h3 class="text-center" id="h_alti">Altitude: Calculating...</h3> <!-- Used to be 120 m -->
-                </div>
-            </div>
-            <div class="col-xs-6">
-              <div class="alert alert-info" id="alt_alti_target">
-                <h3 class="text-center" id="h_alti_target">Target Information</h3>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-    <div class="section">
-      {% if cams_start_display == 'closed' %}
-      <div class="container collapse" id="con_cam">
-      {% else %}
-      <div class="container collapse in" id="con_cam">
-      {% endif %}
-        <div class="alert alert-warning" id="alt_cam_overall">
-          <div class="row">
-            {% for cam_num in range(num_cams) %}
-              <div class="col-xs-{{12//num_cams}}">
-                <div class="alert alert-info" id="alt_cam{{cam_num}}">
-                    {% if num_cams == 3 %}
-                        <h3>{{serial_numbers[cam_num]}} camera</h3>
-                    {% endif %}
-                  <img src="{{url_for('static', filename='img/default.jpg')}}"
-                       class="img-responsive" id="img_cam{{cam_num}}">
-                </div>
-              </div>
-            {% endfor %}
-          </div>
-        </div>
-      </div>
-    </div>
 
-    {% block javascript %}
-        <script type="text/javascript">
-            {% include 'js/home.js' %}
-        </script>
-    {% endblock %}
-
+      <aside class="stack">
+        <section class="card">
+          <div class="card-head"><h2>Device</h2><span class="pill">Refresh</span></div>
+          <div class="metric-grid"><div class="metric"><div class="label">Address</div><strong>control.skyseeker</strong></div><div class="metric"><div class="label">Cameras</div><strong id="sky-device-cameras">{{ num_cams }}</strong></div><div class="metric"><div class="label">GPS</div><strong id="sky-device-gps">No</strong></div></div>
+        </section>
+        <section class="card collapse in" id="con_alti">
+          <div class="card-head"><h2>GPS signal</h2><span class="pill" id="sky-gps-age">no update</span></div>
+          <div id="alt_alti" class="metric-grid"><div class="metric" id="alt_alti_inner"><div class="label">Fix</div><strong id="h_alti">No</strong></div><div class="metric"><div class="label">Satellites</div><strong id="sky-satellites">0</strong></div><div class="metric" id="alt_alti_target"><div class="label">PDOP</div><strong id="h_alti_target">0</strong></div><div class="metric"><div class="label">SNR avg</div><strong id="sky-snr-avg">0</strong></div></div>
+          <a href="#con_alti" class="sky-hook" data-toggle="collapse" id="btn_alti_m" name="btn_alti">Altimeter</a><a href="#con_cam" class="sky-hook" data-toggle="collapse" id="btn_cam_m" name="btn_cam">Camera</a>
+        </section>
+        <section class="card"><h2>Copy progress</h2><p class="muted" id="sky-copy-progress">No active copy reported.</p></section>
+        <section class="card" id="alt_msgs">
+          <div class="card-head"><h2>Messages</h2><span class="pill">live</span></div>
+          <div class="metric-grid"><div class="metric" id="alt_msgs_sys"><div class="label">System</div></div><div class="metric" id="alt_msgs_talkbox"><div class="label">TalkBox</div><input class="form-control" id="input_talkbox" type="text" aria-label="TalkBox"></div></div>
+        </section>
+      </aside>
+    </div>
+  </section>
+  {% block javascript %}<script type="text/javascript">{% include 'js/home.js' %}</script>{% endblock %}
 {% endblock %}

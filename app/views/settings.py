@@ -267,9 +267,12 @@ def revert_to_default_settings(save_to_fp=CONFIG_FP):
     config.save_to_file()
 
 
+@settings_bp.route('/setup', methods=['GET', 'POST'])
 @settings_bp.route('/settings', methods=['GET', 'POST'])
 def settings():
     rootlogger.info('Settings Page Requested.')
+    if request.path == '/setup' and request.method == 'GET':
+        return render_template('/settings/settings.html', form=None)
     if request.method == 'GET':
         # When the user initially opens the page, we need to setup the choices and labels for the
         #  forms

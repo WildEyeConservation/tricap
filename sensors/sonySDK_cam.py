@@ -105,7 +105,10 @@ class sonySDKcam():
         
         # catch SIGINT and SIGTERM to destroy the sony camera object to not break the SDK when you do a systemctl stop
         # signal.signal(signal.SIGINT, self.exitGracefully)
-        signal.signal(signal.SIGTERM, self.exitGracefully)
+        # Background rediscovery runs outside Python's main thread, where
+        # signal.signal() is not permitted.
+        if threading.current_thread() is threading.main_thread():
+            signal.signal(signal.SIGTERM, self.exitGracefully)
         # atexit.register(self.exitGracefully, 1)
 
         self._sonyCamera = sonySDKInstance

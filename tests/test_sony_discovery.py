@@ -24,7 +24,7 @@ class SonyDiscoveryTests(unittest.TestCase):
         )
 
         sdk, count = discover_sony_cameras(
-            factory, attempts=4, interval=0.25
+            factory, attempts=4, interval=0.25, stable_results=2
         )
 
         self.assertIs(sdk, ready_two)
@@ -42,7 +42,9 @@ class SonyDiscoveryTests(unittest.TestCase):
             side_effect=[OSError("USB not ready"), ready_one, ready_two]
         )
 
-        sdk, count = discover_sony_cameras(factory, attempts=3, interval=0)
+        sdk, count = discover_sony_cameras(
+            factory, attempts=3, interval=0, stable_results=2
+        )
 
         self.assertIs(sdk, ready_two)
         self.assertEqual(count, 2)

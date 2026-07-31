@@ -108,7 +108,12 @@ class TriCapCamsManager:
         self._save_threads = list()
         self._capture_threads = list()
         self._preview_threads = list()
-        self._cameras = None
+        # Keep this list object for the lifetime of the manager. Other startup
+        # components retain a reference to it, so late camera discovery must
+        # extend it rather than replace it.
+        self._cameras = []
+        self.camera_startup_error = ''
+        self._camera_discovery_thread = None
         self._rate_timer = None
         self._stop_capture = None
         self._save_done = list() # sync finish time between capture and save threads
@@ -133,7 +138,18 @@ class TriCapCamsManager:
         self.mount_disk()
 
     def _initialise(self):
-        self._find_cameras()
+        try:
+            self._find_cameras(discovery_attempts=5)
+        except Exception as exc:
+            self.camera_startup_error = str(exc)
+            self._logger.error(
+                'Camera startup failed; dashboard will remain available and '
+                'camera discovery will continue in the background: %s',
+                exc,
+                exc_info=True,
+            )
+            if self.use_sony_cam:
+                self._start_camera_discovery_retry()
 
         self._image_capture_interval = float(self._man_settings['image_capture_interval'])
 
@@ -167,10 +183,9 @@ class TriCapCamsManager:
     def get_state(self):
         return self.state
 
-    def _find_cameras(self):
-        self._cameras = []
-        # Do not catch exceptions here. If any detected camera fails to instantiate, it is a critical error and we want
-        # to halt and catch fire.
+    def _find_cameras(self, discovery_attempts=15):
+        # Let callers decide whether a failed pass should affect startup or be
+        # reported by the background retry loop.
 
         if self.use_gpio_cams:
             tricap_cam = CameraGpio()
@@ -186,25 +201,29 @@ class TriCapCamsManager:
         elif self.use_sony_cam:
             self._sonySDKInstance, numCameras = discover_sony_cameras(
                 sonyCamera,
+                attempts=discovery_attempts,
                 logger=self._logger,
             )
             self._sonySDKCamCaptureLock = threading.Lock()
+            discovered_cameras = []
             for i in range(1, numCameras + 1):
                 try:
                     tricap_cam = CameraSony(
                         SONY_TEMPFS_MOUNT_POINT, self._sonySDKInstance, i,
                         self._sonySDKCamCaptureLock,
                         self.get_sony_image_format())
-                    self._cameras.append(tricap_cam)
+                    discovered_cameras.append(tricap_cam)
                 except Exception as exc:
                     self._logger.warning(
                         'Camera %s could not be initialised: %s',
                         i, exc, exc_info=True)
 
-            if not self._cameras:
+            if not discovered_cameras:
                 raise RuntimeError(
                     'Sony cameras were detected, but none could be initialised'
                 )
+            self._cameras.extend(discovered_cameras)
+            self.camera_startup_error = ''
         else:
             for name, address in Camera.autodetect():
                 self._logger.info('Detected camera %s at address %s ' % (name, address))
@@ -223,6 +242,39 @@ class TriCapCamsManager:
                     # tricap_cam._camera.calibrate_func = tricap_cam.focus_infinity
                     tricap_cam._camera.calibrate_step = int(self._man_settings['calibrate_step'])
                     self._cameras.append(tricap_cam)
+
+    def _start_camera_discovery_retry(self):
+        """Retry Sony setup without taking the dashboard API offline."""
+        if (self._camera_discovery_thread is not None
+                and self._camera_discovery_thread.is_alive()):
+            return
+
+        self._camera_discovery_thread = threading.Thread(
+            target=self._retry_camera_discovery,
+            name='sony-camera-discovery',
+            daemon=True,
+        )
+        self._camera_discovery_thread.start()
+
+    def _retry_camera_discovery(self):
+        while not self._cameras:
+            # Let the dashboard finish starting and give camera USB devices
+            # time to settle before another bounded discovery pass.
+            time.sleep(10)
+            try:
+                self._find_cameras(discovery_attempts=5)
+                self.state = CAM_MANAGER_STATES.STOPPED
+                self._logger.info(
+                    'Sony cameras became available during background retry'
+                )
+                return
+            except Exception as exc:
+                self.camera_startup_error = str(exc)
+                self._logger.warning(
+                    'Background Sony camera discovery failed; will retry: %s',
+                    exc,
+                    exc_info=True,
+                )
             self.order_cameras_list()
             # self.show_cameras_list()
 

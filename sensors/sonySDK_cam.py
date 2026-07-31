@@ -238,16 +238,20 @@ class sonySDKcam():
         pc_file_type = SONY_PC_IMAGE_FORMAT_FILE_TYPES[image_format]
         if not self._sonyCamera.setPCFileSaveType(
                 pc_file_type, self._cameraID):
-            raise RuntimeError(
-                "Failed to set camera {} PC transfer format to {}".format(
-                    self._cameraID, image_format
-                )
+            # ILX-LR1 exposes this property as read-only and commonly reports
+            # "Raw and JPEG", which already transfers either explicit camera
+            # format correctly. Do not discard an otherwise healthy camera.
+            self._logger.warning(
+                "Camera %s PC transfer format is not writable; retaining "
+                "the camera's existing transfer selection",
+                self._cameraID,
             )
-        self._logger.info(
-            "Camera %s PC transfer format set to %s",
-            self._cameraID,
-            image_format,
-        )
+        else:
+            self._logger.info(
+                "Camera %s PC transfer format set to %s",
+                self._cameraID,
+                image_format,
+            )
 
     def is_cam_image_fresh(self):
         """Check if the camera image is new."""

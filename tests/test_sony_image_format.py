@@ -58,11 +58,14 @@ class SonyImageFormatTests(unittest.TestCase):
         self.camera._sonyCamera.setCameraFileSaveType.assert_not_called()
         self.camera._sonyCamera.setPCFileSaveType.assert_called_once_with(0, 2)
 
-    def test_pc_transfer_failure_is_not_silently_ignored(self):
+    def test_read_only_pc_transfer_format_does_not_reject_camera(self):
         self.camera._sonyCamera.setPCFileSaveType.return_value = False
 
-        with self.assertRaisesRegex(RuntimeError, "PC transfer format"):
+        with self.assertLogs(
+                self.camera._logger.name, level="WARNING") as captured:
             self.camera.set_image_format("RAW")
+
+        self.assertIn("not writable", "\n".join(captured.output))
 
     @patch("sensors.sonySDK_cam.subprocess.run")
     @patch("sensors.sonySDK_cam.os.path.ismount")

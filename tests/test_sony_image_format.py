@@ -4,7 +4,7 @@ import importlib
 import sys
 import types
 import unittest
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 
 def _import_sony_camera_module():
@@ -63,6 +63,31 @@ class SonyImageFormatTests(unittest.TestCase):
 
         with self.assertRaisesRegex(RuntimeError, "PC transfer format"):
             self.camera.set_image_format("RAW")
+
+    @patch("sensors.sonySDK_cam.subprocess.run")
+    @patch("sensors.sonySDK_cam.os.path.ismount")
+    @patch("sensors.sonySDK_cam.os.makedirs")
+    def test_existing_transfer_tmpfs_is_not_mounted_again(
+            self, makedirs_mock, ismount_mock, run_mock):
+        ismount_mock.return_value = True
+
+        self.camera._ensure_memory_fs("/transfer")
+
+        makedirs_mock.assert_called_once_with("/transfer", exist_ok=True)
+        run_mock.assert_not_called()
+
+    @patch("sensors.sonySDK_cam.sleep")
+    def test_camera_connection_retries_are_bounded(self, sleep_mock):
+        self.camera.CONNECT_ATTEMPTS = 2
+        self.camera.CONNECT_POLLS_PER_ATTEMPT = 2
+        self.camera._sonyCamera.isConnected.return_value = False
+
+        with self.assertRaisesRegex(RuntimeError, "connection timed out"):
+            self.camera._connect_camera()
+
+        self.assertEqual(self.camera._sonyCamera.connectCamera.call_count, 2)
+        self.assertEqual(self.camera._sonyCamera.disconnect.call_count, 2)
+        self.assertEqual(sleep_mock.call_count, 4)
 
 
 if __name__ == "__main__":

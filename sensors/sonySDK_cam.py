@@ -41,6 +41,9 @@ class sonySDKcam():
     """Handler for sony SDK based cameras. Uses this library to handle communication."""
 
     _logger = logging.getLogger(__name__)
+    CONNECT_ATTEMPTS = 10
+    CONNECT_POLLS_PER_ATTEMPT = 50
+    CONNECT_POLL_INTERVAL_SEC = 0.1
     _lock_with_save = None
     KEYS_TO_SAVE = ('Composite:SubSecDateTimeOriginal','EXIF:ExifImageHeight','EXIF:ExifImageWidth','EXIF:LensSerialNumber','Composite:GPSAltitude','EXIF:GPSDateStamp','Composite:GPSLatitude','Composite:GPSLongitude','EXIF:GPSTimeStamp','EXIF:ISO', 'EXIF:ShutterSpeedValue','MakerNotes:FocusMode','MakerNotes:Quality')
     _sonyCamera = None
@@ -98,12 +101,7 @@ class sonySDKcam():
         self._marginTimers = {}
         self._capture_lock = capture_lock
 
-        try:
-            mount_status = subprocess.run(["mount", "tmpfs", "-t",  "tmpfs", memoryFsPath], check=True)
-            self._logger.debug(mount_status)
-        except:
-            raise Exception('Failed to mount ram fs for sony SDK copy, path: ' + memoryFsPath)
-            return
+        self._ensure_memory_fs(memoryFsPath)
         
         # catch SIGINT and SIGTERM to destroy the sony camera object to not break the SDK when you do a systemctl stop
         # signal.signal(signal.SIGINT, self.exitGracefully)
@@ -113,21 +111,7 @@ class sonySDKcam():
         self._sonyCamera = sonySDKInstance
         self._cameraID = cameraID
 
-        retryCounter = 10
-        self._sonyCamera.connectCamera(self._cameraID)
-        while (not self._sonyCamera.isConnected(self._cameraID)):
-            counter = 50
-            while (not self._sonyCamera.isConnected(self._cameraID)):
-                sleep(0.1)
-                counter -= 1
-                if(counter <= 0):
-                    self._sonyCamera.disconnect(self._cameraID)
-                    self._sonyCamera.connectCamera(self._cameraID)
-                    counter = 100
-            retryCounter -= 1
-            if(retryCounter <= 0):
-                self._sonyCamera = None
-                raise Exception("Sony Camera connection timeout!")
+        self._connect_camera()
 
         self._sonyCamera.loadProperties(self._cameraID)
         sleep(2)
@@ -158,6 +142,63 @@ class sonySDKcam():
         sleep(3)
 
         self.state = CAMERA_STATES.INITIALISED
+
+    def _ensure_memory_fs(self, memory_fs_path):
+        """Create and mount the shared transfer tmpfs exactly once."""
+        os.makedirs(memory_fs_path, exist_ok=True)
+        if os.path.ismount(memory_fs_path):
+            self._logger.debug(
+                "Sony transfer tmpfs already mounted at %s", memory_fs_path
+            )
+            return
+
+        try:
+            mount_status = subprocess.run(
+                ["mount", "-t", "tmpfs", "tmpfs", memory_fs_path],
+                check=True,
+            )
+            self._logger.debug(mount_status)
+        except Exception as exc:
+            raise RuntimeError(
+                "Failed to mount Sony transfer tmpfs at {}".format(
+                    memory_fs_path
+                )
+            ) from exc
+
+        if not os.path.ismount(memory_fs_path):
+            raise RuntimeError(
+                "Sony transfer tmpfs is not mounted at {}".format(
+                    memory_fs_path
+                )
+            )
+
+    def _connect_camera(self):
+        """Connect with bounded retries instead of waiting forever."""
+        for attempt in range(1, self.CONNECT_ATTEMPTS + 1):
+            self._sonyCamera.connectCamera(self._cameraID)
+            for _ in range(self.CONNECT_POLLS_PER_ATTEMPT):
+                if self._sonyCamera.isConnected(self._cameraID):
+                    return
+                sleep(self.CONNECT_POLL_INTERVAL_SEC)
+
+            # Check once more at the polling boundary before reconnecting.
+            if self._sonyCamera.isConnected(self._cameraID):
+                return
+
+            self._logger.warning(
+                "Camera %s connection attempt %s/%s timed out",
+                self._cameraID,
+                attempt,
+                self.CONNECT_ATTEMPTS,
+            )
+            self._sonyCamera.disconnect(self._cameraID)
+
+        raise RuntimeError(
+            "Sony camera {} connection timed out after {} attempts".format(
+                self._cameraID,
+                self.CONNECT_ATTEMPTS,
+            )
+        )
 
     def set_image_format(self, image_format):
         """Set the camera format and its corresponding PC transfer format."""

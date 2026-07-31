@@ -43,6 +43,7 @@ except ImportError as e:
 from .dummy_cam import DummyCam
 from .dummy_cam import DummyShell, external_dummy_calibrate_func
 from .base_setting import BaseSetting, SettingSpec
+from .sony_discovery import discover_sony_cameras
 
 from support.basic import RepeatingBarrierPasser
 from statistics import mean
@@ -183,25 +184,27 @@ class TriCapCamsManager:
                     tricap_cam._camera.calibrate_step = int(self._man_settings['calibrate_step'])
                     self._cameras.append(tricap_cam)
         elif self.use_sony_cam:
-            try:
-                self._sonySDKInstance = sonyCamera()
-                numCameras = self._sonySDKInstance.getNumCameras()
-                self._sonySDKCamCaptureLock = threading.Lock()
-                for i in range(1, numCameras + 1):
-                    try:
-                        tricap_cam = CameraSony(
-                            SONY_TEMPFS_MOUNT_POINT, self._sonySDKInstance, i,
-                            self._sonySDKCamCaptureLock,
-                            self.get_sony_image_format())
-                        self._cameras.append(tricap_cam)
-                    except Exception as exc:
-                        self._logger.warning(
-                            'Camera %s could not be initialised; continuing without it: %s',
-                            i, exc, exc_info=True)
-            except Exception as exc:
-                self._logger.warning(
-                    'Sony camera subsystem is unavailable; continuing with no cameras: %s',
-                    exc, exc_info=True)
+            self._sonySDKInstance, numCameras = discover_sony_cameras(
+                sonyCamera,
+                logger=self._logger,
+            )
+            self._sonySDKCamCaptureLock = threading.Lock()
+            for i in range(1, numCameras + 1):
+                try:
+                    tricap_cam = CameraSony(
+                        SONY_TEMPFS_MOUNT_POINT, self._sonySDKInstance, i,
+                        self._sonySDKCamCaptureLock,
+                        self.get_sony_image_format())
+                    self._cameras.append(tricap_cam)
+                except Exception as exc:
+                    self._logger.warning(
+                        'Camera %s could not be initialised: %s',
+                        i, exc, exc_info=True)
+
+            if not self._cameras:
+                raise RuntimeError(
+                    'Sony cameras were detected, but none could be initialised'
+                )
         else:
             for name, address in Camera.autodetect():
                 self._logger.info('Detected camera %s at address %s ' % (name, address))

@@ -28,6 +28,7 @@ from config import (
     SONY_IMAGE_FORMAT_CAMERA_SETTING,
     SONY_IMAGE_FORMAT_CHOICES,
     SONY_IMAGE_FORMAT_FILE_TYPES,
+    SONY_PC_IMAGE_FORMAT_FILE_TYPES,
 )
 sys.path.append(os.path.abspath("/home/radxa/SonySDKWrapper"))
 from sonySDKWrapper import *
@@ -159,7 +160,7 @@ class sonySDKcam():
         self.state = CAMERA_STATES.INITIALISED
 
     def set_image_format(self, image_format):
-        """Apply an explicit Sony format, or leave the camera untouched."""
+        """Set the camera format and its corresponding PC transfer format."""
         if image_format not in SONY_IMAGE_FORMAT_CHOICES:
             raise ValueError(
                 "Unsupported Sony image format {!r}; expected one of {}".format(
@@ -167,21 +168,41 @@ class sonySDKcam():
                 )
             )
 
-        if image_format == SONY_IMAGE_FORMAT_CAMERA_SETTING:
+        if image_format != SONY_IMAGE_FORMAT_CAMERA_SETTING:
+            file_type = SONY_IMAGE_FORMAT_FILE_TYPES[image_format]
+            if not self._sonyCamera.setCameraFileSaveType(
+                    file_type, self._cameraID):
+                raise RuntimeError(
+                    "Failed to set camera {} image format to {}".format(
+                        self._cameraID, image_format
+                    )
+                )
+            self._logger.info(
+                "Camera %s image format set to %s",
+                self._cameraID,
+                image_format,
+            )
+        else:
             self._logger.info(
                 "Camera %s image format left unchanged", self._cameraID
             )
-            return
 
-        file_type = SONY_IMAGE_FORMAT_FILE_TYPES[image_format]
-        if not self._sonyCamera.setCameraFileSaveType(file_type, self._cameraID):
+        # StillImageStoreDestination is configured as host-PC only above. Sony
+        # exposes the host transfer selection separately from the camera's
+        # FileType property, so setting only FileType can fire the shutter
+        # without delivering a file to setSaveInfo's destination.
+        pc_file_type = SONY_PC_IMAGE_FORMAT_FILE_TYPES[image_format]
+        if not self._sonyCamera.setPCFileSaveType(
+                pc_file_type, self._cameraID):
             raise RuntimeError(
-                "Failed to set camera {} image format to {}".format(
+                "Failed to set camera {} PC transfer format to {}".format(
                     self._cameraID, image_format
                 )
             )
         self._logger.info(
-            "Camera %s image format set to %s", self._cameraID, image_format
+            "Camera %s PC transfer format set to %s",
+            self._cameraID,
+            image_format,
         )
 
     def is_cam_image_fresh(self):

@@ -37,6 +37,14 @@ SONY_IMAGE_FORMAT_FILE_TYPES = {
     SONY_IMAGE_FORMAT_JPEG: 1,
     SONY_IMAGE_FORMAT_RAW: 2,
 }
+# The Sony SDK uses a separate property to choose which files are transferred
+# during PC-remote capture.  Zero means transfer every format produced by the
+# camera, which is the only safe counterpart to "Default".
+SONY_PC_IMAGE_FORMAT_FILE_TYPES = {
+    SONY_IMAGE_FORMAT_CAMERA_SETTING: 0,
+    SONY_IMAGE_FORMAT_JPEG: 1,
+    SONY_IMAGE_FORMAT_RAW: 2,
+}
 
 # Altimeter default configs
 ALTI_NUM_AVG_FRAMES = 2

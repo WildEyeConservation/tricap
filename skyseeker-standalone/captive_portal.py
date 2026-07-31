@@ -628,6 +628,13 @@ function beginAction(control,message){
 }
 async function fetchJson(path,opt){const r=await fetch(path,Object.assign({cache:"no-store"},opt||{}));const text=await r.text();let data={};if(text){try{data=JSON.parse(text)}catch(_){data={msg:text}}}if(!r.ok){const e=new Error(data.msg||`${r.status} ${r.statusText}`);e.data=data;e.status=r.status;throw e}return data}
 async function postJson(path,body){return fetchJson(path,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body||{})})}
+async function syncPhoneClock(){
+  const now=new Date();
+  return postJson("/api/sync_phone_time",{
+    epochMs:now.getTime(),
+    timezoneOffsetMinutes:now.getTimezoneOffset()
+  });
+}
 function downloadBlob(blob,name){const u=URL.createObjectURL(blob),a=document.createElement("a");a.href=u;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),4000)}
 let heartbeatBusy=false,heartbeatFailures=0;
 function showConnectionWarning(show){el("connectionWarning").classList.toggle("show",show)}
@@ -648,6 +655,7 @@ window.addEventListener("offline",()=>showConnectionWarning(true));
 window.addEventListener("online",connectionHeartbeat);
 connectionHeartbeat();setInterval(connectionHeartbeat,1500);
 el("host").textContent=location.host||"control.skyseeker";
+syncPhoneClock().catch(()=>{});
 document.querySelectorAll(".acc-head").forEach(h=>h.addEventListener("click",()=>h.closest(".acc").classList.toggle("open")));
 '''
 
@@ -841,6 +849,7 @@ async function doToggle(control){
   if(!finish)return;
   busy=true;el("captureButton").disabled=true;el("flightStop").disabled=true;
   try{
+    if(!capturing)await syncPhoneClock();
     await fetchJson(capturing?"/api/stop_capture":"/api/start_capture");
     toast(capturing?"Capture stopped":"Capture started");
   }

@@ -22,10 +22,12 @@ import subprocess, csv
 from pathlib import Path
 from support.backup import manager as backupManager
 from support.component_health import component_health
+from support.phone_time import set_system_time_from_phone, validate_phone_time
 import time, shutil, threading, re, io
 
 api_bp = Blueprint('api', __name__)
 _logger = logging.getLogger(__name__)
+_phone_time_lock = threading.Lock()
 _FORCE_DELETE_CONFIRMATION = 'delete-unbacked-internal-data'
 _force_delete_lock = threading.Lock()
 _force_delete_status = {
@@ -110,6 +112,54 @@ def status():
   # _logger.debug(f"Status {ret}")
 
   return ret
+
+
+@api_bp.route('/api/sync_phone_time', methods=['POST'])
+def sync_phone_time():
+  """Set the rig and connected cameras from the dashboard device's clock."""
+  if tricap_manager.state in (
+      CAM_MANAGER_STATES.STARTED, CAM_MANAGER_STATES.COPYING):
+    return jsonify({
+      'msg': 'Clock cannot be changed during capture or copying'
+    }), 409
+
+  try:
+    epoch_ms, timezone_offset = validate_phone_time(
+      request.get_json(silent=True))
+  except ValueError as exc:
+    return jsonify({'msg': str(exc)}), 400
+
+  try:
+    with _phone_time_lock:
+      result = set_system_time_from_phone(epoch_ms)
+      cameras_synced = 0
+      camera_errors = []
+      for cam in tricap_manager.get_cameras_as_list():
+        try:
+          cam.sync_time()
+          cameras_synced += 1
+        except Exception as exc:
+          camera_errors.append(str(exc) or type(exc).__name__)
+          _logger.warning('Could not sync camera %s time: %s',
+                          getattr(cam, 'serial_num', '?'), exc)
+  except (OSError, subprocess.SubprocessError) as exc:
+    _logger.exception('Could not set system clock from dashboard client')
+    return jsonify({'msg': 'Could not set the device clock: {}'.format(exc)}), 500
+
+  client_ip = (
+    request.headers.get('X-SkySeeker-Client-IP') or request.remote_addr or
+    'unknown')
+  _logger.info(
+    'Clock synchronized from dashboard client %s; adjustment=%sms, '
+    'timezone_offset=%s, rtc_synced=%s, cameras_synced=%s',
+    client_ip, result['adjustmentMs'], timezone_offset, result['rtcSynced'],
+    cameras_synced)
+  result.update({
+    'success': True,
+    'camerasSynced': cameras_synced,
+    'cameraErrors': camera_errors,
+  })
+  return jsonify(result)
 
 @api_bp.route('/api/images_captured')
 def images_captured():

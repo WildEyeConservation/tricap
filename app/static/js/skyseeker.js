@@ -5,6 +5,13 @@
   function fmtGB(value) { return value === undefined || value === null || value === '' ? '--' : Number(value).toFixed(2).replace(/\.00$/, '') + 'GB'; }
   function fetchJson(url, options) { return fetch(url, options || {}).then(function (res) { if (!res.ok) { return res.json().catch(function () { return {}; }).then(function (body) { throw new Error(body.msg || res.statusText); }); } return res.json(); }); }
   function postJson(url, body) { return fetchJson(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) }); }
+  function syncPhoneClock() {
+    var now = new Date();
+    return postJson('/api/sync_phone_time', {
+      epochMs: now.getTime(),
+      timezoneOffsetMinutes: now.getTimezoneOffset()
+    });
+  }
   function setUpdated(sel) { setText(sel, 'Updated ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })); }
   function toast(message) {
     var target = qs('#sky-action-toast');
@@ -54,6 +61,7 @@
     };
   }
   window.SkySeekerActions = { begin: beginAction, toast: toast, loading: loadingToast };
+  window.SkySeekerClock = { sync: syncPhoneClock };
 
   function refreshHome() {
     Promise.all([
@@ -220,5 +228,10 @@
     }); }
     refreshSetup(); setInterval(refreshSetup, 3000);
   }
-  document.addEventListener('DOMContentLoaded', function () { var page = document.body.getAttribute('data-page'); if (page === 'home') { initHome(); } if (page === 'setup') { initSetup(); } });
+  document.addEventListener('DOMContentLoaded', function () {
+    syncPhoneClock().catch(function () {});
+    var page = document.body.getAttribute('data-page');
+    if (page === 'home') { initHome(); }
+    if (page === 'setup') { initSetup(); }
+  });
 })();

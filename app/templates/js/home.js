@@ -462,16 +462,27 @@ $(function(){
     $('[name="btn_startstop"]').on('click', function(event){
         event.preventDefault();
         var actions = window.SkySeekerActions;
-        var finish = actions ? actions.begin(this, $(this).text() === 'Stop' ? 'Stopping capture...' : 'Starting capture...') : function(){};
+        var starting = $(this).text() !== 'Stop';
+        var finish = actions ? actions.begin(this, starting ? 'Starting capture...' : 'Stopping capture...') : function(){};
         if (!finish){ return false; }
-        var request = buttonClick(tricap.BUTTON_CODES.STARTSTOP);
-        if (request && request.fail){
-            request.fail(function(xhr){
-                var message = (xhr.responseJSON && xhr.responseJSON.msg) || 'Capture request failed';
-                if (actions){ actions.toast(message); }
-            }).always(function(){ finish(); });
+        function requestCapture(){
+            var request = buttonClick(tricap.BUTTON_CODES.STARTSTOP);
+            if (request && request.fail){
+                request.fail(function(xhr){
+                    var message = (xhr.responseJSON && xhr.responseJSON.msg) || 'Capture request failed';
+                    if (actions){ actions.toast(message); }
+                }).always(function(){ finish(); });
+            } else {
+                finish();
+            }
+        }
+        if (starting && window.SkySeekerClock){
+            window.SkySeekerClock.sync().then(requestCapture).catch(function(err){
+                if (actions){ actions.toast(err.message || 'Phone clock sync failed'); }
+                finish();
+            });
         } else {
-            finish();
+            requestCapture();
         }
         return false;
     });

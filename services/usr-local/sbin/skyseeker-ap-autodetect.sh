@@ -27,6 +27,15 @@ log() {
     echo "$LOG_TAG: $1"
 }
 
+ensure_hostapd_control() {
+    local conf="$ROOT/etc/hostapd/hostapd-skyseeker.conf"
+    [ -f "$conf" ] || return 0
+    if ! grep -q '^ctrl_interface=' "$conf"; then
+        printf '\n# Local control socket used by the AP liveness watchdog.\nctrl_interface=/run/hostapd\n' >> "$conf"
+        log "enabled hostapd control socket in $conf"
+    fi
+}
+
 detect_ap_iface() {
     local i name driver
     for i in "$ROOT"/sys/class/net/*; do
@@ -64,6 +73,8 @@ if [ -z "$pinned" ]; then
     log "no AP_IFACE in $env_file; nothing to do"
     exit 0
 fi
+
+ensure_hostapd_control
 
 if [ "$iface" = "$pinned" ]; then
     exit 0  # names match — the common case on the original unit

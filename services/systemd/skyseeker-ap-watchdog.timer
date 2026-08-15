@@ -1,0 +1,11 @@
+[Unit]
+Description=Periodically verify the SkySeeker Wi-Fi AP
+
+[Timer]
+OnBootSec=60s
+OnUnitInactiveSec=15s
+AccuracySec=2s
+RandomizedDelaySec=2s
+
+[Install]
+WantedBy=timers.target

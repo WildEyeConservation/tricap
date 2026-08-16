@@ -1,0 +1,159 @@
+#!/usr/bin/env python3
+"""Restart-only recovery for a wedged SkySeeker AP stack.
+
+Step 5 of docs/stability-recovery-plan.md. Every 15 seconds check the AP
+path end to end (hostapd alive via its control socket, driver in AP mode,
+link up, dnsmasq serving DHCP). After three consecutive failures, restart
+the failed service - and nothing more:
+
+  * There is NO reboot path in this program, by design. The worst thing it
+    can ever do is restart hostapd or dnsmasq, and a cooldown guarantees
+    that happens at most once per 10 minutes, so a persistent false
+    positive degrades to a log line instead of a restart loop.
+  * Every decision is logged to the (persistent) journal: each failed
+    check with its reason, each restart with its trigger, each cooldown
+    suppression, and the post-restart outcome.
+  * Create /run/skyseeker-ap-watchdog.disabled to pause it during
+    maintenance; the marker clears on reboot.
+"""
+
+import json
+import os
+from pathlib import Path
+import re
+import subprocess
+import time
+
+
+SYSTEMCTL = "/bin/systemctl"
+IP = "/usr/sbin/ip"
+IW = "/usr/sbin/iw"
+HOSTAPD_CLI = "/usr/sbin/hostapd_cli"
+CONTROL_PATH = "/run/hostapd"
+STATE_PATH = Path("/run/skyseeker-ap-watchdog.state")
+DISABLE_PATH = Path("/run/skyseeker-ap-watchdog.disabled")
+FAILURES_BEFORE_RESTART = 3
+RESTART_COOLDOWN_SECONDS = 600
+RESTART_SETTLE_SECONDS = 3
+
+
+def run(args, timeout=6):
+    try:
+        return subprocess.run(
+            args, capture_output=True, text=True, timeout=timeout, check=False
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        return subprocess.CompletedProcess(args, 124, "", str(exc))
+
+
+def find_ap_interface(iw_output):
+    interface = None
+    for raw in iw_output.splitlines():
+        fields = raw.strip().split()
+        if len(fields) == 2 and fields[0] == "Interface":
+            interface = fields[1]
+        elif fields == ["type", "AP"] and interface:
+            return interface
+    return None
+
+
+def ap_health():
+    """(healthy, reason, services_to_restart)."""
+    result = run([SYSTEMCTL, "is-active", "--quiet", "hostapd.service"])
+    if result.returncode:
+        return False, "hostapd service is not active", ["hostapd.service"]
+
+    result = run([IW, "dev"])
+    interface = find_ap_interface(result.stdout) if result.returncode == 0 else None
+    if not interface:
+        return False, "no AP interface reported by the Wi-Fi driver", ["hostapd.service"]
+
+    result = run([IP, "-o", "link", "show", "dev", interface])
+    if result.returncode or not re.search(r"<[^>]*\bUP\b[^>]*>", result.stdout):
+        return False, f"AP interface {interface} is not up", ["hostapd.service"]
+
+    result = run([HOSTAPD_CLI, "-p", CONTROL_PATH, "-i", interface, "ping"])
+    if result.returncode or result.stdout.strip() != "PONG":
+        return False, "hostapd control ping failed", ["hostapd.service"]
+
+    result = run([HOSTAPD_CLI, "-p", CONTROL_PATH, "-i", interface, "status"])
+    if result.returncode or "state=ENABLED" not in result.stdout.splitlines():
+        return False, "hostapd does not report state=ENABLED", ["hostapd.service"]
+
+    result = run([SYSTEMCTL, "is-active", "--quiet", "dnsmasq.service"])
+    if result.returncode:
+        # The "AP visible but can't connect" classic: beacons fine, no DHCP.
+        return False, "dnsmasq (DHCP) is not active", ["dnsmasq.service"]
+
+    return True, f"AP {interface} is responsive", []
+
+
+def load_state():
+    try:
+        state = json.loads(STATE_PATH.read_text(encoding="utf-8"))
+        return {
+            "failures": max(0, int(state.get("failures", 0))),
+            "last_restart": float(state.get("last_restart", 0.0)),
+        }
+    except (OSError, ValueError, TypeError):
+        return {"failures": 0, "last_restart": 0.0}
+
+
+def save_state(state):
+    temporary = STATE_PATH.with_suffix(".tmp")
+    temporary.write_text(json.dumps(state), encoding="utf-8")
+    os.replace(temporary, STATE_PATH)
+
+
+def main():
+    if DISABLE_PATH.exists():
+        print(f"ap-watchdog: disabled by {DISABLE_PATH}", flush=True)
+        return 0
+
+    healthy, detail, services = ap_health()
+    state = load_state()
+
+    if healthy:
+        if state["failures"]:
+            print(f"ap-watchdog: recovered without action: {detail}", flush=True)
+        save_state({"failures": 0, "last_restart": state["last_restart"]})
+        return 0
+
+    failures = state["failures"] + 1
+    print(
+        f"ap-watchdog: health failure {failures}/{FAILURES_BEFORE_RESTART}: {detail}",
+        flush=True,
+    )
+    if failures < FAILURES_BEFORE_RESTART:
+        save_state({"failures": failures, "last_restart": state["last_restart"]})
+        return 0
+
+    since_restart = time.time() - state["last_restart"]
+    if since_restart < RESTART_COOLDOWN_SECONDS:
+        print(
+            f"ap-watchdog: still unhealthy but last restart was "
+            f"{since_restart:.0f}s ago (cooldown {RESTART_COOLDOWN_SECONDS}s); "
+            "logging only",
+            flush=True,
+        )
+        save_state({"failures": failures, "last_restart": state["last_restart"]})
+        return 0
+
+    print(f"ap-watchdog: restarting {' '.join(services)}: {detail}", flush=True)
+    for service in services:
+        result = run([SYSTEMCTL, "restart", service], timeout=20)
+        if result.returncode:
+            print(f"ap-watchdog: restart of {service} failed: {result.stderr.strip()}", flush=True)
+    save_state({"failures": 0, "last_restart": time.time()})
+
+    time.sleep(RESTART_SETTLE_SECONDS)
+    healthy, detail, _ = ap_health()
+    print(
+        f"ap-watchdog: post-restart health: {'ok' if healthy else 'STILL FAILING'}: {detail}",
+        flush=True,
+    )
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

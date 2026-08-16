@@ -27,6 +27,18 @@ log() {
     echo "$LOG_TAG: $1"
 }
 
+ensure_hostapd_control() {
+    # Enable hostapd's local control socket so the AP watchdog can ask it
+    # "are you alive" rather than trusting the systemd unit state. Takes
+    # effect the next time hostapd (re)starts.
+    local conf="$ROOT/etc/hostapd/hostapd-skyseeker.conf"
+    [ -f "$conf" ] || return 0
+    if ! grep -q '^ctrl_interface=' "$conf"; then
+        printf '\n# Local control socket used by the AP liveness watchdog.\nctrl_interface=/run/hostapd\n' >> "$conf"
+        log "enabled hostapd control socket in $conf"
+    fi
+}
+
 detect_ap_iface() {
     local i name driver
     for i in "$ROOT"/sys/class/net/*; do
@@ -60,6 +72,8 @@ if [ -z "$ROOT" ]; then
     # autosuspend policy in /etc/udev/rules.d; this covers the interface flag.
     iw dev "$iface" set power_save off 2>/dev/null || true
 fi
+
+ensure_hostapd_control
 
 env_file="$ROOT/etc/default/skyseeker-standalone"
 if [ ! -f "$env_file" ]; then

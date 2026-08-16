@@ -23,6 +23,7 @@ sudo cp services/usr-local/bin/* /usr/local/bin/
 sudo systemctl daemon-reload
 sudo systemctl restart systemd-journald
 sudo systemctl enable --now skyseeker-ap-monitor.timer
+sudo systemctl enable --now skyseeker-ap-watchdog.timer
 sudo systemctl restart skyseeker-portal.service
 # Restart tricap.service separately, only when tricap application code changed.
 ```
@@ -37,6 +38,16 @@ journal every 15 seconds (`journalctl -t skyseeker-ap-monitor` or
 `journalctl -u skyseeker-ap-monitor.service`). It is log-only and takes no
 recovery action. The journald drop-in makes logs persistent (bounded at 200 MB)
 so a field failure can be analysed after a reboot or power cycle.
+
+`skyseeker-ap-watchdog.timer` checks the AP path end to end every 15 seconds
+(hostapd via its control socket, driver AP mode, link state, dnsmasq). Three
+consecutive failures restart the failed service - hostapd, or dnsmasq for the
+"AP visible but no DHCP" case. It has **no reboot path in the code** and a
+10-minute cooldown between restarts, so a false positive can never loop. Every
+decision is logged. For maintenance, `touch /run/skyseeker-ap-watchdog.disabled`
+(clears on reboot). It needs hostapd's control socket, which
+`skyseeker-ap-autodetect.sh` enables in the hostapd config at boot; the first
+hostapd (re)start after that change brings the socket up.
 
 On devices flashed from the 2026-07-29 (or earlier) image, `skyseeker-portal.service`
 still points at the old copy in `/home/radxa/skyseeker-standalone/`. Run the block

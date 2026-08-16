@@ -1613,7 +1613,13 @@ class Handler(BaseHTTPRequestHandler):
 
 
 class PortalServer(ThreadingHTTPServer):
+    # Sized for the worst-case simultaneous rejoin after an AP drop: ~10
+    # connections per device (OS captive-portal probes + parallel browser
+    # sockets) x 4 devices, plus a buffer of 10. The stdlib default of 5 can
+    # be overflowed by a single reconnecting phone.
+    request_queue_size = 50
     daemon_threads = True
+    block_on_close = False
 
     def __init__(
         self, addr, handler, tricap_host, tricap_port,

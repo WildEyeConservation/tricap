@@ -17,6 +17,15 @@ PORTAL = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(PORTAL)
 
 
+class PortalServerTests(unittest.TestCase):
+    def test_accept_queue_covers_worst_case_rejoin_burst(self):
+        # 4 devices x ~10 simultaneous connections on rejoin, plus 10 buffer
+        # (docs/stability-recovery-plan.md, step 1b).
+        self.assertEqual(PORTAL.PortalServer.request_queue_size, 50)
+        self.assertTrue(PORTAL.PortalServer.daemon_threads)
+        self.assertFalse(PORTAL.PortalServer.block_on_close)
+
+
 class PortalPollingTests(unittest.TestCase):
     def test_agreed_polling_intervals(self):
         self.assertIn("runPeriodic(connectionHeartbeat,5000)", PORTAL.COMMON_JS)

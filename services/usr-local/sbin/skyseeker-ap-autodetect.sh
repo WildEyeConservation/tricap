@@ -54,6 +54,13 @@ if [ -z "$iface" ]; then
     exit 0
 fi
 
+if [ -z "$ROOT" ]; then
+    # Belt-and-braces: assert no runtime power saving on the AP radio every
+    # boot. The driver-level knobs are pinned in /etc/modprobe.d and the USB
+    # autosuspend policy in /etc/udev/rules.d; this covers the interface flag.
+    iw dev "$iface" set power_save off 2>/dev/null || true
+fi
+
 env_file="$ROOT/etc/default/skyseeker-standalone"
 if [ ! -f "$env_file" ]; then
     log "$env_file missing; is this a standalone unit? nothing to do"

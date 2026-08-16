@@ -4,6 +4,8 @@ These mirror files that live outside the repo on the device:
 
 - `systemd/` -> `/etc/systemd/system/`
 - `journald.conf.d/` -> `/etc/systemd/journald.conf.d/`
+- `modprobe.d/` -> `/etc/modprobe.d/`
+- `udev-rules.d/` -> `/etc/udev/rules.d/`
 - `usr-local/sbin/` -> `/usr/local/sbin/`
 - `usr-local/bin/` -> `/usr/local/bin/`
 
@@ -14,6 +16,8 @@ directory, re-install and reload:
 ```sh
 sudo cp services/systemd/* /etc/systemd/system/
 sudo install -D -m 0644 services/journald.conf.d/skyseeker-journald.conf /etc/systemd/journald.conf.d/skyseeker-journald.conf
+sudo cp services/modprobe.d/* /etc/modprobe.d/
+sudo cp services/udev-rules.d/* /etc/udev/rules.d/
 sudo cp services/usr-local/sbin/* /usr/local/sbin/
 sudo cp services/usr-local/bin/* /usr/local/bin/
 sudo systemctl daemon-reload
@@ -22,6 +26,11 @@ sudo systemctl enable --now skyseeker-ap-monitor.timer
 sudo systemctl restart skyseeker-portal.service
 # Restart tricap.service separately, only when tricap application code changed.
 ```
+
+The modprobe options for the `8192eu` driver take effect when the module next
+loads (reboot, or a manual module reload with hostapd stopped). The udev rule
+and the `power_save off` assert in `skyseeker-ap-autodetect.sh` apply from the
+next boot on their own.
 
 `skyseeker-ap-monitor.timer` logs a one-line AP/DHCP/PCIe health snapshot to the
 journal every 15 seconds (`journalctl -t skyseeker-ap-monitor` or

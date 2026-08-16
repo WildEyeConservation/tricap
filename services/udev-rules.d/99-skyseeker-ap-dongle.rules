@@ -1,0 +1,5 @@
+# Never USB-autosuspend the SkySeeker AP dongle (TP-Link 2357:0108,
+# RTL8192EU). Suspend/resume transitions in its out-of-tree driver are a
+# known lockup trigger. "on" = always powered; the kernel default can vary
+# between images, so pin it.
+ACTION=="add", SUBSYSTEM=="usb", ATTR{idVendor}=="2357", ATTR{idProduct}=="0108", TEST=="power/control", ATTR{power/control}="on"

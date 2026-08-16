@@ -8,6 +8,7 @@ OBSERVES ONLY - it never restarts services and never reboots. Recovery
 authority is granted separately in later steps, justified by this data.
 """
 
+import glob
 import os
 import re
 import subprocess
@@ -76,6 +77,41 @@ def hostapd_control_state(interface):
     return "no-state"
 
 
+def cpu_temp_c():
+    """Hottest thermal zone in whole degrees C, or -1 if unreadable.
+
+    Overheating is a classic silent-freeze cause; a rising trend in the
+    final snapshots before a lockup is exactly what this exists to catch.
+    """
+    temps = []
+    for path in glob.glob("/sys/class/thermal/thermal_zone*/temp"):
+        try:
+            with open(path, encoding="ascii") as fh:
+                temps.append(int(fh.read().strip()))
+        except (OSError, ValueError):
+            continue
+    return max(temps) // 1000 if temps else -1
+
+
+def load_1min():
+    try:
+        with open("/proc/loadavg", encoding="ascii") as fh:
+            return fh.read().split()[0]
+    except (OSError, IndexError):
+        return "?"
+
+
+def mem_available_mb():
+    try:
+        with open("/proc/meminfo", encoding="ascii") as fh:
+            for line in fh:
+                if line.startswith("MemAvailable:"):
+                    return int(line.split()[1]) // 1024
+    except (OSError, ValueError, IndexError):
+        pass
+    return -1
+
+
 def pcie_error_count():
     result = run([DMESG], timeout=10)
     if result.returncode:
@@ -103,7 +139,8 @@ def main():
 
     print(
         f"ap-monitor: {summary}"
-        f" hostapd={hostapd} dnsmasq={dnsmasq} pcie_err={pcie_error_count()}",
+        f" hostapd={hostapd} dnsmasq={dnsmasq} pcie_err={pcie_error_count()}"
+        f" temp={cpu_temp_c()}C load={load_1min()} mem_free={mem_available_mb()}M",
         flush=True,
     )
     return 0

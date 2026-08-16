@@ -32,6 +32,18 @@ class ApMonitorTests(unittest.TestCase):
         with patch.object(MONITOR.os.path, "exists", return_value=False):
             self.assertEqual(MONITOR.hostapd_control_state("wlx0"), "absent")
 
+    def test_snapshot_line_carries_freeze_diagnostics(self):
+        import contextlib
+        import io
+
+        out = io.StringIO()
+        with patch.object(MONITOR, "run", side_effect=lambda a, timeout=6: result(a, 1)), \
+                contextlib.redirect_stdout(out):
+            MONITOR.main()
+        line = out.getvalue()
+        for key in ("temp=", "load=", "mem_free=", "pcie_err="):
+            self.assertIn(key, line)
+
     def test_main_always_exits_zero_and_never_acts(self):
         # Even with every probe failing, the monitor logs and exits 0 -
         # log-only means no restarts, no reboots, no non-zero exits.

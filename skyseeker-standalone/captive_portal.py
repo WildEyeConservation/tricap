@@ -628,6 +628,21 @@ function beginAction(control,message){
 }
 async function fetchJson(path,opt){const r=await fetch(path,Object.assign({cache:"no-store"},opt||{}));const text=await r.text();let data={};if(text){try{data=JSON.parse(text)}catch(_){data={msg:text}}}if(!r.ok){const e=new Error(data.msg||`${r.status} ${r.statusText}`);e.data=data;e.status=r.status;throw e}return data}
 async function postJson(path,body){return fetchJson(path,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body||{})})}
+// Single-flight: a poll tick that finds the previous request for the same key
+// still in flight is skipped, never queued, so at most one request per poller
+// is outstanding and no catch-up burst fires when a stall clears.
+const inflightRequests=new Set();
+async function singleFlight(key,work){
+  if(inflightRequests.has(key))return;
+  inflightRequests.add(key);
+  try{return await work()}finally{inflightRequests.delete(key)}
+}
+// Reschedules after the work completes (not on a fixed clock), so ticks stay
+// spaced by the full delay even when a request runs long. Fires immediately.
+function runPeriodic(work,delay){
+  const run=async()=>{try{await work()}finally{setTimeout(run,typeof delay==="function"?delay():delay)}};
+  run();
+}
 async function syncPhoneClock(){
   const now=new Date();
   return postJson("/api/sync_phone_time",{
@@ -653,7 +668,7 @@ async function connectionHeartbeat(){
 }
 window.addEventListener("offline",()=>showConnectionWarning(true));
 window.addEventListener("online",connectionHeartbeat);
-connectionHeartbeat();setInterval(connectionHeartbeat,1500);
+runPeriodic(connectionHeartbeat,5000);
 el("host").textContent=location.host||"control.skyseeker";
 syncPhoneClock().catch(()=>{});
 document.querySelectorAll(".acc-head").forEach(h=>h.addEventListener("click",()=>h.closest(".acc").classList.toggle("open")));
@@ -823,7 +838,7 @@ function render(status,images){
   el("flightStop").disabled=busy;
   renderFlight(status,capturing);
 }
-async function poll(){
+async function poll(){return singleFlight("home-status",async()=>{
   try{
     const [s,i]=await Promise.all([fetchJson("/api/status"),fetchJson("/api/images_captured").catch(()=>({}))]);
     render(s,i);
@@ -832,8 +847,8 @@ async function poll(){
     el("modeText").textContent="Offline";
     el("conn").textContent="tricap is not reachable on the rig.";el("captureButton").disabled=true;
   }
-}
-async function pollStorage(){
+})}
+async function pollStorage(){return singleFlight("home-storage",async()=>{
   const [statsResult,estimateResult]=await Promise.allSettled([
     fetchJson("/api/statistics"),fetchJson("/portal/storage_estimate")
   ]);
@@ -841,7 +856,7 @@ async function pollStorage(){
   if(estimateResult.status==="fulfilled")lastStorageEstimate=estimateResult.value;
   renderStorage(lastStats||{},lastStorageEstimate||{});
   el("storageNote").textContent=statsResult.status==="fulfilled"?"":"Storage usage refreshes while capture is stopped.";
-}
+})}
 async function doToggle(control){
   if(!latest||busy)return;
   const capturing=latest.mode==="STARTED";
@@ -874,9 +889,11 @@ el("captureButton").addEventListener("click",toggle);
 el("flightStop").addEventListener("click",toggle);
 el("glanceOpen").addEventListener("click",openGlance);
 el("glanceClose").addEventListener("click",closeGlance);
-poll();pollStorage();
-setInterval(poll,1000);
-setInterval(pollStorage,15000);
+// Storage (incl. the estimate's NVMe directory walk) pauses while recording so
+// it never competes with the cameras for disk I/O; the post-stop manual
+// pollStorage() in doToggle refreshes it as soon as capture ends.
+runPeriodic(poll,1000);
+runPeriodic(()=>latest&&latest.mode==="STARTED"?null:pollStorage(),15000);
 '''
 
 SETUP_JS = COMMON_JS + r'''
@@ -895,7 +912,7 @@ function renderImageButtons(n){
   el("imageNote").textContent="Downloads a representative image from the most recent copy session.";
   for(let i=0;i<n;i++){const b=document.createElement("button");b.className="pill-btn";b.type="button";b.textContent=`Camera ${i+1}`;b.addEventListener("click",()=>downloadImage(i,b));c.appendChild(b)}
 }
-async function loadSensors(){
+async function loadSensors(){return singleFlight("setup-status",async()=>{
   try{
     const status=await fetchJson("/api/status"),gps=status.gps||{};
     capturing=(status.mode==="STARTED"||status.mode==="COPYING");
@@ -907,15 +924,15 @@ async function loadSensors(){
     renderImageButtons((status.cams||[]).length);
     setControlsEnabled();
   }catch(e){el("setupMode").textContent="Offline"}
-}
-async function loadStats(){
+})}
+async function loadStats(){return singleFlight("setup-stats",async()=>{
   try{
     const [stats,lens]=await Promise.all([fetchJson("/api/statistics"),fetchJson("/api/lensNumber").catch(()=>({}))]);
     el("lens").textContent=fmt(lens.lens);
     externalConnected=!!(stats.externalStorage&&Number(stats.externalStorage.capacityGB)>0);
     if(stats.captureInterval!==undefined){currentInterval=Number(stats.captureInterval);el("interval").textContent=currentInterval.toFixed(1)+" s"}
   }catch(e){/* blocked while capturing */}
-}
+})}
 function renderImageFormat(value){
   currentImageFormat=value;
   [["imageFormatDefault","Default"],["imageFormatRaw","RAW"],["imageFormatJpeg","JPEG"]].forEach(([id,choice])=>{
@@ -925,10 +942,10 @@ function renderImageFormat(value){
   });
   el("imageFormatValue").textContent=value||"--";
 }
-async function loadImageFormat(){
+async function loadImageFormat(){return singleFlight("setup-image-format",async()=>{
   try{const result=await fetchJson("/api/sony_image_format");renderImageFormat(result.value)}
   catch(e){el("imageFormatValue").textContent="--"}
-}
+})}
 async function setImageFormat(value,control){
   if(value===currentImageFormat)return;
   const finish=beginAction(control,"Saving image format...");
@@ -971,7 +988,7 @@ function renderBackup(st){
   if(!running&&backupTimer){clearInterval(backupTimer);backupTimer=null}
   if(wasRunning&&!running)toast(st.message||"Backup complete");
 }
-async function pollBackup(){try{renderBackup(await fetchJson("/api/backup_status"))}catch(e){if(backupTimer){clearInterval(backupTimer);backupTimer=null}}}
+async function pollBackup(){return singleFlight("backup-status",async()=>{try{renderBackup(await fetchJson("/api/backup_status"))}catch(e){if(backupTimer){clearInterval(backupTimer);backupTimer=null}}})}
 function formatDuration(seconds){
   const total=Math.max(0,Math.round(Number(seconds)||0));
   if(total<60)return `${total}s`;
@@ -999,11 +1016,11 @@ function renderVerify(st){
     }
   }
 }
-async function pollVerify(){
+async function pollVerify(){return singleFlight("verify-status",async()=>{
   const path=deleteMode==="force"?"/api/force_delete_status":"/api/verify_and_delete_status";
   try{renderVerify(await fetchJson(path))}
   catch(e){if(verifyTimer){clearInterval(verifyTimer);verifyTimer=null};verifyRunning=false;setControlsEnabled()}
-}
+})}
 async function startBackup(control){
   const finish=beginAction(control,"Starting backup...");
   if(!finish)return;
@@ -1168,12 +1185,17 @@ el("themeDefault").addEventListener("click",()=>applyTheme("default",true));
 el("themeLight").addEventListener("click",()=>applyTheme("light",true));
 el("themeDark").addEventListener("click",()=>applyTheme("dark",true));
 applyTheme(["default","light","dark"].includes(document.documentElement.getAttribute("data-theme"))?document.documentElement.getAttribute("data-theme"):"default",false);
-loadSensors();loadStats();loadImageFormat();pollBackup();pollVerify();netbirdStatus();uplinkStatus();
-setInterval(loadSensors,2000);
-setInterval(loadStats,15000);
-setInterval(loadImageFormat,15000);
-setInterval(()=>netbirdStatus(false),20000);
-setInterval(uplinkStatus,10000);
+// While capture (or copy) is running the page is locked out, so everything
+// except the status poll pauses; the status poll slows to 5 s and keeps
+// running only so the page notices capture ended and re-enables. The
+// netbird/uplink manual refreshes after connect/disconnect stay unwrapped so
+// a user action always gets a fresh result.
+pollBackup();pollVerify();
+runPeriodic(loadSensors,()=>capturing?5000:2000);
+runPeriodic(()=>capturing?null:loadStats(),15000);
+runPeriodic(()=>capturing?null:loadImageFormat(),15000);
+runPeriodic(()=>capturing?null:singleFlight("setup-netbird",()=>netbirdStatus(false)),20000);
+runPeriodic(()=>capturing?null:singleFlight("setup-uplink",uplinkStatus),10000);
 '''
 
 # No external font <link>: the rig is an offline field AP with no internet, so a

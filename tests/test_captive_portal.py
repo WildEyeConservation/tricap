@@ -1,0 +1,70 @@
+"""Regression checks for the standalone portal's polling behavior.
+
+Guards the agreed pre-flight polling configuration (see
+docs/stability-recovery-plan.md, step 1a): intervals, single-flight
+guards, and the pause-while-capturing gates.
+"""
+
+import importlib.util
+from pathlib import Path
+import unittest
+
+
+ROOT = Path(__file__).resolve().parents[1]
+PORTAL_PATH = ROOT / "skyseeker-standalone" / "captive_portal.py"
+SPEC = importlib.util.spec_from_file_location("skyseeker_captive_portal", PORTAL_PATH)
+PORTAL = importlib.util.module_from_spec(SPEC)
+SPEC.loader.exec_module(PORTAL)
+
+
+class PortalPollingTests(unittest.TestCase):
+    def test_agreed_polling_intervals(self):
+        self.assertIn("runPeriodic(connectionHeartbeat,5000)", PORTAL.COMMON_JS)
+        self.assertIn("runPeriodic(poll,1000)", PORTAL.HOME_JS)
+        self.assertIn("pollStorage(),15000)", PORTAL.HOME_JS)
+        # Sensors poll doubles as the setup page's unlock check: 2 s normally,
+        # 5 s while the page is locked out during capture/copy.
+        self.assertIn("runPeriodic(loadSensors,()=>capturing?5000:2000)", PORTAL.SETUP_JS)
+
+    def test_baseline_aggressive_timers_removed(self):
+        for js, timer in (
+            (PORTAL.COMMON_JS, "setInterval(connectionHeartbeat,1500)"),
+            (PORTAL.HOME_JS, "setInterval(poll,1000)"),
+            (PORTAL.HOME_JS, "setInterval(pollStorage,15000)"),
+            (PORTAL.SETUP_JS, "setInterval(loadSensors,2000)"),
+            (PORTAL.SETUP_JS, "setInterval(loadStats,15000)"),
+            (PORTAL.SETUP_JS, "setInterval(loadImageFormat,15000)"),
+            (PORTAL.SETUP_JS, "setInterval(uplinkStatus,10000)"),
+        ):
+            self.assertNotIn(timer, js)
+
+    def test_every_poller_is_single_flight(self):
+        for key in ("home-status", "home-storage"):
+            self.assertIn(f'"{key}"', PORTAL.HOME_JS)
+        for key in (
+            "setup-status",
+            "setup-stats",
+            "setup-image-format",
+            "setup-netbird",
+            "setup-uplink",
+            "backup-status",
+            "verify-status",
+        ):
+            self.assertIn(f'"{key}"', PORTAL.SETUP_JS)
+
+    def test_pollers_pause_while_capturing(self):
+        # Home: the storage poll (whose estimate walks the NVMe) pauses while
+        # recording so it never competes with the cameras for disk I/O.
+        self.assertIn('latest&&latest.mode==="STARTED"?null:pollStorage()', PORTAL.HOME_JS)
+        # Setup: everything except the unlock check pauses while locked out.
+        for paused in (
+            "capturing?null:loadStats()",
+            "capturing?null:loadImageFormat()",
+            'capturing?null:singleFlight("setup-netbird"',
+            'capturing?null:singleFlight("setup-uplink"',
+        ):
+            self.assertIn(paused, PORTAL.SETUP_JS)
+
+
+if __name__ == "__main__":
+    unittest.main()

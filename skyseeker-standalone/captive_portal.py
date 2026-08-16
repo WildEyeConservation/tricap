@@ -878,7 +878,10 @@ function toggle(event){
     const finish=beginAction(control,"Opening confirmation...");
     if(!finish)return;
     el("stopConfirmModal").classList.add("open");
-    requestAnimationFrame(finish);
+    // Wrap finish: rAF passes a timestamp, which finish(keepLoading) would
+    // read as "keep the loading toast up", leaving the spinner stuck if the
+    // user cancels the stop confirmation.
+    requestAnimationFrame(()=>finish());
     return;
   }
   doToggle(control);

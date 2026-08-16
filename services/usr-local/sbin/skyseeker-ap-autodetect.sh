@@ -27,48 +27,6 @@ log() {
     echo "$LOG_TAG: $1"
 }
 
-ensure_device_identity() {
-    local hostname_file="$ROOT/etc/hostname"
-    local hosts_file="$ROOT/etc/hosts"
-    local hostapd_conf="$ROOT/etc/hostapd/hostapd-skyseeker.conf"
-    local device_name
-
-    [ -f "$hostname_file" ] || return 0
-    device_name=$(head -n 1 "$hostname_file" | tr -d '\r\n')
-    if ! printf '%s' "$device_name" | grep -Eq '^skyseeker-[A-Za-z0-9_-]+$'; then
-        log "hostname $device_name is not a skyseeker rig name; leaving network identity unchanged"
-        return 0
-    fi
-
-    if [ -f "$hosts_file" ]; then
-        if grep -q '^127\.0\.1\.1[[:space:]]' "$hosts_file"; then
-            if ! grep -q "^127\.0\.1\.1[[:space:]]\+$device_name\([[:space:]]\|$\)" "$hosts_file"; then
-                sed -i "s/^127\.0\.1\.1.*/127.0.1.1 $device_name/" "$hosts_file"
-                log "updated $hosts_file for hostname $device_name"
-            fi
-        else
-            printf '127.0.1.1 %s\n' "$device_name" >> "$hosts_file"
-            log "added hostname $device_name to $hosts_file"
-        fi
-    fi
-
-    if [ -f "$hostapd_conf" ] && grep -q '^ssid=' "$hostapd_conf"; then
-        if ! grep -qx "ssid=$device_name" "$hostapd_conf"; then
-            sed -i "s/^ssid=.*/ssid=$device_name/" "$hostapd_conf"
-            log "set AP SSID to $device_name in $hostapd_conf"
-        fi
-    fi
-}
-
-ensure_hostapd_control() {
-    local conf="$ROOT/etc/hostapd/hostapd-skyseeker.conf"
-    [ -f "$conf" ] || return 0
-    if ! grep -q '^ctrl_interface=' "$conf"; then
-        printf '\n# Local control socket used by the AP liveness watchdog.\nctrl_interface=/run/hostapd\n' >> "$conf"
-        log "enabled hostapd control socket in $conf"
-    fi
-}
-
 detect_ap_iface() {
     local i name driver
     for i in "$ROOT"/sys/class/net/*; do
@@ -81,8 +39,6 @@ detect_ap_iface() {
     done
     return 1
 }
-
-ensure_device_identity
 
 # USB enumeration can lag boot: wait up to 30 s for the AP interface. A
 # synthetic test root is checked once.
@@ -108,8 +64,6 @@ if [ -z "$pinned" ]; then
     log "no AP_IFACE in $env_file; nothing to do"
     exit 0
 fi
-
-ensure_hostapd_control
 
 if [ "$iface" = "$pinned" ]; then
     exit 0  # names match — the common case on the original unit

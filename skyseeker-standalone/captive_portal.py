@@ -42,7 +42,6 @@ PORTAL_HOST = "control.skyseeker"
 DEFAULT_TRICAP_HOST = "127.0.0.1"
 DEFAULT_TRICAP_PORT = 5000
 PROXY_TIMEOUT_SEC = 20
-PORTAL_BACKLOG = 128
 IW = "/usr/sbin/iw"
 
 CAPTIVE_PROBE_PATHS = {
@@ -629,16 +628,6 @@ function beginAction(control,message){
 }
 async function fetchJson(path,opt){const r=await fetch(path,Object.assign({cache:"no-store"},opt||{}));const text=await r.text();let data={};if(text){try{data=JSON.parse(text)}catch(_){data={msg:text}}}if(!r.ok){const e=new Error(data.msg||`${r.status} ${r.statusText}`);e.data=data;e.status=r.status;throw e}return data}
 async function postJson(path,body){return fetchJson(path,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body||{})})}
-const periodicRequests=new Set();
-async function singleFlight(key,work){
-  if(periodicRequests.has(key))return;
-  periodicRequests.add(key);
-  try{return await work()}finally{periodicRequests.delete(key)}
-}
-function runPeriodic(key,work,delay){
-  const run=async()=>{try{await singleFlight(key,work)}finally{setTimeout(run,delay)}};
-  run();
-}
 async function syncPhoneClock(){
   const now=new Date();
   return postJson("/api/sync_phone_time",{
@@ -664,7 +653,7 @@ async function connectionHeartbeat(){
 }
 window.addEventListener("offline",()=>showConnectionWarning(true));
 window.addEventListener("online",connectionHeartbeat);
-connectionHeartbeat();setInterval(connectionHeartbeat,3000);
+connectionHeartbeat();setInterval(connectionHeartbeat,1500);
 el("host").textContent=location.host||"control.skyseeker";
 syncPhoneClock().catch(()=>{});
 document.querySelectorAll(".acc-head").forEach(h=>h.addEventListener("click",()=>h.closest(".acc").classList.toggle("open")));
@@ -885,8 +874,9 @@ el("captureButton").addEventListener("click",toggle);
 el("flightStop").addEventListener("click",toggle);
 el("glanceOpen").addEventListener("click",openGlance);
 el("glanceClose").addEventListener("click",closeGlance);
-runPeriodic("home-status",poll,2000);
-runPeriodic("home-storage",pollStorage,15000);
+poll();pollStorage();
+setInterval(poll,1000);
+setInterval(pollStorage,15000);
 '''
 
 SETUP_JS = COMMON_JS + r'''
@@ -981,7 +971,7 @@ function renderBackup(st){
   if(!running&&backupTimer){clearInterval(backupTimer);backupTimer=null}
   if(wasRunning&&!running)toast(st.message||"Backup complete");
 }
-async function pollBackup(){return singleFlight("backup-status",async()=>{try{renderBackup(await fetchJson("/api/backup_status"))}catch(e){if(backupTimer){clearInterval(backupTimer);backupTimer=null}}})}
+async function pollBackup(){try{renderBackup(await fetchJson("/api/backup_status"))}catch(e){if(backupTimer){clearInterval(backupTimer);backupTimer=null}}}
 function formatDuration(seconds){
   const total=Math.max(0,Math.round(Number(seconds)||0));
   if(total<60)return `${total}s`;
@@ -1010,11 +1000,9 @@ function renderVerify(st){
   }
 }
 async function pollVerify(){
-  return singleFlight("verify-status",async()=>{
-    const path=deleteMode==="force"?"/api/force_delete_status":"/api/verify_and_delete_status";
-    try{renderVerify(await fetchJson(path))}
-    catch(e){if(verifyTimer){clearInterval(verifyTimer);verifyTimer=null};verifyRunning=false;setControlsEnabled()}
-  });
+  const path=deleteMode==="force"?"/api/force_delete_status":"/api/verify_and_delete_status";
+  try{renderVerify(await fetchJson(path))}
+  catch(e){if(verifyTimer){clearInterval(verifyTimer);verifyTimer=null};verifyRunning=false;setControlsEnabled()}
 }
 async function startBackup(control){
   const finish=beginAction(control,"Starting backup...");
@@ -1180,12 +1168,12 @@ el("themeDefault").addEventListener("click",()=>applyTheme("default",true));
 el("themeLight").addEventListener("click",()=>applyTheme("light",true));
 el("themeDark").addEventListener("click",()=>applyTheme("dark",true));
 applyTheme(["default","light","dark"].includes(document.documentElement.getAttribute("data-theme"))?document.documentElement.getAttribute("data-theme"):"default",false);
-runPeriodic("setup-sensors",loadSensors,3000);
-runPeriodic("setup-stats",loadStats,15000);
-runPeriodic("setup-image-format",loadImageFormat,15000);
-pollBackup();pollVerify();
-runPeriodic("netbird-status",()=>netbirdStatus(false),20000);
-runPeriodic("uplink-status",uplinkStatus,10000);
+loadSensors();loadStats();loadImageFormat();pollBackup();pollVerify();netbirdStatus();uplinkStatus();
+setInterval(loadSensors,2000);
+setInterval(loadStats,15000);
+setInterval(loadImageFormat,15000);
+setInterval(()=>netbirdStatus(false),20000);
+setInterval(uplinkStatus,10000);
 '''
 
 # No external font <link>: the rig is an offline field AP with no internet, so a
@@ -1603,9 +1591,7 @@ class Handler(BaseHTTPRequestHandler):
 
 
 class PortalServer(ThreadingHTTPServer):
-    request_queue_size = PORTAL_BACKLOG
     daemon_threads = True
-    block_on_close = False
 
     def __init__(
         self, addr, handler, tricap_host, tricap_port,

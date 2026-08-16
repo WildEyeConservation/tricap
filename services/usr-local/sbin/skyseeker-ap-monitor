@@ -47,11 +47,19 @@ def find_ap_interface(iw_output):
     return None
 
 
-def station_count(interface):
+def station_stats(interface):
+    """(station count, weakest station signal in dBm or None) in one dump.
+
+    The weakest link is the one that matters: failures correlate with clients
+    parked at the edge of range, so every snapshot records how bad the worst
+    connection was at that moment.
+    """
     result = run([IW, "dev", interface, "station", "dump"])
     if result.returncode:
-        return -1
-    return len(re.findall(r"^Station ", result.stdout, flags=re.M))
+        return -1, None
+    count = len(re.findall(r"^Station ", result.stdout, flags=re.M))
+    signals = [int(s) for s in re.findall(r"^\s*signal:\s*(-?\d+)", result.stdout, flags=re.M)]
+    return count, min(signals) if signals else None
 
 
 def link_up(interface):
@@ -128,10 +136,12 @@ def main():
     interface = find_ap_interface(iw_result.stdout) if iw_result.returncode == 0 else None
 
     if interface:
+        stations, weakest_signal = station_stats(interface)
         summary = (
             f"iface={interface}"
             f" link={'UP' if link_up(interface) else 'DOWN'}"
-            f" stations={station_count(interface)}"
+            f" stations={stations}"
+            f" sig={weakest_signal if weakest_signal is not None else 'none'}"
             f" ctrl={hostapd_control_state(interface)}"
         )
     else:

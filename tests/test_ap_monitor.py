@@ -32,6 +32,19 @@ class ApMonitorTests(unittest.TestCase):
         with patch.object(MONITOR.os.path, "exists", return_value=False):
             self.assertEqual(MONITOR.hostapd_control_state("wlx0"), "absent")
 
+    def test_station_stats_reports_count_and_weakest_signal(self):
+        dump = (
+            "Station 24:b2:b9:c9:1e:cf (on wlx0)\n"
+            "\tsignal:  \t-70 [-70, -75] dBm\n"
+            "\tsignal avg:\t-68 dBm\n"
+            "Station aa:bb:cc:dd:ee:ff (on wlx0)\n"
+            "\tsignal:  \t-52 dBm\n"
+        )
+        with patch.object(MONITOR, "run", return_value=result([], stdout=dump)):
+            self.assertEqual(MONITOR.station_stats("wlx0"), (2, -70))
+        with patch.object(MONITOR, "run", return_value=result([], stdout="")):
+            self.assertEqual(MONITOR.station_stats("wlx0"), (0, None))
+
     def test_snapshot_line_carries_freeze_diagnostics(self):
         import contextlib
         import io

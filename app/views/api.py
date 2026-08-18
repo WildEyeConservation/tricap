@@ -611,7 +611,8 @@ def verify_and_delete():
       tricap_manager.unmount_disk()
       return jsonify(res), 409
     return jsonify(res), 202
-  elif not os.path.exists("/dev/sda1") and not os.path.ismount(MOUNT_POINT_SSD):
+  elif (tricap_manager.external_ssd_device() is None and
+        not os.path.ismount(MOUNT_POINT_SSD)):
     return jsonify({
       'code': 'external_not_connected',
       'msg': 'No external SSD is connected',

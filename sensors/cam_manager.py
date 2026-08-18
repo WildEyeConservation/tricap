@@ -485,18 +485,51 @@ class TriCapCamsManager:
 
     def mount_ssd(self):
         if not os.path.ismount(MOUNT_POINT_SSD):
-            if not os.path.exists("/dev/sda1"):
+            device = self.external_ssd_device()
+            if device is None:
                 self._logger.warning('SSD not connected')
                 return False
             try:
-                mount_status = subprocess.run(["mount", "/dev/sda1", MOUNT_POINT_SSD], check=True)
+                os.makedirs(MOUNT_POINT_SSD, exist_ok=True)
+                mount_status = subprocess.run(
+                    ["mount", device, MOUNT_POINT_SSD], check=True)
                 self._logger.debug(mount_status)
-            except:
-                self._logger.warning('Failed to mount')
+            except (OSError, subprocess.SubprocessError) as exc:
+                self._logger.warning('Failed to mount %s: %s', device, exc)
                 return False
         else:
             self._logger.info('Disk already mounted')
+
+        try:
+            if os.statvfs(MOUNT_POINT_SSD).f_flag & os.ST_RDONLY:
+                self._logger.warning('External SSD is mounted read-only')
+                return False
+        except OSError as exc:
+            self._logger.warning('Failed to inspect external SSD mount: %s', exc)
+            return False
         return True
+
+    def external_ssd_device(self):
+        """Return the first filesystem-bearing partition on a USB disk."""
+        try:
+            output = subprocess.check_output([
+                "lsblk", "--json", "--paths", "--output",
+                "NAME,PATH,TYPE,FSTYPE,TRAN",
+            ], text=True)
+            block_devices = json.loads(output).get("blockdevices", [])
+        except (OSError, subprocess.SubprocessError, ValueError) as exc:
+            self._logger.warning('Failed to discover external SSD: %s', exc)
+            return None
+
+        for disk in block_devices:
+            if disk.get("tran") != "usb":
+                continue
+            candidates = disk.get("children") or [disk]
+            for candidate in candidates:
+                if (candidate.get("type") in ("disk", "part") and
+                        candidate.get("fstype") and candidate.get("path")):
+                    return candidate["path"]
+        return None
 
     def unmount_disk(self):
         if os.path.ismount(MOUNT_POINT_SSD):

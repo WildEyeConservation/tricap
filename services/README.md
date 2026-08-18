@@ -33,6 +33,11 @@ loads (reboot, or a manual module reload with hostapd stopped). The udev rule
 and the `power_save off` assert in `skyseeker-ap-autodetect.sh` apply from the
 next boot on their own.
 
+`skyseeker-sd810.conf` disables UAS only for the ADATA SD810 (`090c:a38a`).
+It takes effect when `usb-storage` next loads, normally after a reboot. Verify
+with `lsusb -t`: the SD810 mass-storage interface should show
+`Driver=usb-storage`, not `Driver=uas`.
+
 `skyseeker-ap-monitor.timer` logs a one-line AP/DHCP/PCIe health snapshot to the
 journal every 15 seconds (`journalctl -t skyseeker-ap-monitor` or
 `journalctl -u skyseeker-ap-monitor.service`). It is log-only and takes no

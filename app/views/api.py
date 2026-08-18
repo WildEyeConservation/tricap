@@ -602,12 +602,26 @@ def verify_and_delete():
   current = backupManager.verify_delete_status()
   if current.get("running"):
     return jsonify({'success': True, 'started': False, 'msg': 'Verification is already running'})
+  if (backupManager.status() or {}).get('running'):
+    return jsonify({'success': False, 'msg': 'Backup is running'}), 409
 
   if tricap_manager.mount_ssd():
     src = MOUNT_POINT
     dst = MOUNT_POINT_SSD
-    res = backupManager.start_verify_and_delete(src, dst)
+    if not tricap_manager.begin_usb_storage_mode():
+      tricap_manager.unmount_disk()
+      return jsonify({
+        'code': 'usb_storage_mode_failed',
+        'msg': 'Could not suspend non-storage USB devices safely',
+      }), 500
+    try:
+      res = backupManager.start_verify_and_delete(src, dst)
+    except Exception:
+      tricap_manager.end_usb_storage_mode()
+      tricap_manager.unmount_disk()
+      raise
     if not res.get("success"):
+      tricap_manager.end_usb_storage_mode()
       tricap_manager.unmount_disk()
       return jsonify(res), 409
     return jsonify(res), 202
@@ -665,25 +679,46 @@ def backup_start():
   _logger.debug("backup_start req")
   if tricap_manager.state in (CAM_MANAGER_STATES.STARTED, CAM_MANAGER_STATES.COPYING):
     return jsonify({'msg': 'Not allowed in started or copying state'}), 400
+  if (backupManager.status() or {}).get('running'):
+    return jsonify({'msg': 'Backup is already running'}), 409
+  if backupManager.verify_delete_status().get('running'):
+    return jsonify({'msg': 'Verification is running'}), 409
   
   if tricap_manager.mount_ssd():
     src = MOUNT_POINT
     dst = MOUNT_POINT_SSD
-    res = backupManager.start(src, dst, tag_gps=False)
+    if not tricap_manager.begin_usb_storage_mode():
+      tricap_manager.unmount_disk()
+      return jsonify({
+        'code': 'usb_storage_mode_failed',
+        'msg': 'Could not suspend non-storage USB devices safely',
+      }), 500
+    try:
+      res = backupManager.start(src, dst, tag_gps=False)
 
-    plan = {}
-    if (not res.get("success")) and res.get("msg") and res.get("msg") == "Insufficient space" :
-        _logger.debug("Not enough free space. Starting partial backup")
-        plan = backupManager.generate_partial_files_from(
-            src_root=src,
-            dst_root=dst,
-            margin_bytes=256 * 1024 * 1024
-        )
+      plan = {}
+      if (not res.get("success")) and res.get("msg") and res.get("msg") == "Insufficient space" :
+          _logger.debug("Not enough free space. Starting partial backup")
+          plan = backupManager.generate_partial_files_from(
+              src_root=src,
+              dst_root=dst,
+              margin_bytes=256 * 1024 * 1024
+          )
 
-        res = backupManager.start(src, dst, files_from=plan["files_from"], tag_gps=False)
+          res = backupManager.start(src, dst, files_from=plan["files_from"], tag_gps=False)
+          if not res.get("success"):
+            tricap_manager.end_usb_storage_mode()
+            tricap_manager.unmount_disk()
+          return jsonify(res)
+      else:
+        if not res.get("success"):
+          tricap_manager.end_usb_storage_mode()
+          tricap_manager.unmount_disk()
         return jsonify(res)
-    else:
-      return jsonify(res)
+    except Exception:
+      tricap_manager.end_usb_storage_mode()
+      tricap_manager.unmount_disk()
+      raise
   else:
     return jsonify({'msg': 'Failed to mount external disk'}), 400
 
@@ -1208,6 +1243,8 @@ def _run_delete_dir_contents(root: Path) -> None:
                 message=f'Internal storage could not be cleared: {exc}',
                 errors=[str(exc)],
             )
+    finally:
+        tricap_manager.end_usb_storage_mode()
 
 
 def delete_dir_async(path: str) -> dict:
@@ -1234,6 +1271,20 @@ def delete_dir_async(path: str) -> dict:
             message='Preparing to clear internal storage...',
             errors=[],
         )
+
+    if not tricap_manager.begin_usb_storage_mode():
+        with _force_delete_lock:
+            _force_delete_status.update(
+                running=False,
+                phase='error',
+                success=False,
+                message='Could not suspend non-storage USB devices safely.',
+                errors=['USB storage mode could not be started'],
+            )
+        return {
+            'success': False,
+            'msg': 'Could not suspend non-storage USB devices safely',
+        }
 
     threading.Thread(
         target=_run_delete_dir_contents,

@@ -220,6 +220,7 @@ class RsyncManager:
                 self._verify_status.finished_at = time.time()
         finally:
             tricap_manager.unmount_disk()
+            tricap_manager.end_usb_storage_mode()
 
     def start(
         self,
@@ -938,6 +939,7 @@ class RsyncManager:
         finally:
             self._proc = None
             self._finalize_benchmark()
+            tricap_manager.end_usb_storage_mode()
 
     def _run_arw_backup(self) -> None:
         assert self._src is not None and self._dst is not None

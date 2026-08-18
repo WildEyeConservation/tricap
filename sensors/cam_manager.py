@@ -46,6 +46,7 @@ from .base_setting import BaseSetting, SettingSpec
 from .sony_discovery import discover_sony_cameras
 
 from support.basic import RepeatingBarrierPasser
+from support.usb_storage_mode import UsbStorageMode
 from statistics import mean
 
 
@@ -112,6 +113,8 @@ class TriCapCamsManager:
         # components retain a reference to it.
         self._cameras = []
         self.camera_startup_error = ''
+        self._usb_storage_mode = None
+        self._usb_storage_restart_timer = None
         self._rate_timer = None
         self._stop_capture = None
         self._save_done = list() # sync finish time between capture and save threads
@@ -504,6 +507,81 @@ class TriCapCamsManager:
         else:
             self._logger.info('Disk not mounted')
         return True
+
+    def begin_usb_storage_mode(self):
+        """Disconnect USB sensors while preserving Wi-Fi and external storage."""
+        if self._usb_storage_mode is not None:
+            return True
+
+        mode = UsbStorageMode(logger=self._logger)
+        external_device = self.external_ssd_device()
+        targets = mode.plan(external_device)
+        if not targets:
+            self._logger.info(
+                'USB storage mode found no non-essential devices to disconnect'
+            )
+            return True
+
+        try:
+            if getattr(self, 'altimeter', None) is not None:
+                self.altimeter.stop_measuring()
+                self.altimeter.disconnect()
+
+            if (self.use_sony_cam and self._cameras
+                    and hasattr(self, '_sonySDKCamCaptureLock')):
+                with self._sonySDKCamCaptureLock:
+                    for camera in self._cameras:
+                        camera.disconnect_for_storage()
+
+            changed = mode.quiesce(external_device)
+            self._usb_storage_mode = mode
+            self._logger.info(
+                'USB storage mode active; disconnected: %s',
+                ', '.join(changed),
+            )
+            return True
+        except Exception:
+            self._logger.exception('Could not enter USB storage mode')
+            mode.restore()
+            self._schedule_usb_storage_restart()
+            return False
+
+    def end_usb_storage_mode(self):
+        """Restore USB sensors and restart Tricap so drivers rediscover them."""
+        mode = self._usb_storage_mode
+        self._usb_storage_mode = None
+        if mode is None:
+            return
+        mode.restore()
+        self._logger.info('USB storage mode ended; devices were restored')
+        self._schedule_usb_storage_restart()
+
+    def _schedule_usb_storage_restart(self, delay=5.0):
+        if (self._usb_storage_restart_timer is not None
+                and self._usb_storage_restart_timer.is_alive()):
+            return
+
+        def restart_service():
+            self._logger.info(
+                'Restarting Tricap after USB storage mode device restoration'
+            )
+            try:
+                subprocess.Popen(
+                    ['systemctl', 'restart', 'tricap.service'],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    start_new_session=True,
+                )
+            except Exception:
+                self._logger.exception(
+                    'Could not restart Tricap after USB storage mode'
+                )
+
+        self._usb_storage_restart_timer = threading.Timer(
+            delay, restart_service
+        )
+        self._usb_storage_restart_timer.daemon = True
+        self._usb_storage_restart_timer.start()
 
     def copy_disk_monitor(self):
         """

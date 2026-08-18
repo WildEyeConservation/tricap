@@ -203,6 +203,21 @@ class sonySDKcam():
             )
         )
 
+    def disconnect_for_storage(self):
+        """Release the native SDK connection before USB is deauthorized."""
+        try:
+            self._sonyCamera.setOnErrorCallBack(None, self._cameraID)
+        except Exception:
+            self._logger.warning(
+                "Could not clear camera %s error callback before storage mode",
+                self._cameraID,
+                exc_info=True,
+            )
+        self._sonyCamera.disconnect(self._cameraID)
+        self._logger.info(
+            "Camera %s disconnected for USB storage mode", self._cameraID
+        )
+
     def set_image_format(self, image_format):
         """Set the camera format and its corresponding PC transfer format."""
         if image_format not in SONY_IMAGE_FORMAT_CHOICES:

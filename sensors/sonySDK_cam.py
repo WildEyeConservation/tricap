@@ -205,14 +205,9 @@ class sonySDKcam():
 
     def disconnect_for_storage(self):
         """Release the native SDK connection before USB is deauthorized."""
-        try:
-            self._sonyCamera.setOnErrorCallBack(None, self._cameraID)
-        except Exception:
-            self._logger.warning(
-                "Could not clear camera %s error callback before storage mode",
-                self._cameraID,
-                exc_info=True,
-            )
+        # Do not pass None into the native callback binding here.  The Sony
+        # wrapper does not safely reject it and can terminate the interpreter
+        # before the regular SDK disconnect is reached.
         self._sonyCamera.disconnect(self._cameraID)
         self._logger.info(
             "Camera %s disconnected for USB storage mode", self._cameraID

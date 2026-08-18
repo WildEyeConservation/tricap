@@ -203,16 +203,6 @@ class sonySDKcam():
             )
         )
 
-    def disconnect_for_storage(self):
-        """Release the native SDK connection before USB is deauthorized."""
-        # Do not pass None into the native callback binding here.  The Sony
-        # wrapper does not safely reject it and can terminate the interpreter
-        # before the regular SDK disconnect is reached.
-        self._sonyCamera.disconnect(self._cameraID)
-        self._logger.info(
-            "Camera %s disconnected for USB storage mode", self._cameraID
-        )
-
     def set_image_format(self, image_format):
         """Set the camera format and its corresponding PC transfer format."""
         if image_format not in SONY_IMAGE_FORMAT_CHOICES:

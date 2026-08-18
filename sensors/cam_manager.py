@@ -527,12 +527,6 @@ class TriCapCamsManager:
                 self.altimeter.stop_measuring()
                 self.altimeter.disconnect()
 
-            if (self.use_sony_cam and self._cameras
-                    and hasattr(self, '_sonySDKCamCaptureLock')):
-                with self._sonySDKCamCaptureLock:
-                    for camera in self._cameras:
-                        camera.disconnect_for_storage()
-
             changed = mode.quiesce(external_device)
             self._usb_storage_mode = mode
             self._logger.info(

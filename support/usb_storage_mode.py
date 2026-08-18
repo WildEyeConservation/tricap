@@ -17,6 +17,9 @@ _USB_DEVICE_NAME = re.compile(r"^\d+-\d+(?:\.\d+)*$")
 ESSENTIAL_USB_IDS = {
     ("2357", "0108"),  # TP-Link RTL8192EU Wi-Fi adapter
     ("090c", "a38a"),  # ADATA SD810 mass-storage function
+    # The cameras have their own power feeds.  Keep their SDK connections
+    # intact because the native Sony disconnect path can terminate Tricap.
+    ("054c", "0e90"),  # Sony ILX-LR1
 }
 
 

@@ -92,12 +92,5 @@ class SonyImageFormatTests(unittest.TestCase):
         self.assertEqual(self.camera._sonyCamera.disconnect.call_count, 2)
         self.assertEqual(sleep_mock.call_count, 4)
 
-    def test_storage_disconnect_does_not_clear_native_callback_with_none(self):
-        self.camera.disconnect_for_storage()
-
-        self.camera._sonyCamera.disconnect.assert_called_once_with(2)
-        self.camera._sonyCamera.setOnErrorCallBack.assert_not_called()
-
-
 if __name__ == "__main__":
     unittest.main()

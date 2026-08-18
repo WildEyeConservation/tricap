@@ -20,6 +20,11 @@ ESSENTIAL_USB_IDS = {
     # The cameras have their own power feeds.  Keep their SDK connections
     # intact because the native Sony disconnect path can terminate Tricap.
     ("054c", "0e90"),  # Sony ILX-LR1
+    # Authorization changes on either of these sensors do not remove VBUS
+    # power.  The altimeter also shares the SSD's physical hub; changing its
+    # state has coincided with a paired USB2/USB3 hub reset during writes.
+    ("1546", "01a9"),  # u-blox GNSS receiver
+    ("04d8", "ed57"),  # LightWare altimeter
 }
 
 

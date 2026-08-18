@@ -53,11 +53,13 @@ class UsbStorageModeTests(unittest.TestCase):
 
         self.assertEqual(self.mode().plan(), ["2-1"])
 
-    def test_preserves_sony_camera_but_disconnects_other_sensor(self):
+    def test_preserves_known_rig_sensors_but_disconnects_unknown_device(self):
         self.device("6-1", "054c", "0e90")
         self.device("4-1", "1546", "01a9")
+        self.device("7-1.4", "04d8", "ed57")
+        self.device("2-1", "1234", "5678")
 
-        self.assertEqual(self.mode().plan(), ["4-1"])
+        self.assertEqual(self.mode().plan(), ["2-1"])
 
     def test_disconnects_only_root_of_nonessential_hub_subtree(self):
         self.device("3-1", "1234", "0001")

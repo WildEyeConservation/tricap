@@ -45,7 +45,8 @@ def component_health(camera_manager, gps, altimeter, imu, storage_mounted):
             (f'{camera_count} camera' + ('' if camera_count == 1 else 's') + ' connected.')
             if camera_count
             else (
-                'Cameras are not ready; automatic discovery is retrying. '
+                'Cameras are not connected. Storage operations remain '
+                'available. Restart Tricap after reconnecting cameras. '
                 f'Last error: {camera_startup_error}'
                 if camera_startup_error
                 else 'No cameras connected. Capture is unavailable.'

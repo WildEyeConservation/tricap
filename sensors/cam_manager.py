@@ -109,11 +109,9 @@ class TriCapCamsManager:
         self._capture_threads = list()
         self._preview_threads = list()
         # Keep this list object for the lifetime of the manager. Other startup
-        # components retain a reference to it, so late camera discovery must
-        # extend it rather than replace it.
+        # components retain a reference to it.
         self._cameras = []
         self.camera_startup_error = ''
-        self._camera_discovery_thread = None
         self._rate_timer = None
         self._stop_capture = None
         self._save_done = list() # sync finish time between capture and save threads
@@ -144,12 +142,11 @@ class TriCapCamsManager:
             self.camera_startup_error = str(exc)
             self._logger.error(
                 'Camera startup failed; dashboard will remain available and '
-                'camera discovery will continue in the background: %s',
+                'storage operations can continue. Restart Tricap after '
+                'reconnecting cameras: %s',
                 exc,
                 exc_info=True,
             )
-            if self.use_sony_cam:
-                self._start_camera_discovery_retry()
 
         self._image_capture_interval = float(self._man_settings['image_capture_interval'])
 
@@ -242,41 +239,6 @@ class TriCapCamsManager:
                     # tricap_cam._camera.calibrate_func = tricap_cam.focus_infinity
                     tricap_cam._camera.calibrate_step = int(self._man_settings['calibrate_step'])
                     self._cameras.append(tricap_cam)
-
-    def _start_camera_discovery_retry(self):
-        """Retry Sony setup without taking the dashboard API offline."""
-        if (self._camera_discovery_thread is not None
-                and self._camera_discovery_thread.is_alive()):
-            return
-
-        self._camera_discovery_thread = threading.Thread(
-            target=self._retry_camera_discovery,
-            name='sony-camera-discovery',
-            daemon=True,
-        )
-        self._camera_discovery_thread.start()
-
-    def _retry_camera_discovery(self):
-        while not self._cameras:
-            # Let the dashboard finish starting and give camera USB devices
-            # time to settle before another bounded discovery pass.
-            time.sleep(10)
-            try:
-                self._find_cameras(discovery_attempts=5)
-                self.state = CAM_MANAGER_STATES.STOPPED
-                self._logger.info(
-                    'Sony cameras became available during background retry'
-                )
-                return
-            except Exception as exc:
-                self.camera_startup_error = str(exc)
-                self._logger.warning(
-                    'Background Sony camera discovery failed; will retry: %s',
-                    exc,
-                    exc_info=True,
-                )
-            self.order_cameras_list()
-            # self.show_cameras_list()
 
     # def reset(self, man_settings: dict, cam_settings: dict):
     #     self._man_settings = man_settings

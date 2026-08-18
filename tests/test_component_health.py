@@ -8,7 +8,7 @@ from support.component_health import component_health
 
 class ComponentHealthTests(unittest.TestCase):
 
-    def test_camera_startup_error_is_visible_while_retrying(self):
+    def test_camera_startup_error_explains_storage_remains_available(self):
         manager = Mock()
         manager.get_cameras_as_list.return_value = []
         manager.camera_startup_error = "Sony SDK reported zero cameras"
@@ -22,7 +22,9 @@ class ComponentHealthTests(unittest.TestCase):
         )
 
         self.assertFalse(health['cameras']['connected'])
-        self.assertIn('automatic discovery is retrying',
+        self.assertIn('Storage operations remain available',
+                      health['cameras']['message'])
+        self.assertIn('Restart Tricap after reconnecting cameras',
                       health['cameras']['message'])
         self.assertEqual(
             health['cameras']['error'],

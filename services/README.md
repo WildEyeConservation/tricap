@@ -17,6 +17,7 @@ directory, re-install and reload:
 sudo cp services/systemd/* /etc/systemd/system/
 sudo install -D -m 0644 services/journald.conf.d/skyseeker-journald.conf /etc/systemd/journald.conf.d/skyseeker-journald.conf
 sudo cp services/modprobe.d/* /etc/modprobe.d/
+sudo update-initramfs -u -k "$(uname -r)"
 sudo cp services/udev-rules.d/* /etc/udev/rules.d/
 sudo cp services/usr-local/sbin/* /usr/local/sbin/
 sudo cp services/usr-local/bin/* /usr/local/bin/
@@ -34,8 +35,9 @@ and the `power_save off` assert in `skyseeker-ap-autodetect.sh` apply from the
 next boot on their own.
 
 `skyseeker-sd810.conf` disables UAS only for the ADATA SD810 (`090c:a38a`).
-It takes effect when `usb-storage` next loads, normally after a reboot. Verify
-with `lsusb -t`: the SD810 mass-storage interface should show
+This board loads `usb-storage` from its initramfs, so rebuild the current
+initramfs after installing the file and then reboot. Verify with `lsusb -t`:
+the SD810 mass-storage interface should show
 `Driver=usb-storage`, not `Driver=uas`.
 
 `skyseeker-ap-monitor.timer` logs a one-line AP/DHCP/PCIe health snapshot to the

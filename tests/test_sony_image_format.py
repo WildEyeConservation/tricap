@@ -92,5 +92,6 @@ class SonyImageFormatTests(unittest.TestCase):
         self.assertEqual(self.camera._sonyCamera.disconnect.call_count, 2)
         self.assertEqual(sleep_mock.call_count, 4)
 
+
 if __name__ == "__main__":
     unittest.main()

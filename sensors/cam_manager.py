@@ -46,7 +46,6 @@ from .base_setting import BaseSetting, SettingSpec
 from .sony_discovery import discover_sony_cameras
 
 from support.basic import RepeatingBarrierPasser
-from support.usb_storage_mode import UsbStorageMode
 from statistics import mean
 
 
@@ -110,11 +109,11 @@ class TriCapCamsManager:
         self._capture_threads = list()
         self._preview_threads = list()
         # Keep this list object for the lifetime of the manager. Other startup
-        # components retain a reference to it.
+        # components retain a reference to it, so late camera discovery must
+        # extend it rather than replace it.
         self._cameras = []
         self.camera_startup_error = ''
-        self._usb_storage_mode = None
-        self._usb_storage_restart_timer = None
+        self._camera_discovery_thread = None
         self._rate_timer = None
         self._stop_capture = None
         self._save_done = list() # sync finish time between capture and save threads
@@ -145,11 +144,12 @@ class TriCapCamsManager:
             self.camera_startup_error = str(exc)
             self._logger.error(
                 'Camera startup failed; dashboard will remain available and '
-                'storage operations can continue. Restart Tricap after '
-                'reconnecting cameras: %s',
+                'camera discovery will continue in the background: %s',
                 exc,
                 exc_info=True,
             )
+            if self.use_sony_cam:
+                self._start_camera_discovery_retry()
 
         self._image_capture_interval = float(self._man_settings['image_capture_interval'])
 
@@ -242,6 +242,41 @@ class TriCapCamsManager:
                     # tricap_cam._camera.calibrate_func = tricap_cam.focus_infinity
                     tricap_cam._camera.calibrate_step = int(self._man_settings['calibrate_step'])
                     self._cameras.append(tricap_cam)
+
+    def _start_camera_discovery_retry(self):
+        """Retry Sony setup without taking the dashboard API offline."""
+        if (self._camera_discovery_thread is not None
+                and self._camera_discovery_thread.is_alive()):
+            return
+
+        self._camera_discovery_thread = threading.Thread(
+            target=self._retry_camera_discovery,
+            name='sony-camera-discovery',
+            daemon=True,
+        )
+        self._camera_discovery_thread.start()
+
+    def _retry_camera_discovery(self):
+        while not self._cameras:
+            # Let the dashboard finish starting and give camera USB devices
+            # time to settle before another bounded discovery pass.
+            time.sleep(10)
+            try:
+                self._find_cameras(discovery_attempts=5)
+                self.state = CAM_MANAGER_STATES.STOPPED
+                self._logger.info(
+                    'Sony cameras became available during background retry'
+                )
+                return
+            except Exception as exc:
+                self.camera_startup_error = str(exc)
+                self._logger.warning(
+                    'Background Sony camera discovery failed; will retry: %s',
+                    exc,
+                    exc_info=True,
+                )
+            self.order_cameras_list()
+            # self.show_cameras_list()
 
     # def reset(self, man_settings: dict, cam_settings: dict):
     #     self._man_settings = man_settings
@@ -507,75 +542,6 @@ class TriCapCamsManager:
         else:
             self._logger.info('Disk not mounted')
         return True
-
-    def begin_usb_storage_mode(self):
-        """Disconnect USB sensors while preserving Wi-Fi and external storage."""
-        if self._usb_storage_mode is not None:
-            return True
-
-        mode = UsbStorageMode(logger=self._logger)
-        external_device = self.external_ssd_device()
-        targets = mode.plan(external_device)
-        if not targets:
-            self._logger.info(
-                'USB storage mode found no non-essential devices to disconnect'
-            )
-            return True
-
-        try:
-            if getattr(self, 'altimeter', None) is not None:
-                self.altimeter.stop_measuring()
-                self.altimeter.disconnect()
-
-            changed = mode.quiesce(external_device)
-            self._usb_storage_mode = mode
-            self._logger.info(
-                'USB storage mode active; disconnected: %s',
-                ', '.join(changed),
-            )
-            return True
-        except Exception:
-            self._logger.exception('Could not enter USB storage mode')
-            mode.restore()
-            self._schedule_usb_storage_restart()
-            return False
-
-    def end_usb_storage_mode(self):
-        """Restore USB sensors and restart Tricap so drivers rediscover them."""
-        mode = self._usb_storage_mode
-        self._usb_storage_mode = None
-        if mode is None:
-            return
-        mode.restore()
-        self._logger.info('USB storage mode ended; devices were restored')
-        self._schedule_usb_storage_restart()
-
-    def _schedule_usb_storage_restart(self, delay=5.0):
-        if (self._usb_storage_restart_timer is not None
-                and self._usb_storage_restart_timer.is_alive()):
-            return
-
-        def restart_service():
-            self._logger.info(
-                'Restarting Tricap after USB storage mode device restoration'
-            )
-            try:
-                subprocess.Popen(
-                    ['systemctl', 'restart', 'tricap.service'],
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL,
-                    start_new_session=True,
-                )
-            except Exception:
-                self._logger.exception(
-                    'Could not restart Tricap after USB storage mode'
-                )
-
-        self._usb_storage_restart_timer = threading.Timer(
-            delay, restart_service
-        )
-        self._usb_storage_restart_timer.daemon = True
-        self._usb_storage_restart_timer.start()
 
     def copy_disk_monitor(self):
         """

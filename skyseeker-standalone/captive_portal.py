@@ -1036,6 +1036,19 @@ async function startBackup(control){
   catch(e){toast(e.message)}
   finally{finish(backupRunning);setControlsEnabled()}
 }
+async function moveBackup(control){
+  if(!confirm("Copy files to the SSD and delete them from internal storage as they are verified?"))return;
+  const finish=beginAction(control,"Starting copy & delete...");
+  if(!finish)return;
+  try{
+    const r=await fetchJson("/api/backup_move");
+    if(r&&r.success===false)toast(r.msg||"Copy & delete failed to start");
+    else{backupRunning=true;loadingToast("Moving to SSD...")}
+    pollBackup();
+  }
+  catch(e){toast(e.message)}
+  finally{finish(backupRunning);setControlsEnabled()}
+}
 function openDeleteDialog(){
   el("deleteDecisionTitle").textContent=externalConnected?"Clear internal storage?":"External SSD not connected";
   el("deleteDecisionText").textContent=externalConnected
@@ -1107,6 +1120,7 @@ el("imageFormatJpeg").addEventListener("click",event=>setImageFormat("JPEG",even
 el("restartService").addEventListener("click",async event=>{if(!confirm("Restart the tricap capture service? Capture pauses briefly."))return;const finish=beginAction(event.currentTarget,"Restarting tricap...");if(!finish)return;try{await fetchJson("/api/restart");toast("tricap restart requested")}catch(e){toast(e.message)}finally{finish();setControlsEnabled()}});
 el("rebootDevice").addEventListener("click",async event=>{if(!confirm("Reboot the SkySeeker device? It will be offline for ~30-60s and you may need to rejoin Wi-Fi."))return;const finish=beginAction(event.currentTarget,"Requesting reboot...");if(!finish)return;try{await fetchJson("/api/reboot");toast("Reboot requested - rejoin skyseeker when it returns")}catch(e){toast(e.message)}finally{finish();setControlsEnabled()}});
 el("backupStart").addEventListener("click",event=>startBackup(event.currentTarget));
+el("backupMove").addEventListener("click",event=>moveBackup(event.currentTarget));
 el("backupDelete").addEventListener("click",event=>deleteBackup(event.currentTarget));
 el("deleteDecisionCancel").addEventListener("click",()=>el("deleteDecisionModal").classList.remove("open"));
 el("deleteDecisionVerify").addEventListener("click",event=>verifyDeleteMatched(event.currentTarget));
@@ -1367,6 +1381,7 @@ SETUP_HTML = f'''{_HEAD}<title>SkySeeker Setup</title><style>{STYLE}</style></he
     <button class="go-btn" id="backupStart" type="button" data-locks>Start backup</button>
     <button class="danger-btn" id="backupDelete" type="button" data-locks>Verify &amp; delete</button>
   </div>
+  <button class="danger-btn mt" id="backupMove" type="button" data-locks style="width:100%">Copy &amp; delete</button>
   <div class="progress-track mt"><div class="progress-fill" id="backupFill"></div></div>
   <p class="muted small" id="backupState" style="margin-top:8px">Idle</p>
   <p class="benchmark-line mono" id="backupBenchmark">No benchmark recorded this session.</p>

@@ -126,6 +126,7 @@ class RsyncManager:
         self._verify: bool = False
         self._delete: bool = False
         self._tag_gps: bool = False
+        self._remove_source: bool = False
 
         # cache totals
         self._totals_ready = False
@@ -229,12 +230,15 @@ class RsyncManager:
         verify: bool = False,
         delete: bool = False,
         tag_gps: bool = False,
+        remove_source: bool = False,
     ) -> dict[str, Any]:
         src_p = Path(src)
         dst_p = Path(dst)
 
         if not src_p.exists() or not src_p.is_dir():
             return {"success": False}
+        if remove_source and tag_gps:
+            return {"success": False, "msg": "remove_source is not supported with GPS tagging"}
         dst_p.mkdir(parents=True, exist_ok=True)
 
         if tag_gps:
@@ -254,6 +258,7 @@ class RsyncManager:
             self._verify = bool(verify)
             self._delete = bool(delete)
             self._tag_gps = bool(tag_gps)
+            self._remove_source = bool(remove_source)
 
             # compute totals once
             total_bytes, total_files = self._scan_totals(self._src, self._files_from)
@@ -870,6 +875,15 @@ class RsyncManager:
             cmd.append("--checksum")    # slower; content-verify
         if self._delete:
             cmd.append("--delete-after")
+        if self._remove_source:
+            # rsync checksum-verifies every transferred file before the sender
+            # removes it, so the copy and delete happen in a single pass.
+            cmd.append("--remove-source-files")
+            # Continuously-updated telemetry under today's capture directory must
+            # never be removed from source; it is copied separately afterwards.
+            today = time.strftime("%Y_%m_%d")
+            for name in sorted(LIVE_TELEMETRY_NAMES):
+                cmd.append(f"--exclude=/{today}/{name}")
 
         # If files-from is provided, copy only those relative paths.
         # The files list is expected to be newline-delimited (relative to src).
@@ -888,7 +902,12 @@ class RsyncManager:
             copy_started = time.monotonic()
             with self._lock:
                 self._status.phase = "copying"
-                self._status.message = "Copying non-ARW files..." if self._tag_gps else "Copying files..."
+                if self._tag_gps:
+                    self._status.message = "Copying non-ARW files..."
+                elif self._remove_source:
+                    self._status.message = "Moving files..."
+                else:
+                    self._status.message = "Copying files..."
             self._proc = subprocess.Popen(
                 cmd,
                 stdout=subprocess.DEVNULL,
@@ -910,6 +929,26 @@ class RsyncManager:
                         self._status.message = f"Completed with {self._status.gps_failed} ARW errors."
                     elif self._status.gps_unresolved:
                         self._status.message = f"Completed with {self._status.gps_unresolved} unresolved GPS images."
+            cleanup_deleted = 0
+            cleanup_failed = False
+            if rc == 0 and self._remove_source:
+                with self._lock:
+                    stopping = self._status.phase == "stopping"
+                if not stopping:
+                    self._copy_live_telemetry()
+                    with self._lock:
+                        self._status.phase = "cleaning"
+                        self._status.message = "Removing verified source files..."
+                    # --remove-source-files only removes files transferred in this
+                    # run; sources that already matched the destination are cleaned
+                    # up here with the same verification as "Verify & delete".
+                    cleanup = self.verify_and_delete_matched_sampled(
+                        str(self._src),
+                        str(self._dst),
+                        progress_callback=self._set_move_progress,
+                    )
+                    cleanup_deleted = int((cleanup.get("delete") or {}).get("deleted") or 0)
+                    cleanup_failed = not cleanup.get("success")
             while True:
                 if not tricap_manager.unmount_disk():
                     time.sleep(2.0)
@@ -924,7 +963,12 @@ class RsyncManager:
                     self._status.message = "Stopped by user."
                 elif rc == 0:
                     self._status.phase = "finished"
-                    if not self._status.message.startswith("Completed with"):
+                    if self._remove_source and cleanup_failed:
+                        self._status.phase = "error"
+                        self._status.message = "Copy completed but some source files could not be verified; they were retained."
+                    elif self._remove_source:
+                        self._status.message = f"Completed. Deleted {cleanup_deleted} source files."
+                    elif not self._status.message.startswith("Completed with"):
                         self._status.message = "Completed."
                 else:
                     self._status.phase = "error"
@@ -938,6 +982,30 @@ class RsyncManager:
         finally:
             self._proc = None
             self._finalize_benchmark()
+
+    def _copy_live_telemetry(self) -> None:
+        """Copy today's continuously-updated telemetry files.
+
+        The move pass excludes these so rsync never removes them from source;
+        they are copied here (without source removal) so the backup stays complete.
+        """
+        assert self._src is not None and self._dst is not None
+        today = time.strftime("%Y_%m_%d")
+        for name in LIVE_TELEMETRY_NAMES:
+            source = self._src / today / name
+            if not source.is_file():
+                continue
+            destination = self._dst / today / name
+            try:
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(source, destination)
+            except OSError as exc:
+                self._logger.warning("Could not copy telemetry file %s: %s", source, exc)
+
+    def _set_move_progress(self, phase: str, completed: int, total: int) -> None:
+        with self._lock:
+            action = "Verifying" if phase == "verifying" else "Deleting"
+            self._status.message = f"{action} {completed}/{total} source files..."
 
     def _run_arw_backup(self) -> None:
         assert self._src is not None and self._dst is not None

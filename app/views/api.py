@@ -687,6 +687,31 @@ def backup_start():
   else:
     return jsonify({'msg': 'Failed to mount external disk'}), 400
 
+@api_bp.route('/api/backup_move', methods = ['GET'])
+def backup_move():
+  _logger.debug("backup_move req")
+  if tricap_manager.state in (CAM_MANAGER_STATES.STARTED, CAM_MANAGER_STATES.COPYING):
+    return jsonify({'msg': 'Not allowed in started or copying state'}), 400
+
+  if tricap_manager.mount_ssd():
+    src = MOUNT_POINT
+    dst = MOUNT_POINT_SSD
+    res = backupManager.start(src, dst, tag_gps=False, remove_source=True)
+
+    if (not res.get("success")) and res.get("msg") == "Insufficient space":
+        _logger.debug("Not enough free space. Starting partial copy & delete")
+        plan = backupManager.generate_partial_files_from(
+            src_root=src,
+            dst_root=dst,
+            margin_bytes=256 * 1024 * 1024
+        )
+        if not plan.get("success"):
+          return jsonify(res)
+        res = backupManager.start(src, dst, files_from=plan["files_from"], tag_gps=False, remove_source=True)
+    return jsonify(res)
+  else:
+    return jsonify({'msg': 'Failed to mount external disk'}), 400
+
 @api_bp.route('/api/backup_stop', methods = ['GET'])
 def backup_stop():
   _logger.debug("backup_stop req")

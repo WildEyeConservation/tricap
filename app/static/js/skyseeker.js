@@ -127,7 +127,7 @@
       var pct = Number(backup.percent || 0), fill = qs('#backup-progress');
       if (fill) { fill.style.width = pct + '%'; }
       setText('#backup-status', backup.running ? (backup.phase + ' ' + pct + '% (' + backup.files_done + '/' + backup.files_total + ' files)') : (backup.phase || 'idle'));
-      ['#backup-start', '#backup-verify-delete'].forEach(function (selector) {
+      ['#backup-start', '#backup-move', '#backup-verify-delete'].forEach(function (selector) {
         var button = qs(selector);
         if (button) { button.disabled = setupBackupRunning || button.getAttribute('data-action-busy') === 'true'; }
       });
@@ -188,6 +188,16 @@
         if (result && result.success === false) { throw new Error(result.msg || 'Backup failed to start'); }
         setupBackupRunning = true;
         loadingToast('Copying to SSD...');
+        refreshSetup();
+      }, function (err) { setText('#backup-status', err.message); });
+    }); }
+    var move = qs('#backup-move'); if (move) { move.addEventListener('click', function () {
+      if (!confirm('Copy files to the SSD and delete them from internal storage as they are verified?')) { return; }
+      setText('#backup-status', 'Starting copy & delete...');
+      requestAction(move, 'Starting copy & delete...', function () { return fetchJson('/api/backup_move'); }, function (result) {
+        if (result && result.success === false) { throw new Error(result.msg || 'Copy & delete failed to start'); }
+        setupBackupRunning = true;
+        loadingToast('Moving to SSD...');
         refreshSetup();
       }, function (err) { setText('#backup-status', err.message); });
     }); }

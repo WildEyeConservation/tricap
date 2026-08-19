@@ -37,6 +37,10 @@ LIVE_TELEMETRY_NAMES = {"gpsData.csv", "phoneGpsData.csv", "altitudeData.csv", "
 BACKUP_BENCHMARK_LOG = Path(
     os.environ.get("SKYSEEKER_BACKUP_BENCHMARK_LOG", "/home/radxa/tricap/logs/backup_benchmark.csv")
 )
+# Keep sustained writes below the external SSD's observed stable transfer rate.
+# rsync's limit also prevents the kernel from accumulating a large dirty-page
+# backlog that is only exposed when the destination is unmounted.
+BACKUP_BANDWIDTH_LIMIT = os.environ.get("SKYSEEKER_BACKUP_BWLIMIT", "15m").strip()
 
 @dataclass
 class BackupStatus:
@@ -865,6 +869,8 @@ class RsyncManager:
             "--partial",
             "--append-verify",    # safe resume
         ]
+        if BACKUP_BANDWIDTH_LIMIT:
+            cmd.append(f"--bwlimit={BACKUP_BANDWIDTH_LIMIT}")
         if self._tag_gps:
             cmd += ["--exclude=*.ARW", "--exclude=*.arw"]
         if self._verify:

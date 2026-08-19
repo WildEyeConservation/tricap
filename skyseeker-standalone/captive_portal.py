@@ -1037,9 +1037,9 @@ async function startBackup(control){
   finally{finish(backupRunning);setControlsEnabled()}
 }
 async function moveBackup(control){
-  if(!confirm("Copy files to the SSD and delete them from internal storage as they are verified?"))return;
   const finish=beginAction(control,"Starting copy & delete...");
   if(!finish)return;
+  el("moveConfirmModal").classList.remove("open");
   try{
     const r=await fetchJson("/api/backup_move");
     if(r&&r.success===false)toast(r.msg||"Copy & delete failed to start");
@@ -1120,7 +1120,9 @@ el("imageFormatJpeg").addEventListener("click",event=>setImageFormat("JPEG",even
 el("restartService").addEventListener("click",async event=>{if(!confirm("Restart the tricap capture service? Capture pauses briefly."))return;const finish=beginAction(event.currentTarget,"Restarting tricap...");if(!finish)return;try{await fetchJson("/api/restart");toast("tricap restart requested")}catch(e){toast(e.message)}finally{finish();setControlsEnabled()}});
 el("rebootDevice").addEventListener("click",async event=>{if(!confirm("Reboot the SkySeeker device? It will be offline for ~30-60s and you may need to rejoin Wi-Fi."))return;const finish=beginAction(event.currentTarget,"Requesting reboot...");if(!finish)return;try{await fetchJson("/api/reboot");toast("Reboot requested - rejoin skyseeker when it returns")}catch(e){toast(e.message)}finally{finish();setControlsEnabled()}});
 el("backupStart").addEventListener("click",event=>startBackup(event.currentTarget));
-el("backupMove").addEventListener("click",event=>moveBackup(event.currentTarget));
+el("backupMove").addEventListener("click",()=>el("moveConfirmModal").classList.add("open"));
+el("moveConfirmContinue").addEventListener("click",event=>moveBackup(event.currentTarget));
+el("moveConfirmCancel").addEventListener("click",()=>el("moveConfirmModal").classList.remove("open"));
 el("backupDelete").addEventListener("click",event=>deleteBackup(event.currentTarget));
 el("deleteDecisionCancel").addEventListener("click",()=>el("deleteDecisionModal").classList.remove("open"));
 el("deleteDecisionVerify").addEventListener("click",event=>verifyDeleteMatched(event.currentTarget));
@@ -1444,6 +1446,16 @@ SETUP_HTML = f'''{_HEAD}<title>SkySeeker Setup</title><style>{STYLE}</style></he
   <div class="seg"><button class="seg-btn" id="themeDefault" type="button">Default</button><button class="seg-btn" id="themeLight" type="button">Light</button><button class="seg-btn" id="themeDark" type="button">Dark</button></div>
 </section>
 </main>{_bottomnav("setup")}</div>
+<div class="consent-modal" id="moveConfirmModal" role="dialog" aria-modal="true" aria-labelledby="moveConfirmTitle">
+  <div class="consent-card">
+    <div class="consent-title" id="moveConfirmTitle">Copy &amp; delete?</div>
+    <p class="consent-text">Copies files to the SSD and deletes each one from internal storage once its transfer is verified. Files that cannot be verified are retained.</p>
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <button class="danger-btn" id="moveConfirmContinue" type="button">Copy &amp; delete</button>
+      <button class="consent-cancel" id="moveConfirmCancel" type="button">Cancel</button>
+    </div>
+  </div>
+</div>
 <div class="consent-modal" id="deleteDecisionModal" role="dialog" aria-modal="true" aria-labelledby="deleteDecisionTitle">
   <div class="consent-card">
     <div class="consent-title" id="deleteDecisionTitle">Clear internal storage?</div>

@@ -947,8 +947,14 @@ class RsyncManager:
                         str(self._dst),
                         progress_callback=self._set_move_progress,
                     )
-                    cleanup_deleted = int((cleanup.get("delete") or {}).get("deleted") or 0)
                     cleanup_failed = not cleanup.get("success")
+                    # rsync deletes transferred files in-flight, so the reported
+                    # count is measured from what remains on source rather than
+                    # from the cleanup pass alone.
+                    with self._lock:
+                        selected_files = self._status.total_files
+                    _, remaining_files = self._scan_totals(self._src, self._files_from)
+                    cleanup_deleted = max(0, selected_files - remaining_files)
             while True:
                 if not tricap_manager.unmount_disk():
                     time.sleep(2.0)

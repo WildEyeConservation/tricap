@@ -39,6 +39,10 @@ _force_delete_status = {
   'message': 'Idle',
   'errors': [],
 }
+# Free space on the external SSD only changes during a copy, so measure it
+# once per drive (at plug-in) and serve the cached value while unmounted.
+_ssd_info_lock = threading.Lock()
+_ssd_info_cache = {'device': None, 'info': None}
 
 @api_bp.route('/api')
 def api():
@@ -1165,24 +1169,69 @@ def _internal_disk_info():
 
     return info
 
+# def _external_disk_info():
+#     if tricap_manager.use_gpio_cams:
+#         return
+
+#     _logger.debug(f"_external_disk_info")
+#     info = {}
+#     is_mounted = os.path.ismount(MOUNT_POINT_SSD)
+#     if tricap_manager.mount_ssd():
+#         total, used, free = shutil.disk_usage(MOUNT_POINT_SSD)
+#         if not is_mounted:
+#             # only unmount if unmounted at the start of this function
+#             tricap_manager.unmount_disk()
+
+#         info['capacityGB'] = round(total / 1073741824, 2)
+#         info['usedGB'] = round(used / 1073741824, 2)
+#         info['freeGB'] = round(free / 1073741824, 2)
+    
+#     return info
+
 def _external_disk_info():
     if tricap_manager.use_gpio_cams:
         return
 
     _logger.debug(f"_external_disk_info")
-    info = {}
-    is_mounted = os.path.ismount(MOUNT_POINT_SSD)
-    if tricap_manager.mount_ssd():
-        total, used, free = shutil.disk_usage(MOUNT_POINT_SSD)
-        if not is_mounted:
-            # only unmount if unmounted at the start of this function
-            tricap_manager.unmount_disk()
 
-        info['capacityGB'] = round(total / 1073741824, 2)
-        info['usedGB'] = round(used / 1073741824, 2)
-        info['freeGB'] = round(free / 1073741824, 2)
-    
-    return info
+    def _usage():
+        total, used, free = shutil.disk_usage(MOUNT_POINT_SSD)
+        return {
+            'capacityGB': round(total / 1073741824, 2),
+            'usedGB': round(used / 1073741824, 2),
+            'freeGB': round(free / 1073741824, 2),
+        }
+
+    # Already mounted (a copy is running): read live, no mount needed.
+    if os.path.ismount(MOUNT_POINT_SSD):
+        info = _usage()
+        with _ssd_info_lock:
+            _ssd_info_cache['device'] = tricap_manager.external_ssd_device()
+            _ssd_info_cache['info'] = info
+        return info
+
+    device = tricap_manager.external_ssd_device()
+    if device is None:
+        with _ssd_info_lock:
+            _ssd_info_cache['device'] = None
+            _ssd_info_cache['info'] = None
+        return {}
+
+    with _ssd_info_lock:
+        # Same drive we already measured: serve the cached figures.
+        if _ssd_info_cache['device'] == device and _ssd_info_cache['info']:
+            return dict(_ssd_info_cache['info'])
+
+        # New drive since the last measurement: mount once, measure, unmount.
+        info = {}
+        if tricap_manager.mount_ssd():
+            try:
+                info = _usage()
+            finally:
+                tricap_manager.unmount_disk()
+            _ssd_info_cache['device'] = device
+            _ssd_info_cache['info'] = info
+        return info
 
 def _run_delete_dir_contents(root: Path) -> None:
     errors = []

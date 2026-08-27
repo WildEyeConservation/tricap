@@ -33,6 +33,14 @@ from support.gps_geotag import (
 # We compare within this tolerance instead; the sampled content fingerprint
 # (size + blake2b of sampled blocks) remains the real proof of file equality.
 EXFAT_MTIME_RESOLUTION_NS = 10_000_000  # 10 ms
+
+# Wall-clock ceilings for rsync inspection passes. These are wedge detectors,
+# not performance controls: a healthy scan takes seconds, so they sit far above
+# any legitimate duration. Without them a hung drive blocks the calling thread
+# forever - and _snapshot_progress is called from the Flask request thread.
+RSYNC_SCAN_TIMEOUT_SEC = 300      # dry-run inspection passes
+RSYNC_VERIFY_TIMEOUT_SEC = 1800   # verify passes may checksum the whole tree
+
 LIVE_TELEMETRY_NAMES = {"gpsData.csv", "phoneGpsData.csv", "altitudeData.csv", "accelData.bin"}
 BACKUP_BENCHMARK_LOG = Path(
     os.environ.get("SKYSEEKER_BACKUP_BENCHMARK_LOG", "/home/radxa/tricap/logs/backup_benchmark.csv")
@@ -809,7 +817,8 @@ class RsyncManager:
         cmd += [src_arg, str(dst_p)]
 
         try:
-            out = subprocess.check_output(cmd, text=True, stderr=subprocess.STDOUT, env=env)
+            out = subprocess.check_output(cmd, text=True, stderr=subprocess.STDOUT, env=env,
+                                          timeout=RSYNC_SCAN_TIMEOUT_SEC)
         except Exception as e:
             return {"success": False, "msg": f"rsync_dry_run_failed: {e}"}
 
@@ -1295,6 +1304,7 @@ class RsyncManager:
                 stderr=subprocess.STDOUT,
                 env=env,
                 cwd=cwd,
+                timeout=RSYNC_SCAN_TIMEOUT_SEC,
             )
             remaining_bytes = 0
             remaining_files = 0
@@ -1383,7 +1393,8 @@ class RsyncManager:
         env["LC_ALL"] = "C"  # stable parse
 
         try:
-            out = subprocess.check_output(cmd, text=True, stderr=subprocess.STDOUT, env=env, cwd=cwd)
+            out = subprocess.check_output(cmd, text=True, stderr=subprocess.STDOUT, env=env, cwd=cwd,
+                                          timeout=RSYNC_SCAN_TIMEOUT_SEC)
             remaining_bytes = 0
             remaining_files = 0
 
@@ -1413,6 +1424,17 @@ class RsyncManager:
             bytes_copied = max(0, min(total_bytes, non_arw_done + arw_bytes_done))
             files_done = max(0, min(total_files, non_arw_files_done + arw_files_done))
             return bytes_copied, files_done
+
+        except subprocess.TimeoutExpired:
+            # The drive is not responding. The filesystem fallback below would
+            # stat every destination file, making the problem worse, so serve
+            # the last known figures instead.
+            self._logger.warning(
+                "Progress scan exceeded %ss; serving cached progress",
+                RSYNC_SCAN_TIMEOUT_SEC,
+            )
+            with self._lock:
+                return self._snap_cache
 
         except Exception:
             # Fallback: filesystem snapshot (min(dst_size, src_size))
@@ -1508,7 +1530,8 @@ class RsyncManager:
         missing = 0
         samples: list[str] = []
         try:
-            out1 = subprocess.check_output(cmd1, text=True, stderr=subprocess.STDOUT, env=env)
+            out1 = subprocess.check_output(cmd1, text=True, stderr=subprocess.STDOUT, env=env,
+                                           timeout=RSYNC_VERIFY_TIMEOUT_SEC)
             for line in out1.splitlines():
                 # Expect: "<itemize>|<path>"
                 try:
@@ -1524,7 +1547,7 @@ class RsyncManager:
                         changed += 1
                     if len(samples) < sample_limit:
                         samples.append(f"{'MISSING' if is_missing else 'CHANGED'}: {path}")
-        except subprocess.CalledProcessError as e:
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as e:
             # Treat as verification failure
             return {
                 "ok": False,
@@ -1565,13 +1588,14 @@ class RsyncManager:
 
         extra = 0
         try:
-            out2 = subprocess.check_output(cmd2, text=True, stderr=subprocess.STDOUT, env=env)
+            out2 = subprocess.check_output(cmd2, text=True, stderr=subprocess.STDOUT, env=env,
+                                           timeout=RSYNC_VERIFY_TIMEOUT_SEC)
             for line in out2.splitlines():
                 if line.startswith("deleting "):
                     extra += 1
                     if len(samples) < sample_limit:
                         samples.append(f"EXTRA: {line[len('deleting '):]}")
-        except subprocess.CalledProcessError as e:
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as e:
             return {
                 "ok": False,
                 "missing": -1,

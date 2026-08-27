@@ -63,8 +63,25 @@
   window.SkySeekerActions = { begin: beginAction, toast: toast, loading: loadingToast };
   window.SkySeekerClock = { sync: syncPhoneClock };
 
+  // Poll on a self-scheduling timer so a slow response can never cause
+  // requests to pile up. While a backup to the SSD is in progress, back off
+  // to 10s and fetch only backup status.
+  function scheduleLoop(fullRefresh, backupOnlyRefresh) {
+    var isBackingUp = false;
+    function tick() {
+      (isBackingUp ? backupOnlyRefresh : fullRefresh)().then(function (backupInProgress) {
+        var wasBackingUp = isBackingUp;
+        isBackingUp = Boolean(backupInProgress);
+        if (wasBackingUp && !isBackingUp) { return fullRefresh(); }   // backup just ended
+      }).catch(function () {}).then(function () {
+        setTimeout(tick, isBackingUp ? 10000 : 3000);
+      });
+    }
+    tick();
+  }
+
   function refreshHome() {
-    Promise.all([
+    return Promise.all([
       fetchJson('/api/status').catch(function () { return {}; }),
       fetchJson('/api/images_captured').catch(function () { return {}; }),
       fetchJson('/api/statistics').catch(function () { return {}; }),
@@ -98,12 +115,37 @@
       else if (backup.running) { setText('#sky-copy-progress', 'Backup ' + backup.phase + ' ' + backup.percent + '%'); }
       else { setText('#sky-copy-progress', 'No active copy reported.'); }
       setUpdated('#sky-updated');
+      return Boolean(backup.running);
+    });
+  }
+
+  function refreshHomeBackupOnly() {
+    // Storage figures are still fetched during a backup: the SSD is mounted
+    // for the duration, so _external_disk_info() reads it live with a cheap
+    // statvfs and no mount. Free space is the one figure that matters here.
+    return Promise.all([
+      fetchJson('/api/backup_status').catch(function () { return {}; }),
+      fetchJson('/api/statistics').catch(function () { return {}; })
+    ]).then(function (parts) {
+      var backup = parts[0], stats = parts[1];
+      if (backup.running) {
+        setText('#sky-copy-progress', 'Backup ' + backup.phase + ' ' + backup.percent + '%');
+      }
+      var internal = stats.internalStorage || {}, external = stats.externalStorage || {};
+      setText('#sky-int-free', fmtGB(internal.freeGB));
+      setText('#sky-int-used', fmtGB(internal.usedGB));
+      setText('#sky-int-capacity', fmtGB(internal.capacityGB));
+      setText('#sky-ext-free', fmtGB(external.freeGB));
+      setText('#sky-ext-used', fmtGB(external.usedGB));
+      setText('#sky-ext-capacity', fmtGB(external.capacityGB));
+      setUpdated('#sky-updated');
+      return Boolean(backup.running);
     });
   }
 
   var setupBackupRunning = false;
   function refreshSetup() {
-    Promise.all([
+    return Promise.all([
       fetchJson('/api/status').catch(function () { return {}; }),
       fetchJson('/api/statistics').catch(function () { return {}; }),
       fetchJson('/api/backup_status').catch(function () { return {}; }),
@@ -146,10 +188,30 @@
       setText('#netbird-pill', netbird.connected ? 'connected' : 'offline');
       setText('#netbird-status', netbird.connected ? 'Connected' : 'Disconnected');
       setUpdated('#setup-updated');
+      return Boolean(backup.running);
     });
   }
 
-  function initHome() { refreshHome(); setInterval(refreshHome, 3000); }
+  function refreshSetupBackupOnly() {
+    return fetchJson('/api/backup_status').catch(function () { return {}; })
+      .then(function (backup) {
+        var backupWasRunning = setupBackupRunning;
+        setupBackupRunning = Boolean(backup.running);
+        var pct = Number(backup.percent || 0), fill = qs('#backup-progress');
+        if (fill) { fill.style.width = pct + '%'; }
+        setText('#backup-status', backup.running ? (backup.phase + ' ' + pct + '% (' + backup.files_done + '/' + backup.files_total + ' files)') : (backup.phase || 'idle'));
+        ['#backup-start', '#backup-move', '#backup-verify-delete'].forEach(function (selector) {
+          var button = qs(selector);
+          if (button) { button.disabled = setupBackupRunning || button.getAttribute('data-action-busy') === 'true'; }
+        });
+        if (setupBackupRunning) { loadingToast('Copying to SSD... ' + Math.round(pct) + '%'); }
+        else if (backupWasRunning) { toast(backup.message || 'Backup complete'); }
+        setUpdated('#setup-updated');
+        return setupBackupRunning;
+      });
+  }
+
+  function initHome() { scheduleLoop(refreshHome, refreshHomeBackupOnly); }
   function initSetup() {
     function updateInterval(delta, button) {
       var displayed = Number((qs('#capture-interval-value') || {}).textContent || 0);
@@ -236,7 +298,7 @@
       var button = event.submitter || document.activeElement;
       if (!beginAction(button, button && button.id === 'btn_revert' ? 'Restoring defaults...' : 'Saving settings...', true)) { event.preventDefault(); }
     }); }
-    refreshSetup(); setInterval(refreshSetup, 3000);
+    scheduleLoop(refreshSetup, refreshSetupBackupOnly);
   }
   document.addEventListener('DOMContentLoaded', function () {
     syncPhoneClock().catch(function () {});

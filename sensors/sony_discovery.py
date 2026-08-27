@@ -4,7 +4,7 @@ import time
 
 
 def discover_sony_cameras(camera_factory, attempts=15, interval=2.0,
-                          stable_results=1, logger=None):
+                          stable_results=3, logger=None):
     """Return ``(sdk, count)`` after retrying transient empty/error results.
 
     USB cameras can finish enumerating after the application service starts.
@@ -16,6 +16,9 @@ def discover_sony_cameras(camera_factory, attempts=15, interval=2.0,
     last_error = None
     last_count = 0
     stable_count = 0
+
+    # Allow powered USB hub to come online
+    time.sleep(5)
 
     for attempt in range(1, attempts + 1):
         sdk = None

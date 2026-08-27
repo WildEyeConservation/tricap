@@ -137,7 +137,7 @@ class TriCapCamsManager:
 
     def _initialise(self):
         try:
-            self._find_cameras(discovery_attempts=5)
+            self._find_cameras()
         except Exception as exc:
             self.camera_startup_error = str(exc)
             self._logger.error(

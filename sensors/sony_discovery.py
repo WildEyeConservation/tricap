@@ -18,7 +18,7 @@ def discover_sony_cameras(camera_factory, attempts=15, interval=2.0,
     stable_count = 0
 
     # Allow powered USB hub to come online
-    time.sleep(5)
+    # time.sleep(20)
 
     for attempt in range(1, attempts + 1):
         sdk = None

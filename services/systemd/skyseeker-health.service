@@ -1,0 +1,8 @@
+[Unit]
+Description=SkySeeker health snapshot and bounded AP recovery
+After=hostapd.service dnsmasq.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/skyseeker-health --recover
+TimeoutStartSec=90s

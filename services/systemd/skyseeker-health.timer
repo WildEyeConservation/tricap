@@ -1,5 +1,5 @@
 [Unit]
-Description=Periodically verify the SkySeeker Wi-Fi AP
+Description=Periodically record device health and recover AP services
 
 [Timer]
 OnBootSec=90s

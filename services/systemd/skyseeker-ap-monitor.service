@@ -1,7 +1,0 @@
-[Unit]
-Description=SkySeeker AP health snapshot (log-only, takes no action)
-
-[Service]
-Type=oneshot
-ExecStart=/usr/local/sbin/skyseeker-ap-monitor
-TimeoutStartSec=30s

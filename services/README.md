@@ -7,7 +7,6 @@ These mirror files that live outside the repo on the device:
 - `modprobe.d/` -> `/etc/modprobe.d/`
 - `udev-rules.d/` -> `/etc/udev/rules.d/`
 - `usr-local/sbin/` -> `/usr/local/sbin/`
-- `usr-local/bin/` -> `/usr/local/bin/`
 
 Flask owns the operator UI and API and listens directly on port 80 through
 `tricap.service`. Its request boundary accepts loopback, the
@@ -23,11 +22,10 @@ sudo install -D -m 0644 services/journald.conf.d/skyseeker-journald.conf /etc/sy
 sudo cp services/modprobe.d/* /etc/modprobe.d/
 sudo cp services/udev-rules.d/* /etc/udev/rules.d/
 sudo cp services/usr-local/sbin/* /usr/local/sbin/
-sudo cp services/usr-local/bin/* /usr/local/bin/
 sudo systemctl daemon-reload
 sudo systemctl restart systemd-journald
-sudo systemctl enable --now skyseeker-ap-monitor.timer
-sudo systemctl enable --now skyseeker-ap-watchdog.timer
+sudo systemctl enable --now skyseeker-health.timer
+sudo systemctl enable --now skyseeker-recovery-scan.timer
 sudo systemctl restart tricap.service
 ```
 
@@ -36,28 +34,34 @@ loads (reboot, or a manual module reload with hostapd stopped). The udev rule
 and the `power_save off` assert in `skyseeker-ap-autodetect.sh` apply from the
 next boot on their own.
 
-`skyseeker-ap-monitor.timer` logs a one-line AP/DHCP/PCIe health snapshot to the
-journal every 15 seconds (`journalctl -t skyseeker-ap-monitor` or
-`journalctl -u skyseeker-ap-monitor.service`). It is log-only and takes no
-recovery action. The journald drop-in makes logs persistent (bounded at 200 MB)
-so a field failure can be analysed after a reboot or power cycle.
+`skyseeker-health.timer` records AP, service, storage, PCIe, temperature, load,
+and memory state every 15 seconds. Three consecutive AP failures restart only
+the failed hostapd or dnsmasq service, with a ten-minute cooldown and no reboot
+path. Run `skyseeker-health` manually for the same read-only snapshot. The
+journald drop-in keeps these records across reboots and bounds them at 200 MB.
 
-`skyseeker-ap-watchdog.timer` checks the AP path end to end every 15 seconds
-(hostapd via its control socket, driver AP mode, link state, dnsmasq). Three
-consecutive failures restart the failed service - hostapd, or dnsmasq for the
-"AP visible but no DHCP" case. It has **no reboot path in the code** and a
-10-minute cooldown between restarts, so a false positive can never loop. Every
-decision is logged. For maintenance, `touch /run/skyseeker-ap-watchdog.disabled`
-(clears on reboot). It needs hostapd's control socket, which
-`skyseeker-ap-autodetect.sh` enables in the hostapd config at boot; the first
-hostapd (re)start after that change brings the socket up.
+`skyseeker-recovery-scan.timer` scans for the pre-provisioned
+`skyseeker-rescue` hotspot whenever the onboard radio has no active uplink. It
+does not replace a working connection and does not manage NetBird. See
+[`docs/stability-recovery-plan.md`](../docs/stability-recovery-plan.md) for the
+full behavior and incident guide.
 
-On a device that still has the retired forwarding service, remove it once after
+On a device with retired web or recovery services, remove them once after
 installing the current units:
 
 ```sh
-sudo systemctl disable --now skyseeker-portal.service
-sudo rm -f /etc/systemd/system/skyseeker-portal.service
+sudo systemctl disable --now skyseeker-portal.service skyseeker-diag.service \
+  skyseeker-ap-monitor.timer skyseeker-ap-watchdog.timer udp-ip.service
+sudo rm -f /etc/systemd/system/skyseeker-portal.service \
+  /etc/systemd/system/skyseeker-diag.service \
+  /etc/systemd/system/skyseeker-ap-monitor.service \
+  /etc/systemd/system/skyseeker-ap-monitor.timer \
+  /etc/systemd/system/skyseeker-ap-watchdog.service \
+  /etc/systemd/system/skyseeker-ap-watchdog.timer \
+  /usr/local/bin/skyseeker-diag.py \
+  /usr/local/sbin/skyseeker-ap-monitor \
+  /usr/local/sbin/skyseeker-ap-watchdog \
+  /etc/systemd/system/udp-ip.service
 sudo systemctl daemon-reload
 ```
 

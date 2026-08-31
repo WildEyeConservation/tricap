@@ -1,63 +1,107 @@
-#!/bin/bash
-# Periodically connect the onboard Broadcom radio to the phone recovery AP.
-# The USB RTL8192EU adapter is reserved for the skyseeker access point.
-set -u
+#!/usr/bin/env python3
+"""Join the rescue hotspot when the onboard Wi-Fi has no active uplink."""
 
-export PATH=/usr/sbin:/sbin:/usr/bin:/bin
-PROFILE="${SKYSEEKER_RECOVERY_PROFILE:-skyseeker-rescue}"
-SSID="${SKYSEEKER_RECOVERY_SSID:-skyseeker-rescue}"
-LOG_TAG=skyseeker-recovery-scan
+from __future__ import annotations
 
-log() {
-    logger -t "$LOG_TAG" "$1" 2>/dev/null || true
-    echo "$LOG_TAG: $1"
-}
+import os
+from pathlib import Path
+import subprocess
 
-detect_onboard_iface() {
-    local path driver
-    for path in /sys/class/net/*; do
-        [ -d "$path/wireless" ] || continue
-        driver=$(basename "$(readlink -f "$path/device/driver" 2>/dev/null)" 2>/dev/null)
-        [ "$driver" != "brcmfmac" ] || {
-            basename "$path"
-            return 0
-        }
-    done
-    return 1
-}
 
-command -v nmcli >/dev/null 2>&1 || {
-    log "NetworkManager is unavailable"
-    exit 0
-}
+NMCLI = "/usr/bin/nmcli"
+SYS_CLASS_NET = Path("/sys/class/net")
+PROFILE = os.environ.get("SKYSEEKER_RECOVERY_PROFILE", "skyseeker-rescue")
+SSID = os.environ.get("SKYSEEKER_RECOVERY_SSID", "skyseeker-rescue")
 
-iface=$(detect_onboard_iface || true)
-[ -n "$iface" ] || {
-    log "onboard Broadcom Wi-Fi interface not found"
-    exit 0
-}
 
-nmcli -t -f NAME connection show 2>/dev/null | grep -Fxq "$PROFILE" || {
-    log "recovery profile '$PROFILE' is not provisioned"
-    exit 0
-}
+def run(args, timeout=15):
+    try:
+        return subprocess.run(
+            args, capture_output=True, text=True, timeout=timeout, check=False
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        return subprocess.CompletedProcess(args, 124, "", str(exc))
 
-if nmcli -t -f NAME,DEVICE connection show --active 2>/dev/null |
-        grep -Fxq "$PROFILE:$iface"; then
-    exit 0
-fi
 
-nmcli device set "$iface" managed yes 2>/dev/null || true
-nmcli device wifi rescan ifname "$iface" ssid "$SSID" 2>/dev/null || true
+def log(message):
+    print(f"skyseeker-recovery-scan: {message}", flush=True)
 
-if ! nmcli -t -f SSID device wifi list ifname "$iface" --rescan no 2>/dev/null |
-        grep -Fxq "$SSID"; then
-    exit 0
-fi
 
-if nmcli connection up "$PROFILE" ifname "$iface" >/dev/null 2>&1; then
-    log "connected $iface to recovery AP '$SSID'"
-else
-    log "recovery AP '$SSID' is visible but connection failed"
-fi
-exit 0
+def interface_driver(interface):
+    try:
+        driver = SYS_CLASS_NET / interface / "device" / "driver"
+        return driver.resolve(strict=True).name
+    except OSError:
+        return ""
+
+
+def onboard_interface():
+    try:
+        interfaces = sorted(SYS_CLASS_NET.iterdir())
+    except OSError:
+        return None
+    for path in interfaces:
+        if (
+            (path / "wireless").is_dir()
+            and interface_driver(path.name) == "brcmfmac"
+        ):
+            return path.name
+    return None
+
+
+def active_connection(interface):
+    result = run([
+        NMCLI, "-t", "-f", "NAME,DEVICE", "connection", "show", "--active",
+    ])
+    if result.returncode:
+        return None
+    for line in result.stdout.splitlines():
+        name, separator, device = line.rpartition(":")
+        if separator and device == interface:
+            return name.replace("\\:", ":")
+    return None
+
+
+def profile_exists():
+    result = run([NMCLI, "-t", "-f", "NAME", "connection", "show"])
+    return not result.returncode and PROFILE in result.stdout.splitlines()
+
+
+def rescue_visible(interface):
+    run([NMCLI, "device", "wifi", "rescan", "ifname", interface, "ssid", SSID])
+    result = run([
+        NMCLI, "-t", "-f", "SSID", "device", "wifi", "list", "ifname",
+        interface, "--rescan", "no",
+    ])
+    return not result.returncode and SSID in result.stdout.splitlines()
+
+
+def main():
+    interface = onboard_interface()
+    if not interface:
+        log("onboard Broadcom Wi-Fi interface not found")
+        return 0
+
+    if active_connection(interface):
+        return 0
+
+    if not profile_exists():
+        log(f"recovery profile '{PROFILE}' is not provisioned")
+        return 0
+
+    if not rescue_visible(interface):
+        return 0
+
+    result = run(
+        [NMCLI, "--wait", "30", "connection", "up", PROFILE, "ifname", interface],
+        timeout=35,
+    )
+    if result.returncode:
+        log(f"recovery hotspot '{SSID}' is visible but connection failed")
+    else:
+        log(f"connected {interface} to recovery hotspot '{SSID}'")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

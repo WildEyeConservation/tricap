@@ -1,0 +1,277 @@
+#!/usr/bin/env python3
+"""Report SkySeeker health and perform bounded AP service recovery."""
+
+from __future__ import annotations
+
+import argparse
+import glob
+import json
+import os
+from pathlib import Path
+import re
+import subprocess
+import time
+
+
+SYSTEMCTL = "/bin/systemctl"
+IP = "/usr/sbin/ip"
+IW = "/usr/sbin/iw"
+HOSTAPD_CLI = "/usr/sbin/hostapd_cli"
+CONTROL_PATH = "/run/hostapd"
+DMESG = "/bin/dmesg"
+STATE_PATH = Path("/run/skyseeker-health.state")
+DISABLE_PATH = Path("/run/skyseeker-health.disabled")
+SYS_CLASS_NET = Path("/sys/class/net")
+INTERNAL_STORAGE = "/mnt/ext_cam_storage"
+FAILURES_BEFORE_RESTART = 3
+RESTART_COOLDOWN_SECONDS = 600
+RESTART_SETTLE_SECONDS = 3
+
+
+def run(args, timeout=6):
+    try:
+        return subprocess.run(
+            args, capture_output=True, text=True, timeout=timeout, check=False
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        return subprocess.CompletedProcess(args, 124, "", str(exc))
+
+
+def unit_state(unit):
+    result = run([SYSTEMCTL, "is-active", unit])
+    return result.stdout.strip() or "unavailable"
+
+
+def find_ap_interface(iw_output):
+    interface = None
+    for raw in iw_output.splitlines():
+        fields = raw.strip().split()
+        if len(fields) == 2 and fields[0] == "Interface":
+            interface = fields[1]
+        elif fields == ["type", "AP"] and interface:
+            return interface
+    return None
+
+
+def interface_driver(interface):
+    if not interface:
+        return "none"
+    try:
+        return (SYS_CLASS_NET / interface / "device" / "driver").resolve(strict=True).name
+    except OSError:
+        return "unknown"
+
+
+def station_stats(interface):
+    result = run([IW, "dev", interface, "station", "dump"])
+    if result.returncode:
+        return -1, None
+    count = len(re.findall(r"^Station ", result.stdout, flags=re.M))
+    signals = [
+        int(signal)
+        for signal in re.findall(r"^\s*signal:\s*(-?\d+)", result.stdout, flags=re.M)
+    ]
+    return count, min(signals) if signals else None
+
+
+def link_up(interface):
+    result = run([IP, "-o", "link", "show", "dev", interface])
+    return result.returncode == 0 and bool(
+        re.search(r"<[^>]*\bUP\b[^>]*>", result.stdout)
+    )
+
+
+def control_state(interface):
+    if not Path(CONTROL_PATH, interface).exists():
+        return "missing"
+    result = run([HOSTAPD_CLI, "-p", CONTROL_PATH, "-i", interface, "ping"])
+    if result.returncode or result.stdout.strip() != "PONG":
+        return "unresponsive"
+    result = run([HOSTAPD_CLI, "-p", CONTROL_PATH, "-i", interface, "status"])
+    for line in result.stdout.splitlines():
+        if line.startswith("state="):
+            return line.split("=", 1)[1]
+    return "unknown"
+
+
+def ap_status():
+    hostapd = unit_state("hostapd.service")
+    dnsmasq = unit_state("dnsmasq.service")
+    iw_result = run([IW, "dev"])
+    interface = find_ap_interface(iw_result.stdout) if not iw_result.returncode else None
+    stations, signal = station_stats(interface) if interface else (-1, None)
+    return {
+        "hostapd": hostapd,
+        "dnsmasq": dnsmasq,
+        "interface": interface,
+        "driver": interface_driver(interface),
+        "link_up": link_up(interface) if interface else False,
+        "control": control_state(interface) if interface else "missing",
+        "stations": stations,
+        "weakest_signal": signal,
+    }
+
+
+def ap_health(status):
+    if status["hostapd"] != "active":
+        return False, "hostapd service is not active", ["hostapd.service"]
+    if not status["interface"]:
+        return False, "no AP interface reported by the Wi-Fi driver", ["hostapd.service"]
+    if not status["link_up"]:
+        return False, f"AP interface {status['interface']} is not up", ["hostapd.service"]
+    if status["control"] != "ENABLED":
+        return False, "hostapd control interface is not healthy", ["hostapd.service"]
+    if status["dnsmasq"] != "active":
+        return False, "dnsmasq (DHCP) is not active", ["dnsmasq.service"]
+    return True, f"AP {status['interface']} is responsive", []
+
+
+def cpu_temp_c():
+    temperatures = []
+    for path in glob.glob("/sys/class/thermal/thermal_zone*/temp"):
+        try:
+            temperatures.append(int(Path(path).read_text(encoding="ascii").strip()))
+        except (OSError, ValueError):
+            continue
+    return max(temperatures) // 1000 if temperatures else -1
+
+
+def load_1min():
+    try:
+        return Path("/proc/loadavg").read_text(encoding="ascii").split()[0]
+    except (OSError, IndexError):
+        return "unknown"
+
+
+def mem_available_mb():
+    try:
+        for line in Path("/proc/meminfo").read_text(encoding="ascii").splitlines():
+            if line.startswith("MemAvailable:"):
+                return int(line.split()[1]) // 1024
+    except (OSError, ValueError, IndexError):
+        pass
+    return -1
+
+
+def pcie_error_count():
+    result = run([DMESG], timeout=10)
+    if result.returncode:
+        return -1
+    pattern = re.compile(r"pcie bus error|aer:|nvme.*(error|fail|timeout)", re.I)
+    return sum(1 for line in result.stdout.splitlines() if pattern.search(line))
+
+
+def snapshot(status):
+    healthy, _, _ = ap_health(status)
+    return {
+        "ap": "ok" if healthy else "failed",
+        "interface": status["interface"] or "none",
+        "driver": status["driver"],
+        "link": "up" if status["link_up"] else "down",
+        "stations": status["stations"],
+        "weakest_dbm": (
+            status["weakest_signal"]
+            if status["weakest_signal"] is not None
+            else "none"
+        ),
+        "control": status["control"],
+        "hostapd": status["hostapd"],
+        "dnsmasq": status["dnsmasq"],
+        "tricap": unit_state("tricap.service"),
+        "netbird": unit_state("netbird.service"),
+        "storage": "mounted" if os.path.ismount(INTERNAL_STORAGE) else "unmounted",
+        "pcie_errors": pcie_error_count(),
+        "temp_c": cpu_temp_c(),
+        "load_1m": load_1min(),
+        "mem_available_mb": mem_available_mb(),
+    }
+
+
+def print_snapshot(status):
+    values = " ".join(f"{key}={value}" for key, value in snapshot(status).items())
+    print(f"skyseeker-health: {values}", flush=True)
+
+
+def load_state():
+    try:
+        state = json.loads(STATE_PATH.read_text(encoding="utf-8"))
+        return {
+            "failures": max(0, int(state.get("failures", 0))),
+            "last_restart": float(state.get("last_restart", 0.0)),
+        }
+    except (OSError, ValueError, TypeError):
+        return {"failures": 0, "last_restart": 0.0}
+
+
+def save_state(state):
+    temporary = STATE_PATH.with_suffix(".tmp")
+    temporary.write_text(json.dumps(state), encoding="utf-8")
+    os.replace(temporary, STATE_PATH)
+
+
+def recover(status):
+    if DISABLE_PATH.exists():
+        print(f"skyseeker-health: recovery disabled by {DISABLE_PATH}", flush=True)
+        return 0
+
+    healthy, detail, services = ap_health(status)
+    state = load_state()
+    if healthy:
+        if state["failures"]:
+            print(f"skyseeker-health: recovered without action: {detail}", flush=True)
+        save_state({"failures": 0, "last_restart": state["last_restart"]})
+        return 0
+
+    failures = state["failures"] + 1
+    print(
+        f"skyseeker-health: failure {failures}/{FAILURES_BEFORE_RESTART}: {detail}",
+        flush=True,
+    )
+    if failures < FAILURES_BEFORE_RESTART:
+        save_state({"failures": failures, "last_restart": state["last_restart"]})
+        return 0
+
+    since_restart = time.time() - state["last_restart"]
+    if since_restart < RESTART_COOLDOWN_SECONDS:
+        print(
+            "skyseeker-health: restart suppressed by "
+            f"{RESTART_COOLDOWN_SECONDS}s cooldown",
+            flush=True,
+        )
+        save_state({"failures": failures, "last_restart": state["last_restart"]})
+        return 0
+
+    for service in services:
+        print(f"skyseeker-health: restarting {service}: {detail}", flush=True)
+        result = run([SYSTEMCTL, "restart", service], timeout=20)
+        if result.returncode:
+            print(
+                f"skyseeker-health: restart failed: {result.stderr.strip()}",
+                flush=True,
+            )
+    save_state({"failures": 0, "last_restart": time.time()})
+
+    time.sleep(RESTART_SETTLE_SECONDS)
+    healthy, detail, _ = ap_health(ap_status())
+    outcome = "ok" if healthy else "still-failing"
+    print(f"skyseeker-health: post-restart={outcome} detail={detail}", flush=True)
+    return 0
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(description="Report SkySeeker device health")
+    parser.add_argument(
+        "--recover",
+        action="store_true",
+        help="apply bounded hostapd or dnsmasq restart recovery",
+    )
+    args = parser.parse_args(argv)
+    status = ap_status()
+    print_snapshot(status)
+    if args.recover:
+        return recover(status)
+    return 0 if ap_health(status)[0] else 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

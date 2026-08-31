@@ -8,3 +8,4 @@ Type=oneshot
 Environment=SKYSEEKER_RECOVERY_PROFILE=skyseeker-rescue
 Environment=SKYSEEKER_RECOVERY_SSID=skyseeker-rescue
 ExecStart=/usr/local/sbin/skyseeker-recovery-scan
+TimeoutStartSec=75s

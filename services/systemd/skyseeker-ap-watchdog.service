@@ -1,9 +1,0 @@
-[Unit]
-Description=SkySeeker AP recovery check (restart-only, never reboots)
-After=hostapd.service
-ConditionPathExists=/etc/hostapd/hostapd-skyseeker.conf
-
-[Service]
-Type=oneshot
-ExecStart=/usr/local/sbin/skyseeker-ap-watchdog
-TimeoutStartSec=45s

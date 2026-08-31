@@ -958,6 +958,9 @@ class RsyncManager:
                         selected_files = self._status.total_files
                     _, remaining_files = self._scan_totals(self._src, self._files_from)
                     cleanup_deleted = max(0, selected_files - remaining_files)
+            # Cache the SSD's free space while it is still mounted, so the UI does
+            # not keep serving the pre-copy figure after unmount.
+            tricap_manager.refresh_ssd_usage()
             while True:
                 if not tricap_manager.unmount_disk():
                     time.sleep(2.0)

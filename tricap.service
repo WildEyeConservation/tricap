@@ -8,9 +8,7 @@ Wants=network-online.target
 User=root
 Restart=always
 RestartSec=5
-ExecStartPre=/home/radxa/tricap/get_time_from_camera.sh
 ExecStart=/home/radxa/tricap/tricap_launcher.sh
-PermissionsStartOnly=True
 
 [Install]
 WantedBy=multi-user.target

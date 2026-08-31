@@ -16,12 +16,6 @@ RET_ERROR = -1
 RET_OK = 0
 SERVER_LOG_NAME = 'tricap_server_log'
 
-# gphoto2 canon eos 6d configs
-CE6D_CAP_TARGET_MEMORY = 'Internal RAM'
-CE6D_CAP_TARGET_SD_CARD = 'Memory card'
-
-CE6D_FORMAT_RAW = 'RAW'
-
 # Sony Camera Remote SDK image formats. Default deliberately does not write
 # the SDK property, leaving the format selected on each camera untouched.
 SONY_IMAGE_FORMAT_CONFIG_KEY = 'sony_image_format'
@@ -49,8 +43,6 @@ SONY_PC_IMAGE_FORMAT_FILE_TYPES = {
 # Altimeter default configs
 ALTI_NUM_AVG_FRAMES = 2
 ALTI_MEASURE_TIMEOUT = 2
-
-NUM_DUMMY_CAMS = 3
 
 MOUNT_POINT = "/mnt/ext_cam_storage"
 MOUNT_POINT_SSD = "/mnt/ssd_cam_storage"

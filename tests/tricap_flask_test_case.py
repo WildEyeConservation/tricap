@@ -10,21 +10,11 @@ import os
 from common_tests.flask_test_case import FlaskAppTestCase, FlaskBehaviourTestCase
 from .tricap_tempfile_test_case import TriCapTempFilerTestCase
 
-from support.configure import TricapConfig
 from app import app
 
 
 class TriCapAppTestCase(FlaskAppTestCase, TriCapTempFilerTestCase):
     """Base class for all behaviour tests."""
-
-    def _setup_dummies(self):
-        triconfig = TricapConfig()
-
-        web_settings = triconfig.get_section_dict(TricapConfig.WEB_SECTION_HEADER)
-        web_settings['alti_required'] = 'dummy'
-        web_settings['cams_required'] = 'dummy'
-        triconfig.set_section(web_settings, TricapConfig.WEB_SECTION_HEADER)
-        triconfig.save_to_file()
 
     def create_app(self):
         """Additional setup function needed for flask tests."""

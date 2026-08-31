@@ -14,7 +14,7 @@ class ComponentHealthTests(unittest.TestCase):
         manager.camera_startup_error = "Sony SDK reported zero cameras"
         gps = Mock(isConnected=False)
         gps.hasGps.return_value = False
-        altimeter = Mock(available=False, configured_type='altimeter')
+        altimeter = Mock(available=False)
         imu = Mock(_BerryIMUversion=99)
 
         health = component_health(
@@ -30,6 +30,7 @@ class ComponentHealthTests(unittest.TestCase):
             health['cameras']['error'],
             "Sony SDK reported zero cameras",
         )
+        self.assertIn('GRF-500', health['altimeter']['message'])
 
 
 if __name__ == "__main__":

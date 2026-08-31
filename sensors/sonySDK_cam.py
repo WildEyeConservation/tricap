@@ -11,9 +11,6 @@ from io import BytesIO
 import base64
 import signal
 import time
-from scipy import interpolate
-import numpy as np
-import csv
 import atexit
 
 
@@ -31,7 +28,6 @@ from config import (
     SONY_PC_IMAGE_FORMAT_FILE_TYPES,
 )
 sys.path.append(os.path.abspath("/home/radxa/SonySDKWrapper"))
-from sonySDKWrapper import *
 
 import subprocess, hashlib, json, tempfile
 from pathlib import Path
@@ -634,62 +630,10 @@ class sonySDKcam():
         """Return the state of the camera as a string."""
         return self.state.name
 
-    # def get_disk_info(self):
-    #     # start_get_storageinfo = datetime.now()
-    #     # sifs = self._gp_camera.get_storageinfo(GPhotoCam._context)
-    #     # print('get_storageinfo delay={:.2f}ms'.format((datetime.now()-start_get_storageinfo).total_seconds()*1000))
-    #     # approximately 2.7ms to get storage info
-    #     info = {}
-    #     try:
-    #         sifs = self._gp_camera.get_storageinfo(GPhotoCam._context)[0]
-    #         info['freeMB'] = round(sifs.freekbytes / 1024, 2)
-    #         info['freeGB'] = round(sifs.freekbytes / 1048576, 2)
-    #         info['capacityGB'] = round(sifs.capacitykbytes / 1048576, 2)
-    #         info['usedGB'] = round(info['capacityGB'] - info['freeGB'], 2)
-    #     except IndexError as ex:
-    #         self._logger.warning('Exception: no storage info: %s', ex)
-    #         pass
-    #     except AttributeError as ex:
-    #         self._logger.warning('Exception: invalid storage info: %s', ex)
-    #         pass
-    #     except Exception as ex:
-    #         self._logger.warning('Exception: invalid general storage info: %s', ex)
-    #         pass
-
-    #     return info
-
     def get_im_target_dir(self, timestamp, mount_point, serial_num):
         session_dir = "{}/{}".format(timestamp.strftime('%Y_%m_%d'), self._session_id)
         complete_dir = os.path.join(mount_point, session_dir, str(serial_num))
         return complete_dir
-
-    # def list_camera_files(self, path='/'):
-    #     result = []
-    #     # get files
-    #     gp_list = self._gp_camera.folder_list_files(path, GPhotoCam._context)
-    #     for name, value in gp_list:
-    #         result.append(os.path.join(path, name))
-    #     # read folders
-    #     folders = []
-    #     gp_list = self._gp_camera.folder_list_folders(path, GPhotoCam._context)
-    #     for name, value in gp_list:
-    #         folders.append(name)
-    #     # recurse over subfolders
-    #     for name in folders:
-    #         result.extend(self.list_camera_files(os.path.join(path, name)))
-    #     return result
-
-    # def get_camera_file_info(self, path):
-    #     folder, name = os.path.split(path)
-    #     return self._gp_camera.file_get_info(folder, name, GPhotoCam._context)
-
-    # def refresh_camera(self):
-    #     try:
-    #         self._gp_camera.exit()
-    #         # sleep(500e-3)
-    #         # self._gp_camera.init(GPhotoCam._context)
-    #     except:
-    #         pass
 
     def append_exif_info(self, name, dest_dir, exif_data, md5, current_exif_info):
         # self._logger.debug(f'append_exif_info {len(data_bytes)} name {name} dest_dir {dest_dir}')
@@ -733,109 +677,6 @@ class sonySDKcam():
             else:
                 current_exif_info[dest_dir][filtered_exif['FileName']] = filtered_exif
             # current_exif_info[dest_dir].append(filtered_exif)
-
-    def merge_gps_meta_data(self, gps_session_start_time, cam_serial_num, imu_lock ):
-        # this is outdated -> accelData.csv changed to accelData.bin with raw values only
-        return 
-        try:
-            # read gps data
-            imu_dir = os.path.join(self._mount_point, gps_session_start_time.strftime('%Y_%m_%d'))
-            complete_gps_dir = os.path.join(imu_dir, 'gpsData.csv')
-
-            gps_times = []
-            pi_times = []
-            lats = []
-            longs = []
-            alts = []
-            qualities = []
-            gpsLatDir = ''
-            gpsLongDir = ''
-
-            with imu_lock:
-                with open(complete_gps_dir) as csv_file:
-                    csv_reader = csv.reader(csv_file, delimiter=',')
-                    for row in csv_reader:
-                        if len(row) > 8:
-                            if float(row[1]) != 0 and float(row[2]) != 0 and float(row[3]) != 0 and float(row[5]) != 0 and float(row[7]) != 0:
-                                qualities.append(float(row[0]))
-                                gps_times.append(float(row[1]))
-                                pi_times.append(float(row[2]))
-                                lats.append(float(row[3]))
-                                gpsLatDir = row[4]
-                                longs.append(float(row[5]))
-                                gpsLongDir = row[6]
-                                alts.append(float(row[7]))
-            
-            qualities = np.asarray(qualities)
-            gps_times = np.asarray(gps_times)
-            lats = np.asarray(lats)
-            longs = np.asarray(longs)
-            alts = np.asarray(alts)
-
-            f_qual = interpolate.interp1d(gps_times, qualities)
-            f_lats = interpolate.interp1d(gps_times, lats)
-            f_longs = interpolate.interp1d(gps_times, longs)
-            f_alts = interpolate.interp1d(gps_times, alts)
-
-            # read accelerometer data
-            complete_accel_dir = os.path.join(imu_dir, 'accelData.csv')
-
-            heading = []
-            headingComp = []
-            kalmanX = []
-            kalmanY = []
-            pi_times = []
-            with imu_lock:
-                with open(complete_accel_dir) as csv_file:
-                    csv_reader = csv.reader(csv_file, delimiter=',')
-                    for row in csv_reader:
-                        if len(row) > 16:
-                            pi_times.append(float(row[0]))
-                            heading.append(float(row[13]))
-                            headingComp.append(float(row[14]))
-                            kalmanX.append(float(row[15]))
-                            kalmanY.append(float(row[16]))
-
-            heading = np.asarray(heading)
-            headingComp = np.asarray(headingComp)
-            kalmanX = np.asarray(kalmanX)
-            kalmanY = np.asarray(kalmanY)
-            pi_times = np.asarray(pi_times)
-
-            f_heading = interpolate.interp1d(pi_times, heading)
-            f_headingComp = interpolate.interp1d(pi_times, headingComp)
-            f_kalmanX = interpolate.interp1d(pi_times, kalmanX)
-            f_kalmanY = interpolate.interp1d(pi_times, kalmanY)
-
-            cam_session_dir = os.path.join(self._mount_point, gps_session_start_time.strftime('%Y_%m_%d'), gps_session_start_time.strftime('%H_%M_%S'))
-
-            cam_dir = os.path.join(cam_session_dir, cam_serial_num)
-            complete_cam_dir = os.path.join(cam_dir, 'exif_cam.json')
-            cam_info = {}
-            with open(complete_cam_dir, 'r') as f:
-                cam_info = json.load(f)
-            images = cam_info['exifInfo']
-            for key, im in images.items():
-                im_time = float(datetime.strptime(im['SubSecDateTimeOriginal'], '%Y:%m:%d %H:%M:%S%z').timestamp())
-                try:
-                    im['GPSDateStamp'] = im_time
-                    im['GPSLatitude'] = np.array(f_lats([im_time]))[0]
-                    im['GPSLongitude'] = np.array(f_longs([im_time]))[0]
-                    im['GPSAltitude'] = np.array(f_alts([im_time]))[0]
-                    im['GPSQuality'] = np.array(f_qual([im_time]))[0]
-                    im['Heading'] = np.array(f_heading([im_time]))[0]    
-                    im['HeadingComp'] = np.array(f_headingComp([im_time]))[0]     
-                    im['KalmanX'] = np.array(f_kalmanX([im_time]))[0]     
-                    im['KalmanY'] = np.array(f_kalmanY([im_time]))[0]                        
-                    im['GPSLatitudeDir'] = gpsLatDir
-                    im['GPSLongitudeDir'] = gpsLongDir
-                except Exception as ex:
-                    self._logger.warning(f"sonyCAM GPS append failed {ex}")
-            cam_info['exifInfo'] = images
-            with open(complete_cam_dir, 'w') as f:
-                json.dump(cam_info, f, sort_keys=True)   
-        except Exception as e:
-            self._logger.warning(f"sonyCAM Merge GPS data read failed {e}")
 
     def save_exif_info(self, serial_number):
         # Iterate through all the folders on the SSD and check that all the exif info is up to date
@@ -899,38 +740,7 @@ class sonySDKcam():
                         json.dump(exisiting_data, f, sort_keys=True)
                 except Exception as e:
                     self._logger.warning(f"Append to existing file failed {e}")
-            dir_split = exif_dir.split('/')
-            try:
-                self.merge_gps_meta_data(datetime.strptime(dir_split[-3] +"_"+ dir_split[-2],"%Y_%m_%d_%H_%M_%S"), dir_split[-1], self._imu_lock)
-            except:
-                self._logger.warning("failed to append gps data to exif info in directory "+exif_dir)
         self._exif_info = {}
-
-
-    # def get_camera_image_hash(self, folder, name):
-    #     h = "cam"
-    #     for i in range(3):
-    #         try:
-    #             camera_file = self._gp_camera.file_get(folder, name, gp.GP_FILE_TYPE_NORMAL, GPhotoCam._context)
-    #             h = hashlib.sha256(memoryview(camera_file.get_data_and_size())).hexdigest()
-    #             return h
-    #         except:
-    #             self._logger.warning("Failed to get %s %s hash" % (folder, name))
-    #             sleep(1)
-    #     return h
-
-    # def get_external_image_hash(self, path):
-    #     h = "ext"
-    #     for i in range(3):
-    #         try:
-    #             f = open(path, "rb")
-    #             h = hashlib.sha256(f.read()).hexdigest()
-    #             f.close()
-    #             return h
-    #         except:
-    #             self._logger.warning("Failed to get %s hash" % (path))
-    #             sleep(1)
-    #     return h
 
     def get_preview_image(self, idx):
         if idx >= len(self._preview_images) or self._generating_preview:

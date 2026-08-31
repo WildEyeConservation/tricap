@@ -69,6 +69,12 @@ class TricapConfig:
                     SONY_IMAGE_FORMAT_CONFIG_KEY,
                     SONY_IMAGE_FORMAT_CAMERA_SETTING,
                 )
+            for option in tuple(self._parser.options(self.CAMERA_SECTION_HEADER)):
+                if option != SONY_IMAGE_FORMAT_CONFIG_KEY:
+                    self._parser.remove_option(self.CAMERA_SECTION_HEADER, option)
+            if self._parser.has_section(self.WEB_SECTION_HEADER):
+                self._parser.remove_option(self.WEB_SECTION_HEADER, 'alti_required')
+                self._parser.remove_option(self.WEB_SECTION_HEADER, 'cams_required')
             self._ready_flag = True
         except (configparser.Error, IOError, OSError) as ex:
             self._logger.error('Error reading from config file %s', self._config_fp)

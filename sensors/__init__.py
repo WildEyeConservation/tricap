@@ -1,3 +1,1 @@
-# coding=utf-8
-
-from .abstract_cam import AbstractCamera
+"""SkySeeker hardware integrations."""

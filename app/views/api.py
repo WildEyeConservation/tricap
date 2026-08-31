@@ -16,7 +16,6 @@ from config import (
   SONY_IMAGE_FORMAT_CONFIG_KEY,
 )
 import os, json
-from support.camera_data import ParseData
 from support.configure import TricapConfig
 import subprocess, csv
 from pathlib import Path
@@ -190,28 +189,9 @@ def statistics():
   if tricap_manager.state == CAM_MANAGER_STATES.STARTED or tricap_manager.state == CAM_MANAGER_STATES.COPYING:
     return jsonify({'msg': 'Not allowed in started or copying state'}), 400
   try:
-    # camera_data = ParseData()
     stats = {}
-    # cameras = []
-    # sum_battery = 0.0
-    # battery_count = 0
-    # for index, cam in enumerate(tricap_manager._cameras):
-    #   cam_info = cam.get_disk_info()
-    #   cam_info['id'] = str(cam.serial_num)
-    #   cameras.append(cam_info)
-    #   try:
-    #     _, _, battery_parse = camera_data.parse_camera(index)
-    #     sum_battery += float(battery_parse)
-    #     battery_count += 1
-    #   except Exception as ex:
-    #     pass
     stats['internalStorage'] = _internal_disk_info()
     stats['externalStorage'] = _external_disk_info()
-    # stats['cameras'] = cameras
-    # if battery_count == 0:
-    #   stats['battery'] = 0
-    # else:
-    #   stats['battery'] = sum_battery / battery_count
     config = TricapConfig()
     stats['captureInterval'] = float(config.get('image_capture_interval', TricapConfig.MISC_SECTION_HEADER))
     _logger.debug(stats)
@@ -231,21 +211,16 @@ STREAM_PREVIEW_TIMEOUT_SEC = 300  # Stop live stream after 5 minutes
 
 
 def _stream_preview_frames(cam_idx: int):
-  """Generate MJPEG frames for a camera.
-
-  For Sony cameras uses SDK live view; otherwise uses preview images.
-  Stops after 5 minutes or when the manager enters STARTED/COPYING.
-  """
+  """Generate Sony SDK live-view frames for up to five minutes."""
   boundary = b'frame'
   if cam_idx >= len(tricap_manager._cameras):
     return
 
   cam = tricap_manager._cameras[cam_idx]
   placeholder = _mjpeg_placeholder_frame()
-  use_sony_live_view = getattr(tricap_manager, 'use_sony_cam', False) and hasattr(cam, 'get_live_view_frame')
   stream_start = time.monotonic()
 
-  _logger.debug(f'stream_preview_frames called {use_sony_live_view}')
+  _logger.debug('stream_preview_frames called')
   while True:
     # Stop after 2 minutes
     if time.monotonic() - stream_start >= STREAM_PREVIEW_TIMEOUT_SEC:
@@ -256,20 +231,8 @@ def _stream_preview_frames(cam_idx: int):
       break
 
     try:
-      if use_sony_live_view:
-        frame_bytes = cam.get_live_view_frame()
-        frame = frame_bytes if frame_bytes else placeholder
-      else:
-        # Fall back to latest preview image
-        frame_b64 = ''
-        for idx in (2, 1, 0):
-          try:
-            frame_b64 = cam.get_preview_image(idx)
-            if frame_b64:
-              break
-          except Exception:
-            continue
-        frame = base64.b64decode(frame_b64) if frame_b64 else placeholder
+      frame_bytes = cam.get_live_view_frame()
+      frame = frame_bytes if frame_bytes else placeholder
     except Exception as e:
       _logger.debug('stream frame error: %s', e)
       frame = placeholder
@@ -1156,9 +1119,6 @@ def _eta_simple(started_at: float | None, bytes_done: int, bytes_total: int) -> 
     return max(0.0, total_estimated - elapsed)
 
 def _internal_disk_info():
-    if tricap_manager.use_gpio_cams:
-        return
-
     _logger.debug(f"_internal_disk_info")
     info = {}
     total, used, free = shutil.disk_usage(MOUNT_POINT)
@@ -1169,29 +1129,7 @@ def _internal_disk_info():
 
     return info
 
-# def _external_disk_info():
-#     if tricap_manager.use_gpio_cams:
-#         return
-
-#     _logger.debug(f"_external_disk_info")
-#     info = {}
-#     is_mounted = os.path.ismount(MOUNT_POINT_SSD)
-#     if tricap_manager.mount_ssd():
-#         total, used, free = shutil.disk_usage(MOUNT_POINT_SSD)
-#         if not is_mounted:
-#             # only unmount if unmounted at the start of this function
-#             tricap_manager.unmount_disk()
-
-#         info['capacityGB'] = round(total / 1073741824, 2)
-#         info['usedGB'] = round(used / 1073741824, 2)
-#         info['freeGB'] = round(free / 1073741824, 2)
-    
-#     return info
-
 def _external_disk_info():
-    if tricap_manager.use_gpio_cams:
-        return
-
     _logger.debug(f"_external_disk_info")
 
     def _usage():

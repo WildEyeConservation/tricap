@@ -15,7 +15,7 @@ class UnavailableAltimeter(Subject):
 
     available = False
 
-    def __init__(self, configured_type="altimeter", reason="Not connected"):
+    def __init__(self, configured_type="grf500", reason="Not connected"):
         super().__init__()
         self.configured_type = configured_type
         self.reason = str(reason or "Not connected")

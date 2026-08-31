@@ -31,14 +31,6 @@ def component_health(camera_manager, gps, altimeter, imu, storage_mounted):
     altimeter_connected = bool(getattr(altimeter, 'available', False))
     imu_connected = getattr(imu, '_BerryIMUversion', 99) != 99
 
-    configured_altimeter = getattr(altimeter, 'configured_type', 'altimeter')
-    if configured_altimeter == 'grf500':
-        altimeter_name = 'GRF-500 altimeter'
-    elif configured_altimeter == 'dummy':
-        altimeter_name = 'Simulated altimeter'
-    else:
-        altimeter_name = 'Altimeter'
-
     return {
         'cameras': _entry(
             camera_count > 0,
@@ -60,8 +52,8 @@ def component_health(camera_manager, gps, altimeter, imu, storage_mounted):
             fix=gps_fix),
         'altimeter': _entry(
             altimeter_connected,
-            f'{altimeter_name} connected.' if altimeter_connected
-            else f'{altimeter_name} is not connected. Capture can continue without altitude data.'),
+            'GRF-500 altimeter connected.' if altimeter_connected
+            else 'GRF-500 altimeter is not connected. Capture can continue without altitude data.'),
         'imu': _entry(
             imu_connected,
             'IMU connected.' if imu_connected

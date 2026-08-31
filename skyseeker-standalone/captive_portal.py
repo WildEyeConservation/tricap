@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """SkySeeker standalone control + captive portal.
 
-Serves Home and Setup on :80 and reverse-proxies /api/* (and /camera) to the
+Serves Home and Setup on :80 and reverse-proxies /api/* to the
 existing tricap Flask app on 127.0.0.1:5000. Captive-portal probe handling is
 kept. Production data comes from tricap.
 
@@ -49,7 +49,7 @@ CAPTIVE_PROBE_PATHS = {
     "/connecttest.txt", "/ncsi.txt", "/redirect", "/canonical.html", "/success.txt",
     "/connectivity-check.html",
 }
-PROXY_PREFIXES = ("/api/", "/camera")
+PROXY_PREFIXES = ("/api/",)
 HOP_BY_HOP = {"connection", "keep-alive", "proxy-authenticate", "proxy-authorization", "te", "trailer", "transfer-encoding", "upgrade"}
 
 # --------------------------------------------------------------------------- #

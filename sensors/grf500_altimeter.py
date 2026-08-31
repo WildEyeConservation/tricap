@@ -1,16 +1,9 @@
-"""LightWare GRF-500 laser rangefinder used as an altimeter.
+"""LightWare GRF-500 laser rangefinder used as the SkySeeker altimeter.
 
-Drop-in replacement for :class:`sensors.trusense_altimeter.TrusenseAltimeter`.
-Exposes the same public surface (``value``/``unit``/``state``/``measurement``,
-``start_measuring``/``stop_measuring``/``disconnect``, the ``config`` settings
-object and the ``get_error`` family) so the existing altitude-switch / observer
-pipeline in ``app/__init__.py`` works unchanged.
-
-Unlike the TruSense S100 (Prolific USB-serial, ASCII ``$..`` protocol) the
-GRF-500 is a native USB-CDC device (``04d8:ed57``) speaking LightWare's LWNX
-binary protocol.  We poll command 44 (Distance data) at the sensor's update
-rate, retain both first and last returns, and publish the last-return distance
-as the live altitude.
+The GRF-500 is a native USB-CDC device (``04d8:ed57``) speaking LightWare's
+LWNX binary protocol. We poll command 44 (Distance data) at the sensor's
+update rate, retain both first and last returns, and publish the last-return
+distance as the live altitude.
 """
 # coding=utf-8
 
@@ -58,7 +51,7 @@ class GrfError(Exception):
 
 
 class MiscSettingConfig:
-    """Mirrors TrusenseAltimeter's settings adapter so the settings page works."""
+    """Expose the GRF-500 settings through the existing settings interface."""
     dict_keys = {'_settings'}
 
     def __init__(self, widgets):
@@ -91,13 +84,11 @@ class Grf500Altimeter(Subject):
     def __init__(self, settings, supported_devices=GRF500_USB_IDS):
         super().__init__()
 
-        # Keep the same tunable setting keys the TruSense driver exposed so the
-        # settings web page keeps rendering (they are advisory for the GRF-500).
         self._setting_strings = ['measurement_timeout', 'num_frames_to_avg']
         self._config = MiscSettingConfig(
             {'measurement_timeout': SettingSpec(choices=None,
-                                                get_value=partial(self._get_setting, "num_frames_to_avg"),
-                                                set_value=partial(self._set_setting, "num_frames_to_avg")),
+                                                get_value=partial(self._get_setting, "measurement_timeout"),
+                                                set_value=partial(self._set_setting, "measurement_timeout")),
              'num_frames_to_avg': SettingSpec(choices=None,
                                               get_value=partial(self._get_setting, "num_frames_to_avg"),
                                               set_value=partial(self._set_setting, "num_frames_to_avg"))})
@@ -242,7 +233,7 @@ class Grf500Altimeter(Subject):
     def _set_setting(self, key, value):
         self._settings[key] = value
 
-    # --- error surface (kept identical to the TruSense driver) --------------
+    # --- error surface -------------------------------------------------------
     def set_error(self, error_code=""):
         self.error = error_code
 

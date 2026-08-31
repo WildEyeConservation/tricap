@@ -37,19 +37,7 @@ class TestSettings(TriCapAppTestCase):
             self.client.get(url_for('settings.settings'))
             form = settings.get_form_for_display()
 
-            # check that the shutterspeed setting was correctly instantiated
             labels = [cam_select.label for cam_select in form.cam_selects]
-            self.assertEqual('shutterspeed' in labels, True)
-            choices = form.cam_selects[labels.index('shutterspeed')].choices
-            ss_choices = [ct[1] for ct in choices]
-            self.assertEqual('1/640' in ss_choices, True)
-
-            # check that the iso setting was correctly instantiated
-            self.assertEqual('iso' in labels, True)
-            choices = form.cam_selects[labels.index('iso')].choices
-            iso_choices = [ct[1] for ct in choices]
-            self.assertEqual('100' in iso_choices, True)
-
             self.assertEqual('sony_image_format' in labels, True)
             choices = form.cam_selects[labels.index('sony_image_format')].choices
             image_format_choices = [ct[1] for ct in choices]
@@ -146,24 +134,17 @@ class TestBehaviourSettings(TriCapBehaviourTestCase):
             self.open_page('settings.settings', 'btn_save')
 
             config = TricapConfig()
-            new_ss = '1/2500'
-            if config.get('shutterspeed', TricapConfig.CAMERA_SECTION_HEADER) == new_ss:
-                new_ss = '1/4'  # pragma: no cover
-
-            new_iso = '500'
-            if config.get('iso', TricapConfig.CAMERA_SECTION_HEADER) == new_iso:
-                new_iso = '100'  # pragma: no cover
+            new_image_format = 'JPEG'
+            if config.get('sony_image_format', TricapConfig.CAMERA_SECTION_HEADER) == new_image_format:
+                new_image_format = 'RAW'  # pragma: no cover
 
             new_ici = '5.0'
             if config.get('image_capture_interval', TricapConfig.MISC_SECTION_HEADER) == new_ici:
                 new_ici = '9.0'  # pragma: no cover
 
             # Change settings on the form
-            ss_select = Select(self.driver.find_element_by_css_selector("[id$='shutterspeed']"))
-            ss_select.select_by_visible_text(new_ss)
-
-            iso_select = Select(self.driver.find_element_by_css_selector("[id$='iso']"))
-            iso_select.select_by_visible_text(new_iso)
+            format_select = Select(self.driver.find_element_by_css_selector("[id$='sony_image_format']"))
+            format_select.select_by_visible_text(new_image_format)
 
             ici_string = self.driver.find_element_by_css_selector("[id$='image_capture_interval']")
             ici_string.clear()
@@ -178,8 +159,7 @@ class TestBehaviourSettings(TriCapBehaviourTestCase):
 
             new_config = TricapConfig()
             section_dict = new_config.get_section_dict(TricapConfig.CAMERA_SECTION_HEADER)
-            self.assertEqual(section_dict['shutterspeed'], new_ss)
-            self.assertEqual(section_dict['iso'], new_iso)
+            self.assertEqual(section_dict['sony_image_format'], new_image_format)
             section_dict = new_config.get_section_dict(TricapConfig.MISC_SECTION_HEADER)
             self.assertEqual(section_dict['image_capture_interval'], new_ici)
 

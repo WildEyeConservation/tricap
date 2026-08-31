@@ -25,7 +25,7 @@ from datetime import datetime, timedelta
 import math
 from threading import Lock
 
-from config import MOUNT_POINT
+from config import FALLBACK_TELEMETRY_DIR, MOUNT_POINT
 
 class SerialProcess():
     def __init__(self, cam_manager = None):
@@ -169,10 +169,10 @@ class SerialProcess():
                 except Exception as e:
                     print("GPS line not saved")
             else:
-                complete_dir = os.path.join("/home/radxa/GPS_IMU_Data", datetime.now().strftime('%Y_%m_%d'))
+                complete_dir = os.path.join(FALLBACK_TELEMETRY_DIR, datetime.now().strftime('%Y_%m_%d'))
                 dest = os.path.join(complete_dir, 'gpsData.csv')
                 if not os.path.isdir(complete_dir):
-                    print("SSD not mounted, falling back to builtin storage GPS_IMU_Data for GPS data")
+                    print("SSD not mounted, saving GPS data to built-in storage")
                     os.makedirs(complete_dir)
                 try:
                     if msg.time != None and msg.lat != '' and msg.lon != '':

@@ -15,10 +15,9 @@ class ComponentHealthTests(unittest.TestCase):
         gps = Mock(isConnected=False)
         gps.hasGps.return_value = False
         altimeter = Mock(available=False)
-        imu = Mock(_BerryIMUversion=99)
 
         health = component_health(
-            manager, gps, altimeter, imu, storage_mounted=True
+            manager, gps, altimeter, storage_mounted=True
         )
 
         self.assertFalse(health['cameras']['connected'])
@@ -31,6 +30,10 @@ class ComponentHealthTests(unittest.TestCase):
             "Sony SDK reported zero cameras",
         )
         self.assertIn('GRF-500', health['altimeter']['message'])
+        self.assertEqual(
+            set(health),
+            {'cameras', 'gps', 'altimeter', 'storage'},
+        )
 
 
 if __name__ == "__main__":

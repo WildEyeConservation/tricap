@@ -1,31 +1,16 @@
 """Focused tests for Sony capture and host-transfer format configuration."""
 
-import importlib
-import sys
-import types
 import unittest
 from unittest.mock import Mock, patch
 
-
-def _import_sony_camera_module():
-    """Import the camera handler without requiring the on-device native SDK."""
-    for module_name in (
-            "exiftool", "numpy", "rawpy", "scipy", "scipy.interpolate",
-            "PIL", "PIL.Image", "sonySDKWrapper"):
-        if module_name not in sys.modules:
-            sys.modules[module_name] = types.ModuleType(module_name)
-
-    sys.modules["exiftool"].ExifToolHelper = object
-    sys.modules["scipy"].interpolate = sys.modules["scipy.interpolate"]
-    sys.modules["PIL"].Image = sys.modules["PIL.Image"]
-    return importlib.import_module("sensors.sonySDK_cam")
+from sensors import sonySDK_cam
 
 
 class SonyImageFormatTests(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.module = _import_sony_camera_module()
+        cls.module = sonySDK_cam
 
     def setUp(self):
         self.camera = self.module.sonySDKcam.__new__(

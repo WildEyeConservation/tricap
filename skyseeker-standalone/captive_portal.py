@@ -1410,7 +1410,6 @@ SETUP_HTML = f'''{_HEAD}<title>SkySeeker Setup</title><style>{STYLE}</style></he
   <div class="acc-head"><div class="acc-title">Download logs</div><div class="acc-right"><span class="chev">{CHEV}</span></div></div>
   <div class="acc-body"><div class="grid3">
     <a class="pill-btn" href="/api/download_logs">Main</a>
-    <a class="pill-btn" href="/api/download_imu_logs">IMU</a>
     <a class="pill-btn" href="/portal/flight_log">GPS + altitude</a>
   </div></div>
 </section>

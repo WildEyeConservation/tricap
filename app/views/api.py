@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from flask import Blueprint, Response, request, jsonify, abort, send_file
-from app import tricap_manager, gps_ser, altimeter, accel_ser
+from app import tricap_manager, gps_ser, altimeter
 import base64, logging, cv2
 import numpy as np
 from random import randint
@@ -9,17 +9,18 @@ from datetime import datetime
 from config import (
   CAM_MANAGER_STATES,
   CAMERA_STATES,
+  FALLBACK_TELEMETRY_DIR,
   SERVER_LOG_DIR,
   MOUNT_POINT,
   MOUNT_POINT_SSD,
   SONY_IMAGE_FORMAT_CHOICES,
   SONY_IMAGE_FORMAT_CONFIG_KEY,
 )
-import os, json
+import os
 from support.configure import TricapConfig
 import subprocess, csv
 from pathlib import Path
-from support.backup import manager as backupManager
+from support.backup import RsyncManager
 from support.component_health import component_health
 from support.phone_time import set_system_time_from_phone, validate_phone_time
 import time, shutil, threading, re, io
@@ -42,6 +43,7 @@ _force_delete_status = {
 # once per drive (at plug-in) and serve the cached value while unmounted.
 _ssd_info_lock = threading.Lock()
 _ssd_info_cache = {'device': None, 'info': None}
+backupManager = RsyncManager(unmount=tricap_manager.unmount_disk)
 
 @api_bp.route('/api')
 def api():
@@ -110,8 +112,7 @@ def status():
 
   ret['wifiSignal'] = wifiSignal
   ret['components'] = component_health(
-      tricap_manager, gps_ser, altimeter, accel_ser,
-      os.path.ismount(MOUNT_POINT))
+      tricap_manager, gps_ser, altimeter, os.path.ismount(MOUNT_POINT))
   # _logger.debug(f"Status {ret}")
 
   return ret
@@ -372,85 +373,6 @@ def copy_eta():
 
   return info  
 
-@api_bp.route('/api/exif_sessions')
-def exif_sessions():
-  if tricap_manager.state == CAM_MANAGER_STATES.STARTED or tricap_manager.state == CAM_MANAGER_STATES.COPYING:
-    return jsonify({'msg': 'Not allowed in started or copying state'}), 400
-
-  ids = []
-  if tricap_manager.mount_disk():
-    for root, dirs, files in os.walk(tricap_manager.mount_point):
-      for name in files:
-        if name == 'exif_cam.json':          
-          cam_info = {}
-          filename = os.path.join(root, name)
-          try:
-            with open(filename, 'r') as f:
-              cam_info = json.load(f)
-            if 'sessionId' in cam_info:
-              if cam_info['sessionId'] not in ids:
-                ids.append(cam_info['sessionId'])
-          except Exception as e:
-            _logger.warning(f"Cannot open json file {e}")
-
-    tricap_manager.unmount_disk()
-  else:
-    return jsonify({'msg': 'Failed to mount external disk'}), 400
-
-  return {
-    'sessionIds': ids
-  }
-
-@api_bp.route('/api/exif_info', methods = ['POST'])
-def exif_info():
-  if tricap_manager.state == CAM_MANAGER_STATES.STARTED or tricap_manager.state == CAM_MANAGER_STATES.COPYING:
-    return jsonify({'msg': 'Not allowed in started or copying state'}), 400
-
-  data = request.get_json()
-  if not 'sessionIds' in data:
-    return jsonify({'msg': 'Invalid session information'}), 400
-
-  _logger.debug(f"Missing ids: {data['sessionIds']}")    
-  
-  sessions = [] # array of session
-  if tricap_manager.mount_disk():
-    for root, dirs, files in os.walk(tricap_manager.mount_point):
-      for name in files:
-        if name == 'exif_cam.json':
-          cam_info = {}
-          filename = os.path.join(root, name)
-          try:
-            with open(filename, 'r') as f:
-              cam_info = json.load(f)
-            if 'sessionId' in cam_info:
-              if cam_info['sessionId'] in data['sessionIds']:
-                # missing session detected
-                if any(cam_info['sessionId'] == s['sessionId'] for s in sessions):
-                  # add camera info
-                  session_idx = next((index for (index, d) in enumerate(sessions) if d['sessionId'] == cam_info['sessionId']), None)
-                  if session_idx >= 0 and session_idx < len(sessions):
-                    sessions[session_idx]['sessionInfo'].append(cam_info)
-                else:
-                  # first cam of session
-                  new_session = {
-                    'sessionId': cam_info['sessionId'],
-                    'sessionInfo': [cam_info]
-                  }
-                  sessions.append(new_session)
-          except Exception as e:
-            _logger.warning(f"Cannot open json file {e}")
-    ssd_exif = os.path.join(tricap_manager.mount_point, 'exif_ssd.json')
-    with open(ssd_exif, 'w') as f:
-      json.dump(sessions, f, sort_keys=True)
-    if tricap_manager.state != CAM_MANAGER_STATES.STARTED:
-      tricap_manager.unmount_disk()
-  else:
-    return jsonify({'msg': 'Failed to mount external disk'}), 400
-
-  return {
-    'sessions': sessions
-  }
-
 @api_bp.route('/api/start_capture')
 def start():
   _logger.debug("Start req {}".format(tricap_manager.state))
@@ -636,7 +558,7 @@ def backup_start():
   if tricap_manager.mount_ssd():
     src = MOUNT_POINT
     dst = MOUNT_POINT_SSD
-    res = backupManager.start(src, dst, tag_gps=False)
+    res = backupManager.start(src, dst)
 
     plan = {}
     if (not res.get("success")) and res.get("msg") and res.get("msg") == "Insufficient space" :
@@ -647,7 +569,7 @@ def backup_start():
             margin_bytes=256 * 1024 * 1024
         )
 
-        res = backupManager.start(src, dst, files_from=plan["files_from"], tag_gps=False)
+        res = backupManager.start(src, dst, files_from=plan["files_from"])
         return jsonify(res)
     else:
       return jsonify(res)
@@ -663,7 +585,7 @@ def backup_move():
   if tricap_manager.mount_ssd():
     src = MOUNT_POINT
     dst = MOUNT_POINT_SSD
-    res = backupManager.start(src, dst, tag_gps=False, remove_source=True)
+    res = backupManager.start(src, dst, remove_source=True)
 
     if (not res.get("success")) and res.get("msg") == "Insufficient space":
         _logger.debug("Not enough free space. Starting partial copy & delete")
@@ -674,7 +596,12 @@ def backup_move():
         )
         if not plan.get("success"):
           return jsonify(res)
-        res = backupManager.start(src, dst, files_from=plan["files_from"], tag_gps=False, remove_source=True)
+        res = backupManager.start(
+          src,
+          dst,
+          files_from=plan["files_from"],
+          remove_source=True,
+        )
     return jsonify(res)
   else:
     return jsonify({'msg': 'Failed to mount external disk'}), 400
@@ -709,18 +636,10 @@ def backup_status():
       "files_done": int(st.get("files_done") or 0),
       "files_total": int(st.get("total_files") or 0),
       "eta_seconds": 0 if eta is None else float(eta),
-      "current_file": st.get("current_file") or "",
-      "gps_tagged": int(st.get("gps_tagged") or 0),
-      "gps_interpolated": int(st.get("gps_interpolated") or 0),
-      "gps_nearest": int(st.get("gps_nearest") or 0),
-      "gps_unresolved": int(st.get("gps_unresolved") or 0),
-      "gps_failed": int(st.get("gps_failed") or 0),
-      "tag_gps": bool(st.get("tag_gps")),
       "planned_bytes": int(st.get("planned_bytes") or 0),
       "planned_files": int(st.get("planned_files") or 0),
       "elapsed_seconds": float(st.get("elapsed_seconds") or 0),
       "copy_seconds": float(st.get("copy_seconds") or 0),
-      "tag_seconds": float(st.get("tag_seconds") or 0),
       "throughput_mib_s": float(st.get("throughput_mib_s") or 0),
   }
 
@@ -1002,58 +921,6 @@ def download_log():
   headers["Content-Length"] = str(file_size)
   return Response(file_iterator(log_path_file), headers=headers)
 
-@api_bp.route('/api/download_imu_logs', methods = ['GET'])
-def download_imu_log():
-  if tricap_manager.state in (CAM_MANAGER_STATES.STARTED, CAM_MANAGER_STATES.COPYING):
-    return jsonify({'msg': 'Not allowed in started or copying state'}), 400
-
-  log_path = ''
-  if os.path.ismount(MOUNT_POINT):
-      log_path = os.path.join(MOUNT_POINT, datetime.now().strftime('%Y_%m_%d'))
-  else:
-      print("SSD not mounted, falling back to builtin storage GPS_IMU_Data for Accel data")
-      log_path = os.path.join("/home/radxa/GPS_IMU_Data", datetime.now().strftime('%Y_%m_%d'))
-  log_path_file = Path(os.path.join(log_path, 'accelData.bin'))
-
-  if not log_path_file.exists():
-    abort(404)
-
-  file_size = log_path_file.stat().st_size
-  range_header = request.headers.get("Range", None)
-
-  headers = {
-    "Accept-Ranges": "bytes",
-    "Content-Disposition": f'attachment; filename="{log_path_file.name}"',
-    "Content-Type": "text/plain",
-    "Cache-Control": "no-store",
-  }
-
-  if range_header:
-    try:
-      _, rng = range_header.split("=")
-      start_s, end_s = rng.split("-")
-      start = int(start_s) if start_s else 0
-      end = int(end_s) if end_s else file_size - 1
-      if start < 0 or end >= file_size or start > end:
-        raise ValueError
-    except Exception:
-      abort(416) # invalid Range
-
-    length = end - start + 1
-    headers.update({
-      "Content-Range": f"bytes {start}-{end}/{file_size}",
-      "Content-Length": str(length),
-    })
-    return Response(
-      file_iterator(log_path_file, start, end),
-      status=206,
-      headers=headers,
-    )
-
-  # Full download
-  headers["Content-Length"] = str(file_size)
-  return Response(file_iterator(log_path_file), headers=headers)
-
 @api_bp.route('/api/download_gps_logs', methods = ['GET'])
 def download_gps_log():
   if tricap_manager.state in (CAM_MANAGER_STATES.STARTED, CAM_MANAGER_STATES.COPYING):
@@ -1063,8 +930,8 @@ def download_gps_log():
   if os.path.ismount(MOUNT_POINT):
       log_path = os.path.join(MOUNT_POINT, datetime.now().strftime('%Y_%m_%d'))
   else:
-      print("SSD not mounted, falling back to builtin storage GPS_IMU_Data for GPS data")
-      log_path = os.path.join("/home/radxa/GPS_IMU_Data", datetime.now().strftime('%Y_%m_%d'))
+      print("SSD not mounted, reading GPS data from built-in storage")
+      log_path = os.path.join(FALLBACK_TELEMETRY_DIR, datetime.now().strftime('%Y_%m_%d'))
   log_path_file = Path(os.path.join(log_path, 'gpsData.csv'))
 
   if not log_path_file.exists():

@@ -63,7 +63,7 @@ class TriCapCamsManager:
 
     _logger = logging.getLogger(__name__)
 
-    def __init__(self, man_settings: dict, cam_settings: dict, imu_lock=None):
+    def __init__(self, man_settings: dict, cam_settings: dict, storage_lock=None):
         """Construct."""
         self.state = CAM_MANAGER_STATES.STOPPED
 
@@ -82,7 +82,7 @@ class TriCapCamsManager:
         self._man_settings = man_settings
         self._capture_and_copy_lock = list()
         self._save_and_preview_lock = list()
-        self._imu_lock = imu_lock
+        self._storage_lock = storage_lock or threading.Lock()
         self._thread_sync_lock = None
         subprocess.run(["timedatectl", "set-ntp", "false"], check=True)
         self._initialise()
@@ -244,7 +244,6 @@ class TriCapCamsManager:
                     self._capture_threads_done,
                     self._save_done[index],
                     self._thread_sync_lock,
-                    self._imu_lock,
                 ),
             ))
 
@@ -302,7 +301,7 @@ class TriCapCamsManager:
     def mount_disk(self):
         if not os.path.ismount(MOUNT_POINT):
             try:
-                with self._imu_lock:
+                with self._storage_lock:
                     mount_status = subprocess.run(["mount", "/dev/nvme0n1p1", MOUNT_POINT], check=True)
                     self._logger.debug(mount_status)
             except:

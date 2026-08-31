@@ -3,18 +3,15 @@
 import os
 import logging
 import threading
-from exiftool import ExifToolHelper
 import shutil
-import rawpy
 from PIL import Image
 from io import BytesIO
 import base64
 import signal
 import time
-import atexit
 
 
-from time import sleep, time, strftime
+from time import sleep, time
 from datetime import datetime
 
 import sys
@@ -29,7 +26,7 @@ from config import (
 )
 sys.path.append(os.path.abspath("/home/radxa/SonySDKWrapper"))
 
-import subprocess, hashlib, json, tempfile
+import subprocess, tempfile
 from pathlib import Path
 
 # noinspection PyUnresolvedReferences
@@ -41,7 +38,6 @@ class sonySDKcam():
     CONNECT_POLLS_PER_ATTEMPT = 50
     CONNECT_POLL_INTERVAL_SEC = 0.1
     _lock_with_save = None
-    KEYS_TO_SAVE = ('Composite:SubSecDateTimeOriginal','EXIF:ExifImageHeight','EXIF:ExifImageWidth','EXIF:LensSerialNumber','Composite:GPSAltitude','EXIF:GPSDateStamp','Composite:GPSLatitude','Composite:GPSLongitude','EXIF:GPSTimeStamp','EXIF:ISO', 'EXIF:ShutterSpeedValue','MakerNotes:FocusMode','MakerNotes:Quality')
     _sonyCamera = None
 
     def imageDownloadCompleteCallback(self, filename):
@@ -81,7 +77,6 @@ class sonySDKcam():
             capture_lock,
             image_format=SONY_IMAGE_FORMAT_CAMERA_SETTING):
         """Constructor"""
-        self._exif_info = {}
         self._camera = None
         self._image_count = 0
         self._to_save_queue = []
@@ -89,7 +84,6 @@ class sonySDKcam():
         self._preview_images_big_jpg = []
         self._num_images_copied = 0
         self._num_images_failed = 0
-        self._disableHashAndPreview = True
         self._memoryFsPath = memoryFsPath
         self._preview_images = []
         self._im_aspect_ratio = 0
@@ -105,8 +99,6 @@ class sonySDKcam():
         # signal.signal() is not permitted.
         if threading.current_thread() is threading.main_thread():
             signal.signal(signal.SIGTERM, self.exitGracefully)
-        # atexit.register(self.exitGracefully, 1)
-
         self._sonyCamera = sonySDKInstance
         self._cameraID = cameraID
 
@@ -381,7 +373,6 @@ class sonySDKcam():
         self._preview_images = []
 
         self._dest_dir = self.get_im_target_dir(self._session_start_date, mount_point, serial_number)
-        self._mount_point = mount_point
         if not os.path.isdir(self._dest_dir):
             os.makedirs(self._dest_dir)
 
@@ -438,8 +429,6 @@ class sonySDKcam():
                     with sync_lock:
                         isCaptureDoneSet = capture_done[index].is_set()               
                     if not isCaptureDoneSet:
-                        # self.save_exif_info(serial_number)
-                        # self._exif_info = {}
                         with sync_lock:
                             capture_done[index].set()
                         self._logger.debug('Exit capture thread 2')
@@ -450,14 +439,10 @@ class sonySDKcam():
             
 
 
-    def save_to_ssd(self, mount_point, computer_files, serial_num, lock_with_copy, lock_with_preview, capture_done, save_done, sync_lock, imu_lock):
+    def save_to_ssd(self, mount_point, computer_files, serial_num, lock_with_copy, lock_with_preview, capture_done, save_done, sync_lock):
         self._logger.debug(f"Save to SSD thread started")
 
-        # tagsToGet = ['Composite:SubSecDateTimeOriginal','EXIF:ExifImageHeight','EXIF:ExifImageWidth','Composite:GPSAltitude','EXIF:GPSDateStamp','Composite:GPSLatitude','Composite:GPSLongitude','EXIF:GPSTimeStamp','EXIF:ISO', 'EXIF:ShutterSpeedValue','MakerNotes:FocusMode','MakerNotes:Quality']
-        # et = ExifToolHelper()
         self._dest_dir = self.get_im_target_dir(self._session_start_date, mount_point, serial_num)
-        self._mount_point = mount_point
-        self._imu_lock = imu_lock
 
         while True:
             
@@ -473,11 +458,6 @@ class sonySDKcam():
                 self._lock_with_save.release()
             # if(fileName != ""):
                 # nameParts = fileName.split("/")
-                # exifDataJson[nameParts[-1]] = et.get_tags([fileName], tagsToGet)
-                # print("Copying "+ fileName + " to "+ destinationDirectory+"/"+nameParts[-1])
-                # shutil.move(fileName,destinationDirectory+"/"+nameParts[-1])
-
-
             if fileName == '':
                 with lock_with_copy:
                     save_done.set()
@@ -487,8 +467,7 @@ class sonySDKcam():
                         if not t.is_set():
                             allDone = False            
                 if allDone:
-                    self._logger.debug('save_to_ssd thread is done, generating exif info...')
-                    # self.save_exif_info(serial_num)
+                    self._logger.debug('save_to_ssd thread is done')
                     self._logger.debug('Exit save thread')
                     return
                 # nothing to save
@@ -497,99 +476,45 @@ class sonySDKcam():
                 # save required
                 with lock_with_copy:
                     save_done.clear()
-                # print(str(datetime.now())+ " Getting file name and exif")
                 currentFolder, currentFilename = os.path.split(fileName)
-                # currentFilename = str(currentFilename,encoding="utf-8")
-                # exif_data = et.get_tags([fileName], self.KEYS_TO_SAVE)[0]
-                # print("read exif data: "+str(exif_data))
-                # timestamp = datetime.strptime(exif_data["Composite:SubSecDateTimeOriginal"], "%Y:%m:%d %H:%M:%S%z")
-                # print("Copying to " + dest_dir + "/"+currentFilename)
                 dest = os.path.join(self._dest_dir, currentFilename)
                 if not os.path.isdir(self._dest_dir):
                     os.makedirs(self._dest_dir)
                 if not os.path.isdir(os.path.join(self._dest_dir,"in_progress")):
                     os.makedirs(os.path.join(self._dest_dir,"in_progress"))
-                
-                # if (not self._disableHashAndPreview):
-                #     print(str(datetime.now())+ " read file for md5")
-                #     sourceFile = open(fileName,"rb")
-                #     sourceImageContent = sourceFile.read()
-                #     print(str(datetime.now())+ " done reading, calculating hash")
-                #     imageHash =  hashlib.md5(sourceImageContent).hexdigest() # 170ms for MD5 calc
-                #     sourceFile.close()
-                imageAlreadySaved = False
+
                 print(str(datetime.now())+ " Iterate over destination files")
                 if dest in computer_files:
-                    # file exists
                     self._logger.debug('File exists {}'.format(dest))
-                    if(not self._disableHashAndPreview):
-                        try:
-                            f = open(dest, "rb")
-                            h = hashlib.md5(f.read()).hexdigest()
-                            # exif_data = pyexifinfo.get_json(f.name)[0]
-                            f.close()
-                            if h == imageHash:
-                                imageAlreadySaved = True
-                                self._logger.debug('File already copied {}'.format(dest))
-                                # self.append_exif_info(currentFilename, self._dest_dir, exif_data, imageHash)
-                        except:
-                            while dest in computer_files:
-                                dest = "{0}_{2}.{1}".format(*dest.rsplit(".", 1), "copy")
-                            self._logger.debug('Save as _copy {}'.format(dest))
-                    else:
-                        while dest in computer_files:
-                            dest = "{0}_{2}.{1}".format(*dest.rsplit(".", 1), "copy")
-                        self._logger.debug('Save as _copy {}'.format(dest))
-                
-                # self._logger.debug('Save {} {}'.format(dest, imageAlreadySaved))
+                    while dest in computer_files:
+                        dest = "{0}_{2}.{1}".format(*dest.rsplit(".", 1), "copy")
+                    self._logger.debug('Save as _copy {}'.format(dest))
+
                 try:
-                    if not imageAlreadySaved:
-
-                        if(".JPG" in currentFilename):
-                            previewCount = 0
+                    if currentFilename.upper().endswith(".JPG"):
+                        with lock_with_preview:
+                            preview_count = len(self._preview_images_big_jpg)
+                        if preview_count < 3 or self._num_images_copied % 500 == 0:
+                            with open(fileName, "rb") as source_file:
+                                source_image = source_file.read()
                             with lock_with_preview:
-                                previewCount = len(self._preview_images_big_jpg)
-                            if previewCount < 3:
-                                sourceFile = open(fileName,"rb")
-                                sourceImageContent = sourceFile.read()
-                                sourceFile.close()
-                                with lock_with_preview:
-                                    self._preview_images_big_jpg.append(sourceImageContent)
-                            elif self._num_images_copied % 500 == 0:
-                                with lock_with_preview:
+                                if len(self._preview_images_big_jpg) >= 3:
                                     self._preview_images_big_jpg.pop(0)
-                                    self._preview_images_big_jpg.append(sourceImageContent)
+                                self._preview_images_big_jpg.append(source_image)
 
-                        print(str(datetime.now())+ " start copy")
-                        try:
-                            # First copy to the SSD, then move from the in_progress folder to the main folder. This is done
-                            # to try to make the copy "atomic" to avoid corrupted files on the SSD due to loss of power or similar.
-                            copy_status = subprocess.run(["mv", fileName, os.path.join(self._dest_dir,"in_progress",currentFilename)], check=True)
-                            copy_status = subprocess.run(["mv", os.path.join(self._dest_dir,"in_progress",currentFilename), os.path.join(self._dest_dir,currentFilename)], check=True)
-                            self._logger.debug(copy_status)
-                            self._num_images_copied += 1
-                        except:
-                            # raise Exception('Failed to copy file')
-                            print("Failed to copy file, retrying")
-                            self._lock_with_save.acquire()
+                    print(str(datetime.now())+ " start copy")
+                    try:
+                        copy_status = subprocess.run(["mv", fileName, os.path.join(self._dest_dir,"in_progress",currentFilename)], check=True)
+                        copy_status = subprocess.run(["mv", os.path.join(self._dest_dir,"in_progress",currentFilename), dest], check=True)
+                        self._logger.debug(copy_status)
+                        self._num_images_copied += 1
+                    except Exception:
+                        print("Failed to copy file, retrying")
+                        with self._lock_with_save:
                             self._to_save_queue.append(fileName)
-                            self._lock_with_save.release()
-                            continue
-                        # shutil.move(fileName,self._dest_dir+"/"+currentFilename)
-                        print(str(datetime.now())+ " copied to "+ self._dest_dir+"/"+currentFilename )
-                        # if not self._disableHashAndPreview:
-                        #     self.append_exif_info(currentFilename, self._dest_dir, exif_data, imageHash)
-                        # else:
-                        #     self.append_exif_info(currentFilename, self._dest_dir, exif_data, "")
-                        # self.save_exif_info(serial_num)
-                        # self._exif_info = {}
-                        # if not self._disableHashAndPreview:
-                        #     print(str(datetime.now())+ " generate preview")
-                        
+                        continue
+                    print(str(datetime.now())+ " copied to "+ dest)
                     print(str(datetime.now())+ " done with copy thread")
-                    # if fileName in self._marginTimers:
-                    #     self._logger.info("Copy to ssd time since trigger: " + str(datetime.now() - self._marginTimers[fileName]))
-                    #     del self._marginTimers[fileName]
                 except Exception as e:
                     self._logger.warning("Save exception %s %s -> %s, error: %s" % (currentFolder, currentFilename, dest, str(e)))
                     self._num_images_failed += 1
@@ -634,113 +559,6 @@ class sonySDKcam():
         session_dir = "{}/{}".format(timestamp.strftime('%Y_%m_%d'), self._session_id)
         complete_dir = os.path.join(mount_point, session_dir, str(serial_num))
         return complete_dir
-
-    def append_exif_info(self, name, dest_dir, exif_data, md5, current_exif_info):
-        # self._logger.debug(f'append_exif_info {len(data_bytes)} name {name} dest_dir {dest_dir}')
-        filtered_exif = {}
-        # if str(self.config.eosserialnumber) == '113053000777':
-        #     for key in exif_data:
-        #         self._logger.debug('{} {}'.format(key, exif_data[key]))
-        for key in self.KEYS_TO_SAVE:
-            if key in exif_data:
-                formatted_key = key[key.index(':')+1:]
-                filtered_exif[formatted_key] = exif_data[key]
-
-        # do not save temporary filename
-        filtered_exif['FileName'] = name
-        filtered_exif['FileDir'] = dest_dir
-        if not self._disableHashAndPreview:
-            filtered_exif['md5'] = md5 
-        if 'EXIF:LensSerialNumber' in exif_data:
-            self._lens_serial_number = exif_data['EXIF:LensSerialNumber']
-        else:
-            self._lens_serial_number = ''
-
-        already_saved = False
-        if dest_dir not in current_exif_info:
-            current_exif_info[dest_dir] = {}
-        else:
-            # check if image is already saved
-            if not self._disableHashAndPreview:
-                if filtered_exif['md5'] in current_exif_info[dest_dir]:
-                # if any(filtered_exif['md5'] == s['md5'] for s in current_exif_info[dest_dir]):
-                    already_saved = True
-                    self._logger.debug("File already added to exif info")
-            else:
-                if filtered_exif['FileName'] in current_exif_info[dest_dir]:
-                # if any(filtered_exif['md5'] == s['md5'] for s in current_exif_info[dest_dir]):
-                    already_saved = True
-                    self._logger.debug("File already added to exif info")
-        if not already_saved:
-            if not self._disableHashAndPreview:
-                current_exif_info[dest_dir][filtered_exif['md5']] = filtered_exif
-            else:
-                current_exif_info[dest_dir][filtered_exif['FileName']] = filtered_exif
-            # current_exif_info[dest_dir].append(filtered_exif)
-
-    def save_exif_info(self, serial_number):
-        # Iterate through all the folders on the SSD and check that all the exif info is up to date
-
-        et = ExifToolHelper()
-        for dirPath, dirs, files in os.walk(os.path.expanduser(self._mount_point)):
-            if "in_progress" in dirPath or not dirPath.endswith(str(serial_number)):
-                continue
-            if not "exif_cam.json" in files:
-                imageNames = [name for name in files if (".JPG" in name or ".ARW" in name)]
-                if len(imageNames) >0:
-                    self._logger.debug('Generating exif info for directory: ' + dirPath)
-                    for i in range(len(imageNames)):
-                        imageNames[i] = os.path.join(dirPath,imageNames[i])
-                    # print("getting exif info for: " + str(absImageNames))
-                    exifData = []
-                    try:
-                        exifData = et.get_tags(imageNames, self.KEYS_TO_SAVE)
-                    except Exception as e:
-                        self._logger.warning(f"Failed to read exif data for {dirPath}, error: {e}")
-                        # Add an empty json entry for this directory to create an empty exif file, preventing this directory from being processed again
-                        self._exif_info[dirPath] = {}
-                    for i in range(len(exifData)):
-                        self.append_exif_info(os.path.split(imageNames[i])[-1],dirPath, exifData[i],"",self._exif_info)
-
-        # Save exif info
-        for exif_dir in self._exif_info:
-            filename = os.path.join(exif_dir, 'exif_cam.json')
-            if not os.path.exists(filename):
-                # no existing file
-                self._logger.debug('no existing file')
-                new_data = {}
-                new_data['serialNumber'] = serial_number
-                new_data['exifInfo'] = self._exif_info[exif_dir]
-                new_data['lensSerialNumber'] = self._lens_serial_number
-                # self._logger.debug('serialNumber {} lens {}'.format(new_data['serialNumber'], new_data['lensSerialNumber']))
-
-                # find session index from dest_dir
-                dir_split = exif_dir.split('/')
-                new_data['sessionId'] = dir_split[-3] + "#" + dir_split[-2] # date (YYYY_MM_DD) + session idx
-                
-                with open(filename, 'w') as f:
-                    json.dump(new_data, f, sort_keys=True)
-            else:
-                # existing file
-                self._logger.debug(f'existing file {exif_dir} {filename}')
-                exisiting_data = {}
-                try:
-                    with open(filename, 'r') as f:
-                        exisiting_data = json.load(f)
-                    # print("current exif info: " + str(self._exif_info[exif_dir].items()))
-                    for key,value in self._exif_info[exif_dir].items():
-                        if key in exisiting_data['exifInfo']:
-                            # item already added
-                            self._logger.debug(f"item already added {value['FileName']}")
-                        else:
-                            # new item -> add
-                            self._logger.debug(f"new item - append {value['FileName']}")
-                            exisiting_data['exifInfo'][key] = value
-                    with open(filename, 'w') as f:
-                        json.dump(exisiting_data, f, sort_keys=True)
-                except Exception as e:
-                    self._logger.warning(f"Append to existing file failed {e}")
-        self._exif_info = {}
 
     def get_preview_image(self, idx):
         if idx >= len(self._preview_images) or self._generating_preview:

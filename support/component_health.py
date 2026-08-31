@@ -11,7 +11,7 @@ def _entry(connected, message, **extra):
     return value
 
 
-def component_health(camera_manager, gps, altimeter, imu, storage_mounted):
+def component_health(camera_manager, gps, altimeter, storage_mounted):
     """Return component availability without probing or changing hardware."""
     try:
         camera_count = len(camera_manager.get_cameras_as_list() or [])
@@ -29,8 +29,6 @@ def component_health(camera_manager, gps, altimeter, imu, storage_mounted):
         pass
 
     altimeter_connected = bool(getattr(altimeter, 'available', False))
-    imu_connected = getattr(imu, '_BerryIMUversion', 99) != 99
-
     return {
         'cameras': _entry(
             camera_count > 0,
@@ -54,10 +52,6 @@ def component_health(camera_manager, gps, altimeter, imu, storage_mounted):
             altimeter_connected,
             'GRF-500 altimeter connected.' if altimeter_connected
             else 'GRF-500 altimeter is not connected. Capture can continue without altitude data.'),
-        'imu': _entry(
-            imu_connected,
-            'IMU connected.' if imu_connected
-            else 'IMU is not connected. Capture can continue without motion data.'),
         'storage': _entry(
             storage_mounted,
             'Internal storage mounted.' if storage_mounted

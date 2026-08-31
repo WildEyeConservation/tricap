@@ -46,6 +46,7 @@ ALTI_MEASURE_TIMEOUT = 2
 
 MOUNT_POINT = "/mnt/ext_cam_storage"
 MOUNT_POINT_SSD = "/mnt/ssd_cam_storage"
+FALLBACK_TELEMETRY_DIR = "/home/radxa/SkySeeker_Data"
 SONY_TEMPFS_MOUNT_POINT = "/home/radxa/SonySDKWrapper/memoryFs"
 SECRETS_FILE = "/home/radxa/tricap/secrets.json"
 

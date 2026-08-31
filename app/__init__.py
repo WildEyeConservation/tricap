@@ -30,11 +30,10 @@ from sensors.toggle_switch import CamManagerMonitor, LEDController, CamErrorMoni
 
 from support.system_monitor import generate_system_monitor, SystemMonitorLogger
 
-from config import SERVER_LOG_DIR
+from config import FALLBACK_TELEMETRY_DIR, MOUNT_POINT, SERVER_LOG_DIR
 from enum import Enum
 
 from serial_comms.SerialInterface import SerialInterface
-from serial_comms.berryIMU import BerryImu
 
 class AltiMeasurementObserver():
     """A custom observer to link the alti to the session logger."""
@@ -63,13 +62,12 @@ class AltitudeLogObserver():
             return
         try:
             from datetime import datetime
-            from config import MOUNT_POINT
             now = datetime.now()
             day = now.strftime('%Y_%m_%d')
             if os.path.ismount(MOUNT_POINT):
                 log_dir = os.path.join(MOUNT_POINT, day)
             else:
-                log_dir = os.path.join('/home/radxa/GPS_IMU_Data', day)
+                log_dir = os.path.join(FALLBACK_TELEMETRY_DIR, day)
             if not os.path.isdir(log_dir):
                 os.makedirs(log_dir)
             dest = os.path.join(log_dir, 'altitudeData.csv')
@@ -174,14 +172,18 @@ cam_settings = init_config.get_section_dict(TricapConfig.CAMERA_SECTION_HEADER)
 
 code_inf = GitData()
 
-imu_lock = Lock()
+storage_lock = Lock()
 
-tricap_manager = TriCapCamsManager(misc_settings, cam_settings, imu_lock)
+tricap_manager = TriCapCamsManager(misc_settings, cam_settings, storage_lock)
 tricap_cameras = tricap_manager.get_cameras_as_list()
 tricap_length = len(tricap_cameras)
 
-gps_ser = SerialInterface('/dev/gps', 921600, False, False, imu_lock, tricap_manager)
-accel_ser = BerryImu(imu_lock)
+gps_ser = SerialInterface(
+    '/dev/gps',
+    921600,
+    capturing_lock=storage_lock,
+    cam_manager=tricap_manager,
+)
 
 image_manager = tricap_manager
 

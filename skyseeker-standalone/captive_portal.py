@@ -902,11 +902,14 @@ runPeriodic(()=>latest&&latest.mode==="STARTED"?null:pollStorage(),15000);
 SETUP_JS = COMMON_JS + r'''
 let currentInterval=null,currentImageFormat=null,capturing=false,backupRunning=false,backupTimer=null,camCount=-1,externalConnected=false;
 let verifyRunning=false,verifyTimer=null,verifyAnnounce=false;
-let deleteMode="verify";
+let deleteMode="verify",statusFailures=0;
+// Controls stay locked until every poller has answered at least once.
+const known={status:false,backup:false,verify:false};
 function setControlsEnabled(){
-  const lock=capturing||backupRunning||verifyRunning;
+  const unknown=!(known.status&&known.backup&&known.verify);
+  const lock=unknown||capturing||backupRunning||verifyRunning;
   document.querySelectorAll("[data-locks]").forEach(b=>{b.disabled=lock||b.dataset.actionBusy==="true"});
-  el("lockNote").textContent=lock?"Some controls are disabled while capture or copy is running.":"";
+  el("lockNote").textContent=unknown?"Checking device status...":lock?"Some controls are disabled while capture or copy is running.":"";
 }
 function renderImageButtons(n){
   if(n===camCount)return;camCount=n;
@@ -925,8 +928,11 @@ async function loadSensors(){return singleFlight("setup-status",async()=>{
     const age=Number(gps.lastUpdate);el("age").textContent=Number.isFinite(age)&&age>=0?`${age.toFixed(0)}s`:"--";
     el("snrMin").textContent=fmt(gps.min);el("snrAvg").textContent=fmt(gps.avg);el("snrMax").textContent=fmt(gps.max);
     renderImageButtons((status.cams||[]).length);
-    setControlsEnabled();
-  }catch(e){el("setupMode").textContent="Offline"}
+    known.status=true;statusFailures=0;
+  }catch(e){el("setupMode").textContent="Offline";if(++statusFailures>=3)known.status=false}
+  if(!known.backup)pollBackup();
+  if(!known.verify)pollVerify();
+  setControlsEnabled();
 })}
 async function loadStats(){return singleFlight("setup-stats",async()=>{
   try{
@@ -991,7 +997,16 @@ function renderBackup(st){
   if(!running&&backupTimer){clearInterval(backupTimer);backupTimer=null}
   if(wasRunning&&!running)toast(st.message||"Backup complete");
 }
-async function pollBackup(){return singleFlight("backup-status",async()=>{try{renderBackup(await fetchJson("/api/backup_status"))}catch(e){if(backupTimer){clearInterval(backupTimer);backupTimer=null}}})}
+async function pollBackup(){return singleFlight("backup-status",async()=>{
+  try{const st=await fetchJson("/api/backup_status");known.backup=true;renderBackup(st)}
+  catch(e){
+    if(backupTimer){clearInterval(backupTimer);backupTimer=null}
+    // 400 means the backend refused because capture is running, so no backup can be.
+    known.backup=e.status===400;
+    if(known.backup)backupRunning=false;
+    setControlsEnabled();
+  }
+})}
 function formatDuration(seconds){
   const total=Math.max(0,Math.round(Number(seconds)||0));
   if(total<60)return `${total}s`;
@@ -1020,9 +1035,19 @@ function renderVerify(st){
   }
 }
 async function pollVerify(){return singleFlight("verify-status",async()=>{
-  const path=deleteMode==="force"?"/api/force_delete_status":"/api/verify_and_delete_status";
-  try{renderVerify(await fetchJson(path))}
-  catch(e){if(verifyTimer){clearInterval(verifyTimer);verifyTimer=null};verifyRunning=false;setControlsEnabled()}
+  try{
+    if(known.verify){
+      const path=deleteMode==="force"?"/api/force_delete_status":"/api/verify_and_delete_status";
+      renderVerify(await fetchJson(path));
+    }else{
+      // Either job may already be running from an earlier session.
+      const [verify,force]=await Promise.all([fetchJson("/api/verify_and_delete_status"),fetchJson("/api/force_delete_status")]);
+      deleteMode=force.running?"force":"verify";
+      known.verify=true;
+      renderVerify(force.running?force:verify);
+    }
+  }
+  catch(e){if(verifyTimer){clearInterval(verifyTimer);verifyTimer=null}known.verify=false;setControlsEnabled()}
 })}
 async function startBackup(control){
   const finish=beginAction(control,"Starting backup...");
@@ -1209,7 +1234,6 @@ applyTheme(["default","light","dark"].includes(document.documentElement.getAttri
 // running only so the page notices capture ended and re-enables. The
 // netbird/uplink manual refreshes after connect/disconnect stay unwrapped so
 // a user action always gets a fresh result.
-pollBackup();pollVerify();
 runPeriodic(loadSensors,()=>capturing?5000:2000);
 runPeriodic(()=>capturing?null:loadStats(),15000);
 runPeriodic(()=>capturing?null:loadImageFormat(),15000);
@@ -1347,23 +1371,23 @@ HOME_HTML = f'''{_HEAD}<title>SkySeeker Control</title><style>{STYLE}</style></h
 </body></html>'''
 
 SETUP_HTML = f'''{_HEAD}<title>SkySeeker Setup</title><style>{STYLE}</style></head><body><div class="app">{_appbar()}<main class="content">
-<p class="lock-note" id="lockNote"></p>
+<p class="lock-note" id="lockNote">Checking device status...</p>
 <div class="section-label">Setup · most used</div>
 <section class="card pad">
   <div class="row-between mb"><div class="card-h">Capture interval</div><div class="interval-val mono" id="interval">--</div></div>
   <div class="grid2">
-    <button class="step-btn mono" type="button" data-delta="-0.5" data-locks>−0.5</button>
-    <button class="step-btn mono" type="button" data-delta="-0.1" data-locks>−0.1</button>
-    <button class="step-btn mono" type="button" data-delta="0.1" data-locks>+0.1</button>
-    <button class="step-btn mono" type="button" data-delta="0.5" data-locks>+0.5</button>
+    <button class="step-btn mono" type="button" data-delta="-0.5" data-locks disabled>−0.5</button>
+    <button class="step-btn mono" type="button" data-delta="-0.1" data-locks disabled>−0.1</button>
+    <button class="step-btn mono" type="button" data-delta="0.1" data-locks disabled>+0.1</button>
+    <button class="step-btn mono" type="button" data-delta="0.5" data-locks disabled>+0.5</button>
   </div>
 </section>
 <section class="card pad">
   <div class="row-between mb"><div class="card-h">Camera image format</div><div class="theme-val mono" id="imageFormatValue">--</div></div>
   <div class="seg" role="group" aria-label="Camera image format">
-    <button class="seg-btn" id="imageFormatDefault" type="button" data-locks>Default</button>
-    <button class="seg-btn" id="imageFormatRaw" type="button" data-locks>RAW</button>
-    <button class="seg-btn" id="imageFormatJpeg" type="button" data-locks>JPEG</button>
+    <button class="seg-btn" id="imageFormatDefault" type="button" data-locks disabled>Default</button>
+    <button class="seg-btn" id="imageFormatRaw" type="button" data-locks disabled>RAW</button>
+    <button class="seg-btn" id="imageFormatJpeg" type="button" data-locks disabled>JPEG</button>
   </div>
   <p class="muted small mt">Default leaves each camera at the image format selected on the camera.</p>
 </section>
@@ -1380,10 +1404,10 @@ SETUP_HTML = f'''{_HEAD}<title>SkySeeker Setup</title><style>{STYLE}</style></he
   <div class="card-h mb">Backup to SSD</div>
   <p class="muted small" style="margin:0 0 12px">Copies images together with GPS and altitude CSV logs.</p>
   <div class="grid2">
-    <button class="go-btn" id="backupStart" type="button" data-locks>Start backup</button>
-    <button class="danger-btn" id="backupDelete" type="button" data-locks>Verify &amp; delete</button>
+    <button class="go-btn" id="backupStart" type="button" data-locks disabled>Start backup</button>
+    <button class="danger-btn" id="backupDelete" type="button" data-locks disabled>Verify &amp; delete</button>
   </div>
-  <button class="danger-btn mt" id="backupMove" type="button" data-locks style="width:100%">Copy &amp; delete</button>
+  <button class="danger-btn mt" id="backupMove" type="button" data-locks disabled style="width:100%">Copy &amp; delete</button>
   <div class="progress-track mt"><div class="progress-fill" id="backupFill"></div></div>
   <p class="muted small" id="backupState" style="margin-top:8px">Idle</p>
   <p class="benchmark-line mono" id="backupBenchmark">No benchmark recorded this session.</p>
@@ -1417,7 +1441,7 @@ SETUP_HTML = f'''{_HEAD}<title>SkySeeker Setup</title><style>{STYLE}</style></he
 <section class="card acc">
   <div class="acc-head"><div class="acc-title">Restart</div><div class="acc-right"><span class="chev">{CHEV}</span></div></div>
   <div class="acc-body">
-    <div class="grid2"><button class="pill-btn" id="restartService" type="button" data-locks>Tricap service</button><button class="danger-btn" id="rebootDevice" type="button" data-locks>Reboot device</button></div>
+    <div class="grid2"><button class="pill-btn" id="restartService" type="button" data-locks disabled>Tricap service</button><button class="danger-btn" id="rebootDevice" type="button" data-locks disabled>Reboot device</button></div>
     <p class="muted small mt">&ldquo;Tricap service&rdquo; restarts capture only. &ldquo;Reboot device&rdquo; power-cycles the whole rig.</p>
   </div>
 </section>

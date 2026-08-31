@@ -39,6 +39,17 @@ _force_delete_status = {
   'message': 'Idle',
   'errors': [],
 }
+def _storage_busy_reason():
+  """Reason a storage job blocks restart/reboot, or None."""
+  if (backupManager.status() or {}).get('running'):
+    return 'Not allowed while a backup is running'
+  if backupManager.verify_delete_status().get('running'):
+    return 'Not allowed while verification is running'
+  with _force_delete_lock:
+    if _force_delete_status.get('running'):
+      return 'Not allowed while internal storage is being cleared'
+  return None
+
 # Free space on the external SSD only changes during a copy, so measure it
 # once per drive (at plug-in) and serve the cached value while unmounted.
 _ssd_info_lock = threading.Lock()
@@ -390,6 +401,9 @@ def lens_number():
 @api_bp.route('/api/restart')
 def restart():
   _logger.debug('restart called')
+  busy = _storage_busy_reason()
+  if busy:
+    return jsonify({'msg': busy}), 409
   subprocess.run(['systemctl', 'restart', 'tricap.service'], check=True)
   _logger.debug('restart')
   return {'success': True}
@@ -397,6 +411,9 @@ def restart():
 @api_bp.route('/api/reboot')
 def reboot():
   _logger.debug('reboot called')
+  busy = _storage_busy_reason()
+  if busy:
+    return jsonify({'msg': busy}), 409
   subprocess.run(['systemctl', 'reboot'], check=True)
   _logger.debug('reboot')
   return {'success': True}

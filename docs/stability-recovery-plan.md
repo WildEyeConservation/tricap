@@ -10,11 +10,14 @@ service, but it never reboots or power-cycles the device automatically.
 | TP-Link RTL8192EU USB adapter | Runs the `skyseeker` access point through hostapd |
 | dnsmasq | Assigns addresses on `192.168.50.0/24` |
 | Onboard Broadcom Wi-Fi | Joins an internet uplink or the `skyseeker-rescue` hotspot |
+| Ethernet | Direct laptop maintenance on `192.168.51.0/24` |
 | NetBird | Provides remote access whenever an internet uplink is available |
 | Flask | Serves the dashboard and API directly on port 80 |
 
 The USB adapter is never used as an internet client. NetworkManager manages the
-onboard radio and leaves the AP adapter to hostapd.
+onboard radio and wired maintenance profile, and leaves the AP adapter to
+hostapd. A directly connected laptop receives an address automatically and can
+reach SSH or Flask at `192.168.51.1`.
 
 ## Automatic behavior
 
@@ -79,6 +82,7 @@ systemctl status skyseeker-health.timer skyseeker-recovery-scan.timer
 | AP visible but clients receive no address | dnsmasq | Health recovery restarts dnsmasq after three failures |
 | AP disappears or hostapd control fails | hostapd or USB radio | Health recovery restarts hostapd after three failures |
 | Dashboard unavailable while AP works | Flask | `tricap.service` restarts Flask; inspect its journal |
+| AP and NetBird are unavailable | Wi-Fi paths | Connect a laptop directly by Ethernet and SSH to `192.168.51.1` |
 | NetBird unavailable | Internet uplink or NetBird service | Check recovery-scan and NetBird service journals |
 | PCIe/NVMe errors or complete lockup | Kernel or hardware | Pull power, wait, and perform a full cold start |
 

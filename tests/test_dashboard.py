@@ -1,3 +1,4 @@
+import configparser
 import importlib.util
 from pathlib import Path
 import unittest
@@ -15,11 +16,12 @@ VIEW_SPEC.loader.exec_module(DASHBOARD_VIEW)
 
 
 class WebAccessTests(unittest.TestCase):
-    def test_loopback_ap_and_netbird_clients_are_allowed(self):
+    def test_loopback_ap_wired_and_netbird_clients_are_allowed(self):
         for address in (
             "127.0.0.1",
             "::1",
             "192.168.50.42",
+            "192.168.51.42",
             "100.64.0.1",
             "100.127.255.254",
         ):
@@ -39,6 +41,21 @@ class WebAccessTests(unittest.TestCase):
         ):
             with self.subTest(address=address):
                 self.assertFalse(web_client_allowed(address))
+
+    def test_wired_maintenance_profile_provides_laptop_addressing(self):
+        profile = configparser.ConfigParser()
+        profile.read(
+            ROOT
+            / "services"
+            / "NetworkManager"
+            / "system-connections"
+            / "skyseeker-wired-access.nmconnection"
+        )
+
+        self.assertEqual(profile["connection"]["type"], "ethernet")
+        self.assertEqual(profile["ipv4"]["method"], "shared")
+        self.assertEqual(profile["ipv4"]["address1"], "192.168.51.1/24")
+        self.assertEqual(profile["ipv4"]["never-default"], "true")
 
     def test_flask_runs_directly_on_http_port(self):
         launcher = (ROOT / "tricap.py").read_text()

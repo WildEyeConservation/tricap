@@ -6,8 +6,13 @@ import ipaddress
 
 
 AP_NETWORK = ipaddress.ip_network("192.168.50.0/24")
+WIRED_MAINTENANCE_NETWORK = ipaddress.ip_network("192.168.51.0/24")
 NETBIRD_NETWORK = ipaddress.ip_network("100.64.0.0/10")
-ALLOWED_CLIENT_NETWORKS = (AP_NETWORK, NETBIRD_NETWORK)
+ALLOWED_CLIENT_NETWORKS = (
+    AP_NETWORK,
+    WIRED_MAINTENANCE_NETWORK,
+    NETBIRD_NETWORK,
+)
 
 
 def web_client_allowed(client_ip: str | None) -> bool:

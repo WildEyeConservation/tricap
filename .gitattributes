@@ -1,6 +1,7 @@
 *.sh text eol=lf
 services/systemd/* text eol=lf
 services/usr-local/** text eol=lf
+services/NetworkManager/** text eol=lf
 services/journald.conf.d/* text eol=lf
 services/modprobe.d/* text eol=lf
 services/udev-rules.d/* text eol=lf

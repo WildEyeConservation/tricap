@@ -9,6 +9,7 @@ Supported hardware:
 - GRF-500 laser altimeter
 - u-blox GPS on `/dev/gps`
 - TP-Link USB Wi-Fi adapter for the access point
+- Direct Ethernet maintenance connection
 - GPIO capture switch and status LEDs
 
 ## Runtime
@@ -16,13 +17,18 @@ Supported hardware:
 `tricap.service` starts `tricap.py`, which serves the Flask operator UI and API
 directly on HTTP port 80. There is no proxy, separate web server, or captive
 portal process. Requests are accepted only from loopback, the SkySeeker AP
-subnet (`192.168.50.0/24`), and the NetBird overlay (`100.64.0.0/10`); clients
-on an internet-uplink Wi-Fi or Ethernet network receive HTTP 403. The AP,
+subnet (`192.168.50.0/24`), the wired maintenance subnet
+(`192.168.51.0/24`), and the NetBird overlay (`100.64.0.0/10`); clients on an
+internet-uplink Wi-Fi receive HTTP 403. The AP,
 rescue-network scan, diagnostics, and recovery services are stored under `services/`; see
 [`services/README.md`](services/README.md) for installation and operation.
 
 NetBird remains the remote-support path. The rescue scan remains available when
 the normal AP path cannot be reached.
+
+For last-resort local access, connect a laptop directly to the rig's Ethernet
+port. The rig supplies the laptop with an address and is available at
+`192.168.51.1` for SSH and the dashboard.
 
 See [`docs/repository-audit.md`](docs/repository-audit.md) for the complete used
 file tree, runtime data flow, retained abstractions, and redundant-file ledger.

@@ -15,6 +15,7 @@ The deployed hardware boundary is:
   are available;
 - TP-Link RTL8192EU USB adapter dedicated to the access point;
 - onboard Broadcom Wi-Fi for normal and rescue uplinks;
+- direct Ethernet maintenance at `192.168.51.1`;
 - GPIO capture switch and red/green status LEDs;
 - internal capture storage and a removable USB backup volume.
 
@@ -75,11 +76,12 @@ generated JavaScript, CSS, API, and health endpoint. There is no proxy, WSGI
 wrapper, separate frontend server, redirector, captive-portal detector, or
 second diagnostics web server.
 
-Flask accepts requests only from loopback, the access-point subnet, and the
-NetBird address range. The TP-Link adapter remains dedicated to hostapd. The
-onboard radio keeps an existing uplink; only when disconnected does the rescue
-timer scan for and join the pre-provisioned `skyseeker-rescue` profile. NetBird
-runs independently and reconnects when that uplink becomes usable.
+Flask accepts requests only from loopback, the access-point subnet, the wired
+maintenance subnet, and the NetBird address range. The TP-Link adapter remains
+dedicated to hostapd. The onboard radio keeps an existing uplink; only when
+disconnected does the rescue timer scan for and join the pre-provisioned
+`skyseeker-rescue` profile. NetBird runs independently and reconnects when that
+uplink becomes usable.
 
 ## Used repository tree
 
@@ -144,6 +146,8 @@ The following is the complete tracked tree, grouped by purpose.
 │   │   ├── skyseeker-health.timer            periodic bounded AP recovery
 │   │   ├── skyseeker-recovery-scan.service   one rescue-uplink scan
 │   │   └── skyseeker-recovery-scan.timer     periodic rescue scan
+│   ├── NetworkManager/system-connections/
+│   │   └── skyseeker-wired-access.nmconnection  direct Ethernet DHCP profile
 │   ├── usr-local/sbin/
 │   │   ├── skyseeker-ap-autodetect.sh        detect and pin RTL8192EU AP radio
 │   │   ├── skyseeker-firstboot.sh            regenerate cloned identities

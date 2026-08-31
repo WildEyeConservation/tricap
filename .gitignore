@@ -17,6 +17,7 @@ node_modules
 /build
 /focus
 /.vscode
+/.venv
 
 # !.gitignore
 

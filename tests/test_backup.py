@@ -78,6 +78,18 @@ class BackupTests(unittest.TestCase):
 
         self.assertTrue(manager._unmount_storage())
         self.assertEqual(calls, [True])
+
+    def test_refresh_usage_callback_is_optional_and_failure_tolerant(self):
+        self.manager._refresh_storage_usage()
+
+        calls = []
+        manager = RsyncManager(refresh_usage=lambda: calls.append(True))
+        manager._refresh_storage_usage()
+        self.assertEqual(calls, [True])
+
+        def explode():
+            raise OSError("drive gone")
+        RsyncManager(refresh_usage=explode)._refresh_storage_usage()
         self.assertTrue(RsyncManager()._unmount_storage())
 
 

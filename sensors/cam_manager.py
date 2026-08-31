@@ -4,8 +4,8 @@
 # TODO Settings page should show warning for all incorrectly formatted settings
 
 import logging
-import json
 import os
+import shutil
 import subprocess
 import sys
 import threading
@@ -22,9 +22,17 @@ from config import (
     SONY_IMAGE_FORMAT_CONFIG_KEY,
 )
 
+from support.ssd_volume import find_volume
+
 from .base_setting import BaseSetting, SettingSpec
 from .sony_discovery import discover_sony_cameras
 from .sonySDK_cam import sonySDKcam as SonyCamera
+
+
+def _disk_usage_gb(path):
+    total, used, free = shutil.disk_usage(path)
+    gb = 1073741824
+    return {"capacityGB": round(total / gb, 2), "usedGB": round(used / gb, 2), "freeGB": round(free / gb, 2)}
 
 
 def create_sony_sdk():
@@ -83,6 +91,10 @@ class TriCapCamsManager:
         self._capture_and_copy_lock = list()
         self._save_and_preview_lock = list()
         self._storage_lock = storage_lock or threading.Lock()
+        # Free space on the external SSD only changes during a copy, so measure it
+        # once per volume and serve the cached figures while unmounted.
+        self._ssd_usage_lock = threading.Lock()
+        self._ssd_usage = {"id": None, "info": {}, "at": 0.0}
         self._thread_sync_lock = None
         subprocess.run(["timedatectl", "set-ntp", "false"], check=True)
         self._initialise()
@@ -338,26 +350,47 @@ class TriCapCamsManager:
         return True
 
     def external_ssd_device(self):
-        """Return the first filesystem-bearing partition on a USB disk."""
-        try:
-            output = subprocess.check_output([
-                "lsblk", "--json", "--paths", "--output",
-                "NAME,PATH,TYPE,FSTYPE,TRAN",
-            ], text=True)
-            block_devices = json.loads(output).get("blockdevices", [])
-        except (OSError, subprocess.SubprocessError, ValueError) as exc:
-            self._logger.warning('Failed to discover external SSD: %s', exc)
-            return None
+        """Path of the external SSD's data partition, or None."""
+        vol = find_volume()
+        return vol.path if vol else None
 
-        for disk in block_devices:
-            if disk.get("tran") != "usb":
-                continue
-            candidates = disk.get("children") or [disk]
-            for candidate in candidates:
-                if (candidate.get("type") in ("disk", "part") and
-                        candidate.get("fstype") and candidate.get("path")):
-                    return candidate["path"]
-        return None
+    SSD_FAILED_MOUNT_RETRY_SEC = 60
+
+    def ssd_usage(self):
+        """Capacity/used/free of the external SSD in GB; {} when none is connected."""
+        if os.path.ismount(MOUNT_POINT_SSD):
+            return self.refresh_ssd_usage()
+        vol = find_volume()
+        if vol is None:
+            with self._ssd_usage_lock:
+                self._ssd_usage = {"id": None, "info": {}, "at": 0.0}
+            return {}
+        with self._ssd_usage_lock:
+            cached = self._ssd_usage
+            fresh_failure = time.time() - cached["at"] < self.SSD_FAILED_MOUNT_RETRY_SEC
+            if cached["id"] == vol.id and (cached["info"] or fresh_failure):
+                return dict(cached["info"])
+            # New volume: mount once, measure, unmount. A failed mount is remembered
+            # briefly so a bad drive is not mount-cycled on every poll.
+            info = {}
+            if not os.path.ismount(MOUNT_POINT_SSD) and self.mount_ssd():
+                try:
+                    info = _disk_usage_gb(MOUNT_POINT_SSD)
+                finally:
+                    self.unmount_disk()
+            self._ssd_usage = {"id": vol.id, "info": info, "at": time.time()}
+            return dict(info)
+
+    def refresh_ssd_usage(self):
+        """Measure the mounted SSD and cache it. Called before unmounting after a copy."""
+        try:
+            info = _disk_usage_gb(MOUNT_POINT_SSD)
+        except OSError:
+            return {}
+        vol = find_volume()
+        with self._ssd_usage_lock:
+            self._ssd_usage = {"id": vol.id if vol else None, "info": info, "at": time.time()}
+        return dict(info)
 
     def unmount_disk(self):
         if os.path.ismount(MOUNT_POINT_SSD):

@@ -104,7 +104,11 @@ class RsyncManager:
     Runs rsync in a background thread and reads progress from its output, so
     status() is a plain read and costs the drives nothing.
     """
-    def __init__(self, unmount: Callable[[], bool] | None = None) -> None:
+    def __init__(
+        self,
+        unmount: Callable[[], bool] | None = None,
+        refresh_usage: Callable[[], Any] | None = None,
+    ) -> None:
         self._logger = logging.getLogger(__name__)
         self._lock = threading.Lock()
         self._status = BackupStatus()
@@ -113,6 +117,7 @@ class RsyncManager:
         self._verify_status = VerifyDeleteStatus()
         self._proc: subprocess.Popen[str] | subprocess.Popen[bytes] | None = None
         self._unmount = unmount
+        self._refresh_usage = refresh_usage
 
         # job config
         self._src: Path | None = None
@@ -868,6 +873,9 @@ class RsyncManager:
                         selected_files = self._status.total_files
                     _, remaining_files = self._scan_totals(self._src, self._files_from)
                     cleanup_deleted = max(0, selected_files - remaining_files)
+            # Cache the SSD's free space while it is still mounted, so the UI does
+            # not keep serving the pre-copy figure after unmount.
+            self._refresh_storage_usage()
             while True:
                 if not self._unmount_storage():
                     time.sleep(2.0)
@@ -980,6 +988,13 @@ class RsyncManager:
 
     def _unmount_storage(self) -> bool:
         return True if self._unmount is None else bool(self._unmount())
+
+    def _refresh_storage_usage(self) -> None:
+        if self._refresh_usage is not None:
+            try:
+                self._refresh_usage()
+            except Exception as exc:
+                self._logger.warning("Could not refresh storage usage: %s", exc)
 
     def _disk_free_bytes(self, path: Path) -> int:
         try:

@@ -50,11 +50,10 @@ def _storage_busy_reason():
       return 'Not allowed while internal storage is being cleared'
   return None
 
-# Free space on the external SSD only changes during a copy, so measure it
-# once per drive (at plug-in) and serve the cached value while unmounted.
-_ssd_info_lock = threading.Lock()
-_ssd_info_cache = {'device': None, 'info': None}
-backupManager = RsyncManager(unmount=tricap_manager.unmount_disk)
+backupManager = RsyncManager(
+    unmount=tricap_manager.unmount_disk,
+    refresh_usage=tricap_manager.refresh_ssd_usage,
+)
 
 @api_bp.route('/api')
 def api():
@@ -992,46 +991,7 @@ def _internal_disk_info():
     return info
 
 def _external_disk_info():
-    _logger.debug(f"_external_disk_info")
-
-    def _usage():
-        total, used, free = shutil.disk_usage(MOUNT_POINT_SSD)
-        return {
-            'capacityGB': round(total / 1073741824, 2),
-            'usedGB': round(used / 1073741824, 2),
-            'freeGB': round(free / 1073741824, 2),
-        }
-
-    # Already mounted (a copy is running): read live, no mount needed.
-    if os.path.ismount(MOUNT_POINT_SSD):
-        info = _usage()
-        with _ssd_info_lock:
-            _ssd_info_cache['device'] = tricap_manager.external_ssd_device()
-            _ssd_info_cache['info'] = info
-        return info
-
-    device = tricap_manager.external_ssd_device()
-    if device is None:
-        with _ssd_info_lock:
-            _ssd_info_cache['device'] = None
-            _ssd_info_cache['info'] = None
-        return {}
-
-    with _ssd_info_lock:
-        # Same drive we already measured: serve the cached figures.
-        if _ssd_info_cache['device'] == device and _ssd_info_cache['info']:
-            return dict(_ssd_info_cache['info'])
-
-        # New drive since the last measurement: mount once, measure, unmount.
-        info = {}
-        if tricap_manager.mount_ssd():
-            try:
-                info = _usage()
-            finally:
-                tricap_manager.unmount_disk()
-            _ssd_info_cache['device'] = device
-            _ssd_info_cache['info'] = info
-        return info
+    return tricap_manager.ssd_usage()
 
 def _run_delete_dir_contents(root: Path) -> None:
     errors = []

@@ -112,15 +112,21 @@ let verifyRunning = false;
 let verifyTimer: number | undefined;
 let verifyAnnounce = false;
 let deleteMode: DeleteMode = "verify";
+let statusFailures = 0;
+// Controls stay locked until every poller has answered at least once.
+const known = { status: false, backup: false, verify: false };
 
 function setControlsEnabled(): void {
-  const locked = capturing || backupRunning || verifyRunning;
+  const unknown = !(known.status && known.backup && known.verify);
+  const locked = unknown || capturing || backupRunning || verifyRunning;
   document.querySelectorAll<HTMLButtonElement>("[data-locks]").forEach((control) => {
     control.disabled = locked || control.dataset.actionBusy === "true";
   });
-  byId("lockNote").textContent = locked
-    ? "Some controls are disabled while capture or copy is running."
-    : "";
+  byId("lockNote").textContent = unknown
+    ? "Checking device status..."
+    : locked
+      ? "Some controls are disabled while capture or copy is running."
+      : "";
 }
 
 function renderImageButtons(count: number): void {
@@ -159,10 +165,16 @@ async function loadSensors(): Promise<void> {
       byId("snrAvg").textContent = formatValue(gps.avg);
       byId("snrMax").textContent = formatValue(gps.max);
       renderImageButtons(status.cams.length);
-      setControlsEnabled();
+      known.status = true;
+      statusFailures = 0;
     } catch {
       byId("setupMode").textContent = "Offline";
+      statusFailures += 1;
+      if (statusFailures >= 3) known.status = false;
     }
+    if (!known.backup) void pollBackup();
+    if (!known.verify) void pollVerify();
+    setControlsEnabled();
   });
 }
 
@@ -303,12 +315,18 @@ function renderBackup(status: BackupStatus): void {
 async function pollBackup(): Promise<void> {
   await singleFlight("backup-status", async () => {
     try {
-      renderBackup(await getJson<BackupStatus>("/api/backup_status"));
-    } catch {
+      const status = await getJson<BackupStatus>("/api/backup_status");
+      known.backup = true;
+      renderBackup(status);
+    } catch (error) {
       if (backupTimer !== undefined) {
         window.clearInterval(backupTimer);
         backupTimer = undefined;
       }
+      // 400 means the backend refused because capture is running, so no backup can be.
+      known.backup = error instanceof ApiError && error.status === 400;
+      if (known.backup) backupRunning = false;
+      setControlsEnabled();
     }
   });
 }
@@ -345,15 +363,26 @@ function renderVerify(status: VerifyStatus): void {
 
 async function pollVerify(): Promise<void> {
   await singleFlight("verify-status", async () => {
-    const path = deleteMode === "force" ? "/api/force_delete_status" : "/api/verify_and_delete_status";
     try {
-      renderVerify(await getJson<VerifyStatus>(path));
+      if (known.verify) {
+        const path = deleteMode === "force" ? "/api/force_delete_status" : "/api/verify_and_delete_status";
+        renderVerify(await getJson<VerifyStatus>(path));
+      } else {
+        // Either job may already be running from an earlier session.
+        const [verify, force] = await Promise.all([
+          getJson<VerifyStatus>("/api/verify_and_delete_status"),
+          getJson<VerifyStatus>("/api/force_delete_status"),
+        ]);
+        deleteMode = force.running ? "force" : "verify";
+        known.verify = true;
+        renderVerify(force.running ? force : verify);
+      }
     } catch {
       if (verifyTimer !== undefined) {
         window.clearInterval(verifyTimer);
         verifyTimer = undefined;
       }
-      verifyRunning = false;
+      known.verify = false;
       setControlsEnabled();
     }
   });
@@ -730,8 +759,6 @@ button("themeDark").addEventListener("click", () => applyTheme("dark", true));
 
 loadAltitudeSettings();
 applyTheme(selectedTheme(), false);
-void pollBackup();
-void pollVerify();
 runPeriodic(loadSensors, () => capturing ? 5000 : 2000);
 runPeriodic(() => capturing ? undefined : loadStats(), 15000);
 runPeriodic(() => capturing ? undefined : loadImageFormat(), 15000);

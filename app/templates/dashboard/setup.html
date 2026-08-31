@@ -1,21 +1,21 @@
 <!doctype html><html lang="en" data-theme="default"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>SkySeeker Setup</title><link rel="icon" href="/static/img/favicon.ico"><link rel="stylesheet" href="/static/css/dashboard.css"></head><body><div class="app"><header class="appbar"><a class="brand" href="/" aria-label="SkySeeker home"><span class="wordmark">SkySeeker</span></a><span class="host mono" id="host">control.skyseeker</span></header><main class="content">
-<p class="lock-note" id="lockNote"></p>
+<p class="lock-note" id="lockNote">Checking device status...</p>
 <div class="section-label">Setup · most used</div>
 <section class="card pad">
   <div class="row-between mb"><div class="card-h">Capture interval</div><div class="interval-val mono" id="interval">--</div></div>
   <div class="grid2">
-    <button class="step-btn mono" type="button" data-delta="-0.5" data-locks>−0.5</button>
-    <button class="step-btn mono" type="button" data-delta="-0.1" data-locks>−0.1</button>
-    <button class="step-btn mono" type="button" data-delta="0.1" data-locks>+0.1</button>
-    <button class="step-btn mono" type="button" data-delta="0.5" data-locks>+0.5</button>
+    <button class="step-btn mono" type="button" data-delta="-0.5" data-locks disabled>−0.5</button>
+    <button class="step-btn mono" type="button" data-delta="-0.1" data-locks disabled>−0.1</button>
+    <button class="step-btn mono" type="button" data-delta="0.1" data-locks disabled>+0.1</button>
+    <button class="step-btn mono" type="button" data-delta="0.5" data-locks disabled>+0.5</button>
   </div>
 </section>
 <section class="card pad">
   <div class="row-between mb"><div class="card-h">Camera image format</div><div class="theme-val mono" id="imageFormatValue">--</div></div>
   <div class="seg" role="group" aria-label="Camera image format">
-    <button class="seg-btn" id="imageFormatDefault" type="button" data-locks>Default</button>
-    <button class="seg-btn" id="imageFormatRaw" type="button" data-locks>RAW</button>
-    <button class="seg-btn" id="imageFormatJpeg" type="button" data-locks>JPEG</button>
+    <button class="seg-btn" id="imageFormatDefault" type="button" data-locks disabled>Default</button>
+    <button class="seg-btn" id="imageFormatRaw" type="button" data-locks disabled>RAW</button>
+    <button class="seg-btn" id="imageFormatJpeg" type="button" data-locks disabled>JPEG</button>
   </div>
   <p class="muted small mt">Default leaves each camera at the image format selected on the camera.</p>
 </section>
@@ -32,10 +32,10 @@
   <div class="card-h mb">Backup to SSD</div>
   <p class="muted small" style="margin:0 0 12px">Copies images together with GPS and altitude CSV logs.</p>
   <div class="grid2">
-    <button class="go-btn" id="backupStart" type="button" data-locks>Start backup</button>
-    <button class="danger-btn" id="backupDelete" type="button" data-locks>Verify &amp; delete</button>
+    <button class="go-btn" id="backupStart" type="button" data-locks disabled>Start backup</button>
+    <button class="danger-btn" id="backupDelete" type="button" data-locks disabled>Verify &amp; delete</button>
   </div>
-  <button class="danger-btn mt" id="backupMove" type="button" data-locks style="width:100%">Copy &amp; delete</button>
+  <button class="danger-btn mt" id="backupMove" type="button" data-locks disabled style="width:100%">Copy &amp; delete</button>
   <div class="progress-track mt"><div class="progress-fill" id="backupFill"></div></div>
   <p class="muted small" id="backupState" style="margin-top:8px">Idle</p>
   <p class="benchmark-line mono" id="backupBenchmark">No benchmark recorded this session.</p>
@@ -68,7 +68,7 @@
 <section class="card acc">
   <div class="acc-head"><div class="acc-title">Restart</div><div class="acc-right"><span class="chev"><svg class="chev-svg" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"></path></svg></span></div></div>
   <div class="acc-body">
-    <div class="grid2"><button class="pill-btn" id="restartService" type="button" data-locks>Tricap service</button><button class="danger-btn" id="rebootDevice" type="button" data-locks>Reboot device</button></div>
+    <div class="grid2"><button class="pill-btn" id="restartService" type="button" data-locks disabled>Tricap service</button><button class="danger-btn" id="rebootDevice" type="button" data-locks disabled>Reboot device</button></div>
     <p class="muted small mt">&ldquo;Tricap service&rdquo; restarts capture only. &ldquo;Reboot device&rdquo; power-cycles the whole rig.</p>
   </div>
 </section>

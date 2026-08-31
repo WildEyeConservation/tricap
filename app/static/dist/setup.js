@@ -12,14 +12,20 @@ let verifyRunning = false;
 let verifyTimer;
 let verifyAnnounce = false;
 let deleteMode = "verify";
+let statusFailures = 0;
+// Controls stay locked until every poller has answered at least once.
+const known = { status: false, backup: false, verify: false };
 function setControlsEnabled() {
-    const locked = capturing || backupRunning || verifyRunning;
+    const unknown = !(known.status && known.backup && known.verify);
+    const locked = unknown || capturing || backupRunning || verifyRunning;
     document.querySelectorAll("[data-locks]").forEach((control) => {
         control.disabled = locked || control.dataset.actionBusy === "true";
     });
-    byId("lockNote").textContent = locked
-        ? "Some controls are disabled while capture or copy is running."
-        : "";
+    byId("lockNote").textContent = unknown
+        ? "Checking device status..."
+        : locked
+            ? "Some controls are disabled while capture or copy is running."
+            : "";
 }
 function renderImageButtons(count) {
     if (count === cameraCount)
@@ -57,11 +63,20 @@ async function loadSensors() {
             byId("snrAvg").textContent = formatValue(gps.avg);
             byId("snrMax").textContent = formatValue(gps.max);
             renderImageButtons(status.cams.length);
-            setControlsEnabled();
+            known.status = true;
+            statusFailures = 0;
         }
         catch {
             byId("setupMode").textContent = "Offline";
+            statusFailures += 1;
+            if (statusFailures >= 3)
+                known.status = false;
         }
+        if (!known.backup)
+            void pollBackup();
+        if (!known.verify)
+            void pollVerify();
+        setControlsEnabled();
     });
 }
 async function loadStats() {
@@ -205,13 +220,20 @@ function renderBackup(status) {
 async function pollBackup() {
     await singleFlight("backup-status", async () => {
         try {
-            renderBackup(await getJson("/api/backup_status"));
+            const status = await getJson("/api/backup_status");
+            known.backup = true;
+            renderBackup(status);
         }
-        catch {
+        catch (error) {
             if (backupTimer !== undefined) {
                 window.clearInterval(backupTimer);
                 backupTimer = undefined;
             }
+            // 400 means the backend refused because capture is running, so no backup can be.
+            known.backup = error instanceof ApiError && error.status === 400;
+            if (known.backup)
+                backupRunning = false;
+            setControlsEnabled();
         }
     });
 }
@@ -246,16 +268,28 @@ function renderVerify(status) {
 }
 async function pollVerify() {
     await singleFlight("verify-status", async () => {
-        const path = deleteMode === "force" ? "/api/force_delete_status" : "/api/verify_and_delete_status";
         try {
-            renderVerify(await getJson(path));
+            if (known.verify) {
+                const path = deleteMode === "force" ? "/api/force_delete_status" : "/api/verify_and_delete_status";
+                renderVerify(await getJson(path));
+            }
+            else {
+                // Either job may already be running from an earlier session.
+                const [verify, force] = await Promise.all([
+                    getJson("/api/verify_and_delete_status"),
+                    getJson("/api/force_delete_status"),
+                ]);
+                deleteMode = force.running ? "force" : "verify";
+                known.verify = true;
+                renderVerify(force.running ? force : verify);
+            }
         }
         catch {
             if (verifyTimer !== undefined) {
                 window.clearInterval(verifyTimer);
                 verifyTimer = undefined;
             }
-            verifyRunning = false;
+            known.verify = false;
             setControlsEnabled();
         }
     });
@@ -665,8 +699,6 @@ button("themeLight").addEventListener("click", () => applyTheme("light", true));
 button("themeDark").addEventListener("click", () => applyTheme("dark", true));
 loadAltitudeSettings();
 applyTheme(selectedTheme(), false);
-void pollBackup();
-void pollVerify();
 runPeriodic(loadSensors, () => capturing ? 5000 : 2000);
 runPeriodic(() => capturing ? undefined : loadStats(), 15000);
 runPeriodic(() => capturing ? undefined : loadImageFormat(), 15000);

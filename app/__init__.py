@@ -16,17 +16,10 @@ from sensors.grf500_altimeter import Grf500Altimeter
 from sensors.unavailable_altimeter import UnavailableAltimeter
 from support.session_logger import SessionLogger
 from support.configure import TricapConfig
-from support.talkbox import TalkBox
-from support.log_list import LogListAccessor
-from support.basic import TimeMonitor, PeriodicMonitor
-from support.sms_sender import SMSObserver
 from support.git_info import GitData
 
 from sensors.toggle_switch import ToggleSwitchObserver, ToggleSwitchMonitor
 from sensors.toggle_switch import CamManagerMonitor, LEDController, CamErrorMonitor, CamCaptureMonitor
-
-# from support.connection_monitor import generate_net_monitor, NetworkMonitorLogger
-# from support.connection_monitor import generate_ip_monitor, IPMonitorLogger
 
 from support.system_monitor import generate_system_monitor, SystemMonitorLogger
 
@@ -92,44 +85,6 @@ class AltitudeLogObserver():
             self._logger.debug(f"altitude log failed: {e}")
 
 
-class AltitudeMonitor(PeriodicMonitor):
-    """Monitor how high the altitude is."""
-
-    def __init__(self, period: float, alti):
-        """Constructor."""
-        super(AltitudeMonitor, self).__init__(period)
-
-        self.alti = alti
-
-        self.type_id = 'Altitude'
-        self.value = 0
-        self.unit = 'm'
-
-    def monitor_step(self):
-        """Update the value."""
-        self.value = self.alti.value
-
-
-class CamImgNumMonitor(PeriodicMonitor):
-    """Monitor how many images a camera has taken."""
-
-    def __init__(self, period: float, cam):
-        """Constructor."""
-        super(CamImgNumMonitor, self).__init__(period)
-
-        self.cam = cam
-
-        self.type_id = 'Images'
-        self.value = 0
-        self.unit = 'ims'
-
-    def monitor_step(self):
-        """Update the value with the current time as a string."""
-        self.value = 0
-        for cam in self.cam:
-            self.value = self.value + cam.get_cam_image_count()
-
-
 # Set up rotating log file for the overall log
 format_str = "%(asctime)s | %(pathname)s:%(lineno)d | %(funcName)s | %(levelname)s | %(message)s "
 formatter = logging.Formatter(format_str)
@@ -161,9 +116,6 @@ wz_log.addHandler(flask_handler)
 app.logger.addHandler(flask_handler)
 app.logger.setLevel(logging.DEBUG)
 app.logger.info('Initiated flask logger for new instance of the TriCap app.')
-
-# Instantiate the system log message tracker
-log_list = LogListAccessor(3)
 
 # Instantiate the config setting management
 init_config = TricapConfig()
@@ -207,21 +159,6 @@ except Exception as exc:
 
 rootlogger.debug('Altimeter has been configured.')
 
-talkbox = TalkBox(Lock(), 3)
-talkbox.clear()
-
-# Setup monitor and logger for wireless network connection
-# wlan_mon = generate_net_monitor(period=26)
-# net_mon_logger = NetworkMonitorLogger(wlan_mon)
-# wlan_mon.start()
-
-# Setup monitor and logger for vpn and internet connection
-# vpn_mon = generate_ip_monitor('192.168.88.1', period=27)
-# internet_mon = generate_ip_monitor('8.8.8.8', period=32)
-# ip_mon_logger = IPMonitorLogger([vpn_mon, internet_mon])
-# vpn_mon.start()
-# internet_mon.start()
-
 # Setup monitors for system values
 sys_mons = []
 sys_mons.append(generate_system_monitor(period=28, type_id='RAM'))
@@ -243,15 +180,6 @@ altimeter.attach(AltitudeLogObserver())
 # Capture controls measurement when an altimeter is present. The unavailable
 # placeholder implements the same no-op interface, so capture remains usable.
 tricap_manager.altimeter = altimeter
-
-# setup a time monitor and the sms sender
-time_mon = TimeMonitor(5*60)  # will emit the time every 5 minutes as primary observer
-cam_img_num_mon = CamImgNumMonitor(5*59, tricap_cameras) # will update just before time_mon
-# alti_mon = AltitudeMonitor(5*59, altimeter)
-# sms_observer = SMSObserver(time_mon, [cam_img_num_mon, alti_mon], send_on_start=True)
-cam_img_num_mon.start()
-# alti_mon.start()
-time_mon.start()
 
 rootlogger.info("Git version: " + code_inf.code_id())
 
@@ -286,10 +214,6 @@ cam_man_state_monitor.start()
 
 def stop_all_threads():
     """Helper function for a clean exit."""
-    # wlan_mon.stop()
-    # vpn_mon.stop()
-    # internet_mon.stop()
-
     for sm in sys_mons:
         if sm is not None:
             sm.stop()

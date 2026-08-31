@@ -5,19 +5,15 @@
 /tmp
 /logs
 /.idea
-/.coveragerc
-/htmlcov
-/__pycache__
-/app/__pycache__
-/*/__pycache__
-/.coveragerc
+/.vscode
+/.venv
 /htmlcov
 /coverage_html
+__pycache__/
+*.coverage
 node_modules
 /build
 /focus
-/.vscode
-/.venv
 
 # !.gitignore
 
@@ -40,14 +36,7 @@ node_modules
 *.gz
 *~
 
-# specific files
+# Local configuration
 init_config.txt
 initial.cfg
-.pylintrc
-pylintrc
-test_local.py
-delete_log_files.py
-SD_card_reader.spec
-setup.py
-*.coverage
 secrets.json

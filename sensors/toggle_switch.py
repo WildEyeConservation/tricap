@@ -2,7 +2,6 @@
 
 import RPi.GPIO as GPIO
 
-from support.sms_sender import SMSSender
 from support.basic import PeriodicMonitor, Observer
 import subprocess
 
@@ -72,8 +71,6 @@ class ToggleSwitchObserver(Observer):
     
         self.cam_manager = cam_manager
         self.session_logger = session_logger
-        # self.sms_sender = SMSSender()
-
         if toggle_switch_monitor is not None:
             toggle_switch_monitor.attach(self)
 
@@ -213,8 +210,6 @@ class LEDController(Observer):
 
         self._logger.info('LED Controller has been instantiated.')
 
-        # self.sms_sender = SMSSender()
-
     def __del__(self):
         """Destructor."""
         gpio_cleanup()
@@ -265,8 +260,4 @@ class LEDController(Observer):
                     self._logger.info('LEDController - Capture has started')
                     self.toggled_on = True
 
-        # if (self.prev_error_state != self.error_state and self.error_state == 1):
-        #     # error state changed and in error
-        #     self.sms_sender.send('Error state entered')
-        
         self.prev_error_state = self.error_state

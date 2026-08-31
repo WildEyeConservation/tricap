@@ -1,10 +1,9 @@
 """System Monitor - Classes to monitor the state of the system you are running on."""
 
 import os
-import re
 import logging
 from abc import ABCMeta
-from .basic import PeriodicMonitor, UnknownOperatingSystem
+from .basic import PeriodicMonitor
 
 
 class UnknownSysMonTypeID(Exception):
@@ -24,77 +23,8 @@ class SystemMonitor(PeriodicMonitor):
 
         self.type_id = 'SysMon'
         self.unit = 'MB'
-
         self.value = None
-
-
-class WindowsFreeRAMMonitor(SystemMonitor):
-    """Monitor how much free RAM in MB is available in Windows."""
-
-    def __init__(self, period: float):
-        """Constructor, set the type_id to RAM."""
-        super(WindowsFreeRAMMonitor, self).__init__(period)
-
-        self.type_id = 'Windows RAM'
-
-    def monitor_step(self):
-        """Update the value with the amount of free RAM available."""
-        with os.popen('wmic OS get FreePhysicalMemory /Value') as cmd_output:
-            try:
-                lines = cmd_output.readlines()
-                val = float(lines[4].split('=')[1].strip())
-                self.value = val/1000.0
-            except (ValueError, IndexError) as exp:
-                self.logger.error('Error while monitoring system resources: %s', str(exp))
-
-
-class WindowsCPUUsageMonitor(SystemMonitor):
-    """Monitor how much the CPU is used as a percentage in Windows."""
-
-    def __init__(self, period):
-        """Constructor, lower limites the period to 2 seconds."""
-        if period < 2:
-            period = 2
-
-        super(WindowsCPUUsageMonitor, self).__init__(period)
-
-        self.type_id = 'Windows CPU'
-        self.unit = '%'
-
-    def monitor_step(self):
-        """Update the value with the percentage of CPU used."""
-        with os.popen('wmic cpu get loadpercentage') as cmd_output:
-            try:
-                lines = cmd_output.readlines()
-                self.value = float(lines[2].strip())
-            except (ValueError, IndexError) as exp:
-                self.logger.error('Error while monitoring system resources: %s', str(exp))
-
-
-class WindowsDiskUsageMonitor(SystemMonitor):
-    """Monitor how much the space is left on HD in MB in Windows."""
-
-    def __init__(self, period, disk_fp=None):
-        """Constructor, can change the defaul disk to check."""
-        if disk_fp is None:
-            self.disk_fp = 'c:'
-        else:
-            self.disk_fp = disk_fp
-
-        super(WindowsDiskUsageMonitor, self).__init__(period)
-
-        self.type_id = 'Windows Disk'
-
-    def monitor_step(self):
-        """Update the value with the free space on the disk in MB."""
-        with os.popen('dir %s' % self.disk_fp) as cmd_output:
-            try:
-                lines = cmd_output.readlines()
-                val = lines[-1].split(')')[1].split('bytes')[0]
-                val = re.sub("[^0-9]", "", val.strip())
-                self.value = float(val)/1000.0/1000.0
-            except (ValueError, IndexError) as exp:
-                self.logger.error('Error while monitoring system resources: %s', str(exp))
+        self.logger = logging.getLogger(__name__)
 
 
 class LinuxFreeRAMMonitor(SystemMonitor):
@@ -194,35 +124,19 @@ class LinuxDiskIOMonitor(SystemMonitor):
                 self.logger.error('Error while monitoring system resources: %s', str(exp))
 
 
-def generate_system_monitor(period: float, type_id: str, add_arg: str = None):
-    """Generate the appropriate system monitor based on OS type and the type asked for."""
-    sys_mon = None
-    if os.name == 'nt':
-        if type_id == 'RAM':
-            sys_mon = WindowsFreeRAMMonitor(period)
-        elif type_id == 'CPU':
-            sys_mon = WindowsCPUUsageMonitor(period)
-        elif type_id == 'Disk':
-            sys_mon = WindowsDiskUsageMonitor(period, add_arg)
-        elif type_id == 'IO':
-            sys_mon = None
-        else:
-            raise UnknownSysMonTypeID
-    elif os.name == 'posix':
-        if type_id == 'RAM':
-            sys_mon = LinuxFreeRAMMonitor(period)
-        elif type_id == 'CPU':
-            sys_mon = LinuxCPUUsageMonitor(period)
-        elif type_id == 'Disk':
-            sys_mon = LinuxDiskUsageMonitor(period)
-        elif type_id == 'IO':
-            sys_mon = LinuxDiskIOMonitor(period)
-        else:
-            raise UnknownSysMonTypeID
-    else:
-        raise UnknownOperatingSystem
-
-    return sys_mon
+def generate_system_monitor(period: float, type_id: str):
+    """Generate a Linux system monitor for the requested metric."""
+    monitor_types = {
+        'RAM': LinuxFreeRAMMonitor,
+        'CPU': LinuxCPUUsageMonitor,
+        'Disk': LinuxDiskUsageMonitor,
+        'IO': LinuxDiskIOMonitor,
+    }
+    try:
+        monitor_type = monitor_types[type_id]
+    except KeyError as exc:
+        raise UnknownSysMonTypeID from exc
+    return monitor_type(period)
 
 
 class SystemMonitorLogger():

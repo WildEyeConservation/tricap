@@ -1,5 +1,5 @@
 # backup.py
-# Minimal rsync-backed backup engine with simple filesystem-snapshot progress.
+# Minimal rsync-backed backup engine. Progress is read from rsync's own output.
 from __future__ import annotations
 
 import os
@@ -19,6 +19,7 @@ from dataclasses import dataclass, asdict
 from pathlib import Path
 from typing import Any, Callable
 from app import tricap_manager
+from support.rsync_progress import RSYNC_PROGRESS_ARGS, iter_lines, parse_line
 from support.gps_geotag import (
     ExifToolARW,
     GPSIndex,
@@ -37,7 +38,7 @@ EXFAT_MTIME_RESOLUTION_NS = 10_000_000  # 10 ms
 # Wall-clock ceilings for rsync inspection passes. These are wedge detectors,
 # not performance controls: a healthy scan takes seconds, so they sit far above
 # any legitimate duration. Without them a hung drive blocks the calling thread
-# forever - and _snapshot_progress is called from the Flask request thread.
+# forever.
 RSYNC_SCAN_TIMEOUT_SEC = 300      # dry-run inspection passes
 RSYNC_VERIFY_TIMEOUT_SEC = 1800   # verify passes may checksum the whole tree
 
@@ -58,7 +59,7 @@ class BackupStatus:
     total_files: int = 0
     total_bytes: int = 0
 
-    # Snapshotted progress (recomputed on status())
+    # Progress (updated live from rsync output)
     files_done: int = 0
     bytes_copied: int = 0
 
@@ -113,10 +114,8 @@ class VerifyDeleteStatus:
 
 class RsyncManager:
     """
-    Runs rsync in a background thread. Progress is derived by scanning:
-      bytes_copied = Σ min(dst_size, src_size) over all source files
-      files_done   = count(dst_size >= src_size)
-    This is robust for 20s polling and avoids parsing rsync output.
+    Runs rsync in a background thread and reads progress from its output, so
+    status() is a plain read and costs the drives nothing.
     """
     def __init__(self) -> None:
         self._logger = logging.getLogger(__name__)
@@ -127,7 +126,7 @@ class RsyncManager:
         self._verify_status = VerifyDeleteStatus()
         self._proc: subprocess.Popen[str] | subprocess.Popen[bytes] | None = None
 
-        # job config for snapshotting
+        # job config
         self._src: Path | None = None
         self._dst: Path | None = None
         self._files_from: Path | None = None
@@ -136,12 +135,12 @@ class RsyncManager:
         self._tag_gps: bool = False
         self._remove_source: bool = False
 
-        # cache totals
-        self._totals_ready = False
-
-        # tiny cache to avoid re-scanning too often (not strictly needed for 20s poll)
-        self._snap_cache_ts = 0.0
-        self._snap_cache: tuple[int, int] = (0, 0)  # (bytes_copied, files_done)
+        # Progress parts: files already on the destination at start, bytes/files
+        # reported by the live rsync, and ARWs written by the tagging pass.
+        self._base_bytes = 0
+        self._base_files = 0
+        self._rsync_bytes = 0
+        self._rsync_files = 0
         self._non_arw_total_bytes = 0
         self._non_arw_total_files = 0
         self._arw_total_bytes = 0
@@ -322,8 +321,10 @@ class RsyncManager:
                 planned_bytes=remaining_bytes,
                 planned_files=remaining_files,
             )
-            self._totals_ready = True
-            self._snap_cache_ts = 0.0
+            self._base_bytes = max(0, self._non_arw_total_bytes - remaining_bytes)
+            self._base_files = max(0, self._non_arw_total_files - remaining_files)
+            self._rsync_bytes = self._rsync_files = 0
+            self._set_progress()
 
             self._thread = threading.Thread(target=self._run_rsync, daemon=True)
             self._thread.start()
@@ -353,30 +354,13 @@ class RsyncManager:
 
     def status(self) -> dict[str, Any]:
         with self._lock:
-            st = asdict(self._status)
-            src = self._src
-            dst = self._dst
-            files_from = self._files_from
+            return asdict(self._status)
 
-        # If a job is configured, compute a fresh (or cached) snapshot
-        if src and dst and self._totals_ready and st["running"]:
-            now = time.time()
-            if now - self._snap_cache_ts >= 1.5:  # throttle a little
-                bytes_copied, files_done = self._snapshot_progress(src, dst, files_from)
-                with self._lock:
-                    self._status.bytes_copied = bytes_copied
-                    self._status.files_done = files_done
-                    self._snap_cache = (bytes_copied, files_done)
-                    self._snap_cache_ts = now
-                st["bytes_copied"] = bytes_copied
-                st["files_done"] = files_done
-            else:
-                # use cached
-                bc, fd = self._snap_cache
-                st["bytes_copied"] = bc
-                st["files_done"] = fd
-
-        return st
+    def _set_progress(self) -> None:
+        """Recompute bytes_copied/files_done from the parts. Caller holds the lock."""
+        st = self._status
+        st.bytes_copied = min(st.total_bytes, self._base_bytes + self._rsync_bytes + self._arw_bytes_done)
+        st.files_done = min(st.total_files, self._base_files + self._rsync_files + self._arw_files_done)
 
 
     def verify_now(self, 
@@ -905,7 +889,7 @@ class RsyncManager:
         else:
             src_arg = str(self._src) + os.sep  # copy *contents*
 
-        cmd += [src_arg, str(self._dst)]
+        cmd += RSYNC_PROGRESS_ARGS + [src_arg, str(self._dst)]
 
         try:
             copy_started = time.monotonic()
@@ -917,13 +901,23 @@ class RsyncManager:
                     self._status.message = "Moving files..."
                 else:
                     self._status.message = "Copying files..."
-            self._proc = subprocess.Popen(
-                cmd,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-                text=False,
-                cwd=cwd,
-            )
+            self._proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, cwd=cwd,
+                                          env={**os.environ, "LC_ALL": "C"})
+            rsync_error = ""
+            for line in iter_lines(self._proc.stdout):
+                parsed = parse_line(line)
+                if not parsed:
+                    continue
+                kind, value = parsed
+                with self._lock:
+                    if kind == "bytes":
+                        self._rsync_bytes = value
+                    elif kind == "file":
+                        self._rsync_files += 1
+                        self._status.current_file = value
+                    elif not rsync_error:
+                        rsync_error = value
+                    self._set_progress()
             rc = self._proc.wait()
             with self._lock:
                 self._status.copy_seconds = max(0.0, time.monotonic() - copy_started)
@@ -987,7 +981,7 @@ class RsyncManager:
                         self._status.message = "Completed."
                 else:
                     self._status.phase = "error"
-                    self._status.message = f"exited with code {rc}"
+                    self._status.message = rsync_error or f"exited with code {rc}"
         except Exception as e:
             with self._lock:
                 self._status.running = False
@@ -1108,6 +1102,7 @@ class RsyncManager:
         with self._lock:
             self._arw_bytes_done += size
             self._arw_files_done += 1
+            self._set_progress()
 
     def _preserve_mtime(self, source: Path, destination: Path) -> None:
         try:
@@ -1261,9 +1256,8 @@ class RsyncManager:
     ) -> tuple[int, int]:
         """Estimate remaining bytes/files that would be transferred if we ran rsync now.
 
-        Uses the same rsync --dry-run itemization as _snapshot_progress, but returns
-        the *remaining* work instead of derived progress. Falls back to treating the
-        whole dataset as remaining if rsync fails for any reason.
+        Uses rsync --dry-run itemization. Falls back to treating the whole dataset
+        as remaining if rsync fails for any reason.
         """
         dst_arg = str(dst)
 
@@ -1344,150 +1338,6 @@ class RsyncManager:
         except Exception:
             # If rsync inspection fails, fall back to worst-case: everything remaining.
             return total_bytes, total_files
-
-    def _snapshot_progress(self, src: Path, dst: Path, files_from: Path | None) -> tuple[int, int]:
-        """
-        Progress snapshot using rsync's own difference engine:
-
-        - Run: rsync --dry-run -aH --itemize-changes --out-format '%i|%l|%n' SRC/ DST/
-        - Sum %l (size) for lines where %i indicates a file that WOULD be sent (>'f...)
-        - Remaining bytes/files = those sums
-        - bytes_copied = total_bytes - remaining_bytes
-        - files_done   = total_files - remaining_files
-
-        Falls back to filesystem-based snapshot if rsync errors out.
-        """
-        # Read totals computed at start()
-        with self._lock:
-            total_bytes = int(self._status.total_bytes or 0)
-            total_files = int(self._status.total_files or 0)
-
-        dst_arg = str(dst)
-
-        cwd = None
-        if files_from is not None:
-            src_arg = "./"
-            cwd = str(src)
-        else:
-            src_arg = str(src) + os.sep  # copy *contents*
-
-        cmd: list[str] = [
-            "rsync",
-            "-aH",
-            "--dry-run",
-            "--itemize-changes",
-            "--no-human-readable",          # numeric sizes in stats
-            "--out-format=%i|%l|%n",        # itemize code | length | path
-        ]
-        if self._tag_gps:
-            cmd += ["--exclude=*.ARW", "--exclude=*.arw"]
-        # Be careful enabling --checksum here: it would re-hash everything every poll.
-        # Use the manager's verify flag only if you *really* want content-compare.
-        if self._verify:
-            cmd.append("--checksum")
-        if files_from is not None:
-            cmd += [f"--files-from={files_from}"]
-        cmd += [src_arg, dst_arg]
-
-        env = os.environ.copy()
-        env["LC_ALL"] = "C"  # stable parse
-
-        try:
-            out = subprocess.check_output(cmd, text=True, stderr=subprocess.STDOUT, env=env, cwd=cwd,
-                                          timeout=RSYNC_SCAN_TIMEOUT_SEC)
-            remaining_bytes = 0
-            remaining_files = 0
-
-            for line in out.splitlines():
-                # Expect: "<itemize>|<length>|<path>"
-                # Example itemize for a file to be sent: ">f.st......"
-                try:
-                    item, length_str, _path = line.split("|", 2)
-                except ValueError:
-                    continue
-
-                if len(item) >= 2 and item[0] == ">" and item[1] == "f":
-                    # This file would be transferred
-                    remaining_files += 1
-                    try:
-                        remaining_bytes += int(length_str)
-                    except Exception:
-                        pass
-
-            with self._lock:
-                arw_bytes_done = self._arw_bytes_done if self._tag_gps else 0
-                arw_files_done = self._arw_files_done if self._tag_gps else 0
-            base_total_bytes = self._non_arw_total_bytes if self._tag_gps else total_bytes
-            base_total_files = self._non_arw_total_files if self._tag_gps else total_files
-            non_arw_done = max(0, base_total_bytes - remaining_bytes)
-            non_arw_files_done = max(0, base_total_files - remaining_files)
-            bytes_copied = max(0, min(total_bytes, non_arw_done + arw_bytes_done))
-            files_done = max(0, min(total_files, non_arw_files_done + arw_files_done))
-            return bytes_copied, files_done
-
-        except subprocess.TimeoutExpired:
-            # The drive is not responding. The filesystem fallback below would
-            # stat every destination file, making the problem worse, so serve
-            # the last known figures instead.
-            self._logger.warning(
-                "Progress scan exceeded %ss; serving cached progress",
-                RSYNC_SCAN_TIMEOUT_SEC,
-            )
-            with self._lock:
-                return self._snap_cache
-
-        except Exception:
-            # Fallback: filesystem snapshot (min(dst_size, src_size))
-            bytes_present = 0
-            files_done = 0
-
-            if files_from is None:
-                for root, _dirs, files in os.walk(src):
-                    root_p = Path(root)
-                    for f in files:
-                        sp = root_p / f
-                        if self._tag_gps and sp.suffix.lower() == ".arw":
-                            continue
-                        try:
-                            rel = sp.relative_to(src)
-                            ssz = sp.stat().st_size
-                        except Exception:
-                            continue
-                        dp = dst / rel
-                        try:
-                            dsz = dp.stat().st_size
-                        except FileNotFoundError:
-                            dsz = 0
-                        bytes_present += min(ssz, dsz)
-                        if dsz >= ssz:
-                            files_done += 1
-                with self._lock:
-                    return bytes_present + self._arw_bytes_done, files_done + self._arw_files_done
-
-            try:
-                rels = [ln.strip() for ln in files_from.read_text().splitlines() if ln.strip()]
-            except Exception:
-                rels = []
-            for rel_s in rels:
-                sp = src / rel_s
-                try:
-                    if not sp.is_file():
-                        continue
-                    if self._tag_gps and sp.suffix.lower() == ".arw":
-                        continue
-                    ssz = sp.stat().st_size
-                except Exception:
-                    continue
-                dp = dst / rel_s
-                try:
-                    dsz = dp.stat().st_size
-                except FileNotFoundError:
-                    dsz = 0
-                bytes_present += min(ssz, dsz)
-                if dsz >= ssz:
-                    files_done += 1
-            with self._lock:
-                return bytes_present + self._arw_bytes_done, files_done + self._arw_files_done
 
     def _verify_pass(
         self,

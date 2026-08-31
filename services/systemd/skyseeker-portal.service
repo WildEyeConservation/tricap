@@ -1,8 +1,6 @@
 [Unit]
-Description=SkySeeker standalone control + captive portal (:80)
+Description=SkySeeker HTTP forwarder (:80 to Flask)
 After=network.target
-# In production this can simply proxy/redirect to the existing tricap Flask app on :5000,
-# or tricap can host these routes itself and bind :80 directly.
 
 [Service]
 Type=simple

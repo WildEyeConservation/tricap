@@ -9,7 +9,7 @@ import os
 from threading import Lock
 from logging.handlers import TimedRotatingFileHandler
 
-from flask import Flask
+from flask import Flask, request
 
 from sensors.cam_manager import TriCapCamsManager
 from sensors.grf500_altimeter import Grf500Altimeter
@@ -100,6 +100,19 @@ rootlogger.info('Initiating new instance of the TriCap app.')
 # Setup the Flask Server, configuring it using the config.py file
 app = Flask(__name__)
 app.config.from_object('config')
+
+
+@app.after_request
+def set_http_headers(response):
+    response.headers['Permissions-Policy'] = 'geolocation=()'
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    response.headers['Content-Security-Policy'] = (
+        "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; "
+        "img-src 'self' blob:; connect-src 'self'; frame-ancestors 'none'"
+    )
+    if request.path.startswith(('/api/', '/portal/')):
+        response.headers['Cache-Control'] = 'no-store'
+    return response
 
 # Setup a rotating log file for the HTTP requests (and whatever flask does)
 # werkzeug messages always come from the same function, log, using a different formatter for clarity
@@ -223,12 +236,10 @@ def stop_all_threads():
 
 
 # Configure the Flask Blueprints
-from .views.showlog import showlog_bp
-from .views.settings import settings_bp
+from .views.portal import portal_bp
 from .views.api import api_bp
 
-app.register_blueprint(showlog_bp)
-app.register_blueprint(settings_bp)
+app.register_blueprint(portal_bp)
 app.register_blueprint(api_bp)
 
 rootlogger.info('New instance of TriCap app has been initiated.')

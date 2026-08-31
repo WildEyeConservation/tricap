@@ -23,6 +23,7 @@ from pathlib import Path
 from support.backup import RsyncManager
 from support.component_health import component_health
 from support.phone_time import set_system_time_from_phone, validate_phone_time
+from .portal import ap_wifi_signal
 import time, shutil, threading, re, io
 
 api_bp = Blueprint('api', __name__)
@@ -88,31 +89,15 @@ def status():
       'error': str(altimeter.get_error() or ''),
   }
 
-  wifiSignal = 0
-  try:
-    # Detect an upstream Wi-Fi station link. The USB radio serves the rescue AP
-    # outside NetworkManager, while the onboard Broadcom radio may join the
-    # phone recovery hotspot. Query every connected station and use the one
-    # which actually reports a signal.
-    _dev = subprocess.check_output(["nmcli", "-t", "-f", "DEVICE,TYPE,STATE", "device"], text=True)
-    for _line in _dev.split("\n"):
-      _p = _line.split(":")
-      if len(_p) >= 3 and _p[1] == "wifi" and _p[2] == "connected":
-        try:
-          result = subprocess.check_output(["/usr/sbin/iw", "dev", _p[0], "link"], text=True)
-        except Exception:
-          continue
-        if "signal:" in result:
-          for line in result.split("\n"):
-            if "signal:" in line:
-              wifiSignal = int(line.split()[1])  # dBm value
-          break
-  except Exception as e:
-      print("Error:", e)
-
-  ret['wifiSignal'] = wifiSignal
+  client_ip = request.headers.get('X-SkySeeker-Client-IP') or request.remote_addr
+  ret['wifiSignal'] = ap_wifi_signal(client_ip) or 0
   ret['components'] = component_health(
       tricap_manager, gps_ser, altimeter, os.path.ismount(MOUNT_POINT))
+  ret['components']['wifi'] = {
+      'connected': True,
+      'state': 'connected',
+      'message': 'Wi-Fi access point connected.',
+  }
   # _logger.debug(f"Status {ret}")
 
   return ret

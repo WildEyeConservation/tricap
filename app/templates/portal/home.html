@@ -1,0 +1,87 @@
+<!doctype html><html lang="en" data-theme="default"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>SkySeeker Control</title><link rel="icon" href="/static/img/favicon.ico"><link rel="stylesheet" href="/static/css/portal.css"></head><body><div class="app"><header class="appbar"><a class="brand" href="/" aria-label="SkySeeker home"><span class="wordmark">SkySeeker</span></a><span class="host mono" id="host">control.skyseeker</span></header><main class="content">
+<div class="notice" id="camError">Camera error detected. Check camera states before flying.</div>
+<section class="component-panel" id="componentPanel" hidden aria-live="polite" aria-atomic="true">
+  <div class="component-title">Limited configuration</div>
+  <ul class="component-list" id="componentList"></ul>
+</section>
+<div id="normalHome" class="home-stack">
+<section class="card status-card">
+  <div class="status-top"><div class="kicker">Capture status</div><div class="rec"><span class="rec-dot" id="recDot"></span><span class="rec-text" id="recText">--</span></div></div>
+  <div class="mode-text" id="modeText">--</div>
+  <div class="statgrid">
+    <div class="stat"><div class="stat-val mono" id="statCaptured">--</div><div class="stat-label">Captured</div></div>
+    <div class="stat"><div class="stat-val mono" id="statSignal">-- dBm</div><div class="stat-label">Signal</div></div>
+    <div class="stat"><div class="stat-val mono" id="statPdop">--</div><div class="stat-label">PDOP</div></div>
+    <div class="stat"><div class="stat-val mono" id="statAltitude">--</div><div class="stat-label">Altitude</div></div>
+  </div>
+  <button class="big-btn go" id="captureButton" type="button">Start capture</button>
+  <p class="conn-note" id="conn"></p>
+</section>
+<div class="section-label">Rig status</div>
+<div id="glanceSections" class="home-stack">
+<section class="card acc">
+  <div class="acc-head"><div class="acc-title">Cameras</div><div class="acc-right"><span class="acc-sum mono" id="camSummary">-- active</span><span class="chev"><svg class="chev-svg" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"></path></svg></span></div></div>
+  <div class="acc-body"><div class="cam-list" id="cameraGrid"></div></div>
+</section>
+<section class="card acc">
+  <div class="acc-head"><div class="acc-title">Storage</div><div class="acc-right"><span class="acc-sum mono" id="storageSummary">--</span><span class="chev"><svg class="chev-svg" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"></path></svg></span></div></div>
+  <div class="acc-body"><div id="storageBody"></div><p class="muted small" id="storageNote"></p></div>
+</section>
+<section class="card acc">
+  <div class="acc-head"><div class="acc-title">Device &amp; GPS</div><div class="acc-right"><span class="acc-sum mono strong" id="deviceGpsSummary">--</span><span class="chev"><svg class="chev-svg" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"></path></svg></span></div></div>
+  <div class="acc-body">
+    <div class="subhead">Device</div>
+    <div class="mgrid">
+      <div class="m-item"><div class="m-label">Address</div><div class="m-value mono" id="host2">control.skyseeker</div></div>
+      <div class="m-item"><div class="m-label">Cameras</div><div class="m-value mono" id="devCams">0</div></div>
+    </div>
+    <div class="subhead row-between"><span>GPS signal</span><span class="badge idle" id="gpsFix">--</span></div>
+    <div class="mgrid">
+      <div class="m-item"><div class="m-label">Satellites</div><div class="m-value mono" id="sats">--</div></div>
+      <div class="m-item"><div class="m-label">PDOP</div><div class="m-value mono" id="pdop">--</div></div>
+      <div class="m-item"><div class="m-label">SNR avg</div><div class="m-value mono" id="snrAvg">--</div></div>
+    </div>
+  </div>
+</section>
+<section class="card acc">
+  <div class="acc-head"><div class="acc-title">Copy progress</div><div class="acc-right"><span class="acc-sum mono strong" id="copySummary">idle</span><span class="chev"><svg class="chev-svg" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"></path></svg></span></div></div>
+  <div class="acc-body"><div class="progress-track"><div class="progress-fill" id="copyFill"></div></div><p class="muted small" id="copyText" style="margin-top:8px">No active copy reported.</p></div>
+</section>
+</div>
+</div>
+<section class="flight-view" id="flightView">
+  <div class="flight-top"><div class="kicker">Capture status</div><div class="rec"><span class="rec-dot live"></span><span class="rec-text">Recording</span></div></div>
+  <div class="flight-main">
+    <div class="chev-stack up" id="chevUp"><svg class="fchev" viewBox="0 0 132 44" aria-hidden="true"><path d="M66 0 132 27v17L66 17 0 44V27Z"></path></svg><svg class="fchev" viewBox="0 0 132 44" aria-hidden="true"><path d="M66 0 132 27v17L66 17 0 44V27Z"></path></svg><svg class="fchev" viewBox="0 0 132 44" aria-hidden="true"><path d="M66 0 132 27v17L66 17 0 44V27Z"></path></svg></div>
+    <div class="flight-alt"><span id="flightAlt">--</span><span class="unit" id="flightUnit"></span></div>
+    <div class="flight-target" id="flightTarget"></div>
+    <div class="chev-stack down" id="chevDown"><svg class="fchev" viewBox="0 0 132 44" aria-hidden="true"><path d="M66 44 0 17V0l66 27L132 0v17Z"></path></svg><svg class="fchev" viewBox="0 0 132 44" aria-hidden="true"><path d="M66 44 0 17V0l66 27L132 0v17Z"></path></svg><svg class="fchev" viewBox="0 0 132 44" aria-hidden="true"><path d="M66 44 0 17V0l66 27L132 0v17Z"></path></svg></div>
+  </div>
+  <div class="flight-stats">
+    <div class="stat"><div class="stat-val mono" id="flCaptured">--</div><div class="stat-label">Captured</div></div>
+    <div class="stat"><div class="stat-val mono" id="flSignal">-- dBm</div><div class="stat-label">Signal</div></div>
+    <div class="stat"><div class="stat-val mono" id="flPdop">--</div><div class="stat-label">PDOP</div></div>
+  </div>
+  <div class="flight-actions">
+    <button class="flight-stop-btn" id="flightStop" type="button">Stop capture</button>
+    <button class="glance-bar" id="glanceOpen" type="button">Rig status</button>
+  </div>
+</section>
+</main><nav class="bottomnav" aria-label="Main"><a class="navitem active" href="/" aria-label="Home"><svg class="nav-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11.5 12 4l9 7.5"></path><path d="M5.5 10.5V20h13v-9.5"></path><path d="M9.5 20v-5h5v5"></path></svg><span class="nav-label">Home</span></a><a class="navitem" href="/setup" aria-label="Setup"><svg class="nav-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M14.7 6.3a4 4 0 0 0-5 5L3.8 17.2a1.8 1.8 0 0 0 2.5 2.5l5.9-5.9a4 4 0 0 0 5-5l-2.7 2.7-2-2 2.2-3.2Z"></path></svg><span class="nav-label">Setup</span></a></nav></div>
+<div class="consent-modal" id="stopConfirmModal" role="dialog" aria-modal="true" aria-label="Stop capture confirmation">
+  <div class="consent-card">
+    <div class="consent-title">Stop capture?</div>
+    <p class="consent-text">This ends the current capture session.</p>
+    <button class="big-btn stop" id="stopConfirmYes" type="button">Stop capture</button>
+    <button class="consent-cancel" id="stopConfirmNo" type="button">Keep capturing</button>
+  </div>
+</div>
+<div class="glance-modal" id="glanceModal" role="dialog" aria-modal="true" aria-label="Rig status">
+  <div class="glance-modal-head"><div class="glance-modal-title">Rig status</div><button class="glance-close" id="glanceClose" type="button">&#10005;&ensp;Close</button></div>
+  <div class="glance-modal-body" id="glanceBody"></div>
+</div>
+<div class="connection-warning" id="connectionWarning" role="alert" aria-live="assertive">
+  <div class="connection-warning-inner"><div class="connection-warning-title">Connection lost</div><p class="connection-warning-text">Reconnect this screen to the skyseeker Wi-Fi network immediately.</p></div>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
+<script type="module" src="/static/dist/home.js"></script></body></html>

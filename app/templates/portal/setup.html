@@ -1,0 +1,125 @@
+<!doctype html><html lang="en" data-theme="default"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>SkySeeker Setup</title><link rel="icon" href="/static/img/favicon.ico"><link rel="stylesheet" href="/static/css/portal.css"></head><body><div class="app"><header class="appbar"><a class="brand" href="/" aria-label="SkySeeker home"><span class="wordmark">SkySeeker</span></a><span class="host mono" id="host">control.skyseeker</span></header><main class="content">
+<p class="lock-note" id="lockNote"></p>
+<div class="section-label">Setup · most used</div>
+<section class="card pad">
+  <div class="row-between mb"><div class="card-h">Capture interval</div><div class="interval-val mono" id="interval">--</div></div>
+  <div class="grid2">
+    <button class="step-btn mono" type="button" data-delta="-0.5" data-locks>−0.5</button>
+    <button class="step-btn mono" type="button" data-delta="-0.1" data-locks>−0.1</button>
+    <button class="step-btn mono" type="button" data-delta="0.1" data-locks>+0.1</button>
+    <button class="step-btn mono" type="button" data-delta="0.5" data-locks>+0.5</button>
+  </div>
+</section>
+<section class="card pad">
+  <div class="row-between mb"><div class="card-h">Camera image format</div><div class="theme-val mono" id="imageFormatValue">--</div></div>
+  <div class="seg" role="group" aria-label="Camera image format">
+    <button class="seg-btn" id="imageFormatDefault" type="button" data-locks>Default</button>
+    <button class="seg-btn" id="imageFormatRaw" type="button" data-locks>RAW</button>
+    <button class="seg-btn" id="imageFormatJpeg" type="button" data-locks>JPEG</button>
+  </div>
+  <p class="muted small mt">Default leaves each camera at the image format selected on the camera.</p>
+</section>
+<section class="card pad">
+  <div class="row-between mb"><div class="card-h">Flight altitude</div><div class="interval-val mono" id="altBand">--</div></div>
+  <div class="nb-field"><input class="text-input mono" id="altTarget" name="flight-target-altitude" type="number" inputmode="decimal" min="0" placeholder="Target altitude" autocomplete="off"></div>
+  <div class="grid2 mt">
+    <div class="nb-field"><label class="input-suffix"><input class="text-input mono" id="altDev" name="flight-deviation-percent" type="number" inputmode="decimal" min="0" max="100" step="0.5" placeholder="Deviation" autocomplete="off"><span class="input-suffix-mark" aria-hidden="true">%</span></label></div>
+    <div class="seg"><button class="seg-btn" id="unitFt" type="button">ft</button><button class="seg-btn" id="unitM" type="button">m</button></div>
+  </div>
+  <p class="muted small mt">The deviation is the maximum permitted error. One and two chevrons appear as altitude approaches that limit; all three appear at or beyond it.</p>
+</section>
+<section class="card pad">
+  <div class="card-h mb">Backup to SSD</div>
+  <p class="muted small" style="margin:0 0 12px">Copies images together with GPS and altitude CSV logs.</p>
+  <div class="grid2">
+    <button class="go-btn" id="backupStart" type="button" data-locks>Start backup</button>
+    <button class="danger-btn" id="backupDelete" type="button" data-locks>Verify &amp; delete</button>
+  </div>
+  <button class="danger-btn mt" id="backupMove" type="button" data-locks style="width:100%">Copy &amp; delete</button>
+  <div class="progress-track mt"><div class="progress-fill" id="backupFill"></div></div>
+  <p class="muted small" id="backupState" style="margin-top:8px">Idle</p>
+  <p class="benchmark-line mono" id="backupBenchmark">No benchmark recorded this session.</p>
+</section>
+<div class="section-label">More</div>
+<section class="card acc">
+  <div class="acc-head"><div class="acc-title">Download images</div><div class="acc-right"><span class="chev"><svg class="chev-svg" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"></path></svg></span></div></div>
+  <div class="acc-body"><div class="grid3" id="imageButtons"></div><p class="muted small" id="imageNote" style="margin-top:10px">Downloads a representative image from the most recent copy session.</p></div>
+</section>
+<section class="card acc">
+  <div class="acc-head"><div class="acc-title">Sensor check</div><div class="acc-right"><span class="acc-sum mono" id="setupMode">--</span><span class="chev"><svg class="chev-svg" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"></path></svg></span></div></div>
+  <div class="acc-body"><div class="mgrid">
+    <div class="m-item"><div class="m-label">Wi-Fi</div><div class="m-value mono" id="wifi">-- dBm</div></div>
+    <div class="m-item"><div class="m-label">Satellites</div><div class="m-value mono" id="sats">--</div></div>
+    <div class="m-item"><div class="m-label">PDOP</div><div class="m-value mono" id="pdop">--</div></div>
+    <div class="m-item"><div class="m-label">GPS age</div><div class="m-value mono" id="age">--</div></div>
+    <div class="m-item"><div class="m-label">SNR min</div><div class="m-value mono" id="snrMin">--</div></div>
+    <div class="m-item"><div class="m-label">SNR avg</div><div class="m-value mono" id="snrAvg">--</div></div>
+    <div class="m-item"><div class="m-label">SNR max</div><div class="m-value mono" id="snrMax">--</div></div>
+    <div class="m-item"><div class="m-label">Lens</div><div class="m-value mono" id="lens">--</div></div>
+  </div></div>
+</section>
+<section class="card acc">
+  <div class="acc-head"><div class="acc-title">Download logs</div><div class="acc-right"><span class="chev"><svg class="chev-svg" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"></path></svg></span></div></div>
+  <div class="acc-body"><div class="grid3">
+    <a class="pill-btn" href="/api/download_logs">Main</a>
+    <a class="pill-btn" href="/portal/flight_log">GPS + altitude</a>
+  </div></div>
+</section>
+<section class="card acc">
+  <div class="acc-head"><div class="acc-title">Restart</div><div class="acc-right"><span class="chev"><svg class="chev-svg" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"></path></svg></span></div></div>
+  <div class="acc-body">
+    <div class="grid2"><button class="pill-btn" id="restartService" type="button" data-locks>Tricap service</button><button class="danger-btn" id="rebootDevice" type="button" data-locks>Reboot device</button></div>
+    <p class="muted small mt">&ldquo;Tricap service&rdquo; restarts capture only. &ldquo;Reboot device&rdquo; power-cycles the whole rig.</p>
+  </div>
+</section>
+<section class="card acc">
+  <div class="acc-head"><div class="acc-title">Connectivity</div><div class="acc-right"><span class="acc-sum"><span class="dot off" id="ulDot"></span><span class="mono" id="ulState">--</span></span><span class="chev"><svg class="chev-svg" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"></path></svg></span></div></div>
+  <div class="acc-body">
+    <div class="subhead">Internet connection</div>
+    <p class="muted small" style="margin:0 0 10px">The USB Wi-Fi adapter serves <span class="mono">skyseeker</span> for local control. The onboard radio periodically searches for the phone's <span class="mono">skyseeker-rescue</span> recovery hotspot.</p>
+    <p class="muted small" id="ulDetail"></p>
+    <button class="pill-btn" id="ulConnect" type="button">Reconnect internet</button>
+    <div class="subhead row-between"><span>Remote support</span><span class="acc-sum"><span class="dot off" id="nbDot"></span><span class="mono" id="nbState">--</span></span></div>
+    <p class="muted small" style="margin:0 0 12px">Remote support becomes available automatically whenever the rig has internet access. No action is normally required.</p>
+    <div class="grid2"><button class="pill-btn" id="nbConnect" type="button">Reconnect support</button><button class="pill-btn" id="nbDisconnect" type="button">Turn off support</button></div>
+    <details class="advanced">
+      <summary>Advanced connection options</summary>
+      <p class="muted small" style="margin:0 0 10px">Use a different hotspot temporarily, or disconnect the internet uplink.</p>
+      <div class="nb-field"><input class="text-input mono" id="ulSsid" type="text" placeholder="Different hotspot name" autocomplete="off" spellcheck="false"></div>
+      <div class="nb-field mt"><input class="text-input mono" id="ulPsk" type="password" placeholder="Hotspot password" autocomplete="new-password" spellcheck="false"></div>
+      <div class="grid2 mt"><button class="pill-btn" id="ulConnectCustom" type="button">Use different hotspot</button><button class="pill-btn" id="ulDisconnect" type="button">Disconnect internet</button></div>
+    </details>
+  </div>
+</section>
+<div class="section-label">Appearance</div>
+<section class="card pad">
+  <div class="row-between mb"><div class="card-h">Theme</div><div class="theme-val mono" id="themeVal">Default</div></div>
+  <div class="seg"><button class="seg-btn" id="themeDefault" type="button">Default</button><button class="seg-btn" id="themeLight" type="button">Light</button><button class="seg-btn" id="themeDark" type="button">Dark</button></div>
+</section>
+</main><nav class="bottomnav" aria-label="Main"><a class="navitem" href="/" aria-label="Home"><svg class="nav-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11.5 12 4l9 7.5"></path><path d="M5.5 10.5V20h13v-9.5"></path><path d="M9.5 20v-5h5v5"></path></svg><span class="nav-label">Home</span></a><a class="navitem active" href="/setup" aria-label="Setup"><svg class="nav-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M14.7 6.3a4 4 0 0 0-5 5L3.8 17.2a1.8 1.8 0 0 0 2.5 2.5l5.9-5.9a4 4 0 0 0 5-5l-2.7 2.7-2-2 2.2-3.2Z"></path></svg><span class="nav-label">Setup</span></a></nav></div>
+<div class="consent-modal" id="moveConfirmModal" role="dialog" aria-modal="true" aria-labelledby="moveConfirmTitle">
+  <div class="consent-card">
+    <div class="consent-title" id="moveConfirmTitle">Copy &amp; delete?</div>
+    <p class="consent-text">Copies files to the SSD and deletes each one from internal storage once its transfer is verified. Files that cannot be verified are retained.</p>
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <button class="danger-btn" id="moveConfirmContinue" type="button">Copy &amp; delete</button>
+      <button class="consent-cancel" id="moveConfirmCancel" type="button">Cancel</button>
+    </div>
+  </div>
+</div>
+<div class="consent-modal" id="deleteDecisionModal" role="dialog" aria-modal="true" aria-labelledby="deleteDecisionTitle">
+  <div class="consent-card">
+    <div class="consent-title" id="deleteDecisionTitle">Clear internal storage?</div>
+    <p class="consent-text" id="deleteDecisionText">Choose how to clear internal storage.</p>
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <button class="go-btn" id="deleteDecisionVerify" type="button">Verify backup and delete matched files</button>
+      <button class="danger-btn" id="deleteDecisionContinue" type="button">Continue, delete everything</button>
+      <button class="consent-cancel" id="deleteDecisionCancel" type="button">Keep data</button>
+    </div>
+  </div>
+</div>
+<div class="connection-warning" id="connectionWarning" role="alert" aria-live="assertive">
+  <div class="connection-warning-inner"><div class="connection-warning-title">Connection lost</div><p class="connection-warning-text">Reconnect this screen to the skyseeker Wi-Fi network immediately.</p></div>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
+<script type="module" src="/static/dist/setup.js"></script></body></html>

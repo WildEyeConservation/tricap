@@ -9,9 +9,10 @@ These mirror files that live outside the repo on the device:
 - `usr-local/sbin/` -> `/usr/local/sbin/`
 - `usr-local/bin/` -> `/usr/local/bin/`
 
-The portal now runs from inside the repo (`/home/radxa/tricap/skyseeker-standalone/captive_portal.py`),
-so a `git pull` updates it. After pulling a change that touches anything in this
-directory, re-install and reload:
+Flask owns the operator UI and API. The transitional port-80 forwarder runs
+from `/home/radxa/tricap/skyseeker-standalone/captive_portal.py`, so a `git pull`
+updates it along with the application. After pulling a change that touches
+anything in this directory, re-install and reload:
 
 ```sh
 sudo cp services/systemd/* /etc/systemd/system/

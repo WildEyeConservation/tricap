@@ -64,7 +64,7 @@ class BackupTests(unittest.TestCase):
             set(status),
             {
                 "running", "phase", "message", "started_at", "finished_at",
-                "total_files", "total_bytes", "files_done", "bytes_copied",
+                "total_files", "total_bytes", "files_done", "bytes_copied", "current_file",
                 "verify_mode", "verified", "verify_missing", "verify_changed",
                 "verify_extra", "verify_samples", "dst_files", "dst_bytes",
                 "ready_to_delete", "planned_bytes", "planned_files",

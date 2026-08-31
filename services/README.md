@@ -9,10 +9,13 @@ These mirror files that live outside the repo on the device:
 - `usr-local/sbin/` -> `/usr/local/sbin/`
 - `usr-local/bin/` -> `/usr/local/bin/`
 
-Flask owns the operator UI and API. The transitional port-80 forwarder runs
-from `/home/radxa/tricap/skyseeker-standalone/captive_portal.py`, so a `git pull`
-updates it along with the application. After pulling a change that touches
-anything in this directory, re-install and reload:
+Flask owns the operator UI and API and listens directly on port 80 through
+`tricap.service`. Its request boundary accepts loopback, the
+`192.168.50.0/24` access-point subnet, and the `100.64.0.0/10` NetBird overlay.
+It rejects requests from the internet-uplink Wi-Fi and Ethernet paths.
+
+After pulling a change that touches anything in this directory, re-install and
+reload:
 
 ```sh
 sudo cp services/systemd/* /etc/systemd/system/
@@ -25,8 +28,7 @@ sudo systemctl daemon-reload
 sudo systemctl restart systemd-journald
 sudo systemctl enable --now skyseeker-ap-monitor.timer
 sudo systemctl enable --now skyseeker-ap-watchdog.timer
-sudo systemctl restart skyseeker-portal.service
-# Restart tricap.service separately, only when tricap application code changed.
+sudo systemctl restart tricap.service
 ```
 
 The modprobe options for the `8192eu` driver take effect when the module next
@@ -50,6 +52,13 @@ decision is logged. For maintenance, `touch /run/skyseeker-ap-watchdog.disabled`
 `skyseeker-ap-autodetect.sh` enables in the hostapd config at boot; the first
 hostapd (re)start after that change brings the socket up.
 
-On devices flashed from the 2026-07-29 (or earlier) image, `skyseeker-portal.service`
-still points at the old copy in `/home/radxa/skyseeker-standalone/`. Run the block
-above once to switch them over; the old directory can then be removed.
+On a device that still has the retired forwarding service, remove it once after
+installing the current units:
+
+```sh
+sudo systemctl disable --now skyseeker-portal.service
+sudo rm -f /etc/systemd/system/skyseeker-portal.service
+sudo systemctl daemon-reload
+```
+
+The old `/home/radxa/skyseeker-standalone/` directory is no longer used.

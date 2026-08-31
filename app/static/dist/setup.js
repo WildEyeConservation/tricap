@@ -466,7 +466,7 @@ async function rebootDevice(control) {
 }
 async function uplinkStatus() {
     try {
-        const result = await getJson("/portal/uplink_status");
+        const result = await getJson("/api/uplink_status");
         if (!result.available) {
             byId("ulDot").className = "dot off";
             byId("ulState").textContent = "--";
@@ -501,7 +501,7 @@ async function connectUplink(custom) {
             if (psk)
                 body.psk = psk;
         }
-        const result = await postJson("/portal/uplink_connect", body);
+        const result = await postJson("/api/uplink_connect", body);
         toast(result.msg || "Internet connected");
         void uplinkStatus();
     }
@@ -519,7 +519,7 @@ async function disconnectUplink(control) {
     if (!finish)
         return;
     try {
-        const result = await postJson("/portal/uplink_disconnect");
+        const result = await postJson("/api/uplink_disconnect");
         toast(result.msg || "Internet disconnected");
         void uplinkStatus();
     }

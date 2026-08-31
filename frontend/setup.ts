@@ -544,7 +544,7 @@ async function rebootDevice(control: HTMLButtonElement): Promise<void> {
 
 async function uplinkStatus(): Promise<void> {
   try {
-    const result = await getJson<UplinkStatus>("/portal/uplink_status");
+    const result = await getJson<UplinkStatus>("/api/uplink_status");
     if (!result.available) {
       byId("ulDot").className = "dot off";
       byId("ulState").textContent = "--";
@@ -576,7 +576,7 @@ async function connectUplink(custom: boolean): Promise<void> {
       body.ssid = ssid;
       if (psk) body.psk = psk;
     }
-    const result = await postJson<ActionResponse, UplinkRequest>("/portal/uplink_connect", body);
+    const result = await postJson<ActionResponse, UplinkRequest>("/api/uplink_connect", body);
     toast(result.msg || "Internet connected");
     void uplinkStatus();
   } catch (error) {
@@ -591,7 +591,7 @@ async function disconnectUplink(control: HTMLButtonElement): Promise<void> {
   const finish = beginAction(control, "Disconnecting internet...");
   if (!finish) return;
   try {
-    const result = await postJson<ActionResponse>("/portal/uplink_disconnect");
+    const result = await postJson<ActionResponse>("/api/uplink_disconnect");
     toast(result.msg || "Internet disconnected");
     void uplinkStatus();
   } catch (error) {

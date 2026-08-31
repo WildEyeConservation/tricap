@@ -23,7 +23,7 @@ from pathlib import Path
 from support.backup import RsyncManager
 from support.component_health import component_health
 from support.phone_time import set_system_time_from_phone, validate_phone_time
-from .portal import ap_wifi_signal
+from .dashboard import ap_wifi_signal
 import time, shutil, threading, re, io
 
 api_bp = Blueprint('api', __name__)
@@ -89,8 +89,7 @@ def status():
       'error': str(altimeter.get_error() or ''),
   }
 
-  client_ip = request.headers.get('X-SkySeeker-Client-IP') or request.remote_addr
-  ret['wifiSignal'] = ap_wifi_signal(client_ip) or 0
+  ret['wifiSignal'] = ap_wifi_signal(request.remote_addr) or 0
   ret['components'] = component_health(
       tricap_manager, gps_ser, altimeter, os.path.ismount(MOUNT_POINT))
   ret['components']['wifi'] = {
@@ -135,9 +134,7 @@ def sync_phone_time():
     _logger.exception('Could not set system clock from dashboard client')
     return jsonify({'msg': 'Could not set the device clock: {}'.format(exc)}), 500
 
-  client_ip = (
-    request.headers.get('X-SkySeeker-Client-IP') or request.remote_addr or
-    'unknown')
+  client_ip = request.remote_addr or 'unknown'
   _logger.info(
     'Clock synchronized from dashboard client %s; adjustment=%sms, '
     'timezone_offset=%s, rtc_synced=%s, cameras_synced=%s',

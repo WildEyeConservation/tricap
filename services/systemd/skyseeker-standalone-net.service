@@ -1,7 +1,7 @@
 [Unit]
 Description=SkySeeker standalone AP interface address
 After=NetworkManager.service
-Before=hostapd.service dnsmasq.service skyseeker-portal.service
+Before=hostapd.service dnsmasq.service tricap.service
 Wants=NetworkManager.service
 
 [Service]

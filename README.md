@@ -13,10 +13,11 @@ Supported hardware:
 
 ## Runtime
 
-`tricap.service` starts `tricap.py`, which runs the Flask application on
-`127.0.0.1:5000`. Flask owns both the operator UI and API. During the service
-transition, `skyseeker-portal.service` is only a port-80 forwarder to Flask; it
-contains no UI, captive-portal behavior, or application routes. The AP,
+`tricap.service` starts `tricap.py`, which serves the Flask operator UI and API
+directly on HTTP port 80. There is no proxy, separate web server, or captive
+portal process. Requests are accepted only from loopback, the SkySeeker AP
+subnet (`192.168.50.0/24`), and the NetBird overlay (`100.64.0.0/10`); clients
+on an internet-uplink Wi-Fi or Ethernet network receive HTTP 403. The AP,
 rescue-network scan, diagnostics, and recovery services are stored under `services/`; see
 [`services/README.md`](services/README.md) for installation and operation.
 

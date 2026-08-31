@@ -1,8 +1,7 @@
-# Copy to /etc/systemd/system
 [Unit]
-Description=Tricap Launcher
-After=network-online.target
-Wants=network-online.target
+Description=SkySeeker capture controller and web interface
+After=network-online.target skyseeker-standalone-net.service
+Wants=network-online.target skyseeker-standalone-net.service
 
 [Service]
 User=root

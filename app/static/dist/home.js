@@ -307,7 +307,7 @@ async function pollStorage() {
     await singleFlight("home-storage", async () => {
         const [statsResult, estimateResult] = await Promise.allSettled([
             getJson("/api/statistics"),
-            getJson("/portal/storage_estimate"),
+            getJson("/api/storage_estimate"),
         ]);
         if (statsResult.status === "fulfilled")
             lastStats = statsResult.value;

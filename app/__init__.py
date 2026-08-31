@@ -9,7 +9,7 @@ import os
 from threading import Lock
 from logging.handlers import TimedRotatingFileHandler
 
-from flask import Flask, request
+from flask import Flask, abort, request
 
 from sensors.cam_manager import TriCapCamsManager
 from sensors.grf500_altimeter import Grf500Altimeter
@@ -27,6 +27,7 @@ from config import FALLBACK_TELEMETRY_DIR, MOUNT_POINT, SERVER_LOG_DIR
 from enum import Enum
 
 from serial_comms.SerialInterface import SerialInterface
+from support.local_network import web_client_allowed
 
 class AltiMeasurementObserver():
     """A custom observer to link the alti to the session logger."""
@@ -102,6 +103,12 @@ app = Flask(__name__)
 app.config.from_object('config')
 
 
+@app.before_request
+def restrict_web_access():
+    if not web_client_allowed(request.remote_addr):
+        abort(403)
+
+
 @app.after_request
 def set_http_headers(response):
     response.headers['Permissions-Policy'] = 'geolocation=()'
@@ -110,7 +117,7 @@ def set_http_headers(response):
         "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; "
         "img-src 'self' blob:; connect-src 'self'; frame-ancestors 'none'"
     )
-    if request.path.startswith(('/api/', '/portal/')):
+    if request.path.startswith('/api/'):
         response.headers['Cache-Control'] = 'no-store'
     return response
 
@@ -236,10 +243,10 @@ def stop_all_threads():
 
 
 # Configure the Flask Blueprints
-from .views.portal import portal_bp
+from .views.dashboard import dashboard_bp
 from .views.api import api_bp
 
-app.register_blueprint(portal_bp)
+app.register_blueprint(dashboard_bp)
 app.register_blueprint(api_bp)
 
 rootlogger.info('New instance of TriCap app has been initiated.')

@@ -357,37 +357,37 @@ def storage_image_sample():
         _storage_sample_cache.update(ts=now, payload=payload)
     return payload
 
-portal_bp = Blueprint("portal", __name__)
+dashboard_bp = Blueprint("dashboard", __name__)
 
 
-@portal_bp.get("/")
-@portal_bp.get("/index")
-@portal_bp.get("/index.html")
+@dashboard_bp.get("/")
+@dashboard_bp.get("/index")
+@dashboard_bp.get("/index.html")
 def home():
-    return render_template("portal/home.html")
+    return render_template("dashboard/home.html")
 
 
-@portal_bp.get("/setup")
+@dashboard_bp.get("/setup")
 def setup():
-    return render_template("portal/setup.html")
+    return render_template("dashboard/setup.html")
 
 
-@portal_bp.get("/healthz")
+@dashboard_bp.get("/healthz")
 def health():
     return jsonify({"ok": True})
 
 
-@portal_bp.get("/portal/uplink_status")
+@dashboard_bp.get("/api/uplink_status")
 def get_uplink_status():
     return jsonify(uplink_status())
 
 
-@portal_bp.get("/portal/storage_estimate")
+@dashboard_bp.get("/api/storage_estimate")
 def get_storage_estimate():
     return jsonify(storage_image_sample())
 
 
-@portal_bp.post("/portal/uplink_connect")
+@dashboard_bp.post("/api/uplink_connect")
 def connect_uplink():
     payload = request.get_json(silent=True) or {}
     ok, message = uplink_connect(payload.get("ssid") or None,
@@ -395,13 +395,13 @@ def connect_uplink():
     return jsonify({"success": ok, "msg": message}), 200 if ok else 500
 
 
-@portal_bp.post("/portal/uplink_disconnect")
+@dashboard_bp.post("/api/uplink_disconnect")
 def disconnect_uplink():
     ok, message = uplink_disconnect()
     return jsonify({"success": ok, "msg": message}), 200 if ok else 500
 
 
-@portal_bp.get("/portal/flight_log")
+@dashboard_bp.get("/api/flight_log")
 def download_flight_log():
     day, payload = merged_flight_log()
     if payload is None:

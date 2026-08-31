@@ -4,39 +4,61 @@ import unittest
 from unittest.mock import patch
 
 from flask import Flask
+from support.local_network import web_client_allowed
 
 
 ROOT = Path(__file__).resolve().parents[1]
-FORWARDER_PATH = ROOT / "skyseeker-standalone" / "captive_portal.py"
-SPEC = importlib.util.spec_from_file_location("skyseeker_forwarder", FORWARDER_PATH)
-FORWARDER = importlib.util.module_from_spec(SPEC)
-SPEC.loader.exec_module(FORWARDER)
-VIEW_PATH = ROOT / "app" / "views" / "portal.py"
-VIEW_SPEC = importlib.util.spec_from_file_location("skyseeker_portal_view", VIEW_PATH)
-PORTAL_VIEW = importlib.util.module_from_spec(VIEW_SPEC)
-VIEW_SPEC.loader.exec_module(PORTAL_VIEW)
+VIEW_PATH = ROOT / "app" / "views" / "dashboard.py"
+VIEW_SPEC = importlib.util.spec_from_file_location("skyseeker_dashboard_view", VIEW_PATH)
+DASHBOARD_VIEW = importlib.util.module_from_spec(VIEW_SPEC)
+VIEW_SPEC.loader.exec_module(DASHBOARD_VIEW)
 
 
-class PortForwarderTests(unittest.TestCase):
-    def test_rejoin_queue_capacity_is_preserved(self):
-        self.assertEqual(FORWARDER.PortalServer.request_queue_size, 50)
-        self.assertTrue(FORWARDER.PortalServer.daemon_threads)
-        self.assertFalse(FORWARDER.PortalServer.block_on_close)
+class WebAccessTests(unittest.TestCase):
+    def test_loopback_ap_and_netbird_clients_are_allowed(self):
+        for address in (
+            "127.0.0.1",
+            "::1",
+            "192.168.50.42",
+            "100.64.0.1",
+            "100.127.255.254",
+        ):
+            with self.subTest(address=address):
+                self.assertTrue(web_client_allowed(address))
 
-    def test_every_http_method_forwards_to_flask(self):
-        self.assertIs(FORWARDER.Handler.do_GET, FORWARDER.Handler._proxy)
-        self.assertIs(FORWARDER.Handler.do_HEAD, FORWARDER.Handler._proxy)
-        self.assertIs(FORWARDER.Handler.do_POST, FORWARDER.Handler._proxy)
+    def test_upstream_and_invalid_clients_are_rejected(self):
+        for address in (
+            None,
+            "",
+            "not-an-address",
+            "10.0.0.20",
+            "172.16.0.20",
+            "192.168.1.20",
+            "192.168.43.20",
+            "203.0.113.20",
+        ):
+            with self.subTest(address=address):
+                self.assertFalse(web_client_allowed(address))
+
+    def test_flask_runs_directly_on_http_port(self):
+        launcher = (ROOT / "tricap.py").read_text()
+        self.assertIn('host="0.0.0.0", port=80', launcher)
+        self.assertFalse(
+            (ROOT / "skyseeker-standalone" / "captive_portal.py").exists()
+        )
+        self.assertFalse(
+            (ROOT / "services" / "systemd" / "skyseeker-portal.service").exists()
+        )
 
 
-class FlaskPortalAssetTests(unittest.TestCase):
+class FlaskDashboardAssetTests(unittest.TestCase):
     def setUp(self):
         app = Flask(
             __name__,
             template_folder=str(ROOT / "app" / "templates"),
             static_folder=str(ROOT / "app" / "static"),
         )
-        app.register_blueprint(PORTAL_VIEW.portal_bp)
+        app.register_blueprint(DASHBOARD_VIEW.dashboard_bp)
         self.client = app.test_client()
 
     def test_flask_owns_operator_pages_and_health(self):
@@ -45,14 +67,14 @@ class FlaskPortalAssetTests(unittest.TestCase):
         self.assertEqual(self.client.get("/healthz").get_json(), {"ok": True})
 
     def test_flask_owns_uplink_endpoints(self):
-        with patch.object(PORTAL_VIEW, "uplink_status", return_value={"available": True}):
+        with patch.object(DASHBOARD_VIEW, "uplink_status", return_value={"available": True}):
             self.assertEqual(
-                self.client.get("/portal/uplink_status").get_json(),
+                self.client.get("/api/uplink_status").get_json(),
                 {"available": True},
             )
-        with patch.object(PORTAL_VIEW, "uplink_connect", return_value=(True, "joined")) as connect:
+        with patch.object(DASHBOARD_VIEW, "uplink_connect", return_value=(True, "joined")) as connect:
             response = self.client.post(
-                "/portal/uplink_connect",
+                "/api/uplink_connect",
                 json={"ssid": "field-hotspot", "psk": "secret"},
             )
             self.assertEqual(response.status_code, 200)
@@ -61,7 +83,7 @@ class FlaskPortalAssetTests(unittest.TestCase):
 
     def test_templates_load_only_compiled_typescript(self):
         for page in ("home", "setup"):
-            template = (ROOT / "app" / "templates" / "portal" / f"{page}.html").read_text()
+            template = (ROOT / "app" / "templates" / "dashboard" / f"{page}.html").read_text()
             self.assertIn(f'/static/dist/{page}.js', template)
             self.assertNotIn("<style>", template)
             self.assertEqual(template.count("<script"), 1)
@@ -88,15 +110,15 @@ class AccessPointSignalTests(unittest.TestCase):
     def test_requesting_client_station_is_preferred(self):
         stations = {"aa:aa:aa:aa:aa:aa": -68, "bb:bb:bb:bb:bb:bb": -42}
         with (
-            patch.object(PORTAL_VIEW, "_scan_ap_stations", return_value=("wlan1", stations)),
-            patch.object(PORTAL_VIEW, "_ip_to_mac", return_value="aa:aa:aa:aa:aa:aa"),
+            patch.object(DASHBOARD_VIEW, "_scan_ap_stations", return_value=("wlan1", stations)),
+            patch.object(DASHBOARD_VIEW, "_ip_to_mac", return_value="aa:aa:aa:aa:aa:aa"),
         ):
-            self.assertEqual(PORTAL_VIEW.ap_wifi_signal("192.168.4.20"), -68)
+            self.assertEqual(DASHBOARD_VIEW.ap_wifi_signal("192.168.50.20"), -68)
 
     def test_strongest_station_is_used_without_a_client_match(self):
         stations = {"aa:aa:aa:aa:aa:aa": -68, "bb:bb:bb:bb:bb:bb": -42}
-        with patch.object(PORTAL_VIEW, "_scan_ap_stations", return_value=("wlan1", stations)):
-            self.assertEqual(PORTAL_VIEW.ap_wifi_signal(), -42)
+        with patch.object(DASHBOARD_VIEW, "_scan_ap_stations", return_value=("wlan1", stations)):
+            self.assertEqual(DASHBOARD_VIEW.ap_wifi_signal(), -42)
 
 
 if __name__ == "__main__":

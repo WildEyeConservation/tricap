@@ -8,7 +8,6 @@ from PIL import Image
 from io import BytesIO
 import base64
 import signal
-import time
 
 
 from time import sleep, time
@@ -41,30 +40,18 @@ class sonySDKcam():
     _sonyCamera = None
 
     def imageDownloadCompleteCallback(self, filename):
-        # print("Received sony camera download callback with filename "+str(filename, encoding="utf-8"))
         self._logger.debug("Sony camera transfer callback called with "+str(filename, encoding="utf-8"))
         with self._lock_with_save:
-                # self._to_save_queue.append(str(filename, encoding="utf-8"))
                 self._downLoadedCount += 1
                 self._num_images_copied += 1
-                # if self._downLoadedCount % 2 == 0:
-                #     # self._logger.info("Index: "+ str(round(self._downLoadedCount/2)) + " marginTimers: " + str(self._marginTimers))
-                #     self._logger.info("Copy from camera time since trigger: " + str(datetime.now() - self._marginTimers[str(round(self._downLoadedCount/2))]))
-                #     self._marginTimers[self._to_save_queue[-1]] = self._marginTimers[str(round(self._downLoadedCount/2))]
-                #     del self._marginTimers[str(round(self._downLoadedCount/2))]
 
     def cameraErrorCallback(self, message):
-        # print("Received an error callback from sony camera SDK "+str(message, encoding="utf-8"))
         self._logger.error("Received an error callback from sony camera SDK "+str(message, encoding="utf-8"))
         raise Exception("Received an error callback from sony camera SDK "+str(message, encoding="utf-8"))
 
     def exitGracefully(self, *args):
         print("exiting gracefully")
         self._sonyCamera.setOnErrorCallBack(None,self._cameraID)
-        # for i in range(1,self.numConnectedCameras+1):
-        #     self._sonyCamera.disconnect(i)
-            # numConnectedCameras -=1
-        # sleep(0.5)
         del self._sonyCamera
         self._sonyCamera = None
         sys.exit(143)
@@ -93,8 +80,6 @@ class sonySDKcam():
 
         self._ensure_memory_fs(memoryFsPath)
         
-        # catch SIGINT and SIGTERM to destroy the sony camera object to not break the SDK when you do a systemctl stop
-        # signal.signal(signal.SIGINT, self.exitGracefully)
         # Background rediscovery runs outside Python's main thread, where
         # signal.signal() is not permitted.
         if threading.current_thread() is threading.main_thread():
@@ -112,9 +97,6 @@ class sonySDKcam():
 
         # This instructs the camera to save images to the PC only and not on the SD card.
         self._sonyCamera.setCameraSaveLocation(1,self._cameraID)
-        # Save to memory card only
-        # self._sonyCamera.setCameraSaveLocation(2,self._cameraID)
-
         # live view is enabled by default on connection and seems to use USB bandwidth, so toggle it to disable
         self._sonyCamera.toggleLiveView(self._cameraID)
 
@@ -124,9 +106,6 @@ class sonySDKcam():
         self._sonyCamera.setOnDownloadCompleteCallback(self.imageDownloadCompleteCallback,self._cameraID)
         self._sonyCamera.setOnErrorCallBack(self.cameraErrorCallback,self._cameraID)
 
-        # if (not self._sonyCamera.setSaveInfo(memoryFsPath, "IMG3_"+str(self._cameraID)+"_", 1,self._cameraID)):
-        #     raise Exception("Failed to set the save location. Make sure that the following path exists and has appropriate permissions: " + memoryFsPath)
-        
         self._serial_num = self._sonyCamera.getModel(self._cameraID).replace("-","_")
 
         # Give the camera a moment to settle before starting to capture images. Prevents the first capture from being missed
@@ -341,21 +320,11 @@ class sonySDKcam():
                 self.imageDownloadCompleteCallback, self._cameraID
             )
 
-    # def reset(self, settings: dict):
-    #     """Reset the camera."""
-    #     self.state = CAMERA_STATES.UNINITIALISED
-    #     self._setup_camera(settings)
-
     def capture_and_copy(self, mount_point, interval, init_start, session_start_date, serial_number, stop_capture, lock_with_save, index, capture_done, save_done, sync_lock):
         self._lock_with_save = lock_with_save
         # empty event buffer
         self._logger.debug(f'capture_and_copy {init_start}')
         self._session_start_date = session_start_date
-        # code=0
-        # while code != 1:
-        #     code,filepath=self._gp_camera.wait_for_event(1)
-
-
         # local variables
         start = init_start
         self._triggers = 0
@@ -403,7 +372,6 @@ class sonySDKcam():
                     self._triggers += 1
                     with self._lock_with_save:
                         self._logger.info(str(serial_number)+": Waiting for "+str(self._triggers - self._downLoadedCount )+" images from the camera save queue is: " + str(len(self._to_save_queue)) + " images long.")
-                        # self._marginTimers[str(self._triggers)] = datetime.now()
                 else:
                     self._logger.warning('Could not successfully trigger a capture.')
                     self.state = CAMERA_STATES.ERROR_CAPTURE
@@ -447,17 +415,13 @@ class sonySDKcam():
         while True:
             
             fileName = ""
-            # print("About to wait on lock")
             self._lock_with_save.acquire()
-            # print("Lock aquired")
             if(len(self._to_save_queue) > 0):
                 fileName = self._to_save_queue.pop(0)
                 self._lock_with_save.release()
                 print(str(datetime.now())+ " popping file " + fileName)
             else:
                 self._lock_with_save.release()
-            # if(fileName != ""):
-                # nameParts = fileName.split("/")
             if fileName == '':
                 with lock_with_copy:
                     save_done.set()
@@ -581,24 +545,7 @@ class sonySDKcam():
                 self._sonyCamera.toggleLiveView(self._cameraID)
             return self._sonyCamera.getLiveViewFrame(self._cameraID)
 
-    # def get_copy_percentage(self):
-    #     if self._num_images_to_copy == 0:
-    #         # invalid
-    #         return 0
-
-    #     return round(self._num_images_copied / self._num_images_to_copy, 2)
-
-    # def get_copy_exception_count(self):
-    #     return self._num_images_failed
-
-    # def get_images_to_copy(self):
-    #     return self._num_images_to_copy
-
-    # def get_images_copied(self):
-    #     return self._num_images_copied
-        
     def sync_time(self):
-        # print("Syncing time to "+str(round(datetime.now().timestamp())))
         self._sonyCamera.setDateTime(round(datetime.now().timestamp()),self._cameraID)
 
     @property

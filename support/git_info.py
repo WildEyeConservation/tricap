@@ -25,9 +25,3 @@ class GitData():
             self.index += 1
         return self.parse_date
 
-# parser = Git()
-# parser.code_id()
-# parser.code_date()
-
-
-

@@ -24,7 +24,6 @@ from sensors.toggle_switch import CamManagerMonitor, LEDController, CamErrorMoni
 from support.system_monitor import generate_system_monitor, SystemMonitorLogger
 
 from config import FALLBACK_TELEMETRY_DIR, MOUNT_POINT, SERVER_LOG_DIR
-from enum import Enum
 
 from serial_comms.SerialInterface import SerialInterface
 from support.local_network import web_client_allowed
@@ -148,7 +147,6 @@ storage_lock = Lock()
 
 tricap_manager = TriCapCamsManager(misc_settings, cam_settings, storage_lock)
 tricap_cameras = tricap_manager.get_cameras_as_list()
-tricap_length = len(tricap_cameras)
 
 gps_ser = SerialInterface(
     '/dev/gps',
@@ -157,12 +155,9 @@ gps_ser = SerialInterface(
     cam_manager=tricap_manager,
 )
 
-image_manager = tricap_manager
-
 rootlogger.debug('Cameras have been configured.')
 
 alti_settings = init_config.get_section_dict(TricapConfig.ALTI_SECTION_HEADER)
-web_settings = init_config.get_section_dict(TricapConfig.WEB_SECTION_HEADER)
 
 try:
     rootlogger.debug('Connecting to the GRF-500 altimeter.')
@@ -198,7 +193,7 @@ altimeter.attach(alti_observer)
 altimeter.attach(AltitudeLogObserver())
 
 # Capture controls measurement when an altimeter is present. The unavailable
-# placeholder implements the same no-op interface, so capture remains usable.
+# adapter keeps capture usable without fabricating readings.
 tricap_manager.altimeter = altimeter
 
 rootlogger.info("Git version: " + code_inf.code_id())

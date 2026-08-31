@@ -4,7 +4,6 @@ from flask import Blueprint, Response, request, jsonify, abort, send_file
 from app import tricap_manager, gps_ser, altimeter
 import base64, logging, cv2
 import numpy as np
-from random import randint
 from datetime import datetime
 from config import (
   CAM_MANAGER_STATES,
@@ -253,8 +252,6 @@ def stream_preview(cam_idx):
 
 @api_bp.route('/api/image/<cam_idx>/<im_idx>')
 def get_image(cam_idx, im_idx):
-  # if tricap_manager.state == CAM_MANAGER_STATES.STARTED:
-  #   return jsonify({'msg': 'Not allowed in started state'}), 400
   camIdx = int(cam_idx)
   imIdx = int(im_idx)
   if camIdx >= len(tricap_manager._cameras):
@@ -298,7 +295,6 @@ def get_images(cam_idx):
     return jsonify({'msg': 'Invalid camera index'}), 400
 
   cam_session_dir = os.path.join(MOUNT_POINT, tricap_manager._copy_start_time.strftime('%Y_%m_%d'), tricap_manager._copy_start_time.strftime('%H_%M_%S'))
-  # cam_session_dir = os.path.join(MOUNT_POINT, "2025_09_19", "00_26_29")
   image_dir = os.path.join(cam_session_dir, str(tricap_manager._cameras[camIdx].serial_num))
 
   if not Path(image_dir).is_dir():

@@ -3,13 +3,10 @@
 import RPi.GPIO as GPIO
 
 from support.basic import PeriodicMonitor, Observer
-import subprocess
 
 import logging
 
 from config import CAM_MANAGER_STATES, CAMERA_STATES
-
-import time
 
 GPIO.setmode(GPIO.BCM)
 
@@ -48,15 +45,10 @@ class ToggleSwitchMonitor(PeriodicMonitor):
 
     def monitor_step(self):
         """Update the value."""
-        # if GPIO.input(SWITCH_PIN):
-        #     # toggle switch is high impedance, which we are interpreting as off
-        #     if self.prev_value == 0:
-        #         self.value = 0
-        #     self.prev_value = 0
-        # else:
-        #     if self.prev_value == 1:
-        #         self.value = 1
-        #     self.prev_value = 1
+        current_value = 0 if GPIO.input(SWITCH_PIN) else 1
+        if current_value == self.prev_value:
+            self.value = current_value
+        self.prev_value = current_value
 
 class ToggleSwitchObserver(Observer):
     """React to the toggle switch status."""
@@ -97,7 +89,6 @@ class ToggleSwitchObserver(Observer):
                 self.cam_manager.start_capturing()
                 self.toggled_on = True
 
-# TODO The LED Light Monitor should be separate
 class CamManagerMonitor(PeriodicMonitor):
     """Monitor how high the altitude is."""
     _logger = logging.getLogger(__name__)  # start the logger
@@ -189,10 +180,6 @@ class LEDController(Observer):
 
         GPIO.output(GREEN_PIN, GPIO.LOW)
 
-        # self.red_pwm = GPIO.PWM(RED_PIN, 0.5)
-        # self.red_pwm.start(50)
-        # self.green_pwm = GPIO.PWM(GREEN_PIN, 0.5)
-
         self.allowed_cam_errors = 0
         self.cam_errors = [0]*len(cam_error_monitors)
         self.cam_captures = [0]*len(cam_capture_monitors)
@@ -233,8 +220,7 @@ class LEDController(Observer):
             idx = int(subject.type_id[-1])
             self.cam_captures[idx] = subject.value
 
-        # self.capture_state = self.cam_captures == [1]*len(self.cam_captures)
-        self.capture_state = self.cam_captures == [1]
+        self.capture_state = bool(self.cam_captures) and all(self.cam_captures)
 
         if self.error_state == 1:
             GPIO.output(GREEN_PIN, GPIO.HIGH)
@@ -251,10 +237,6 @@ class LEDController(Observer):
                 if self.toggled_on: # Capture was stopped (previous observation was still running)
                     self._logger.info('LEDController - Capture was stopped')
                     self.toggled_on = False
-                    if self.error_state == 1:
-                        self._logger.info('Restarting...')
-                        # subprocess.run(["systemctl", "restart", "tricap.service"])
-                        subprocess.call('reboot', shell=True)
             else: # switch is in the on position
                 if self.toggled_on is False: # User has flicked the switch on
                     self._logger.info('LEDController - Capture has started')

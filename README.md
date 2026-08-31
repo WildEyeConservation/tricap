@@ -24,6 +24,9 @@ rescue-network scan, diagnostics, and recovery services are stored under `servic
 NetBird remains the remote-support path. The rescue scan remains available when
 the normal AP path cannot be reached.
 
+See [`docs/repository-audit.md`](docs/repository-audit.md) for the complete used
+file tree, runtime data flow, retained abstractions, and redundant-file ledger.
+
 ## Development
 
 Install the locked Python environment:

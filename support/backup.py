@@ -501,12 +501,6 @@ class RsyncManager:
                 source_fingerprint = self._sample_fingerprint(source_path, block_size=block_size, blocks=blocks)
                 destination_fingerprint = self._sample_fingerprint(destination_path, block_size=block_size, blocks=blocks)
 
-                # hashstring = source_fingerprint.split(':')[1]
-                # with self.fingerprint_lock:
-                #     self.fingerprint_counts[hashstring] += 1
-                #     if self.fingerprint_counts[hashstring] > 1:
-                #         self.fingerprint_repeats += 1
-                #         self.fingerprint_names.append(source_path)
                 if source_fingerprint == destination_fingerprint:
                     return ("matched", rel)
                 return ("different", rel)

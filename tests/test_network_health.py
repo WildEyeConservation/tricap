@@ -134,10 +134,14 @@ class NetworkHealthTests(unittest.TestCase):
             self.assertEqual(HEALTH.recover(healthy_status()), 0)
         run_mock.assert_not_called()
 
-    def test_recovery_has_no_power_cycle_path(self):
-        source = HEALTH_PATH.read_text(encoding="utf-8")
-        for command in ('"reboot"', '"poweroff"', '"shutdown"'):
-            self.assertNotIn(command, source)
+    def test_automatic_recovery_has_no_power_cycle_path(self):
+        sources = [
+            HEALTH_PATH.read_text(encoding="utf-8"),
+            (ROOT / "sensors" / "toggle_switch.py").read_text(encoding="utf-8"),
+        ]
+        for source in sources:
+            for command in ("reboot", "poweroff", "shutdown"):
+                self.assertNotIn(command, source)
 
     def test_failed_snapshot_is_still_printable(self):
         status = healthy_status()

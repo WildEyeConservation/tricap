@@ -9,7 +9,7 @@ export class ApiError extends Error {
     }
 }
 export function byId(id) {
-    const element = document.getElementById(id);
+    const element = document.querySelector(`#${CSS.escape(id)}`);
     if (!element) {
         throw new Error(`Missing page element: ${id}`);
     }

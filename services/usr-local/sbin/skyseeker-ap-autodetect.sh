@@ -28,13 +28,13 @@ log() {
 }
 
 ensure_hostapd_control() {
-    # Enable hostapd's local control socket so the AP watchdog can ask it
+    # Enable hostapd's local control socket so the health check can ask it
     # "are you alive" rather than trusting the systemd unit state. Takes
     # effect the next time hostapd (re)starts.
     local conf="$ROOT/etc/hostapd/hostapd-skyseeker.conf"
     [ -f "$conf" ] || return 0
     if ! grep -q '^ctrl_interface=' "$conf"; then
-        printf '\n# Local control socket used by the AP liveness watchdog.\nctrl_interface=/run/hostapd\n' >> "$conf"
+        printf '\n# Local control socket used by SkySeeker health checks.\nctrl_interface=/run/hostapd\n' >> "$conf"
         log "enabled hostapd control socket in $conf"
     fi
 }

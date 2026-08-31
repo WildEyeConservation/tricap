@@ -1,5 +1,6 @@
 """Tests for the production SkySeeker configuration."""
 
+import configparser
 import tempfile
 import unittest
 from pathlib import Path
@@ -43,15 +44,19 @@ class ConfigureTests(unittest.TestCase):
     def tearDown(self):
         self.temp_dir.cleanup()
 
-    def test_removes_retired_hardware_settings(self):
+    def test_removes_retired_settings(self):
         config = TricapConfig(str(self.config_path))
 
         self.assertEqual(
             config.get_section_dict(TricapConfig.CAMERA_SECTION_HEADER),
             {SONY_IMAGE_FORMAT_CONFIG_KEY: SONY_IMAGE_FORMAT_CAMERA_SETTING},
         )
-        web_settings = config.get_section_dict(TricapConfig.WEB_SECTION_HEADER)
-        self.assertEqual(web_settings, {"refresh_rate": "1000"})
+        config.save_to_file()
+
+        saved = configparser.ConfigParser()
+        saved.read(self.config_path)
+        self.assertFalse(saved.has_section("Web"))
+        self.assertFalse(saved.has_section("SMS"))
 
     def test_saves_supported_sony_setting(self):
         config = TricapConfig(str(self.config_path))

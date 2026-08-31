@@ -4,16 +4,9 @@ Imports all paths from the local_paths.py file.
 """
 # coding=utf-8
 
-from enum import Enum, IntEnum
+from enum import Enum
 
-# Get all the local file paths, specific to a system
-from local_paths import *
-
-# other variables
-CAM_IMAGE_PREFIX = 'cam'
-RET_ERROR = -1
-RET_OK = 0
-SERVER_LOG_NAME = 'tricap_server_log'
+from local_paths import CONFIG_FP, SERVER_LOG_DIR, SESSION_ROOT_DIR
 
 # Sony Camera Remote SDK image formats. Default deliberately does not write
 # the SDK property, leaving the format selected on each camera untouched.
@@ -39,10 +32,6 @@ SONY_PC_IMAGE_FORMAT_FILE_TYPES = {
     SONY_IMAGE_FORMAT_RAW: 2,
 }
 
-# Altimeter default configs
-ALTI_NUM_AVG_FRAMES = 2
-ALTI_MEASURE_TIMEOUT = 2
-
 MOUNT_POINT = "/mnt/ext_cam_storage"
 MOUNT_POINT_SSD = "/mnt/ssd_cam_storage"
 FALLBACK_TELEMETRY_DIR = "/home/radxa/SkySeeker_Data"
@@ -54,8 +43,3 @@ CAMERA_STATES = Enum("CamState", ["UNINITIALISED", "INITIALISED", "CAPTURING",
 CAM_MANAGER_STATES = Enum("CamManagerState", ["STOPPED", "STARTED", "ERROR_NO_CAMS", "ERROR_CONFIG", "COPYING", "LOADING_PREVIEW"])
 ALTIMETER_STATE = Enum("AltiState", ["NOT_CONNECTED", "CONNECTED", "MEASURING", 
                                      "ERROR"])
-BUTTON_CODE = IntEnum("ButtonCode", {"START": 0, "STOP": 1, "TEST": 2,
-                                     "RESET": 3, "STARTSTOP": 4})
-LOG_CODES = Enum("LogCode", "ALL")
-OVERRIDESTATE = IntEnum("OverrideState", {"ALTISWITCH": 0, "STOPOVERRIDE": 1, 
-                                          "MANUALSTART": 2})

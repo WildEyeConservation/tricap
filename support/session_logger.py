@@ -113,7 +113,6 @@ class SessionLogger(ThreadedLogger):
         if os.path.isdir(self._root_folder) is False:
             os.mkdir(self._root_folder)
 
-        #date_str = time.strftime("%Y_%m_%d")
         date_str = time.strftime("%Y-%m-%d")
         date_folder = os.path.join(self._root_folder, date_str)
         if os.path.isdir(date_folder) is False:

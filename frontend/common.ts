@@ -18,11 +18,11 @@ export type ActionControl = HTMLButtonElement;
 export type FinishAction = (keepLoading?: boolean) => void;
 
 export function byId<T extends HTMLElement = HTMLElement>(id: string): T {
-  const element = document.getElementById(id);
+  const element = document.querySelector<T>(`#${CSS.escape(id)}`);
   if (!element) {
     throw new Error(`Missing page element: ${id}`);
   }
-  return element as T;
+  return element;
 }
 
 export function formatValue(value: unknown, fallback = "--"): string {

@@ -119,7 +119,11 @@ function cssColor(variable: string, styles: CSSStyleDeclaration): Rgb | undefine
   if (hex.length !== 6) {
     return undefined;
   }
-  return [0, 2, 4].map((index) => Number.parseInt(hex.slice(index, index + 2), 16)) as Rgb;
+  return [
+    Number.parseInt(hex.slice(0, 2), 16),
+    Number.parseInt(hex.slice(2, 4), 16),
+    Number.parseInt(hex.slice(4, 6), 16),
+  ];
 }
 
 function chevronTone(nearVariable: string, farVariable: string, severity: number): string {
@@ -227,7 +231,12 @@ function renderCameras(status: CaptureStatus, images: ImageCounts): void {
 function renderComponents(status: CaptureStatus): void {
   const panel = byId("componentPanel");
   const list = byId("componentList");
-  const order = ["cameras", "gps", "altimeter", "storage"] as const;
+  const order: Array<keyof NonNullable<CaptureStatus["components"]>> = [
+    "cameras",
+    "gps",
+    "altimeter",
+    "storage",
+  ];
   const missing = order
     .map((name) => status.components?.[name])
     .filter((component): component is ComponentStatus => component?.connected === false);

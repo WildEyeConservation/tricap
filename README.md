@@ -35,8 +35,8 @@ file tree, runtime data flow, retained abstractions, and redundant-file ledger.
 ## Configuration
 
 `default.cfg` in the repository lists every supported option with its accepted
-values: the Sony image format, the capture interval, the GPS timezone, and the
-dashboard poll rates. A rig overrides any of them in
+values: the Sony image format, the capture interval, and the dashboard poll
+rates. A rig overrides any of them in
 `/home/radxa/tricap/initial.cfg` (gitignored); options missing there fall back
 to `default.cfg`. Only the two options the Setup page changes (image format and
 capture interval) are written back to `initial.cfg`, so hand-edited overrides
@@ -48,7 +48,9 @@ sudo systemctl restart tricap
 
 Everything else (driver timeouts, storage paths, network subnets) is a named
 constant in code, because it is tied to the hardware image rather than to a
-deployment.
+deployment. The clock and timezone are not configured at all: each dashboard
+client that connects sets the rig's clock and, for whole-hour offsets, its
+system timezone from the phone.
 
 ## Development
 

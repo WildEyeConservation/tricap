@@ -139,7 +139,6 @@ gps_ser = SerialInterface(
     921600,
     capturing_lock=storage_lock,
     cam_manager=tricap_manager,
-    timezone=init_config.get('timezone', TricapConfig.MISC_SECTION_HEADER),
 )
 
 rootlogger.debug('Cameras have been configured.')

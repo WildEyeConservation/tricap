@@ -166,7 +166,7 @@ The following is the complete tracked tree, grouped by purpose.
 │   └── test_ublox_gps.py             GPS satellite and quality parsing
 ├── config.py                         runtime constants and state enums
 ├── local_paths.py                    deployed log and config paths
-├── default.cfg                       every supported option: Sony format, capture interval, timezone, UI poll rates
+├── default.cfg                       every supported option: Sony format, capture interval, UI poll rates
 ├── pyproject.toml                    locked Python dependency declaration
 ├── uv.lock                           exact Python dependency graph
 ├── package.json                      TypeScript build commands and dependency

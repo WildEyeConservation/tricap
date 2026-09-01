@@ -19,7 +19,6 @@ sony_image_format = Default   ; Default | RAW | JPEG
 
 [Misc]
 image_capture_interval = 3    ; float >= 0.5
-timezone = Africa/Johannesburg
 
 [Ui]
 status_poll_ms = 1000
@@ -80,7 +79,6 @@ class ConfigureTests(unittest.TestCase):
         config = self.load()
 
         self.assertEqual(config.get("image_capture_interval", "Misc", "float"), 4.0)
-        self.assertEqual(config.get("timezone", "Misc"), "Africa/Johannesburg")
         self.assertEqual(
             config.get_section_dict("Camera"),
             {SONY_IMAGE_FORMAT_CONFIG_KEY: SONY_IMAGE_FORMAT_CAMERA_SETTING},
@@ -123,7 +121,7 @@ class ConfigureTests(unittest.TestCase):
 
     def test_save_keeps_the_rigs_other_overrides(self):
         self.config_path.write_text(
-            "[Misc]\ntimezone = UTC\n\n[Ui]\nstatus_poll_ms = 2000\n", encoding="utf-8"
+            "[Misc]\nimage_capture_interval = 2\n\n[Ui]\nstatus_poll_ms = 2000\n", encoding="utf-8"
         )
         config = self.load()
         camera_settings = config.get_section_dict("Camera")
@@ -133,8 +131,7 @@ class ConfigureTests(unittest.TestCase):
 
         saved = self.saved()
         self.assertEqual(saved["Camera"][SONY_IMAGE_FORMAT_CONFIG_KEY], "JPEG")
-        self.assertEqual(saved["Misc"]["timezone"], "UTC")
-        self.assertEqual(saved["Misc"]["image_capture_interval"], "3")
+        self.assertEqual(saved["Misc"]["image_capture_interval"], "2")
         self.assertEqual(saved["Ui"]["status_poll_ms"], "2000")
         self.assertEqual(self.load().get(SONY_IMAGE_FORMAT_CONFIG_KEY, "Camera"), "JPEG")
 
@@ -166,7 +163,6 @@ class ConfigureTests(unittest.TestCase):
 
         self.assertEqual(config.get(SONY_IMAGE_FORMAT_CONFIG_KEY, "Camera"), "Default")
         self.assertGreaterEqual(config.get("image_capture_interval", "Misc", "float"), 0.5)
-        self.assertEqual(config.get("timezone", "Misc"), "Africa/Johannesburg")
         self.assertEqual(
             config.ui_settings(),
             {

@@ -1,7 +1,6 @@
 import math
 import os
 import serial
-import pytz
 from statistics import mean
 from io import BytesIO
 from pyubx2 import (
@@ -9,16 +8,14 @@ from pyubx2 import (
     UBX_PROTOCOL,
     UBXReader,
 )
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from threading import Lock
 
 from config import FALLBACK_TELEMETRY_DIR, MOUNT_POINT
 
 class SerialProcess():
-    def __init__(self, cam_manager = None, timezone='UTC'):
+    def __init__(self, cam_manager = None):
         super().__init__()
-        # Local zone the GPS UTC timestamps are shifted into (config [Misc] timezone).
-        self._tz = pytz.timezone(timezone)
         # append valid reponses
         self._requests = []
         self._hasGps = False
@@ -68,17 +65,28 @@ class SerialProcess():
             return False
         return True
 
+    @staticmethod
+    def gps_datetime(gps_time, now=None):
+        """Aware UTC datetime for a GGA time-of-day, dated by the rig's clock.
+
+        GGA carries UTC time of day only. The date comes from the rig, and the
+        result is nudged by a day when the two straddle midnight UTC.
+        """
+        now = now or datetime.now(timezone.utc)
+        candidate = datetime.combine(now.date(), gps_time.replace(tzinfo=None),
+                                     tzinfo=timezone.utc)
+        if candidate - now > timedelta(hours=12):
+            candidate -= timedelta(days=1)
+        elif now - candidate > timedelta(hours=12):
+            candidate += timedelta(days=1)
+        return candidate
+
     def saveGga(self, msg):
-        gps_datetime = datetime.now()
         pi_time = datetime.now()
         if msg.time != None and msg.lat != '' and msg.lon != '' and self._firstGps:
-            # calculate gps time with time zone
             self._hasGps = True
-            tzOffset = self._tz.utcoffset(datetime.now()).total_seconds()
-            gpsTimeString = msg.time.strftime('%H:%M:%S.%f')
-            gps_time = datetime.strptime(gpsTimeString, '%H:%M:%S.%f')
-            gps_time += timedelta(seconds=tzOffset)
-            gps_datetime = pi_time.replace(hour=gps_time.hour, minute=gps_time.minute, second=gps_time.second, microsecond=gps_time.microsecond)
+            # Epoch seconds, so the stored timestamp does not depend on the rig's zone.
+            gps_datetime = self.gps_datetime(msg.time)
             if os.path.ismount(MOUNT_POINT):
                 complete_dir = os.path.join(MOUNT_POINT, datetime.now().strftime('%Y_%m_%d'))
                 dest = os.path.join(complete_dir, 'gpsData.csv')
@@ -121,10 +129,10 @@ class SerialProcess():
     def saveRmc(self, msg):
         if msg.date != None and msg.time != None and msg.lat != '' and msg.lon != '' and not self._firstGps and self._cam_manager != None:
             self._firstGps = True
-            # calculate gps time with time zone
-            tzOffset = self._tz.utcoffset(datetime.now()).total_seconds()
-            gps_time = datetime.combine(msg.date, msg.time, msg.time.tzinfo)
-            gps_time += timedelta(seconds=tzOffset)
+            # timedatectl set-time reads wall-clock time in the system zone, so
+            # express the GPS UTC fix in whatever zone the rig currently has.
+            gps_time = datetime.combine(msg.date, msg.time.replace(tzinfo=None),
+                                        tzinfo=timezone.utc).astimezone()
             self._cam_manager.sync_time(gps_time.strftime('%Y-%m-%d %H:%M:%S.%f'))
 
     def process_gsv(self, msg):

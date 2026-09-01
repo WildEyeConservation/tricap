@@ -39,6 +39,47 @@ def validate_phone_time(payload):
     return epoch_ms, timezone_offset
 
 
+def timezone_name_for_offset(offset_minutes):
+    """IANA zone matching a browser ``getTimezoneOffset()`` value, or None.
+
+    The browser reports minutes *behind* UTC (UTC+2 -> -120), and the POSIX
+    ``Etc/GMT`` zones are signed the same way (``Etc/GMT-2`` is UTC+2). Only
+    whole-hour offsets have such a zone; the rig cannot represent others.
+    """
+    if offset_minutes is None or offset_minutes % 60:
+        return None
+    if offset_minutes == 0:
+        return "Etc/UTC"
+    hours = abs(offset_minutes) // 60
+    return "Etc/GMT{}{}".format("+" if offset_minutes > 0 else "-", hours)
+
+
+def set_system_timezone_from_phone(offset_minutes):
+    """Point the system timezone at the phone's UTC offset; returns the zone or None.
+
+    Fixed-offset zones carry no daylight-saving rules, which is fine because the
+    rig is re-synchronised every time a dashboard client connects. The change
+    is best-effort and never fails the clock update.
+    """
+    zone = timezone_name_for_offset(offset_minutes)
+    if zone is None:
+        return None
+    try:
+        subprocess.run(
+            ["timedatectl", "set-timezone", zone],
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if hasattr(time, "tzset"):
+        # Make the running process see the new /etc/localtime.
+        time.tzset()
+    return zone
+
+
 def set_system_time_from_phone(epoch_ms):
     """Set Linux system time and persist it to the RTC.
 

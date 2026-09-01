@@ -6,6 +6,8 @@ from unittest.mock import call, patch
 
 from support.phone_time import (
     set_system_time_from_phone,
+    set_system_timezone_from_phone,
+    timezone_name_for_offset,
     validate_phone_time,
 )
 
@@ -68,6 +70,33 @@ class PhoneTimeTests(unittest.TestCase):
         result = set_system_time_from_phone(1785484800123)
 
         self.assertFalse(result["rtcSynced"])
+
+    def test_browser_offsets_map_to_posix_etc_zones(self):
+        self.assertEqual(timezone_name_for_offset(-120), "Etc/GMT-2")   # UTC+2
+        self.assertEqual(timezone_name_for_offset(300), "Etc/GMT+5")    # UTC-5
+        self.assertEqual(timezone_name_for_offset(0), "Etc/UTC")
+        self.assertIsNone(timezone_name_for_offset(-330))               # UTC+5:30
+        self.assertIsNone(timezone_name_for_offset(None))
+
+    @patch("support.phone_time.subprocess.run")
+    def test_sets_system_timezone_for_whole_hour_offsets(self, run_mock):
+        self.assertEqual(set_system_timezone_from_phone(-120), "Etc/GMT-2")
+
+        run_mock.assert_called_once_with(
+            ["timedatectl", "set-timezone", "Etc/GMT-2"],
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+
+    @patch("support.phone_time.subprocess.run")
+    def test_unrepresentable_or_failed_timezone_is_skipped(self, run_mock):
+        self.assertIsNone(set_system_timezone_from_phone(-330))
+        run_mock.assert_not_called()
+
+        run_mock.side_effect = subprocess.CalledProcessError(1, ["timedatectl"])
+        self.assertIsNone(set_system_timezone_from_phone(-120))
 
 
 if __name__ == "__main__":

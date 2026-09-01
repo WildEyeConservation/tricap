@@ -22,7 +22,11 @@ import subprocess, csv
 from pathlib import Path
 from support.backup import RsyncManager
 from support.component_health import component_health
-from support.phone_time import set_system_time_from_phone, validate_phone_time
+from support.phone_time import (
+  set_system_time_from_phone,
+  set_system_timezone_from_phone,
+  validate_phone_time,
+)
 from .dashboard import ap_wifi_signal
 import time, shutil, threading, re, io
 
@@ -129,6 +133,7 @@ def sync_phone_time():
 
   try:
     with _phone_time_lock:
+      timezone = set_system_timezone_from_phone(timezone_offset)
       result = set_system_time_from_phone(epoch_ms)
       cameras_synced = 0
       camera_errors = []
@@ -147,11 +152,12 @@ def sync_phone_time():
   client_ip = request.remote_addr or 'unknown'
   _logger.info(
     'Clock synchronized from dashboard client %s; adjustment=%sms, '
-    'timezone_offset=%s, rtc_synced=%s, cameras_synced=%s',
-    client_ip, result['adjustmentMs'], timezone_offset, result['rtcSynced'],
-    cameras_synced)
+    'timezone_offset=%s, timezone=%s, rtc_synced=%s, cameras_synced=%s',
+    client_ip, result['adjustmentMs'], timezone_offset, timezone,
+    result['rtcSynced'], cameras_synced)
   result.update({
     'success': True,
+    'timezone': timezone,
     'camerasSynced': cameras_synced,
     'cameraErrors': camera_errors,
   })

@@ -156,7 +156,7 @@ The following is the complete tracked tree, grouped by purpose.
 │   ├── test_component_health.py      hardware failure reporting
 │   ├── test_configure.py             supported/retired config behavior
 │   ├── test_dashboard.py             Flask ownership, access and UI assets
-│   ├── test_grf500_altimeter.py      GRF-500 frames and settings
+│   ├── test_grf500_altimeter.py      GRF-500 serial setup and frames
 │   ├── test_network_health.py        bounded AP diagnostics and recovery
 │   ├── test_phone_time.py            safe device clock updates
 │   ├── test_recovery_scan.py         rescue scan and NetBird separation
@@ -166,7 +166,7 @@ The following is the complete tracked tree, grouped by purpose.
 │   └── test_ublox_gps.py             GPS satellite and quality parsing
 ├── config.py                         runtime constants and state enums
 ├── local_paths.py                    deployed log and config paths
-├── default.cfg                       only Sony, GRF-500 and capture settings
+├── default.cfg                       only Sony and capture settings
 ├── pyproject.toml                    locked Python dependency declaration
 ├── uv.lock                           exact Python dependency graph
 ├── package.json                      TypeScript build commands and dependency
@@ -237,9 +237,10 @@ Directory globs mean every previously tracked file beneath that directory.
 | Root test harnesses | `test_app.py`, `test_behaviour.py`, `test_live_server.py`, `test_sensors.py`, `test_unit.py` | Duplicate and hardware-stale test entry points |
 | Obsolete tests | `tests/test_alti_simulator.py`, `tests/test_altitude_switch.py`, `tests/test_ap_monitor.py`, `tests/test_ap_watchdog.py`, `tests/test_basic.py`, `tests/test_camera_logger.py`, `tests/test_canon6d_cam.py`, `tests/test_captive_portal.py`, `tests/test_connection_monitor.py`, `tests/test_dummy_alti.py`, `tests/test_dummy_cam.py`, `tests/test_log_list.py`, `tests/test_page_camera_live_server.py`, `tests/test_page_home.py`, `tests/test_page_home_live_server.py`, `tests/test_session_logger.py`, `tests/test_settings.py`, `tests/test_sms_sender.py`, `tests/test_system_monitor.py`, `tests/test_talkbox.py`, `tests/test_trusense_altimeter.py`, `tests/tricap_flask_live_server_test_case.py`, `tests/tricap_flask_test_case.py`, `tests/tricap_tempfile_test_case.py` | Covered retired components, duplicate layers or brittle live-server scaffolding |
 
-The cleanup also removed dead Web and SMS sections and the unused
-`session_description` option from `default.cfg`, prunes them when an older
-`initial.cfg` is next saved, removed unused runtime
+The cleanup also removed dead Web and SMS sections, the unused
+`session_description` option and the retired Trusense altimeter options
+(`measurement_timeout`, `num_frames_to_avg`) from `default.cfg`, prunes them
+when an older `initial.cfg` is next saved, removed unused runtime
 constants/imports, and deleted a captured AssistNow binary payload that had
 been committed as a comment.
 

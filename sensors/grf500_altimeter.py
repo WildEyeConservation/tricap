@@ -16,8 +16,6 @@ import serial
 import serial.tools.list_ports
 
 from config import ALTIMETER_STATE
-from functools import partial
-from sensors.base_setting import BaseSetting, SettingSpec
 from support.basic import Subject
 
 
@@ -50,32 +48,6 @@ class GrfError(Exception):
     pass
 
 
-class MiscSettingConfig:
-    """Expose the GRF-500 settings through the existing settings interface."""
-    dict_keys = {'_settings'}
-
-    def __init__(self, widgets):
-        self._settings = {key: BaseSetting(widget) for key, widget in widgets.items()}
-
-    def __repr__(self):
-        return str(sorted(self._settings))
-
-    def __dir__(self):
-        return self._settings.keys()
-
-    def __setattr__(self, key, value):
-        if key in self.dict_keys:
-            self.__dict__[key] = value
-        else:
-            self._settings[key].set(value)
-
-    def __getattr__(self, key):
-        return self._settings[key]
-
-    __setitem__ = __setattr__
-    __getitem__ = __getattr__
-
-
 class Grf500Altimeter(Subject):
     """Handles LWNX communication with the LightWare GRF-500 laser rangefinder."""
 
@@ -84,15 +56,8 @@ class Grf500Altimeter(Subject):
     def __init__(self, settings, supported_devices=GRF500_USB_IDS):
         super().__init__()
 
-        self._setting_strings = ['measurement_timeout', 'num_frames_to_avg']
-        self._config = MiscSettingConfig(
-            {'measurement_timeout': SettingSpec(choices=None,
-                                                get_value=partial(self._get_setting, "measurement_timeout"),
-                                                set_value=partial(self._set_setting, "measurement_timeout")),
-             'num_frames_to_avg': SettingSpec(choices=None,
-                                              get_value=partial(self._get_setting, "num_frames_to_avg"),
-                                              set_value=partial(self._set_setting, "num_frames_to_avg"))})
-
+        # The [Altimeter] section of the config file. No options are consumed
+        # yet; the retired Trusense driver's keys were removed from it.
         self._settings = settings
 
         self.state = ALTIMETER_STATE.NOT_CONNECTED
@@ -123,10 +88,6 @@ class Grf500Altimeter(Subject):
         self._configure()
 
     # --- properties ---------------------------------------------------------
-    @property
-    def config(self):
-        return self._config
-
     @property
     def measurement(self):
         return self._measurement
@@ -226,12 +187,6 @@ class Grf500Altimeter(Subject):
             self._txn(_CMD_LASER_FIRING, write=True, data=struct.pack('<B', 1 if on else 0))
         except Exception:
             pass
-
-    def _get_setting(self, key):
-        return self._settings[key]
-
-    def _set_setting(self, key, value):
-        self._settings[key] = value
 
     # --- error surface -------------------------------------------------------
     def set_error(self, error_code=""):

@@ -11,18 +11,11 @@ class Grf500AltimeterTests(unittest.TestCase):
     @patch.object(Grf500Altimeter, "_configure")
     @patch.object(Grf500Altimeter, "_get_correct_port_name", return_value="/dev/grf500")
     @patch("sensors.grf500_altimeter.serial.Serial")
-    def test_settings_are_independent(
+    def test_opens_port_with_lwnx_serial_settings(
             self, serial_mock, _port_mock, _configure_mock):
-        settings = {
-            "measurement_timeout": "2",
-            "num_frames_to_avg": "4",
-        }
+        altimeter = Grf500Altimeter({})
 
-        altimeter = Grf500Altimeter(settings)
-        altimeter.config.measurement_timeout = 7
-
-        self.assertEqual(settings["measurement_timeout"], "7")
-        self.assertEqual(settings["num_frames_to_avg"], "4")
+        self.assertFalse(hasattr(altimeter, "config"))
         serial_mock.assert_called_once_with(
             port="/dev/grf500",
             baudrate=115200,

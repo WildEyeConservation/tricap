@@ -33,6 +33,9 @@ class TricapConfig:
 
     # Options that older initial.cfg files may still carry but nothing reads.
     RETIRED_MISC_OPTIONS = ('session_description',)
+    # Serial commands of the retired Trusense altimeter; the GRF-500 has no
+    # equivalent and its driver never consumed them.
+    RETIRED_ALTI_OPTIONS = ('measurement_timeout', 'num_frames_to_avg')
 
     TYPE_STRING = 'string'
     TYPE_INT = 'int'
@@ -74,6 +77,8 @@ class TricapConfig:
                 self._parser.remove_section(retired_section)
             for retired_option in self.RETIRED_MISC_OPTIONS:
                 self._parser.remove_option(self.MISC_SECTION_HEADER, retired_option)
+            for retired_option in self.RETIRED_ALTI_OPTIONS:
+                self._parser.remove_option(self.ALTI_SECTION_HEADER, retired_option)
             self._ready_flag = True
         except (configparser.Error, IOError, OSError) as ex:
             self._logger.error('Error reading from config file %s', self._config_fp)

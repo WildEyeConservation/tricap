@@ -61,6 +61,10 @@ class ConfigureTests(unittest.TestCase):
             dict(saved.items(TricapConfig.MISC_SECTION_HEADER)),
             {"image_capture_interval": "3"},
         )
+        self.assertTrue(saved.has_section(TricapConfig.ALTI_SECTION_HEADER))
+        self.assertEqual(
+            dict(saved.items(TricapConfig.ALTI_SECTION_HEADER)), {},
+        )
 
     def test_saves_supported_sony_setting(self):
         config = TricapConfig(str(self.config_path))

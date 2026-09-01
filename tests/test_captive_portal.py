@@ -77,3 +77,30 @@ class PortalPollingTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class PortalFlightLogTests(unittest.TestCase):
+    def test_flight_log_download_is_the_file_written_on_the_drive(self):
+        import os
+        import tempfile
+        from datetime import datetime
+        from unittest.mock import patch
+
+        with tempfile.TemporaryDirectory() as tmp:
+            day = datetime.now().strftime("%Y_%m_%d")
+            os.makedirs(os.path.join(tmp, day))
+            body = "Fix Quality,GPS Time\n1,2026-09-01 10:00:00.000\n"
+            with open(os.path.join(tmp, day, PORTAL.FLIGHT_LOG_FILENAME), "w") as f:
+                f.write(body)
+            with patch.object(PORTAL, "DATA_MOUNT", "/definitely/not/mounted"), \
+                    patch.object(PORTAL, "DATA_FALLBACK", tmp):
+                self.assertEqual(PORTAL.flight_log_for_today(), (day, body))
+
+    def test_flight_log_missing_reports_none(self):
+        import tempfile
+        from unittest.mock import patch
+
+        with tempfile.TemporaryDirectory() as tmp:
+            with patch.object(PORTAL, "DATA_MOUNT", "/definitely/not/mounted"), \
+                    patch.object(PORTAL, "DATA_FALLBACK", tmp):
+                self.assertEqual(PORTAL.flight_log_for_today(), (None, None))

@@ -42,7 +42,9 @@ EXFAT_MTIME_RESOLUTION_NS = 10_000_000  # 10 ms
 RSYNC_SCAN_TIMEOUT_SEC = 300      # dry-run inspection passes
 RSYNC_VERIFY_TIMEOUT_SEC = 1800   # verify passes may checksum the whole tree
 
-LIVE_TELEMETRY_NAMES = {"gpsData.csv", "phoneGpsData.csv", "altitudeData.csv", "accelData.bin"}
+LIVE_TELEMETRY_NAMES = {
+    "gpsData.csv", "phoneGpsData.csv", "altitudeData.csv", "flightData.csv", "accelData.bin",
+}
 BACKUP_BENCHMARK_LOG = Path(
     os.environ.get("SKYSEEKER_BACKUP_BENCHMARK_LOG", "/home/radxa/tricap/logs/backup_benchmark.csv")
 )

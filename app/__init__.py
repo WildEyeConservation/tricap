@@ -25,6 +25,7 @@ from support.log_list import LogListAccessor
 from support.basic import TimeMonitor, PeriodicMonitor
 from support.sms_sender import SMSObserver
 from support.git_info import GitData
+from support import flight_log
 
 from sensors.toggle_switch import ToggleSwitchObserver, ToggleSwitchMonitor
 from sensors.toggle_switch import CamManagerMonitor, LEDController, CamErrorMonitor, CamCaptureMonitor
@@ -63,6 +64,9 @@ class AltitudeLogObserver():
         last_return = getattr(alti, 'last_return', alti.measurement)
         first_strength = getattr(alti, 'first_strength', legacy_strength)
         last_strength = getattr(alti, 'last_strength', legacy_strength)
+        # Publish the last return for the live flight log even when it is None,
+        # so a lost target clears the value rather than leaving a stale reading.
+        flight_log.record_laser_altitude(last_return)
         if first_return is None and last_return is None:
             return
         try:

@@ -25,7 +25,6 @@ Two things this layer adds on top of a plain proxy:
 from __future__ import annotations
 
 import argparse
-import bisect
 import http.client
 import json
 import os
@@ -237,91 +236,25 @@ def uplink_disconnect():
 
 
 # --------------------------------------------------------------------------- #
-#  Merged onboard-GPS + laser-altitude flight log                             #
+#  Onboard-GPS + laser-altitude flight log                                    #
 # --------------------------------------------------------------------------- #
 DATA_MOUNT = "/mnt/ext_cam_storage"
 DATA_FALLBACK = "/home/radxa/GPS_IMU_Data"
-FLIGHT_LOG_HEADER = ("quality,gps_timestamp,pi_timestamp,latitude,ns,longitude,ew,"
-                     "gps_altitude_m,hdop,geoid_sep,"
-                     "laser_altitude_agl_m,laser_strength_db,"
-                     "laser_first_return_m,laser_last_return_m,"
-                     "laser_first_strength_db,laser_last_strength_db\n")
-ALT_MATCH_TOLERANCE_SEC = 2.0
+# Written live by tricap (support/flight_log.py) beside the raw sensor logs,
+# so the download is byte-identical to the file on the storage drive.
+FLIGHT_LOG_FILENAME = "flightData.csv"
 
 
-def _load_altitude_samples(path):
-    """Load new dual-return rows while retaining legacy log compatibility."""
-    rows = []
-    try:
-        with open(path, "r", encoding="utf-8", errors="replace") as f:
-            for line in f:
-                parts = line.strip().split(",")
-                try:
-                    ts = float(parts[0])
-                except (IndexError, ValueError):
-                    continue
-                if len(parts) >= 7:
-                    # altitude_m and strength_db are last-return compatibility
-                    # aliases, followed by explicit first/last fields.
-                    values = tuple(parts[i] for i in (1, 2, 3, 4, 5, 6))
-                elif len(parts) >= 3:
-                    # Historical logs contain only the then-live first return.
-                    values = (parts[1], parts[2], parts[1], "", parts[2], "")
-                else:
-                    continue
-                rows.append((ts, values))
-    except OSError:
-        pass
-    rows.sort(key=lambda r: r[0])
-    return [r[0] for r in rows], rows
-
-
-def _nearest(keys, rows, ts, blanks):
-    if rows:
-        i = bisect.bisect_left(keys, ts)
-        best = None
-        for j in (i - 1, i):
-            if 0 <= j < len(keys) and (best is None or abs(keys[j] - ts) < abs(keys[best] - ts)):
-                best = j
-        if best is not None and abs(keys[best] - ts) <= ALT_MATCH_TOLERANCE_SEC:
-            return rows[best][1]
-    return blanks
-
-
-def merged_flight_log():
-    """Today's gpsData.csv with the nearest laser-altimeter sample joined on.
-
-    Each GPS row gains the altitudeData.csv sample nearest in pi_timestamp
-    within two seconds. The fields are empty when the laser was not measuring.
-    Returns (day, csv_text), or (None, None) when there is no GPS log for today.
-    """
+def flight_log_for_today():
+    """Return (day, csv_text) for today's flightData.csv, or (None, None)."""
     day = datetime.now().strftime("%Y_%m_%d")
     base = DATA_MOUNT if os.path.ismount(DATA_MOUNT) else DATA_FALLBACK
-    gps_path = os.path.join(base, day, "gpsData.csv")
-    if not os.path.exists(gps_path):
+    path = os.path.join(base, day, FLIGHT_LOG_FILENAME)
+    try:
+        with open(path, "r", encoding="utf-8", errors="replace") as f:
+            return day, f.read()
+    except OSError:
         return None, None
-
-    # altitudeData.csv contains legacy last-return aliases plus explicit
-    # first/last distances and strengths.
-    alt_keys, alt_rows = _load_altitude_samples(
-        os.path.join(base, day, "altitudeData.csv"))
-
-    out = [FLIGHT_LOG_HEADER]
-    with open(gps_path, "r", encoding="utf-8", errors="replace") as f:
-        for line in f:
-            row = line.strip()
-            if not row:
-                continue
-            laser = ("", "", "", "", "", "")
-            parts = row.split(",")
-            if len(parts) >= 3:
-                try:
-                    ts = float(parts[2])
-                    laser = _nearest(alt_keys, alt_rows, ts, laser)
-                except ValueError:
-                    pass
-            out.append(row + "," + ",".join(laser) + "\n")
-    return day, "".join(out)
 
 
 # --------------------------------------------------------------------------- #
@@ -1641,9 +1574,9 @@ class Handler(BaseHTTPRequestHandler):
             ok, msg = uplink_disconnect()
             self._json(200 if ok else 500, {"success": ok, "msg": msg})
         elif path == "/portal/flight_log":
-            day, payload = merged_flight_log()
+            day, payload = flight_log_for_today()
             if payload is None:
-                self._json(404, {"msg": "No GPS log recorded today."})
+                self._json(404, {"msg": "No flight log recorded today."})
             else:
                 self._send(200, payload, ctype="text/csv; charset=utf-8",
                            headers={"Content-Disposition": f'attachment; filename="flightData_{day}.csv"'})

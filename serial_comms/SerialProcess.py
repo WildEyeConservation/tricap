@@ -26,6 +26,7 @@ import math
 from threading import Lock
 
 from config import MOUNT_POINT
+from support import flight_log
 
 class SerialProcess():
     def __init__(self, cam_manager = None):
@@ -151,42 +152,33 @@ class SerialProcess():
             gps_time = datetime.strptime(gpsTimeString, '%H:%M:%S.%f')
             gps_time += timedelta(seconds=tzOffset)
             gps_datetime = pi_time.replace(hour=gps_time.hour, minute=gps_time.minute, second=gps_time.second, microsecond=gps_time.microsecond)
+            day = datetime.now().strftime('%Y_%m_%d')
             if os.path.ismount(MOUNT_POINT):
-                complete_dir = os.path.join(MOUNT_POINT, datetime.now().strftime('%Y_%m_%d'))
-                dest = os.path.join(complete_dir, 'gpsData.csv')
-                if not os.path.isdir(complete_dir):
-                    os.makedirs(complete_dir)
-                try:
-                    if msg.time != None and msg.lat != '' and msg.lon != '':
-                        alt = 0.0
-                        if msg.alt != None:
-                            alt = msg.alt
-                        line=(f"{str(msg.quality)},{str(gps_datetime.timestamp())},{str(pi_time.timestamp())},{str(msg.lat)},{msg.NS},{str(msg.lon)},{msg.EW},{str(alt)},{str(msg.HDOP)},{str(msg.sep)}\n")
-                        with open(dest, 'ta') as f:
-                            f.write(line)
-                    else:
-                        print('No GPS timestamp')
-                except Exception as e:
-                    print("GPS line not saved")
+                complete_dir = os.path.join(MOUNT_POINT, day)
             else:
-                complete_dir = os.path.join("/home/radxa/GPS_IMU_Data", datetime.now().strftime('%Y_%m_%d'))
-                dest = os.path.join(complete_dir, 'gpsData.csv')
+                complete_dir = os.path.join("/home/radxa/GPS_IMU_Data", day)
                 if not os.path.isdir(complete_dir):
                     print("SSD not mounted, falling back to builtin storage GPS_IMU_Data for GPS data")
-                    os.makedirs(complete_dir)
-                try:
-                    if msg.time != None and msg.lat != '' and msg.lon != '':
-                        alt = 0.0
-                        if msg.alt != None:
-                            alt = msg.alt
-                        line=(f"{str(msg.quality)},{str(gps_datetime.timestamp())},{str(pi_time.timestamp())},{str(msg.lat)},{msg.NS},{str(msg.lon)},{msg.EW},{str(alt)},{str(msg.HDOP)},{str(msg.sep)}\n")
-                        with open(dest, 'ta') as f:
-                            f.write(line)
-                    else:
-                        print('No GPS timestamp')
-                except Exception as e:
-                    print("GPS line not saved")
-                
+            dest = os.path.join(complete_dir, 'gpsData.csv')
+            if not os.path.isdir(complete_dir):
+                os.makedirs(complete_dir)
+            alt = 0.0
+            if msg.alt != None:
+                alt = msg.alt
+            # Raw, headerless sensor log (source of truth).
+            try:
+                line=(f"{str(msg.quality)},{str(gps_datetime.timestamp())},{str(pi_time.timestamp())},{str(msg.lat)},{msg.NS},{str(msg.lon)},{msg.EW},{str(alt)},{str(msg.HDOP)},{str(msg.sep)}\n")
+                with open(dest, 'ta') as f:
+                    f.write(line)
+            except Exception as e:
+                print("GPS line not saved")
+            # User-friendly flight log with the laser's latest last return joined
+            # on, written live so it is complete however the folder is copied.
+            try:
+                flight_log.append_fix(complete_dir, msg.quality, gps_datetime, pi_time,
+                                      msg.lat, msg.NS, msg.lon, msg.EW, alt, msg.HDOP)
+            except Exception as e:
+                print(f"Flight log line not saved: {e}")
         else:
             self._hasGps = False
 

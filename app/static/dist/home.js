@@ -1,4 +1,4 @@
-import { beginAction, byId, errorMessage, formatValue, getJson, numberFormat, runPeriodic, singleFlight, syncPhoneClock, toast, } from "./common.js";
+import { beginAction, byId, errorMessage, formatValue, getJson, numberFormat, runPeriodic, singleFlight, syncPhoneClock, toast, uiConfig, } from "./common.js";
 const healthyCameraStates = new Set(["INITIALISED", "CAPTURING", "READY", "STARTED"]);
 const errorStates = new Set(["ERROR_CONFIG", "ERROR_CAPTURE", "ERROR"]);
 let latest;
@@ -379,5 +379,5 @@ captureButton.addEventListener("click", () => requestToggle(captureButton));
 flightStop.addEventListener("click", () => requestToggle(flightStop));
 byId("glanceOpen").addEventListener("click", openGlance);
 byId("glanceClose").addEventListener("click", closeGlance);
-runPeriodic(pollStatus, 1000);
-runPeriodic(() => latest?.mode === "STARTED" ? undefined : pollStorage(), 15000);
+runPeriodic(pollStatus, uiConfig.status_poll_ms);
+runPeriodic(() => latest?.mode === "STARTED" ? undefined : pollStorage(), uiConfig.background_poll_ms);

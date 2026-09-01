@@ -13,7 +13,7 @@ class Grf500AltimeterTests(unittest.TestCase):
     @patch("sensors.grf500_altimeter.serial.Serial")
     def test_opens_port_with_lwnx_serial_settings(
             self, serial_mock, _port_mock, _configure_mock):
-        altimeter = Grf500Altimeter({})
+        altimeter = Grf500Altimeter()
 
         self.assertFalse(hasattr(altimeter, "config"))
         serial_mock.assert_called_once_with(

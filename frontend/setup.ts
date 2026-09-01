@@ -11,6 +11,7 @@ import {
   runPeriodic,
   singleFlight,
   toast,
+  uiConfig,
 } from "./common.js";
 
 interface GpsStatus {
@@ -248,7 +249,8 @@ async function setIntervalValue(delta: number, control: HTMLButtonElement): Prom
     toast("Current interval is not available");
     return;
   }
-  const next = Math.max(0.1, Math.round((currentInterval + delta) * 10) / 10);
+  // The capture loop skips triggers below 0.5 s; the API rejects anything lower.
+  const next = Math.max(0.5, Math.round((currentInterval + delta) * 10) / 10);
   const finish = beginAction(control, "Saving capture interval...");
   if (!finish) return;
   try {
@@ -303,7 +305,7 @@ function renderBackup(status: BackupStatus): void {
     byId("backupBenchmark").textContent = benchmark;
   }
   if (status.running && backupTimer === undefined) {
-    backupTimer = window.setInterval(() => void pollBackup(), 2000);
+    backupTimer = window.setInterval(() => void pollBackup(), uiConfig.backup_poll_ms);
   }
   if (!status.running && backupTimer !== undefined) {
     window.clearInterval(backupTimer);
@@ -346,7 +348,7 @@ function renderVerify(status: VerifyStatus): void {
       ? `${action} ${completed}/${total} files...`
       : status.message || `${action}...`;
     loadingToast(total ? `${action} files... ${completed}/${total}` : `${action} files...`);
-    if (verifyTimer === undefined) verifyTimer = window.setInterval(() => void pollVerify(), 1000);
+    if (verifyTimer === undefined) verifyTimer = window.setInterval(() => void pollVerify(), uiConfig.verify_poll_ms);
     return;
   }
 
@@ -759,8 +761,8 @@ button("themeDark").addEventListener("click", () => applyTheme("dark", true));
 
 loadAltitudeSettings();
 applyTheme(selectedTheme(), false);
-runPeriodic(loadSensors, () => capturing ? 5000 : 2000);
-runPeriodic(() => capturing ? undefined : loadStats(), 15000);
-runPeriodic(() => capturing ? undefined : loadImageFormat(), 15000);
-runPeriodic(() => capturing ? undefined : singleFlight("setup-netbird", () => netbirdStatus(false)), 20000);
-runPeriodic(() => capturing ? undefined : singleFlight("setup-uplink", uplinkStatus), 10000);
+runPeriodic(loadSensors, () => capturing ? uiConfig.sensors_poll_capturing_ms : uiConfig.sensors_poll_ms);
+runPeriodic(() => capturing ? undefined : loadStats(), uiConfig.background_poll_ms);
+runPeriodic(() => capturing ? undefined : loadImageFormat(), uiConfig.background_poll_ms);
+runPeriodic(() => capturing ? undefined : singleFlight("setup-netbird", () => netbirdStatus(false)), uiConfig.netbird_poll_ms);
+runPeriodic(() => capturing ? undefined : singleFlight("setup-uplink", uplinkStatus), uiConfig.uplink_poll_ms);

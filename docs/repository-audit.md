@@ -31,7 +31,7 @@ camera controller and web UI to start when the physical altimeter is missing.
 systemd tricap.service
 └── tricap.py
     └── import app
-        ├── load initial.cfg through TricapConfig
+        ├── load default.cfg, then initial.cfg overrides, through TricapConfig
         ├── discover Sony SDK cameras
         │   └── TriCapCamsManager coordinates capture and storage
         ├── open /dev/gps
@@ -122,7 +122,7 @@ The following is the complete tracked tree, grouped by purpose.
 ├── support/
 │   ├── __init__.py                   Python package marker
 │   ├── basic.py                      observer and periodic-monitor primitives
-│   ├── configure.py                  supported initial.cfg reader/writer
+│   ├── configure.py                  layered default.cfg/initial.cfg reader/writer
 │   ├── component_health.py           camera/GPS/altimeter health summary
 │   ├── system_monitor.py             CPU, RAM, disk and I/O logging
 │   ├── phone_time.py                 validated browser-to-device clock sync
@@ -166,7 +166,7 @@ The following is the complete tracked tree, grouped by purpose.
 │   └── test_ublox_gps.py             GPS satellite and quality parsing
 ├── config.py                         runtime constants and state enums
 ├── local_paths.py                    deployed log and config paths
-├── default.cfg                       only Sony and capture settings
+├── default.cfg                       every supported option: Sony format, capture interval, timezone, UI poll rates
 ├── pyproject.toml                    locked Python dependency declaration
 ├── uv.lock                           exact Python dependency graph
 ├── package.json                      TypeScript build commands and dependency

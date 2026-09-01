@@ -110,6 +110,43 @@ export async function singleFlight(key, work) {
         inflightRequests.delete(key);
     }
 }
+// Mirrors default.cfg; used for any key the page did not supply.
+const UI_CONFIG_DEFAULTS = {
+    status_poll_ms: 1000,
+    sensors_poll_ms: 2000,
+    sensors_poll_capturing_ms: 5000,
+    background_poll_ms: 15000,
+    uplink_poll_ms: 10000,
+    netbird_poll_ms: 20000,
+    backup_poll_ms: 2000,
+    verify_poll_ms: 1000,
+    heartbeat_ms: 5000,
+};
+function readUiConfig() {
+    const config = { ...UI_CONFIG_DEFAULTS };
+    const block = document.getElementById("ui-config");
+    if (!block?.textContent) {
+        return config;
+    }
+    let supplied;
+    try {
+        supplied = JSON.parse(block.textContent);
+    }
+    catch {
+        return config;
+    }
+    if (typeof supplied !== "object" || supplied === null) {
+        return config;
+    }
+    for (const key of Object.keys(UI_CONFIG_DEFAULTS)) {
+        const value = supplied[key];
+        if (typeof value === "number" && Number.isFinite(value) && value > 0) {
+            config[key] = value;
+        }
+    }
+    return config;
+}
+export const uiConfig = readUiConfig();
 export function runPeriodic(work, delay) {
     const run = async () => {
         try {
@@ -189,7 +226,7 @@ async function connectionHeartbeat() {
 window.addEventListener("offline", () => showConnectionWarning(true));
 window.addEventListener("online", () => void connectionHeartbeat());
 restoreTheme();
-runPeriodic(connectionHeartbeat, 5000);
+runPeriodic(connectionHeartbeat, uiConfig.heartbeat_ms);
 byId("host").textContent = location.host || "control.skyseeker";
 void syncPhoneClock().catch(() => undefined);
 document.querySelectorAll(".acc-head").forEach((header) => {

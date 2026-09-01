@@ -53,12 +53,8 @@ class Grf500Altimeter(Subject):
 
     _logger = logging.getLogger(__name__)
 
-    def __init__(self, settings, supported_devices=GRF500_USB_IDS):
+    def __init__(self, supported_devices=GRF500_USB_IDS):
         super().__init__()
-
-        # The [Altimeter] section of the config file. No options are consumed
-        # yet; the retired Trusense driver's keys were removed from it.
-        self._settings = settings
 
         self.state = ALTIMETER_STATE.NOT_CONNECTED
         self._kill_pill = None

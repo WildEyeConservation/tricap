@@ -76,6 +76,7 @@ class FlaskDashboardAssetTests(unittest.TestCase):
             static_folder=str(ROOT / "app" / "static"),
         )
         app.register_blueprint(DASHBOARD_VIEW.dashboard_bp)
+        app.config["UI_SETTINGS"] = {"status_poll_ms": 1500, "heartbeat_ms": 7000}
         self.client = app.test_client()
 
     def test_flask_owns_operator_pages_and_health(self):
@@ -103,23 +104,34 @@ class FlaskDashboardAssetTests(unittest.TestCase):
             template = (ROOT / "app" / "templates" / "dashboard" / f"{page}.html").read_text()
             self.assertIn(f'/static/dist/{page}.js', template)
             self.assertNotIn("<style>", template)
-            self.assertEqual(template.count("<script"), 1)
-            self.assertIn('script type="module"', template)
+            # One compiled module plus the [Ui] JSON data block, which is not executable.
+            self.assertEqual(template.count("<script"), 2)
+            self.assertEqual(template.count('script type="module"'), 1)
+            self.assertEqual(template.count('script type="application/json" id="ui-config"'), 1)
+
+    def test_pages_embed_the_configured_poll_rates(self):
+        for path in ("/", "/setup"):
+            html = self.client.get(path).get_data(as_text=True)
+            self.assertIn(
+                '<script type="application/json" id="ui-config">'
+                '{"heartbeat_ms": 7000, "status_poll_ms": 1500}</script>',
+                html,
+            )
 
     def test_polling_remains_single_flight_and_capture_aware(self):
         home = (ROOT / "frontend" / "home.ts").read_text()
         setup = (ROOT / "frontend" / "setup.ts").read_text()
         common = (ROOT / "frontend" / "common.ts").read_text()
 
-        self.assertIn("runPeriodic(connectionHeartbeat, 5000)", common)
-        self.assertIn("runPeriodic(pollStatus, 1000)", home)
+        self.assertIn("runPeriodic(connectionHeartbeat, uiConfig.heartbeat_ms)", common)
+        self.assertIn("runPeriodic(pollStatus, uiConfig.status_poll_ms)", home)
         self.assertIn('singleFlight("home-status"', home)
         self.assertIn('singleFlight("home-storage"', home)
         self.assertIn('latest?.mode === "STARTED" ? undefined : pollStorage()', home)
         self.assertIn('singleFlight("setup-status"', setup)
         self.assertIn('singleFlight("setup-stats"', setup)
         self.assertIn('singleFlight("setup-image-format"', setup)
-        self.assertIn("capturing ? 5000 : 2000", setup)
+        self.assertIn("capturing ? uiConfig.sensors_poll_capturing_ms : uiConfig.sensors_poll_ms", setup)
         self.assertIn("capturing ? undefined : loadStats()", setup)
 
 

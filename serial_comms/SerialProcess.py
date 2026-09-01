@@ -15,8 +15,10 @@ from threading import Lock
 from config import FALLBACK_TELEMETRY_DIR, MOUNT_POINT
 
 class SerialProcess():
-    def __init__(self, cam_manager = None):
+    def __init__(self, cam_manager = None, timezone='UTC'):
         super().__init__()
+        # Local zone the GPS UTC timestamps are shifted into (config [Misc] timezone).
+        self._tz = pytz.timezone(timezone)
         # append valid reponses
         self._requests = []
         self._hasGps = False
@@ -72,8 +74,7 @@ class SerialProcess():
         if msg.time != None and msg.lat != '' and msg.lon != '' and self._firstGps:
             # calculate gps time with time zone
             self._hasGps = True
-            tz = pytz.timezone('Africa/Johannesburg')
-            tzOffset = tz.utcoffset(datetime.now()).total_seconds()
+            tzOffset = self._tz.utcoffset(datetime.now()).total_seconds()
             gpsTimeString = msg.time.strftime('%H:%M:%S.%f')
             gps_time = datetime.strptime(gpsTimeString, '%H:%M:%S.%f')
             gps_time += timedelta(seconds=tzOffset)
@@ -121,8 +122,7 @@ class SerialProcess():
         if msg.date != None and msg.time != None and msg.lat != '' and msg.lon != '' and not self._firstGps and self._cam_manager != None:
             self._firstGps = True
             # calculate gps time with time zone
-            tz = pytz.timezone('Africa/Johannesburg')
-            tzOffset = tz.utcoffset(datetime.now()).total_seconds()
+            tzOffset = self._tz.utcoffset(datetime.now()).total_seconds()
             gps_time = datetime.combine(msg.date, msg.time, msg.time.tzinfo)
             gps_time += timedelta(seconds=tzOffset)
             self._cam_manager.sync_time(gps_time.strftime('%Y-%m-%d %H:%M:%S.%f'))

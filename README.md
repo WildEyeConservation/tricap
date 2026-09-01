@@ -32,6 +32,24 @@ port. The rig supplies the laptop with an address and is available at
 See [`docs/repository-audit.md`](docs/repository-audit.md) for the complete used
 file tree, runtime data flow, retained abstractions, and redundant-file ledger.
 
+## Configuration
+
+`default.cfg` in the repository lists every supported option with its accepted
+values: the Sony image format, the capture interval, the GPS timezone, and the
+dashboard poll rates. A rig overrides any of them in
+`/home/radxa/tricap/initial.cfg` (gitignored); options missing there fall back
+to `default.cfg`. Only the two options the Setup page changes (image format and
+capture interval) are written back to `initial.cfg`, so hand-edited overrides
+are kept. Restart the service after editing either file:
+
+```sh
+sudo systemctl restart tricap
+```
+
+Everything else (driver timeouts, storage paths, network subnets) is a named
+constant in code, because it is tied to the hardware image rather than to a
+deployment.
+
 ## Development
 
 Install the locked Python environment:

@@ -8,6 +8,7 @@ from datetime import datetime
 from config import (
   CAM_MANAGER_STATES,
   CAMERA_STATES,
+  CAPTURE_INTERVAL_MIN_SEC,
   FALLBACK_TELEMETRY_DIR,
   SERVER_LOG_DIR,
   MOUNT_POINT,
@@ -424,14 +425,17 @@ def set_capture_interval():
   if tricap_manager.state in (CAM_MANAGER_STATES.STARTED, CAM_MANAGER_STATES.COPYING):
     return jsonify({'msg': 'Not allowed in started or copying state'}), 400
 
-  data = request.get_json()
-  if not 'interval' in data:
+  data = request.get_json(silent=True) or {}
+  interval = data.get('interval')
+  if isinstance(interval, bool) or not isinstance(interval, (int, float)):
     return jsonify({'msg': 'Invalid request'}), 400
+  if interval < CAPTURE_INTERVAL_MIN_SEC:
+    return jsonify({'msg': f'Capture interval must be at least {CAPTURE_INTERVAL_MIN_SEC} s'}), 400
 
-  tricap_manager.set_image_capture_interval(data['interval'])
+  tricap_manager.set_image_capture_interval(interval)
   config = TricapConfig()
   miscSection = config.get_section_dict(TricapConfig.MISC_SECTION_HEADER)
-  miscSection["image_capture_interval"] = data['interval']
+  miscSection["image_capture_interval"] = interval
   config.set_section(miscSection, TricapConfig.MISC_SECTION_HEADER)
   config.save_to_file()
 

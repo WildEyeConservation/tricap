@@ -84,6 +84,11 @@ rootlogger.info('Initiating new instance of the TriCap app.')
 app = Flask(__name__)
 app.config.from_object('config')
 
+# Instantiate the config setting management
+init_config = TricapConfig()
+# Dashboard poll rates, rendered into the pages by the dashboard views.
+app.config['UI_SETTINGS'] = init_config.ui_settings()
+
 
 @app.before_request
 def restrict_web_access():
@@ -119,8 +124,6 @@ app.logger.addHandler(flask_handler)
 app.logger.setLevel(logging.DEBUG)
 app.logger.info('Initiated flask logger for new instance of the TriCap app.')
 
-# Instantiate the config setting management
-init_config = TricapConfig()
 misc_settings = init_config.get_section_dict(TricapConfig.MISC_SECTION_HEADER)
 cam_settings = init_config.get_section_dict(TricapConfig.CAMERA_SECTION_HEADER)
 
@@ -136,15 +139,14 @@ gps_ser = SerialInterface(
     921600,
     capturing_lock=storage_lock,
     cam_manager=tricap_manager,
+    timezone=init_config.get('timezone', TricapConfig.MISC_SECTION_HEADER),
 )
 
 rootlogger.debug('Cameras have been configured.')
 
-alti_settings = init_config.get_section_dict(TricapConfig.ALTI_SECTION_HEADER)
-
 try:
     rootlogger.debug('Connecting to the GRF-500 altimeter.')
-    altimeter = Grf500Altimeter(alti_settings)
+    altimeter = Grf500Altimeter()
     altimeter.available = True
     altimeter.configured_type = 'grf500'
 except Exception as exc:

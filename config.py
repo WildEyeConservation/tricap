@@ -4,9 +4,16 @@ Imports all paths from the local_paths.py file.
 """
 # coding=utf-8
 
+import os
 from enum import Enum
 
 from local_paths import CONFIG_FP, SERVER_LOG_DIR
+
+# Shipped defaults for every supported option; initial.cfg only holds overrides.
+DEFAULT_CONFIG_FP = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'default.cfg')
+
+# Below this the capture loop skips triggers rather than firing late.
+CAPTURE_INTERVAL_MIN_SEC = 0.5
 
 # Sony Camera Remote SDK image formats. Default deliberately does not write
 # the SDK property, leaving the format selected on each camera untouched.

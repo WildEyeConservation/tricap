@@ -9,6 +9,7 @@ import {
   singleFlight,
   syncPhoneClock,
   toast,
+  uiConfig,
 } from "./common.js";
 
 interface GpsStatus {
@@ -465,5 +466,5 @@ flightStop.addEventListener("click", () => requestToggle(flightStop));
 byId<HTMLButtonElement>("glanceOpen").addEventListener("click", openGlance);
 byId<HTMLButtonElement>("glanceClose").addEventListener("click", closeGlance);
 
-runPeriodic(pollStatus, 1000);
-runPeriodic(() => latest?.mode === "STARTED" ? undefined : pollStorage(), 15000);
+runPeriodic(pollStatus, uiConfig.status_poll_ms);
+runPeriodic(() => latest?.mode === "STARTED" ? undefined : pollStorage(), uiConfig.background_poll_ms);

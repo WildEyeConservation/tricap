@@ -8,7 +8,7 @@ import threading
 import time
 from datetime import datetime
 
-from flask import Blueprint, Response, jsonify, render_template, request
+from flask import Blueprint, Response, current_app, jsonify, render_template, request
 
 from config import FALLBACK_TELEMETRY_DIR, MOUNT_POINT
 
@@ -364,12 +364,17 @@ dashboard_bp = Blueprint("dashboard", __name__)
 @dashboard_bp.get("/index")
 @dashboard_bp.get("/index.html")
 def home():
-    return render_template("dashboard/home.html")
+    return render_template("dashboard/home.html", ui_config=_ui_config())
 
 
 @dashboard_bp.get("/setup")
 def setup():
-    return render_template("dashboard/setup.html")
+    return render_template("dashboard/setup.html", ui_config=_ui_config())
+
+
+def _ui_config():
+    """[Ui] poll rates from initial.cfg; the pages fall back to built-in values if empty."""
+    return current_app.config.get("UI_SETTINGS") or {}
 
 
 @dashboard_bp.get("/healthz")

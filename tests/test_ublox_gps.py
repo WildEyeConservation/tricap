@@ -17,6 +17,12 @@ class UbloxGpsTests(unittest.TestCase):
         self.assertEqual(self.gps.pdop, 1.25)
         self.assertIsNotNone(self.gps.pdopLastUpdate)
 
+    def test_timezone_comes_from_configuration(self):
+        gps = SerialProcess(timezone="Africa/Johannesburg")
+
+        self.assertEqual(gps._tz.zone, "Africa/Johannesburg")
+        self.assertEqual(self.gps._tz.zone, "UTC")
+
     def test_completed_gsv_cycle_updates_satellite_and_snr_status(self):
         self.gps.process_gsv(SimpleNamespace(
             talker="GP",

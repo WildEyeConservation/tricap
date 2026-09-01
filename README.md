@@ -10,7 +10,6 @@ Supported hardware:
 - u-blox GPS on `/dev/gps`
 - TP-Link USB Wi-Fi adapter for the access point
 - Direct Ethernet maintenance connection
-- GPIO capture switch and status LEDs
 
 ## Runtime
 

@@ -6,7 +6,7 @@ Imports all paths from the local_paths.py file.
 
 from enum import Enum
 
-from local_paths import CONFIG_FP, SERVER_LOG_DIR, SESSION_ROOT_DIR
+from local_paths import CONFIG_FP, SERVER_LOG_DIR
 
 # Sony Camera Remote SDK image formats. Default deliberately does not write
 # the SDK property, leaving the format selected on each camera untouched.
@@ -36,7 +36,6 @@ MOUNT_POINT = "/mnt/ext_cam_storage"
 MOUNT_POINT_SSD = "/mnt/ssd_cam_storage"
 FALLBACK_TELEMETRY_DIR = "/home/radxa/SkySeeker_Data"
 SONY_TEMPFS_MOUNT_POINT = "/home/radxa/SonySDKWrapper/memoryFs"
-SECRETS_FILE = "/home/radxa/tricap/secrets.json"
 
 CAMERA_STATES = Enum("CamState", ["UNINITIALISED", "INITIALISED", "CAPTURING", 
                                   "ERROR_CONFIG", "ERROR_CAPTURE"])

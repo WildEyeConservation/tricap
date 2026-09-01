@@ -31,6 +31,9 @@ class TricapConfig:
     ALTI_SECTION_HEADER = 'Altimeter'
     MISC_SECTION_HEADER = 'Misc'
 
+    # Options that older initial.cfg files may still carry but nothing reads.
+    RETIRED_MISC_OPTIONS = ('session_description',)
+
     TYPE_STRING = 'string'
     TYPE_INT = 'int'
     TYPE_FLOAT = 'float'
@@ -69,6 +72,8 @@ class TricapConfig:
                     self._parser.remove_option(self.CAMERA_SECTION_HEADER, option)
             for retired_section in ('Web', 'SMS'):
                 self._parser.remove_section(retired_section)
+            for retired_option in self.RETIRED_MISC_OPTIONS:
+                self._parser.remove_option(self.MISC_SECTION_HEADER, retired_option)
             self._ready_flag = True
         except (configparser.Error, IOError, OSError) as ex:
             self._logger.error('Error reading from config file %s', self._config_fp)

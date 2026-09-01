@@ -2,10 +2,8 @@ import serial
 from time import sleep
 from threading import Thread, Lock
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime
 from .SerialProcess import SerialProcess
-import ntplib
-from .ubloxAgps import UBXAgps
 
 class SerialInterface(SerialProcess):
   _logger = logging.getLogger(__name__)
@@ -22,10 +20,6 @@ class SerialInterface(SerialProcess):
     self._lock = Lock()
     self._capturing_lock = capturing_lock
     self._lastGpsPacketDate = None
-    self._AGPS_sent = False
-    self._cam_manager = cam_manager
-    self._AGPS_max_retries = 3
-    self._ubxAgps = UBXAgps(self.serialPort,self._requests)
     self.mainThread.start()
     self.rxThread.start()
 
@@ -113,21 +107,5 @@ class SerialInterface(SerialProcess):
         except Exception as e:
             print(f"Serial process error {e}")
       self._requests = list()
-      # Send AGPS data to the GPS if we have'nt yet and we have an internet connection
-      if(self._AGPS_max_retries > 0 and self.isConnected and (not self._lastGpsPacketDate == None) and (not self.hasGps()) and (not self._AGPS_sent) and self._ubxAgps.has_internet()):
-        try:
-          if(self._cam_manager):
-            # To be able to connect to the AGPS server we need to have the system time set correctly. So query an NTP server and set the time
-            ntp_client = ntplib.NTPClient()
-            ntp_response = ntp_client.request('pool.ntp.org')
-            time_to_set = datetime.now() + timedelta(seconds=ntp_response.offset) 
-            self._cam_manager.sync_time(time_to_set.strftime('%Y-%m-%d %H:%M:%S.%f'))
-          else:
-            self._logger.warning("No cam manager, cannot sync time before AGPS download. Connection to AGPS server may fail.")
-          self._ubxAgps.download_and_send_agps(self.serialPort)
-          self._AGPS_sent = True
-        except Exception as e:
-          print(f"Failed to upload AGPS data: {e}")
-          self._AGPS_max_retries -= 1
       sleep(50e-3)
     self._logger.debug('Serial thread stopped')

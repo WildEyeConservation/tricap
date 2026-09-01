@@ -57,6 +57,10 @@ class ConfigureTests(unittest.TestCase):
         saved.read(self.config_path)
         self.assertFalse(saved.has_section("Web"))
         self.assertFalse(saved.has_section("SMS"))
+        self.assertEqual(
+            dict(saved.items(TricapConfig.MISC_SECTION_HEADER)),
+            {"image_capture_interval": "3"},
+        )
 
     def test_saves_supported_sony_setting(self):
         config = TricapConfig(str(self.config_path))

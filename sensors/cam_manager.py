@@ -265,6 +265,12 @@ class TriCapCamsManager:
         self.state = CAM_MANAGER_STATES.STARTED
         self._logger.debug('Cam manager - capture threads started.')
 
+        threading.Thread(
+            target=self._finalise_when_saved,
+            daemon=True,
+            args=(list(self._save_threads),),
+        ).start()
+
     def stop_capturing(self):
         try:
             if getattr(self, 'altimeter', None) is not None:
@@ -404,10 +410,19 @@ class TriCapCamsManager:
             self._logger.info('Disk not mounted')
         return True
 
+    def _finalise_when_saved(self, save_threads):
+        """Return to STOPPED once every save thread of this capture has exited.
+
+        Nothing else transitions the manager out of STARTED: stop_capturing
+        only requests the threads to stop, and the save threads may keep
+        copying for a while after that.
+        """
+        for thread in save_threads:
+            thread.join()
+        self.copy_disk_monitor()
+
     def copy_disk_monitor(self):
-        """
-        If all threads are done -> unmount the external disk
-        """
+        """Reset manager and camera state once the save threads have finished."""
 
         if not self.is_save_thread_alive() and self.state == CAM_MANAGER_STATES.STARTED:
             self._logger.debug("Save completed - unmount disk")

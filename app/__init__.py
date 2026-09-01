@@ -14,12 +14,8 @@ from flask import Flask, abort, request
 from sensors.cam_manager import TriCapCamsManager
 from sensors.grf500_altimeter import Grf500Altimeter
 from sensors.unavailable_altimeter import UnavailableAltimeter
-from support.session_logger import SessionLogger
 from support.configure import TricapConfig
 from support.git_info import GitData
-
-from sensors.toggle_switch import ToggleSwitchObserver, ToggleSwitchMonitor
-from sensors.toggle_switch import CamManagerMonitor, LEDController, CamErrorMonitor, CamCaptureMonitor
 
 from support.system_monitor import generate_system_monitor, SystemMonitorLogger
 
@@ -27,19 +23,6 @@ from config import FALLBACK_TELEMETRY_DIR, MOUNT_POINT, SERVER_LOG_DIR
 
 from serial_comms.SerialInterface import SerialInterface
 from support.local_network import web_client_allowed
-
-class AltiMeasurementObserver():
-    """A custom observer to link the alti to the session logger."""
-
-    def __init__(self, session_logger):
-        """Construct."""
-        self.session_logger = session_logger
-
-    def update(self, alti):
-        """Update."""
-        if alti.measurement is not None:
-            self.session_logger.log('Alti Measurement: %f' % alti.measurement)
-
 
 class AltitudeLogObserver():
     """Log available altitude readings beside the GPS data."""
@@ -185,11 +168,6 @@ for sm in sys_mons:
     if sm is not None:
         sm.start()
 
-# setup the session logger, hook it up to the alti and all the other logs
-log_names_to_track = [rootlogger.name, app.logger.name, wz_log.name]
-session_logger = SessionLogger(log_names_to_track=log_names_to_track)
-alti_observer = AltiMeasurementObserver(session_logger)
-altimeter.attach(alti_observer)
 altimeter.attach(AltitudeLogObserver())
 
 # Capture controls measurement when an altimeter is present. The unavailable
@@ -197,34 +175,6 @@ altimeter.attach(AltitudeLogObserver())
 tricap_manager.altimeter = altimeter
 
 rootlogger.info("Git version: " + code_inf.code_id())
-
-toggle_switch_monitor = ToggleSwitchMonitor(period=0.3)
-toggle_switch_observer = ToggleSwitchObserver(
-    tricap_manager,
-    session_logger,
-    toggle_switch_monitor,
-)
-toggle_switch_monitor.start()
-
-cam_man_state_monitor = CamManagerMonitor(tricap_manager, period=0.5)
-cam_error_monitors = []
-cam_capture_monitors = []
-for idx, cam in enumerate(tricap_cameras):
-    cem = CamErrorMonitor(cam, idx)
-    cem.start()
-    cam_error_monitors.append(cem)
-
-for idx, cam in enumerate(tricap_cameras):
-    ccm = CamCaptureMonitor(cam, idx)
-    ccm.start()
-    cam_capture_monitors.append(ccm)
-
-led_controller = LEDController(
-    cam_man_state_monitor,
-    cam_error_monitors,
-    cam_capture_monitors,
-)
-cam_man_state_monitor.start()
 
 
 def stop_all_threads():

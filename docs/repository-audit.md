@@ -11,17 +11,15 @@ The deployed hardware boundary is:
 
 - Sony cameras through the Sony Camera Remote SDK;
 - GRF-500 laser altimeter;
-- u-blox GPS on `/dev/gps`, including AssistNow data when an uplink and token
-  are available;
+- u-blox GPS on `/dev/gps`;
 - TP-Link RTL8192EU USB adapter dedicated to the access point;
 - onboard Broadcom Wi-Fi for normal and rescue uplinks;
 - direct Ethernet maintenance at `192.168.51.1`;
-- GPIO capture switch and red/green status LEDs;
 - internal capture storage and a removable USB backup volume.
 
 There is no IMU, image geotagging, Canon/gPhoto camera path, simulated or dummy
 sensor, Bluetooth path, SMS path, SD-card reader integration, protobuf layer,
-or captive-portal process.
+captive-portal process, GPIO switch/LED path, or AssistNow (A-GPS) exchange.
 
 `UnavailableAltimeter` is not a simulator. It is a failure adapter that reports
 the configured GRF-500 as unavailable and returns no measurements, allowing the
@@ -37,19 +35,18 @@ systemd tricap.service
         ├── discover Sony SDK cameras
         │   └── TriCapCamsManager coordinates capture and storage
         ├── open /dev/gps
-        │   ├── parse u-blox NMEA/UBX telemetry
-        │   └── optionally download and upload AssistNow data
+        │   └── parse u-blox NMEA telemetry
         ├── connect GRF-500
         │   └── use UnavailableAltimeter on connection failure
-        ├── start GPIO switch, LED, and system monitors
-        ├── start session and telemetry logging
+        ├── start system monitors
+        ├── start telemetry logging
         └── start Flask on port 80
             ├── render the home and setup templates
             ├── serve CSS, favicon, and compiled TypeScript output
             └── expose same-origin JSON, stream, log, and backup endpoints
 ```
 
-Capture can be started from the browser or physical switch. The camera manager
+Capture is started and stopped from the browser. The camera manager
 starts GRF-500 measurement, triggers every discovered Sony camera at the
 configured interval, and writes each camera's files beneath
 `/mnt/ext_cam_storage/<date>/<session>/<camera>/`. GPS and altitude are logged
@@ -117,19 +114,16 @@ The following is the complete tracked tree, grouped by purpose.
 │   ├── sony_discovery.py             bounded Sony SDK discovery retries
 │   ├── sonySDK_cam.py                Sony SDK camera adapter
 │   ├── grf500_altimeter.py           GRF-500 serial protocol and measurement
-│   ├── unavailable_altimeter.py      non-fabricating GRF-500 failure adapter
-│   └── toggle_switch.py              GPIO switch, camera monitors and LEDs
+│   └── unavailable_altimeter.py      non-fabricating GRF-500 failure adapter
 ├── serial_comms/
 │   ├── __init__.py                   Python package marker
 │   ├── SerialInterface.py            u-blox connection and reader threads
-│   ├── SerialProcess.py              NMEA/UBX parsing and GPS CSV output
-│   └── ubloxAgps.py                  optional u-blox AssistNow exchange
+│   └── SerialProcess.py              NMEA parsing and GPS CSV output
 ├── support/
 │   ├── __init__.py                   Python package marker
 │   ├── basic.py                      observer and periodic-monitor primitives
 │   ├── configure.py                  supported initial.cfg reader/writer
 │   ├── component_health.py           camera/GPS/altimeter health summary
-│   ├── session_logger.py             per-flight logs and config snapshot
 │   ├── system_monitor.py             CPU, RAM, disk and I/O logging
 │   ├── phone_time.py                 validated browser-to-device clock sync
 │   ├── local_network.py              Flask source-network allow-list
@@ -163,7 +157,6 @@ The following is the complete tracked tree, grouped by purpose.
 │   ├── test_configure.py             supported/retired config behavior
 │   ├── test_dashboard.py             Flask ownership, access and UI assets
 │   ├── test_grf500_altimeter.py      GRF-500 frames and settings
-│   ├── test_gpio_controls.py         physical switch input and debounce
 │   ├── test_network_health.py        bounded AP diagnostics and recovery
 │   ├── test_phone_time.py            safe device clock updates
 │   ├── test_recovery_scan.py         rescue scan and NetBird separation
@@ -172,7 +165,7 @@ The following is the complete tracked tree, grouped by purpose.
 │   ├── test_sony_image_format.py     Sony connection and transfer settings
 │   └── test_ublox_gps.py             GPS satellite and quality parsing
 ├── config.py                         runtime constants and state enums
-├── local_paths.py                    deployed log, session and config paths
+├── local_paths.py                    deployed log and config paths
 ├── default.cfg                       only Sony, GRF-500 and capture settings
 ├── pyproject.toml                    locked Python dependency declaration
 ├── uv.lock                           exact Python dependency graph
@@ -198,10 +191,12 @@ build, while the generated JavaScript is the artifact Flask must serve.
   synchronized capture, storage mounts and backup hand-off. Removing it would
   spread concurrency and storage state through Flask routes.
 - `SerialInterface` and `SerialProcess` separate serial lifetime from u-blox
-  message interpretation. `ubloxAgps` remains separate because AssistNow is an
-  HTTPS/UBX exchange, not normal streaming telemetry.
-- `Subject`, `Observer` and `PeriodicMonitor` support the GRF-500 logger, GPIO
-  switch and status LEDs. They are small shared primitives, not sensor plugins.
+  message interpretation.
+- `Subject` and `PeriodicMonitor` support the GRF-500 altimeter and system
+  monitors. They are small shared primitives, not sensor plugins.
+- `TriCapCamsManager` finalises its own capture state: a watcher thread joins
+  the save threads of each capture and returns the manager to `STOPPED`, so
+  no external periodic caller is required.
 - `UnavailableAltimeter` preserves one GRF-500-shaped interface on a hardware
   fault without inventing values or selecting another sensor.
 - `backup.py` is large, but its copy, verify and delete logic is one safety
@@ -228,6 +223,9 @@ Directory globs mean every previously tracked file beneath that directory.
 | Protobuf | `tricap.proto`, `protobuf/**`, `serial_comms/out/**` | Generated protocol layer had no remaining producer or consumer |
 | Image geotagging | `support/gps_geotag.py` | Geotagging was too slow and is no longer performed |
 | SD-card reader | `SD_card_reader.py` | Unsupported external reader integration |
+| GPIO switch and LEDs | `sensors/toggle_switch.py`, `tests/test_gpio_controls.py` | Raspberry Pi `RPi.GPIO` switch/LED path; the Radxa rigs have no switch or LEDs and capture is driven by the browser |
+| AssistNow (A-GPS) | `serial_comms/ubloxAgps.py` | GPS is only needed in AP mode, where there is no uplink; the receiver acquires its own fix |
+| Session logger | `support/session_logger.py` | Only ever started by the GPIO switch; wrote altimeter lines and log copies to `/home/radxa/temp`, which nothing reads. Altitude is already logged to `altitudeData.csv` for the flight log |
 | SMS/phone/Bluetooth-era support | `support/sms_sender.py`, `support/phone_gps.py`, `support/talkbox.py`, `support/connection_monitor.py` | Retired communication paths |
 | Old image/log models | `support/camera_data.py`, `support/camera_image.py`, `support/log_list.py` | Used only by the retired Flask pages |
 | Old Flask UI | `app/forms.py`, `app/views/camera.py`, `app/views/home.py`, `app/views/settings.py`, `app/views/showlog.py`, `app/templates/base.html`, `app/templates/camera/**`, `app/templates/home/**`, `app/templates/settings/**`, `app/templates/showlog/**`, `app/templates/js/**` | Replaced by the two direct Flask operator pages |
@@ -239,8 +237,9 @@ Directory globs mean every previously tracked file beneath that directory.
 | Root test harnesses | `test_app.py`, `test_behaviour.py`, `test_live_server.py`, `test_sensors.py`, `test_unit.py` | Duplicate and hardware-stale test entry points |
 | Obsolete tests | `tests/test_alti_simulator.py`, `tests/test_altitude_switch.py`, `tests/test_ap_monitor.py`, `tests/test_ap_watchdog.py`, `tests/test_basic.py`, `tests/test_camera_logger.py`, `tests/test_canon6d_cam.py`, `tests/test_captive_portal.py`, `tests/test_connection_monitor.py`, `tests/test_dummy_alti.py`, `tests/test_dummy_cam.py`, `tests/test_log_list.py`, `tests/test_page_camera_live_server.py`, `tests/test_page_home.py`, `tests/test_page_home_live_server.py`, `tests/test_session_logger.py`, `tests/test_settings.py`, `tests/test_sms_sender.py`, `tests/test_system_monitor.py`, `tests/test_talkbox.py`, `tests/test_trusense_altimeter.py`, `tests/tricap_flask_live_server_test_case.py`, `tests/tricap_flask_test_case.py`, `tests/tricap_tempfile_test_case.py` | Covered retired components, duplicate layers or brittle live-server scaffolding |
 
-The cleanup also removed dead Web and SMS sections from `default.cfg`, prunes
-those sections when an older `initial.cfg` is next saved, removed unused runtime
+The cleanup also removed dead Web and SMS sections and the unused
+`session_description` option from `default.cfg`, prunes them when an older
+`initial.cfg` is next saved, removed unused runtime
 constants/imports, and deleted a captured AssistNow binary payload that had
 been committed as a comment.
 

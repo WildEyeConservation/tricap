@@ -1,11 +1,12 @@
 """Tests for the Sony-only production camera manager."""
 
+import time
 import unittest
 from threading import Lock
 from unittest.mock import ANY, Mock, call, patch
 
 from sensors.cam_manager import TriCapCamsManager
-from config import SONY_TEMPFS_MOUNT_POINT
+from config import CAM_MANAGER_STATES, CAMERA_STATES, SONY_TEMPFS_MOUNT_POINT
 
 
 class SonyCameraManagerTests(unittest.TestCase):
@@ -38,6 +39,35 @@ class SonyCameraManagerTests(unittest.TestCase):
                 call(SONY_TEMPFS_MOUNT_POINT, sdk, 2, ANY, "Default"),
             ],
         )
+
+    @patch.object(TriCapCamsManager, "list_exisiting_files", return_value=[])
+    @patch.object(TriCapCamsManager, "mount_disk", return_value=True)
+    @patch("sensors.cam_manager.subprocess.run")
+    @patch("sensors.cam_manager.SonyCamera")
+    @patch("sensors.cam_manager.discover_sony_cameras")
+    def test_returns_to_stopped_once_save_threads_finish(
+            self, discover_mock, camera_mock, _run_mock, _mount_mock, _list_mock):
+        discover_mock.return_value = (Mock(), 1)
+        camera = Mock(serial_num="one", state=CAMERA_STATES.CAPTURING)
+        camera_mock.return_value = camera
+
+        manager = TriCapCamsManager(
+            {"image_capture_interval": "3"},
+            {"sony_image_format": "Default"},
+            Lock(),
+        )
+
+        # The mocked capture and save targets return immediately, so the
+        # manager must reset itself without any external periodic caller.
+        manager.start_capturing()
+
+        deadline = time.monotonic() + 2
+        while manager.state != CAM_MANAGER_STATES.STOPPED and time.monotonic() < deadline:
+            time.sleep(0.01)
+
+        self.assertEqual(manager.state, CAM_MANAGER_STATES.STOPPED)
+        self.assertEqual(camera.state, CAMERA_STATES.INITIALISED)
+        self.assertTrue(camera.save_to_ssd.called)
 
 
 if __name__ == "__main__":

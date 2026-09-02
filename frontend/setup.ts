@@ -52,10 +52,6 @@ interface Statistics {
   externalStorage?: StorageUsage;
 }
 
-interface LensResponse {
-  lens?: string;
-}
-
 type ImageFormat = "Default" | "RAW" | "JPEG";
 
 interface ImageFormatResponse {
@@ -195,11 +191,7 @@ async function loadSensors(): Promise<void> {
 async function loadStats(): Promise<void> {
   await singleFlight("setup-stats", async () => {
     try {
-      const [stats, lens] = await Promise.all([
-        getJson<Statistics>("/api/statistics"),
-        getJson<LensResponse>("/api/lensNumber").catch((): LensResponse => ({})),
-      ]);
-      byId("lens").textContent = formatValue(lens.lens);
+      const stats = await getJson<Statistics>("/api/statistics");
       externalConnected = Number(stats.externalStorage?.capacityGB) > 0;
       if (stats.captureInterval !== undefined) {
         currentInterval = Number(stats.captureInterval);
@@ -407,7 +399,7 @@ async function startBackup(control: HTMLButtonElement): Promise<void> {
   const finish = beginAction(control, "Starting backup...");
   if (!finish) return;
   try {
-    const result = await getJson<ActionResponse>("/api/backup_start", {}, STORAGE_ACTION_TIMEOUT_MS);
+    const result = await postJson<ActionResponse>("/api/backup_start", undefined, STORAGE_ACTION_TIMEOUT_MS);
     if (result.success === false) toast(result.msg || "Backup failed to start");
     else {
       backupRunning = true;
@@ -427,7 +419,7 @@ async function moveBackup(control: HTMLButtonElement): Promise<void> {
   if (!finish) return;
   byId("moveConfirmModal").classList.remove("open");
   try {
-    const result = await getJson<ActionResponse>("/api/backup_move", {}, STORAGE_ACTION_TIMEOUT_MS);
+    const result = await postJson<ActionResponse>("/api/backup_move", undefined, STORAGE_ACTION_TIMEOUT_MS);
     if (result.success === false) toast(result.msg || "Copy & delete failed to start");
     else {
       backupRunning = true;
@@ -471,7 +463,7 @@ async function verifyDeleteMatched(control: HTMLButtonElement): Promise<void> {
   byId("deleteDecisionModal").classList.remove("open");
   try {
     deleteMode = "verify";
-    const result = await getJson<ActionResponse>("/api/verify_and_delete", {}, STORAGE_ACTION_TIMEOUT_MS);
+    const result = await postJson<ActionResponse>("/api/verify_and_delete", undefined, STORAGE_ACTION_TIMEOUT_MS);
     if (result.success) {
       verifyRunning = true;
       verifyAnnounce = true;
@@ -561,7 +553,7 @@ async function restartCaptureService(control: HTMLButtonElement): Promise<void> 
   const finish = beginAction(control, "Restarting tricap...");
   if (!finish) return;
   try {
-    await getJson<unknown>("/api/restart", {}, SYSTEM_ACTION_TIMEOUT_MS);
+    await postJson<unknown>("/api/restart", undefined, SYSTEM_ACTION_TIMEOUT_MS);
     toast("tricap restart requested");
   } catch (error) {
     toast(errorMessage(error));
@@ -576,7 +568,7 @@ async function rebootDevice(control: HTMLButtonElement): Promise<void> {
   const finish = beginAction(control, "Requesting reboot...");
   if (!finish) return;
   try {
-    await getJson<unknown>("/api/reboot", {}, SYSTEM_ACTION_TIMEOUT_MS);
+    await postJson<unknown>("/api/reboot", undefined, SYSTEM_ACTION_TIMEOUT_MS);
     toast("Reboot requested - rejoin skyseeker when it returns");
   } catch (error) {
     toast(errorMessage(error));

@@ -94,11 +94,7 @@ async function loadSensors() {
 async function loadStats() {
     await singleFlight("setup-stats", async () => {
         try {
-            const [stats, lens] = await Promise.all([
-                getJson("/api/statistics"),
-                getJson("/api/lensNumber").catch(() => ({})),
-            ]);
-            byId("lens").textContent = formatValue(lens.lens);
+            const stats = await getJson("/api/statistics");
             externalConnected = Number(stats.externalStorage?.capacityGB) > 0;
             if (stats.captureInterval !== undefined) {
                 currentInterval = Number(stats.captureInterval);
@@ -312,7 +308,7 @@ async function startBackup(control) {
     if (!finish)
         return;
     try {
-        const result = await getJson("/api/backup_start", {}, STORAGE_ACTION_TIMEOUT_MS);
+        const result = await postJson("/api/backup_start", undefined, STORAGE_ACTION_TIMEOUT_MS);
         if (result.success === false)
             toast(result.msg || "Backup failed to start");
         else {
@@ -335,7 +331,7 @@ async function moveBackup(control) {
         return;
     byId("moveConfirmModal").classList.remove("open");
     try {
-        const result = await getJson("/api/backup_move", {}, STORAGE_ACTION_TIMEOUT_MS);
+        const result = await postJson("/api/backup_move", undefined, STORAGE_ACTION_TIMEOUT_MS);
         if (result.success === false)
             toast(result.msg || "Copy & delete failed to start");
         else {
@@ -382,7 +378,7 @@ async function verifyDeleteMatched(control) {
     byId("deleteDecisionModal").classList.remove("open");
     try {
         deleteMode = "verify";
-        const result = await getJson("/api/verify_and_delete", {}, STORAGE_ACTION_TIMEOUT_MS);
+        const result = await postJson("/api/verify_and_delete", undefined, STORAGE_ACTION_TIMEOUT_MS);
         if (result.success) {
             verifyRunning = true;
             verifyAnnounce = true;
@@ -482,7 +478,7 @@ async function restartCaptureService(control) {
     if (!finish)
         return;
     try {
-        await getJson("/api/restart", {}, SYSTEM_ACTION_TIMEOUT_MS);
+        await postJson("/api/restart", undefined, SYSTEM_ACTION_TIMEOUT_MS);
         toast("tricap restart requested");
     }
     catch (error) {
@@ -500,7 +496,7 @@ async function rebootDevice(control) {
     if (!finish)
         return;
     try {
-        await getJson("/api/reboot", {}, SYSTEM_ACTION_TIMEOUT_MS);
+        await postJson("/api/reboot", undefined, SYSTEM_ACTION_TIMEOUT_MS);
         toast("Reboot requested - rejoin skyseeker when it returns");
     }
     catch (error) {

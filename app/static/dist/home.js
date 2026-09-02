@@ -1,4 +1,4 @@
-import { beginAction, byId, errorMessage, formatValue, getJson, numberFormat, runPeriodic, singleFlight, syncPhoneClock, toast, uiConfig, } from "./common.js";
+import { beginAction, byId, errorMessage, formatValue, getJson, numberFormat, postJson, runPeriodic, singleFlight, syncPhoneClock, toast, uiConfig, } from "./common.js";
 const healthyCameraStates = new Set(["INITIALISED", "CAPTURING", "READY", "STARTED"]);
 const errorStates = new Set(["ERROR_CONFIG", "ERROR_CAPTURE", "ERROR"]);
 let latest;
@@ -349,7 +349,7 @@ async function toggleCapture(control) {
                 clockNote = " (clock sync failed)";
             }
         }
-        await getJson(capturing ? "/api/stop_capture" : "/api/start_capture");
+        await postJson(capturing ? "/api/stop_capture" : "/api/start_capture");
         toast(capturing ? "Capture stopped" : `Capture started${clockNote}`);
     }
     catch (error) {

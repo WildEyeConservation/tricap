@@ -5,6 +5,7 @@ import {
   formatValue,
   getJson,
   numberFormat,
+  postJson,
   runPeriodic,
   singleFlight,
   syncPhoneClock,
@@ -437,7 +438,7 @@ async function toggleCapture(control: HTMLButtonElement): Promise<void> {
         clockNote = " (clock sync failed)";
       }
     }
-    await getJson<unknown>(capturing ? "/api/stop_capture" : "/api/start_capture");
+    await postJson<unknown>(capturing ? "/api/stop_capture" : "/api/start_capture");
     toast(capturing ? "Capture stopped" : `Capture started${clockNote}`);
   } catch (error) {
     toast(errorMessage(error));

@@ -6,6 +6,7 @@ Lots of instantiation going on here, not recommended to run this unnecessarily w
 import logging
 import os
 
+from datetime import datetime
 from threading import Lock
 from logging.handlers import TimedRotatingFileHandler
 
@@ -17,8 +18,6 @@ from sensors.unavailable_altimeter import UnavailableAltimeter
 from support.configure import TricapConfig
 from support.git_info import GitData
 
-from support.system_monitor import generate_system_monitor, SystemMonitorLogger
-
 from config import FALLBACK_TELEMETRY_DIR, MOUNT_POINT, SERVER_LOG_DIR
 
 from serial_comms.SerialInterface import SerialInterface
@@ -29,15 +28,13 @@ class AltitudeLogObserver():
     _logger = logging.getLogger(__name__)
 
     def update(self, alti):
-        legacy_strength = getattr(alti, 'strength', 0)
-        first_return = getattr(alti, 'first_return', alti.measurement)
-        last_return = getattr(alti, 'last_return', alti.measurement)
-        first_strength = getattr(alti, 'first_strength', legacy_strength)
-        last_strength = getattr(alti, 'last_strength', legacy_strength)
+        first_return = alti.first_return
+        last_return = alti.last_return
+        first_strength = alti.first_strength
+        last_strength = alti.last_strength
         if first_return is None and last_return is None:
             return
         try:
-            from datetime import datetime
             now = datetime.now()
             day = now.strftime('%Y_%m_%d')
             if os.path.ismount(MOUNT_POINT):
@@ -71,6 +68,7 @@ class AltitudeLogObserver():
 # Set up rotating log file for the overall log
 format_str = "%(asctime)s | %(pathname)s:%(lineno)d | %(funcName)s | %(levelname)s | %(message)s "
 formatter = logging.Formatter(format_str)
+os.makedirs(SERVER_LOG_DIR, exist_ok=True)
 master_log_fp = os.path.join(SERVER_LOG_DIR, 'tricap_master.log')
 master_handler = TimedRotatingFileHandler(filename=master_log_fp, when='midnight', backupCount=10)
 master_handler.setLevel(logging.DEBUG)
@@ -80,9 +78,8 @@ rootlogger.addHandler(master_handler)
 rootlogger.setLevel(logging.DEBUG)
 rootlogger.info('Initiating new instance of the TriCap app.')
 
-# Setup the Flask Server, configuring it using the config.py file
+# Setup the Flask Server
 app = Flask(__name__)
-app.config.from_object('config')
 
 # Instantiate the config setting management
 init_config = TricapConfig()
@@ -156,17 +153,6 @@ except Exception as exc:
 
 rootlogger.debug('Altimeter has been configured.')
 
-# Setup monitors for system values
-sys_mons = []
-sys_mons.append(generate_system_monitor(period=28, type_id='RAM'))
-sys_mons.append(generate_system_monitor(period=29, type_id='CPU'))
-sys_mons.append(generate_system_monitor(period=30, type_id='Disk'))
-sys_mons.append(generate_system_monitor(period=31, type_id='IO'))
-sys_mon_logger = SystemMonitorLogger(sys_mons)
-for sm in sys_mons:
-    if sm is not None:
-        sm.start()
-
 altimeter.attach(AltitudeLogObserver())
 
 # Capture controls measurement when an altimeter is present. The unavailable
@@ -174,16 +160,6 @@ altimeter.attach(AltitudeLogObserver())
 tricap_manager.altimeter = altimeter
 
 rootlogger.info("Git version: " + code_inf.code_id())
-
-
-def stop_all_threads():
-    """Helper function for a clean exit."""
-    for sm in sys_mons:
-        if sm is not None:
-            sm.stop()
-
-    tricap_manager.stop_capturing()
-    altimeter.stop_measuring()
 
 
 # Configure the Flask Blueprints

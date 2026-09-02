@@ -38,7 +38,6 @@ systemd tricap.service
         │   └── parse u-blox NMEA telemetry
         ├── connect GRF-500
         │   └── use UnavailableAltimeter on connection failure
-        ├── start system monitors
         ├── start telemetry logging
         └── start Flask on port 80
             ├── render the home and setup templates
@@ -121,10 +120,9 @@ The following is the complete tracked tree, grouped by purpose.
 │   └── SerialProcess.py              NMEA parsing and GPS CSV output
 ├── support/
 │   ├── __init__.py                   Python package marker
-│   ├── basic.py                      observer and periodic-monitor primitives
+│   ├── basic.py                      observer primitive
 │   ├── configure.py                  layered default.cfg/initial.cfg reader/writer
 │   ├── component_health.py           camera/GPS/altimeter health summary
-│   ├── system_monitor.py             CPU, RAM, disk and I/O logging
 │   ├── phone_time.py                 validated browser-to-device clock sync
 │   ├── local_network.py              Flask source-network allow-list
 │   ├── git_info.py                   deployed revision reporting
@@ -192,8 +190,8 @@ build, while the generated JavaScript is the artifact Flask must serve.
   spread concurrency and storage state through Flask routes.
 - `SerialInterface` and `SerialProcess` separate serial lifetime from u-blox
   message interpretation.
-- `Subject` and `PeriodicMonitor` support the GRF-500 altimeter and system
-  monitors. They are small shared primitives, not sensor plugins.
+- `Subject` supports the GRF-500 altimeter's observer notifications. It is a
+  small shared primitive, not a sensor plugin.
 - `TriCapCamsManager` finalises its own capture state: a watcher thread joins
   the save threads of each capture and returns the manager to `STOPPED`, so
   no external periodic caller is required.
@@ -231,6 +229,7 @@ Directory globs mean every previously tracked file beneath that directory.
 | Old Flask UI | `app/forms.py`, `app/views/camera.py`, `app/views/home.py`, `app/views/settings.py`, `app/views/showlog.py`, `app/templates/base.html`, `app/templates/camera/**`, `app/templates/home/**`, `app/templates/settings/**`, `app/templates/showlog/**`, `app/templates/js/**` | Replaced by the two direct Flask operator pages |
 | Old browser stack | `app/static/js/**`, old Bootstrap/Bootswatch/Font Awesome/Lato assets under `app/static/css/**` and `app/static/fonts/**`, `app/static/img/default.jpg`, `app/static/img/placeholder.png`, `app/static/img/Power-Shutdown.png` | jQuery and handwritten JavaScript UI replaced by strict TypeScript and one stylesheet |
 | Captive portal | `skyseeker-standalone/captive_portal.py`, `services/systemd/skyseeker-portal.service` | Flask now serves the UI directly over the AP |
+| System monitors | `support/system_monitor.py`; `RepeatingBarrierPasser` and `PeriodicMonitor` from `support/basic.py`; `SystemMonitor`, `LinuxFreeRAMMonitor`, `LinuxCPUUsageMonitor`, `LinuxDiskUsageMonitor`, `LinuxDiskIOMonitor`, and `SystemMonitorLogger` | duplicate of skyseeker-health journal diagnostics |
 | Duplicate diagnostics/recovery | `services/usr-local/bin/skyseeker-diag.py`, `services/usr-local/sbin/skyseeker-ap-monitor`, `services/usr-local/sbin/skyseeker-ap-watchdog`, their systemd units/timers, `udp_ip.sh`, `udp-ip.service` | Consolidated into the dashboard, NetBird and `skyseeker-health` |
 | Old launch/deploy files | `tricap.service`, `tricap.ini`, `wsgi.py`, `tricap_launcher.sh`, `tricap_launch_tester.py`, `tricap_loop.py`, `main_serial.py`, `python_setup.sh`, `setup.py`, `wifi_setup.sh`, `get_time_from_camera.sh`, `local_paths_example.py` | Duplicate, obsolete or replaced entry/deployment paths |
 | Root artifacts | `.coveragerc`, `defaultend.jpg` | Unused coverage and image residue |

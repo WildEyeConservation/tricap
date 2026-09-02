@@ -136,6 +136,12 @@ class FlaskDashboardAssetTests(unittest.TestCase):
 
 
 class AccessPointSignalTests(unittest.TestCase):
+    def setUp(self):
+        with DASHBOARD_VIEW._wifi_lock:
+            DASHBOARD_VIEW._wifi_cache.update(
+                ts=0.0, ap=None, stations={}, clients={}
+            )
+
     def test_requesting_client_station_is_preferred(self):
         stations = {"aa:aa:aa:aa:aa:aa": -68, "bb:bb:bb:bb:bb:bb": -42}
         with (
@@ -148,6 +154,46 @@ class AccessPointSignalTests(unittest.TestCase):
         stations = {"aa:aa:aa:aa:aa:aa": -68, "bb:bb:bb:bb:bb:bb": -42}
         with patch.object(DASHBOARD_VIEW, "_scan_ap_stations", return_value=("wlan1", stations)):
             self.assertEqual(DASHBOARD_VIEW.ap_wifi_signal(), -42)
+
+    def test_requesting_client_mac_is_cached_within_wifi_ttl(self):
+        stations = {"aa:aa:aa:aa:aa:aa": -68}
+        neighbor = "192.168.50.20 dev wlan1 lladdr aa:aa:aa:aa:aa:aa REACHABLE\n"
+        with (
+            patch.object(
+                DASHBOARD_VIEW,
+                "_scan_ap_stations",
+                return_value=("wlan1", stations),
+            ),
+            patch.object(
+                DASHBOARD_VIEW.subprocess,
+                "check_output",
+                return_value=neighbor,
+            ) as check_output,
+        ):
+            self.assertEqual(DASHBOARD_VIEW.ap_wifi_signal("192.168.50.20"), -68)
+            self.assertEqual(DASHBOARD_VIEW.ap_wifi_signal("192.168.50.20"), -68)
+
+        check_output.assert_called_once_with(
+            ["ip", "neigh", "show", "192.168.50.20"], text=True, timeout=3
+        )
+
+
+class StorageImageSampleTests(unittest.TestCase):
+    def test_unmounted_internal_storage_is_unavailable(self):
+        DASHBOARD_VIEW._storage_sample_cache = {"ts": 0.0, "payload": None}
+        with patch.object(DASHBOARD_VIEW.os.path, "ismount", return_value=False):
+            payload = DASHBOARD_VIEW.storage_image_sample()
+
+        self.assertEqual(
+            payload,
+            {
+                "available": False,
+                "freeBytes": None,
+                "averageImageBytes": None,
+                "sampleCount": 0,
+                "message": "Internal storage is not mounted.",
+            },
+        )
 
 
 if __name__ == "__main__":

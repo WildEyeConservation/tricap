@@ -18,7 +18,12 @@ IW = "/usr/sbin/iw"
 #  Wi-Fi signal from the AP's connected stations                              #
 # --------------------------------------------------------------------------- #
 _wifi_lock = threading.Lock()
-_wifi_cache = {"ts": 0.0, "ap": None, "stations": {}}  # stations: {mac: dBm}
+_wifi_cache = {
+    "ts": 0.0,
+    "ap": None,
+    "stations": {},  # {mac: dBm}
+    "clients": {},  # {ip: (timestamp, mac)}
+}
 _WIFI_TTL = 2.0
 
 
@@ -27,54 +32,73 @@ def _scan_ap_stations():
 
     Best-effort: any failure (no iw, no AP, parse error) yields (None, {}).
     """
-    now = time.monotonic()
     with _wifi_lock:
+        now = time.monotonic()
         if now - _wifi_cache["ts"] < _WIFI_TTL:
             return _wifi_cache["ap"], _wifi_cache["stations"]
 
-    ap = None
-    stations = {}
-    try:
-        dev = subprocess.check_output([IW, "dev"], text=True, timeout=4)
-        cur = None
-        for raw in dev.splitlines():
-            line = raw.strip()
-            if line.startswith("Interface "):
-                cur = line.split()[1]
-            elif line.startswith("type ") and cur and line.split()[1] == "AP":
-                ap = cur
-        if ap:
-            dump = subprocess.check_output([IW, "dev", ap, "station", "dump"], text=True, timeout=4)
-            mac = None
-            for raw in dump.splitlines():
+        ap = None
+        stations = {}
+        try:
+            dev = subprocess.check_output([IW, "dev"], text=True, timeout=4)
+            cur = None
+            for raw in dev.splitlines():
                 line = raw.strip()
-                if line.startswith("Station "):
-                    mac = line.split()[1].lower()
-                elif line.startswith("signal:") and mac:
-                    try:
-                        stations[mac] = int(line.split(":", 1)[1].split()[0])
-                    except (ValueError, IndexError):
-                        pass
-    except Exception:
-        ap, stations = None, {}
+                if line.startswith("Interface "):
+                    cur = line.split()[1]
+                elif line.startswith("type ") and cur and line.split()[1] == "AP":
+                    ap = cur
+            if ap:
+                dump = subprocess.check_output(
+                    [IW, "dev", ap, "station", "dump"], text=True, timeout=4
+                )
+                mac = None
+                for raw in dump.splitlines():
+                    line = raw.strip()
+                    if line.startswith("Station "):
+                        mac = line.split()[1].lower()
+                    elif line.startswith("signal:") and mac:
+                        try:
+                            stations[mac] = int(line.split(":", 1)[1].split()[0])
+                        except (ValueError, IndexError):
+                            pass
+        except Exception:
+            ap, stations = None, {}
 
-    with _wifi_lock:
-        _wifi_cache.update(ts=now, ap=ap, stations=stations)
-    return ap, stations
+        _wifi_cache.update(ts=time.monotonic(), ap=ap, stations=stations)
+        return ap, stations
 
 
 def _ip_to_mac(ip):
     if not ip:
         return None
-    try:
-        out = subprocess.check_output(["ip", "neigh", "show", ip], text=True, timeout=3)
-        for raw in out.splitlines():
-            parts = raw.split()
-            if "lladdr" in parts:
-                return parts[parts.index("lladdr") + 1].lower()
-    except Exception:
-        pass
-    return None
+    with _wifi_lock:
+        now = time.monotonic()
+        clients = _wifi_cache["clients"]
+        expired = [
+            cached_ip
+            for cached_ip, (ts, _) in clients.items()
+            if now - ts >= _WIFI_TTL
+        ]
+        for cached_ip in expired:
+            del clients[cached_ip]
+        if ip in clients:
+            return clients[ip][1]
+
+        mac = None
+        try:
+            out = subprocess.check_output(
+                ["ip", "neigh", "show", ip], text=True, timeout=3
+            )
+            for raw in out.splitlines():
+                parts = raw.split()
+                if "lladdr" in parts:
+                    mac = parts[parts.index("lladdr") + 1].lower()
+                    break
+        except Exception:
+            pass
+        clients[ip] = (time.monotonic(), mac)
+        return mac
 
 
 def ap_wifi_signal(client_ip=None):
@@ -311,6 +335,12 @@ def storage_image_sample():
         "averageImageBytes": None,
         "freeBytes": None,
     }
+    if not os.path.ismount(DATA_MOUNT):
+        payload["message"] = "Internal storage is not mounted."
+        with _storage_sample_lock:
+            _storage_sample_cache.update(ts=now, payload=payload)
+        return payload
+
     try:
         usage = shutil.disk_usage(DATA_MOUNT)
         payload["freeBytes"] = usage.free

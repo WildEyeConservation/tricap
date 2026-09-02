@@ -5,9 +5,9 @@ import logging
 from datetime import datetime
 from .SerialProcess import SerialProcess
 
-class SerialInterface(SerialProcess):
-  _logger = logging.getLogger(__name__)
+logger = logging.getLogger(__name__)
 
+class SerialInterface(SerialProcess):
   def __init__(self, port, baud, capturing_lock=None, cam_manager=None):
     super().__init__(cam_manager)
     self.port = port
@@ -31,22 +31,20 @@ class SerialInterface(SerialProcess):
       self.open()
       sleep(2)
     self.isConnected = True
-    self._logger.debug('Serial port {} connected'.format(self.port))
+    logger.debug('Serial port %s connected', self.port)
 
   def open(self):
     with self._lock:
       try:
-        self._logger.debug('Serial port try connect')
+        logger.debug('Serial port try connect')
         self.serialPort = serial.Serial(port=self.port, baudrate=self._baud)
-        sleep(10e-3)
-        bytesWaiting = self.serialPort.inWaiting()
-      except:
+      except (serial.SerialException, OSError) as e:
+        logger.warning('Failed to open serial port %s: %s', self.port, e)
         self.serialPort.close()
-        # self._logger.debug('Failed to open port')
 
   def reconnect(self):
     with self._lock:
-      self._logger.debug('Serial port reconnect')
+      logger.debug('Serial port reconnect')
       self.serialPort.close()
 
     self.connect()
@@ -62,7 +60,7 @@ class SerialInterface(SerialProcess):
       return self._hasGps
 
   def thread(self):
-    self._logger.debug('Serial thread started')
+    logger.debug('Serial thread started')
     buff = bytearray()
     while self.killThread == False:
       if self.isConnected:
@@ -82,30 +80,29 @@ class SerialInterface(SerialProcess):
                 if len(item) > 1:
                   self.processGpsResponse(item)
         except Exception as e:
-          self._logger.debug(f"Serial thread error {e}")
+          logger.warning('Serial thread error: %s', e)
           self._hasGps = False
+          self.isConnected = False
           self.reconnect()
           buff = bytearray()
 
       for request in self._requests:
         try:
           if request.identity == 'GNGGA':
-#            self._logger.debug('Process {}'.format(request.sentence_type))
             with self._capturing_lock:
-              # do not open file while capture and copy has the file open 
+              # Do not append telemetry while the internal disk is being mounted.
               self.saveGga(request)
               self._lastGpsPacketDate = datetime.now()
           elif request.identity == 'GNRMC':
-#            self._logger.debug('Process {}'.format(request.sentence_type))
             with self._capturing_lock:
-              # do not open file while capture and copy has the file open 
+              # Do not append telemetry while the internal disk is being mounted.
               self.saveRmc(request)
           elif 'GSV' in request.identity:
             self.process_gsv(request)
           elif request.identity == 'GNGSA':
             self.process_gsa(request)
         except Exception as e:
-            print(f"Serial process error {e}")
+            logger.warning('Serial process error: %s', e)
       self._requests = list()
       sleep(50e-3)
-    self._logger.debug('Serial thread stopped')
+    logger.debug('Serial thread stopped')

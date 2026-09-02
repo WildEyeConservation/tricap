@@ -1,8 +1,11 @@
 """Focused tests for u-blox GPS status processing."""
 
+import os
+import tempfile
 import unittest
 from datetime import datetime, time, timezone
 from types import SimpleNamespace
+from unittest.mock import patch
 
 from serial_comms.SerialProcess import SerialProcess
 
@@ -50,6 +53,42 @@ class UbloxGpsTests(unittest.TestCase):
         self.assertEqual(self.gps.snr_min, 10)
         self.assertEqual(self.gps.snr_avg, 20.0)
         self.assertEqual(self.gps.snr_max, 30)
+
+    def test_save_gga_writes_one_formatted_line_to_fallback_directory(self):
+        class FixedDateTime(datetime):
+            @classmethod
+            def now(cls, tz=None):
+                value = cls(2026, 9, 2, 12, 0, 0)
+                return value.replace(tzinfo=tz) if tz is not None else value
+
+        msg = SimpleNamespace(
+            time=time(12, 30, 15),
+            lat='1234.5678',
+            NS='S',
+            lon='01234.5678',
+            EW='E',
+            alt=100.0,
+            HDOP='0.9',
+            sep='30.0',
+            quality=1,
+        )
+        self.gps._firstGps = True
+
+        with tempfile.TemporaryDirectory() as fallback_dir, \
+                patch('serial_comms.SerialProcess.os.path.ismount', return_value=False), \
+                patch('serial_comms.SerialProcess.FALLBACK_TELEMETRY_DIR', fallback_dir), \
+                patch('serial_comms.SerialProcess.datetime', FixedDateTime):
+            self.gps.saveGga(msg)
+
+            gps_file = os.path.join(fallback_dir, '2026_09_02', 'gpsData.csv')
+            with open(gps_file, 'rt') as f:
+                lines = f.readlines()
+
+        gps_epoch = datetime(2026, 9, 2, 12, 30, 15, tzinfo=timezone.utc).timestamp()
+        pi_epoch = datetime(2026, 9, 2, 12, 0, 0).timestamp()
+        self.assertEqual(lines, [
+            f'1,{gps_epoch},{pi_epoch},1234.5678,S,01234.5678,E,100.0,0.9,30.0\n'
+        ])
 
 
 if __name__ == "__main__":

@@ -1,6 +1,7 @@
 import math
 import os
 import serial
+import logging
 from statistics import mean
 from io import BytesIO
 from pyubx2 import (
@@ -12,6 +13,8 @@ from datetime import datetime, timedelta, timezone
 from threading import Lock
 
 from config import FALLBACK_TELEMETRY_DIR, MOUNT_POINT
+
+logger = logging.getLogger(__name__)
 
 class SerialProcess():
     def __init__(self, cam_manager = None):
@@ -58,10 +61,10 @@ class SerialProcess():
             if parsed:
                 self._requests.append(parsed)
         except serial.SerialException as e:
-            print('Device error: {}'.format(e))
+            logger.warning('Device error: %s', e)
             return False
         except Exception as e:
-            print('Parse error: {}'.format(e))
+            logger.warning('Parse error: %s', e)
             return False
         return True
 
@@ -87,41 +90,23 @@ class SerialProcess():
             self._hasGps = True
             # Epoch seconds, so the stored timestamp does not depend on the rig's zone.
             gps_datetime = self.gps_datetime(msg.time)
-            if os.path.ismount(MOUNT_POINT):
-                complete_dir = os.path.join(MOUNT_POINT, datetime.now().strftime('%Y_%m_%d'))
-                dest = os.path.join(complete_dir, 'gpsData.csv')
+            mounted = os.path.ismount(MOUNT_POINT)
+            storage_dir = MOUNT_POINT if mounted else FALLBACK_TELEMETRY_DIR
+            complete_dir = os.path.join(storage_dir, datetime.now().strftime('%Y_%m_%d'))
+            dest = os.path.join(complete_dir, 'gpsData.csv')
+            try:
                 if not os.path.isdir(complete_dir):
-                    os.makedirs(complete_dir)
-                try:
-                    if msg.time != None and msg.lat != '' and msg.lon != '':
-                        alt = 0.0
-                        if msg.alt != None:
-                            alt = msg.alt
-                        line=(f"{str(msg.quality)},{str(gps_datetime.timestamp())},{str(pi_time.timestamp())},{str(msg.lat)},{msg.NS},{str(msg.lon)},{msg.EW},{str(alt)},{str(msg.HDOP)},{str(msg.sep)}\n")
-                        with open(dest, 'ta') as f:
-                            f.write(line)
-                    else:
-                        print('No GPS timestamp')
-                except Exception as e:
-                    print("GPS line not saved")
-            else:
-                complete_dir = os.path.join(FALLBACK_TELEMETRY_DIR, datetime.now().strftime('%Y_%m_%d'))
-                dest = os.path.join(complete_dir, 'gpsData.csv')
-                if not os.path.isdir(complete_dir):
-                    print("SSD not mounted, saving GPS data to built-in storage")
-                    os.makedirs(complete_dir)
-                try:
-                    if msg.time != None and msg.lat != '' and msg.lon != '':
-                        alt = 0.0
-                        if msg.alt != None:
-                            alt = msg.alt
-                        line=(f"{str(msg.quality)},{str(gps_datetime.timestamp())},{str(pi_time.timestamp())},{str(msg.lat)},{msg.NS},{str(msg.lon)},{msg.EW},{str(alt)},{str(msg.HDOP)},{str(msg.sep)}\n")
-                        with open(dest, 'ta') as f:
-                            f.write(line)
-                    else:
-                        print('No GPS timestamp')
-                except Exception as e:
-                    print("GPS line not saved")
+                    if not mounted:
+                        logger.warning('Internal storage not mounted; saving GPS data to %s', complete_dir)
+                    os.makedirs(complete_dir, exist_ok=True)
+                alt = 0.0
+                if msg.alt != None:
+                    alt = msg.alt
+                line=(f"{str(msg.quality)},{str(gps_datetime.timestamp())},{str(pi_time.timestamp())},{str(msg.lat)},{msg.NS},{str(msg.lon)},{msg.EW},{str(alt)},{str(msg.HDOP)},{str(msg.sep)}\n")
+                with open(dest, 'ta') as f:
+                    f.write(line)
+            except Exception as e:
+                logger.warning('GPS line not saved: %s', e)
                 
         else:
             self._hasGps = False
@@ -243,7 +228,6 @@ class SerialProcess():
             self.snr_min = min(all_snrs)
             self.snr_max = max(all_snrs)
             self.snr_avg = round(mean(all_snrs), 2)
-            # print(f"min max avg {self.snr_min} {self.snr_max} {self.snr_avg}")
         else:
             self.snr_min = self.snr_max = self.snr_avg = None
 

@@ -1,7 +1,7 @@
 [Unit]
 Description=SkySeeker capture controller and web interface
-After=network-online.target skyseeker-standalone-net.service
-Wants=network-online.target skyseeker-standalone-net.service
+After=NetworkManager.service skyseeker-standalone-net.service
+Wants=NetworkManager.service skyseeker-standalone-net.service
 
 [Service]
 User=root

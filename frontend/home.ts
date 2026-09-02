@@ -224,8 +224,19 @@ function renderCameras(status: CaptureStatus, images: ImageCounts): void {
   status.cams.forEach((state, index) => {
     const indicator = healthyCameraStates.has(state) ? "good" : errorStates.has(state) ? "bad" : "warn";
     const row = document.createElement("div");
+    const left = document.createElement("div");
+    const dot = document.createElement("span");
+    const name = document.createElement("span");
+    const meta = document.createElement("div");
     row.className = "cam-row";
-    row.innerHTML = `<div class="cam-left"><span class="dot ${indicator}"></span><span class="cam-name">Camera ${index + 1}</span></div><div class="cam-meta mono">${state} · ${formatValue(counts[index], "0")}/${formatValue(copies[index], "0")}</div>`;
+    left.className = "cam-left";
+    dot.className = `dot ${indicator}`;
+    name.className = "cam-name";
+    name.textContent = `Camera ${index + 1}`;
+    meta.className = "cam-meta mono";
+    meta.textContent = `${state} · ${formatValue(counts[index], "0")}/${formatValue(copies[index], "0")}`;
+    left.append(dot, name);
+    row.append(left, meta);
     grid.appendChild(row);
   });
 }
@@ -258,9 +269,17 @@ function renderComponents(status: CaptureStatus): void {
   });
 }
 
-function storageBar(percent: number): string {
-  const bounded = Math.max(0, Math.min(100, percent));
-  return `<div class="track"><div class="fill" style="width:${bounded}%"></div></div>`;
+function storageBar(percent?: number): HTMLDivElement {
+  const track = document.createElement("div");
+  track.className = percent === undefined ? "track dashed" : "track";
+  if (percent !== undefined) {
+    const fill = document.createElement("div");
+    const bounded = Math.max(0, Math.min(100, percent));
+    fill.className = "fill";
+    fill.style.width = `${bounded}%`;
+    track.appendChild(fill);
+  }
+  return track;
 }
 
 function formatFlightTime(seconds: number): string {
@@ -298,21 +317,52 @@ function renderStorage(stats: Statistics, estimate: StorageEstimate): void {
     ? flight.text
     : hasInternal ? `${numberFormat(internal.usedGB)} / ${numberFormat(internal.capacityGB)} GB` : "--";
 
-  const internalBar = hasInternal
-    ? storageBar(internal.capacityGB ? Number(internal.usedGB) / internal.capacityGB * 100 : 0)
-    : '<div class="track dashed"></div>';
-  const externalBar = hasExternal
-    ? storageBar(external.capacityGB ? Number(external.usedGB) / external.capacityGB * 100 : 0)
-    : '<div class="track dashed"></div>';
-  byId("storageBody").innerHTML = `
-    <div class="stor-item">
-      <div class="stor-head"><span class="stor-name">Internal SSD</span><span class="mono stor-val">${hasInternal ? `${numberFormat(internal.usedGB)} / ${numberFormat(internal.capacityGB)} GB` : "--"}</span></div>
-      ${internalBar}<p class="stor-estimate${flight.ready ? "" : " muted"}">${flight.text}</p>
-    </div>
-    <div class="stor-item">
-      <div class="stor-head"><span class="stor-name off">External</span><span class="mono stor-val off">${hasExternal ? `${numberFormat(external.usedGB)} / ${numberFormat(external.capacityGB)} GB` : "not connected"}</span></div>
-      ${externalBar}
-    </div>`;
+  const storageBody = byId("storageBody");
+  const internalItem = document.createElement("div");
+  const internalHead = document.createElement("div");
+  const internalName = document.createElement("span");
+  const internalValue = document.createElement("span");
+  const internalEstimate = document.createElement("p");
+  const externalItem = document.createElement("div");
+  const externalHead = document.createElement("div");
+  const externalName = document.createElement("span");
+  const externalValue = document.createElement("span");
+
+  internalItem.className = "stor-item";
+  internalHead.className = "stor-head";
+  internalName.className = "stor-name";
+  internalName.textContent = "Internal SSD";
+  internalValue.className = "mono stor-val";
+  internalValue.textContent = hasInternal
+    ? `${numberFormat(internal.usedGB)} / ${numberFormat(internal.capacityGB)} GB`
+    : "--";
+  internalEstimate.className = `stor-estimate${flight.ready ? "" : " muted"}`;
+  internalEstimate.textContent = flight.text;
+  internalHead.append(internalName, internalValue);
+  internalItem.append(
+    internalHead,
+    storageBar(hasInternal && internal.capacityGB
+      ? Number(internal.usedGB) / internal.capacityGB * 100
+      : hasInternal ? 0 : undefined),
+    internalEstimate,
+  );
+
+  externalItem.className = "stor-item";
+  externalHead.className = "stor-head";
+  externalName.className = "stor-name off";
+  externalName.textContent = "External";
+  externalValue.className = "mono stor-val off";
+  externalValue.textContent = hasExternal
+    ? `${numberFormat(external.usedGB)} / ${numberFormat(external.capacityGB)} GB`
+    : "not connected";
+  externalHead.append(externalName, externalValue);
+  externalItem.append(
+    externalHead,
+    storageBar(hasExternal && external.capacityGB
+      ? Number(external.usedGB) / external.capacityGB * 100
+      : hasExternal ? 0 : undefined),
+  );
+  storageBody.replaceChildren(internalItem, externalItem);
 }
 
 function render(status: CaptureStatus, images: ImageCounts): void {

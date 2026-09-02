@@ -116,6 +116,11 @@ html:not([data-theme=dark]):not([data-theme=default]) .logo-dark{display:none}
 .row-between{display:flex;align-items:center;justify-content:space-between;gap:10px}
 .mb{margin-bottom:14px}
 .mt{margin-top:10px}
+.mt8{margin-top:8px}
+.mb10{margin:0 0 10px}
+.mb12{margin:0 0 12px}
+.full-width{width:100%}
+.stack-gap{display:flex;flex-direction:column;gap:10px}
 .card-h{font-weight:600;font-size:15px;color:var(--ink)}
 .interval-val{font-weight:500;font-size:20px;color:var(--ink)}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}

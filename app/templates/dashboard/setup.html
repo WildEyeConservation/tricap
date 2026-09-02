@@ -30,20 +30,20 @@
 </section>
 <section class="card pad">
   <div class="card-h mb">Backup to SSD</div>
-  <p class="muted small" style="margin:0 0 12px">Copies images together with GPS and altitude CSV logs.</p>
+  <p class="muted small mb12">Copies images together with GPS and altitude CSV logs.</p>
   <div class="grid2">
     <button class="go-btn" id="backupStart" type="button" data-locks disabled>Start backup</button>
     <button class="danger-btn" id="backupDelete" type="button" data-locks disabled>Verify &amp; delete</button>
   </div>
-  <button class="danger-btn mt" id="backupMove" type="button" data-locks disabled style="width:100%">Copy &amp; delete</button>
+  <button class="danger-btn mt full-width" id="backupMove" type="button" data-locks disabled>Copy &amp; delete</button>
   <div class="progress-track mt"><div class="progress-fill" id="backupFill"></div></div>
-  <p class="muted small" id="backupState" style="margin-top:8px">Idle</p>
+  <p class="muted small mt8" id="backupState">Idle</p>
   <p class="benchmark-line mono" id="backupBenchmark">No benchmark recorded this session.</p>
 </section>
 <div class="section-label">More</div>
 <section class="card acc">
   <div class="acc-head"><div class="acc-title">Download images</div><div class="acc-right"><span class="chev"><svg class="chev-svg" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"></path></svg></span></div></div>
-  <div class="acc-body"><div class="grid3" id="imageButtons"></div><p class="muted small" id="imageNote" style="margin-top:10px">Downloads a representative image from the most recent copy session.</p></div>
+  <div class="acc-body"><div class="grid3" id="imageButtons"></div><p class="muted small mt" id="imageNote">Downloads a representative image from the most recent copy session.</p></div>
 </section>
 <section class="card acc">
   <div class="acc-head"><div class="acc-title">Sensor check</div><div class="acc-right"><span class="acc-sum mono" id="setupMode">--</span><span class="chev"><svg class="chev-svg" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"></path></svg></span></div></div>
@@ -75,15 +75,15 @@
   <div class="acc-head"><div class="acc-title">Connectivity</div><div class="acc-right"><span class="acc-sum"><span class="dot off" id="ulDot"></span><span class="mono" id="ulState">--</span></span><span class="chev"><svg class="chev-svg" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"></path></svg></span></div></div>
   <div class="acc-body">
     <div class="subhead">Internet connection</div>
-    <p class="muted small" style="margin:0 0 10px">The USB Wi-Fi adapter serves <span class="mono">skyseeker</span> for local control. The onboard radio periodically searches for the phone's <span class="mono">skyseeker-rescue</span> recovery hotspot.</p>
+    <p class="muted small mb10">The USB Wi-Fi adapter serves <span class="mono">skyseeker</span> for local control. The onboard radio periodically searches for the phone's <span class="mono">skyseeker-rescue</span> recovery hotspot.</p>
     <p class="muted small" id="ulDetail"></p>
     <button class="pill-btn" id="ulConnect" type="button">Reconnect internet</button>
     <div class="subhead row-between"><span>Remote support</span><span class="acc-sum"><span class="dot off" id="nbDot"></span><span class="mono" id="nbState">--</span></span></div>
-    <p class="muted small" style="margin:0 0 12px">Remote support becomes available automatically whenever the rig has internet access. No action is normally required.</p>
+    <p class="muted small mb12">Remote support becomes available automatically whenever the rig has internet access. No action is normally required.</p>
     <div class="grid2"><button class="pill-btn" id="nbConnect" type="button">Reconnect support</button><button class="pill-btn" id="nbDisconnect" type="button">Turn off support</button></div>
     <details class="advanced">
       <summary>Advanced connection options</summary>
-      <p class="muted small" style="margin:0 0 10px">Use a different hotspot temporarily, or disconnect the internet uplink.</p>
+      <p class="muted small mb10">Use a different hotspot temporarily, or disconnect the internet uplink.</p>
       <div class="nb-field"><input class="text-input mono" id="ulSsid" type="text" placeholder="Different hotspot name" autocomplete="off" spellcheck="false"></div>
       <div class="nb-field mt"><input class="text-input mono" id="ulPsk" type="password" placeholder="Hotspot password" autocomplete="new-password" spellcheck="false"></div>
       <div class="grid2 mt"><button class="pill-btn" id="ulConnectCustom" type="button">Use different hotspot</button><button class="pill-btn" id="ulDisconnect" type="button">Disconnect internet</button></div>
@@ -100,7 +100,7 @@
   <div class="consent-card">
     <div class="consent-title" id="moveConfirmTitle">Copy &amp; delete?</div>
     <p class="consent-text">Copies files to the SSD and deletes each one from internal storage once its transfer is verified. Files that cannot be verified are retained.</p>
-    <div style="display:flex;flex-direction:column;gap:10px">
+    <div class="stack-gap">
       <button class="danger-btn" id="moveConfirmContinue" type="button">Copy &amp; delete</button>
       <button class="consent-cancel" id="moveConfirmCancel" type="button">Cancel</button>
     </div>
@@ -110,7 +110,7 @@
   <div class="consent-card">
     <div class="consent-title" id="deleteDecisionTitle">Clear internal storage?</div>
     <p class="consent-text" id="deleteDecisionText">Choose how to clear internal storage.</p>
-    <div style="display:flex;flex-direction:column;gap:10px">
+    <div class="stack-gap">
       <button class="go-btn" id="deleteDecisionVerify" type="button">Verify backup and delete matched files</button>
       <button class="danger-btn" id="deleteDecisionContinue" type="button">Continue, delete everything</button>
       <button class="consent-cancel" id="deleteDecisionCancel" type="button">Keep data</button>

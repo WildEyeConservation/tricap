@@ -25,6 +25,7 @@ SYS_CLASS_NET = Path("/sys/class/net")
 INTERNAL_STORAGE = "/mnt/ext_cam_storage"
 FAILURES_BEFORE_RESTART = 3
 RESTART_COOLDOWN_SECONDS = 600
+MAX_RESTARTS_BEFORE_BACKOFF = 3
 RESTART_SETTLE_SECONDS = 3
 
 
@@ -198,9 +199,16 @@ def load_state():
         return {
             "failures": max(0, int(state.get("failures", 0))),
             "last_restart": float(state.get("last_restart", 0.0)),
+            "restarts_since_recovery": max(
+                0, int(state.get("restarts_since_recovery", 0))
+            ),
         }
     except (OSError, ValueError, TypeError):
-        return {"failures": 0, "last_restart": 0.0}
+        return {
+            "failures": 0,
+            "last_restart": 0.0,
+            "restarts_since_recovery": 0,
+        }
 
 
 def save_state(state):
@@ -219,7 +227,11 @@ def recover(status):
     if healthy:
         if state["failures"]:
             print(f"skyseeker-health: recovered without action: {detail}", flush=True)
-        save_state({"failures": 0, "last_restart": state["last_restart"]})
+        save_state({
+            "failures": 0,
+            "last_restart": state["last_restart"],
+            "restarts_since_recovery": 0,
+        })
         return 0
 
     failures = state["failures"] + 1
@@ -227,8 +239,25 @@ def recover(status):
         f"skyseeker-health: failure {failures}/{FAILURES_BEFORE_RESTART}: {detail}",
         flush=True,
     )
+    if state["restarts_since_recovery"] >= MAX_RESTARTS_BEFORE_BACKOFF:
+        print(
+            f"skyseeker-health: recovery paused after {MAX_RESTARTS_BEFORE_BACKOFF} "
+            "restarts without recovery; manual attention needed",
+            flush=True,
+        )
+        save_state({
+            "failures": failures,
+            "last_restart": state["last_restart"],
+            "restarts_since_recovery": state["restarts_since_recovery"],
+        })
+        return 0
+
     if failures < FAILURES_BEFORE_RESTART:
-        save_state({"failures": failures, "last_restart": state["last_restart"]})
+        save_state({
+            "failures": failures,
+            "last_restart": state["last_restart"],
+            "restarts_since_recovery": state["restarts_since_recovery"],
+        })
         return 0
 
     since_restart = time.time() - state["last_restart"]
@@ -238,23 +267,40 @@ def recover(status):
             f"{RESTART_COOLDOWN_SECONDS}s cooldown",
             flush=True,
         )
-        save_state({"failures": failures, "last_restart": state["last_restart"]})
+        save_state({
+            "failures": failures,
+            "last_restart": state["last_restart"],
+            "restarts_since_recovery": state["restarts_since_recovery"],
+        })
         return 0
 
+    restarts = state["restarts_since_recovery"]
     for service in services:
         print(f"skyseeker-health: restarting {service}: {detail}", flush=True)
         result = run([SYSTEMCTL, "restart", service], timeout=20)
+        restarts += 1
         if result.returncode:
             print(
                 f"skyseeker-health: restart failed: {result.stderr.strip()}",
                 flush=True,
             )
-    save_state({"failures": 0, "last_restart": time.time()})
+    restart_time = time.time()
+    save_state({
+        "failures": 0,
+        "last_restart": restart_time,
+        "restarts_since_recovery": restarts,
+    })
 
     time.sleep(RESTART_SETTLE_SECONDS)
     healthy, detail, _ = ap_health(ap_status())
     outcome = "ok" if healthy else "still-failing"
     print(f"skyseeker-health: post-restart={outcome} detail={detail}", flush=True)
+    if healthy:
+        save_state({
+            "failures": 0,
+            "last_restart": restart_time,
+            "restarts_since_recovery": 0,
+        })
     return 0
 
 

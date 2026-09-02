@@ -128,6 +128,29 @@ class NetworkHealthTests(unittest.TestCase):
             self.assertEqual(HEALTH.recover(status), 0)
         run_mock.assert_not_called()
 
+    def test_restart_budget_suppresses_further_restarts(self):
+        HEALTH.save_state({"failures": 0, "last_restart": 0.0,
+                           "restarts_since_recovery": HEALTH.MAX_RESTARTS_BEFORE_BACKOFF})
+        status = healthy_status()
+        status["hostapd"] = "inactive"
+        with (
+            patch.object(HEALTH, "run") as run_mock,
+            contextlib.redirect_stdout(io.StringIO()) as output,
+        ):
+            self.assertEqual(HEALTH.recover(status), 0)
+        run_mock.assert_not_called()
+        self.assertIn("recovery paused", output.getvalue())
+
+    def test_healthy_check_resets_restart_budget(self):
+        HEALTH.save_state({"failures": 4, "last_restart": 123.0, "restarts_since_recovery": 3})
+
+        self.assertEqual(HEALTH.recover(healthy_status()), 0)
+
+        state = HEALTH.load_state()
+        self.assertEqual(state["failures"], 0)
+        self.assertEqual(state["restarts_since_recovery"], 0)
+        self.assertEqual(state["last_restart"], 123.0)
+
     def test_disable_marker_suppresses_recovery(self):
         HEALTH.DISABLE_PATH.touch()
         with patch.object(HEALTH, "run") as run_mock:

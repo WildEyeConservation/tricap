@@ -43,8 +43,10 @@ handles network changes itself and reconnects after an uplink becomes usable.
 The snapshot is written to the persistent system journal. If hostapd, its AP
 interface, its control socket, or dnsmasq fails three consecutive checks, the
 tool restarts only the failed service. A ten-minute cooldown prevents repeated
-restarts. Create `/run/skyseeker-health.disabled` to disable recovery actions
-during maintenance; diagnostics continue and the marker clears at reboot.
+restarts. Recovery pauses after three restarts without an intervening healthy
+check and reports that manual attention is needed. A healthy check resets this
+restart budget. Create `/run/skyseeker-health.disabled` to disable recovery
+actions during maintenance; diagnostics continue and the marker clears at reboot.
 
 There is no automatic reboot path and no systemd hardware watchdog. Warm resets
 on this Rockchip/NVMe platform can leave PCIe in a failed state, so a persistent

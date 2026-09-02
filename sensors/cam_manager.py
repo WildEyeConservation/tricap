@@ -75,6 +75,8 @@ class TriCapCamsManager:
         self._external_storage_jobs = set()
         self._thread_sync_lock = None
         subprocess.run(["timedatectl", "set-ntp", "false"], check=True)
+        # A marker left by a crash mid-capture would otherwise defer AP recovery until reboot.
+        self._clear_capture_marker()
         self._initialise()
         self.mount_disk()
 
@@ -222,8 +224,8 @@ class TriCapCamsManager:
             time.sleep(0.1)
         if self.is_capture_thread_alive():
             self._logger.warning('Capture threads did not stop before shutdown timeout')
-        else:
-            self._clear_capture_marker()
+        # The process is exiting either way, so capture cannot still be running.
+        self._clear_capture_marker()
         for camera in self._cameras:
             camera.release()
 

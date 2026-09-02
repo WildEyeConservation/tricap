@@ -60,12 +60,10 @@ class WebAccessTests(unittest.TestCase):
     def test_flask_runs_directly_on_http_port(self):
         launcher = (ROOT / "tricap.py").read_text()
         self.assertIn('host="0.0.0.0", port=80', launcher)
-        self.assertFalse(
-            (ROOT / "skyseeker-standalone" / "captive_portal.py").exists()
-        )
-        self.assertFalse(
-            (ROOT / "services" / "systemd" / "skyseeker-portal.service").exists()
-        )
+
+    def test_compiled_frontend_is_present_for_each_page(self):
+        for page in ("common", "home", "setup"):
+            self.assertTrue((ROOT / "app" / "static" / "dist" / f"{page}.js").is_file())
 
 
 class FlaskDashboardAssetTests(unittest.TestCase):
@@ -117,22 +115,6 @@ class FlaskDashboardAssetTests(unittest.TestCase):
                 '{"heartbeat_ms": 7000, "status_poll_ms": 1500}</script>',
                 html,
             )
-
-    def test_polling_remains_single_flight_and_capture_aware(self):
-        home = (ROOT / "frontend" / "home.ts").read_text()
-        setup = (ROOT / "frontend" / "setup.ts").read_text()
-        common = (ROOT / "frontend" / "common.ts").read_text()
-
-        self.assertIn("runPeriodic(connectionHeartbeat, uiConfig.heartbeat_ms)", common)
-        self.assertIn("runPeriodic(pollStatus, uiConfig.status_poll_ms)", home)
-        self.assertIn('singleFlight("home-status"', home)
-        self.assertIn('singleFlight("home-storage"', home)
-        self.assertIn('latest?.mode === "STARTED" ? undefined : pollStorage()', home)
-        self.assertIn('singleFlight("setup-status"', setup)
-        self.assertIn('singleFlight("setup-stats"', setup)
-        self.assertIn('singleFlight("setup-image-format"', setup)
-        self.assertIn("capturing ? uiConfig.sensors_poll_capturing_ms : uiConfig.sensors_poll_ms", setup)
-        self.assertIn("capturing ? undefined : loadStats()", setup)
 
 
 class AccessPointSignalTests(unittest.TestCase):

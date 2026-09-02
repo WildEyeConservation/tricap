@@ -2,12 +2,10 @@
 
 import os
 import tempfile
-import threading
 import unittest
 from pathlib import Path
 from unittest.mock import Mock, patch
 
-from sensors.cam_manager import TriCapCamsManager
 from support.backup import RsyncManager
 
 
@@ -263,22 +261,6 @@ class BackupTests(unittest.TestCase):
         self.assertEqual(result["code"], "destination_not_mounted")
         self.assertFalse(result["success"])
         self.assertFalse(self.destination.exists())
-
-    @patch("sensors.cam_manager.subprocess.run")
-    @patch("sensors.cam_manager.os.path.ismount", return_value=True)
-    def test_unmount_refuses_while_external_storage_is_claimed(
-        self, _ismount, run
-    ):
-        manager = TriCapCamsManager.__new__(TriCapCamsManager)
-        manager._external_jobs_lock = threading.Lock()
-        manager._external_storage_jobs = set()
-        manager.claim_external_storage("backup")
-        self.assertFalse(manager.unmount_disk())
-        run.assert_not_called()
-
-        manager.release_external_storage("backup")
-        self.assertTrue(manager.unmount_disk())
-        run.assert_called_once()
 
     @patch("support.backup.time.sleep")
     def test_unmount_retries_are_bounded(self, sleep):

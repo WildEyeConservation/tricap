@@ -222,7 +222,6 @@ class sonySDKcam:
             self._num_images_copied = 0
         self._session_id = session_start_date.strftime("%H_%M_%S")
         self._logger.debug("_session_id %s", self._session_id)
-        stop_trigger_initiated = False
         self._num_images_failed = 0
         self._image_count = 0
 
@@ -254,6 +253,22 @@ class sonySDKcam:
         sleep(1)
         download_wait_attempts = 20
 
+        try:
+            self._capture_loop(
+                interval, start, serial_number, stop_capture, index,
+                capture_done, sync_lock, download_wait_attempts)
+        except Exception as exc:
+            # An SDK call that raises must not leave the camera looking healthy
+            # or the session waiting on a thread that is already gone.
+            self.last_error = str(exc)
+            self.state = CAMERA_STATES.ERROR_CAPTURE
+            with sync_lock:
+                capture_done[index].set()
+            raise
+
+    def _capture_loop(self, interval, start, serial_number, stop_capture,
+                      index, capture_done, sync_lock, download_wait_attempts):
+        stop_trigger_initiated = False
         while True:
             if stop_capture.is_set() and not stop_trigger_initiated:
                 stop_trigger_initiated = True
@@ -323,6 +338,9 @@ class sonySDKcam:
 
                 download_wait_attempts -= 1
                 sleep(1)
+            else:
+                # Poll the schedule without pinning a core between triggers.
+                sleep(0.005)
 
     def get_state_as_string(self):
         """Return the state of the camera as a string."""

@@ -7,6 +7,7 @@ guards, and the pause-while-capturing gates.
 
 import importlib.util
 from pathlib import Path
+import re
 import unittest
 
 
@@ -58,6 +59,7 @@ class PortalPollingTests(unittest.TestCase):
             "setup-uplink",
             "backup-status",
             "verify-status",
+            "job-check",
         ):
             self.assertIn(f'"{key}"', PORTAL.SETUP_JS)
 
@@ -73,6 +75,26 @@ class PortalPollingTests(unittest.TestCase):
             'capturing?null:singleFlight("setup-uplink"',
         ):
             self.assertIn(paused, PORTAL.SETUP_JS)
+
+    def test_setup_controls_lock_until_state_is_known(self):
+        # Lockable controls render disabled and stay locked until the status,
+        # backup and verify pollers have each answered once.
+        self.assertIn('id="lockNote">Checking device status...</p>', PORTAL.SETUP_HTML)
+        lockable = re.findall(r"<button[^>]* data-locks[ >][^>]*>", PORTAL.SETUP_HTML)
+        self.assertTrue(lockable)
+        for tag in lockable:
+            self.assertIn(" disabled", tag, tag)
+        self.assertIn("const unknown=!(known.status&&known.backup&&known.verify)", PORTAL.SETUP_JS)
+        self.assertIn("const lock=unknown||capturing||backupRunning||verifyRunning", PORTAL.SETUP_JS)
+
+    def test_setup_page_notices_jobs_started_elsewhere(self):
+        # An already-open page re-checks the job endpoints every third status
+        # tick while idle, so a copy or delete started from another device
+        # locks this page too. Skipped while capturing or following a job.
+        self.assertIn(
+            "!capturing&&!backupRunning&&!verifyRunning&&++jobTick%3===0)checkRemoteJobs()",
+            PORTAL.SETUP_JS,
+        )
 
 
 if __name__ == "__main__":

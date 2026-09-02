@@ -835,7 +835,7 @@ runPeriodic(()=>latest&&latest.mode==="STARTED"?null:pollStorage(),15000);
 SETUP_JS = COMMON_JS + r'''
 let currentInterval=null,currentImageFormat=null,capturing=false,backupRunning=false,backupTimer=null,camCount=-1,externalConnected=false;
 let verifyRunning=false,verifyTimer=null,verifyAnnounce=false;
-let deleteMode="verify",statusFailures=0;
+let deleteMode="verify",statusFailures=0,jobTick=0;
 // Controls stay locked until every poller has answered at least once.
 const known={status:false,backup:false,verify:false};
 function setControlsEnabled(){
@@ -865,7 +865,19 @@ async function loadSensors(){return singleFlight("setup-status",async()=>{
   }catch(e){el("setupMode").textContent="Offline";if(++statusFailures>=3)known.status=false}
   if(!known.backup)pollBackup();
   if(!known.verify)pollVerify();
+  // A copy or delete can be started from another phone or tab while this
+  // page sits idle, so the job endpoints are re-checked every third tick.
+  else if(known.backup&&!capturing&&!backupRunning&&!verifyRunning&&++jobTick%3===0)checkRemoteJobs();
   setControlsEnabled();
+})}
+// Only a running job is rendered: an idle answer must not overwrite the
+// completion message the other poller left on the backup line.
+async function checkRemoteJobs(){return singleFlight("job-check",async()=>{
+  try{
+    const [backup,verify,force]=await Promise.all([fetchJson("/api/backup_status"),fetchJson("/api/verify_and_delete_status"),fetchJson("/api/force_delete_status")]);
+    if(force.running||verify.running){deleteMode=force.running?"force":"verify";renderVerify(force.running?force:verify)}
+    else if(backup.running)renderBackup(backup);
+  }catch(e){}
 })}
 async function loadStats(){return singleFlight("setup-stats",async()=>{
   try{

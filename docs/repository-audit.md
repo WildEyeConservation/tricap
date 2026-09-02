@@ -42,14 +42,18 @@ systemd tricap.service
         └── start Flask on port 80
             ├── render the home and setup templates
             ├── serve CSS, favicon, and compiled TypeScript output
-            └── expose same-origin JSON, stream, log, and backup endpoints
+            └── expose same-origin JSON, stored-image sample, log, and backup endpoints
 ```
 
-Capture is started and stopped from the browser. The camera manager
-starts GRF-500 measurement, triggers every discovered Sony camera at the
-configured interval, and writes each camera's files beneath
-`/mnt/ext_cam_storage/<date>/<session>/<camera>/`. GPS and altitude are logged
-alongside the flight data, but they are never written into image metadata.
+`tricap.py` handles `SIGTERM` by stopping capture, stopping the laser altimeter,
+unmounting the external SSD, and then exiting.
+
+Capture is started and stopped from the browser. The camera manager starts
+GRF-500 measurement and triggers every discovered Sony camera at the configured
+interval. The Sony SDK writes files directly to
+`/mnt/ext_cam_storage/<date>/<session>/<serial>/`; there is no application save
+thread, preview-image pipeline, tmpfs mount, or `memoryFs` path. GPS and altitude
+are logged alongside the flight data but are never written into image metadata.
 Backup operations verify and copy captures to `/mnt/ssd_cam_storage`.
 
 The browser and Flask are one application boundary:
@@ -59,7 +63,7 @@ browser
 ├── GET / or /setup ───────────────> Flask templates
 ├── GET /static/... ───────────────> Flask static files
 └── same-origin /api/* requests ───> Flask blueprints
-    ├── capture, preview, status and settings
+    ├── capture, stored-image sampling, status, clock and settings
     ├── storage verification, backup and log downloads
     ├── onboard-Wi-Fi uplink selection
     └── NetBird configuration and status
@@ -68,9 +72,14 @@ browser
 `frontend/*.ts` is the only browser source. `tsc` type-checks it in strict mode
 and emits `app/static/dist/*.js`, because browsers execute JavaScript. Node is a
 build tool only; it is not a deployed server. Flask directly serves the HTML,
-generated JavaScript, CSS, API, and health endpoint. There is no proxy, WSGI
-wrapper, separate frontend server, redirector, captive-portal detector, or
-second diagnostics web server.
+generated JavaScript, CSS, API, and health endpoint.
+
+All state-changing API endpoints accept only `POST`. Responses carry
+`Content-Security-Policy: default-src 'self'; script-src 'self'; style-src
+'self'; img-src 'self' blob:; connect-src 'self'; frame-ancestors 'none'`.
+
+There is no proxy, WSGI wrapper, separate frontend server, redirector,
+captive-portal detector, or second diagnostics web server.
 
 Flask accepts requests only from loopback, the access-point subnet, the wired
 maintenance subnet, and the NetBird address range. The TP-Link adapter remains
@@ -91,7 +100,7 @@ The following is the complete tracked tree, grouped by purpose.
 │   ├── views/
 │   │   ├── __init__.py               Python package marker
 │   │   ├── dashboard.py              pages, uplink, flight log, storage sample
-│   │   └── api.py                    capture, preview, backup and NetBird API
+│   │   └── api.py                    capture, status, clock, backup and NetBird API
 │   ├── templates/dashboard/
 │   │   ├── home.html                 flight dashboard shell
 │   │   └── setup.html                device setup and maintenance shell
@@ -119,13 +128,15 @@ The following is the complete tracked tree, grouped by purpose.
 │   └── SerialProcess.py              NMEA parsing and GPS CSV output
 ├── support/
 │   ├── __init__.py                   Python package marker
+│   ├── backup.py                     copy, verification and safe-delete engine
 │   ├── basic.py                      observer primitive
-│   ├── configure.py                  layered default.cfg/initial.cfg reader/writer
 │   ├── component_health.py           camera/GPS/altimeter health summary
-│   ├── phone_time.py                 validated browser-to-device clock sync
-│   ├── local_network.py              Flask source-network allow-list
+│   ├── configure.py                  layered default.cfg/initial.cfg reader/writer
 │   ├── git_info.py                   deployed revision reporting
-│   └── backup.py                     copy, verification and safe-delete engine
+│   ├── local_network.py              Flask source-network allow-list
+│   ├── rsync_progress.py             live rsync progress-output parser
+│   ├── ssd_volume.py                 external USB volume discovery and stable identity
+│   └── system_clock.py               phone/GPS clock authority and system-time updates
 ├── services/
 │   ├── README.md                     install, update and retirement procedure
 │   ├── systemd/
@@ -153,13 +164,16 @@ The following is the complete tracked tree, grouped by purpose.
 │   ├── test_component_health.py      hardware failure reporting
 │   ├── test_configure.py             supported/retired config behavior
 │   ├── test_dashboard.py             Flask ownership, access and UI assets
+│   ├── test_git_info.py              safe deployed-revision reporting
 │   ├── test_grf500_altimeter.py      GRF-500 serial setup and frames
 │   ├── test_network_health.py        bounded AP diagnostics and recovery
-│   ├── test_phone_time.py            safe device clock updates
 │   ├── test_recovery_scan.py         rescue scan and NetBird separation
+│   ├── test_rsync_progress.py        rsync progress-output parsing
 │   ├── test_sony_camera_manager.py   discovered-camera construction
 │   ├── test_sony_discovery.py        bounded SDK discovery
 │   ├── test_sony_image_format.py     Sony connection and transfer settings
+│   ├── test_ssd_volume.py            external USB volume selection
+│   ├── test_system_clock.py          phone/GPS clock authority and system-time updates
 │   └── test_ublox_gps.py             GPS satellite and quality parsing
 ├── config.py                         runtime constants and state enums
 ├── default.cfg                       every supported option: Sony format, capture interval, UI poll rates
@@ -191,8 +205,8 @@ build, while the generated JavaScript is the artifact Flask must serve.
 - `Subject` supports the GRF-500 altimeter's observer notifications. It is a
   small shared primitive, not a sensor plugin.
 - `TriCapCamsManager` finalises its own capture state: a watcher thread joins
-  the save threads of each capture and returns the manager to `STOPPED`, so
-  no external periodic caller is required.
+  every camera capture thread and returns the manager to `STOPPED` once those
+  threads exit, so no external periodic caller is required.
 - `UnavailableAltimeter` preserves one GRF-500-shaped interface on a hardware
   fault without inventing values or selecting another sensor.
 - `backup.py` is large, but its copy, verify and delete logic is one safety
@@ -215,6 +229,7 @@ Directory globs mean every previously tracked file beneath that directory.
 | Bluetooth | `bluez/**` | Retired BlueZ agent and utility layer |
 | Canon/gPhoto fixtures | `camModels/**`, `sensors/abstract_cam.py`, `sensors/canon_6D.py`, `sensors/canon_R.py`, `sensors/gphoto_cam.py`, `sensors/gpio_cam.py` | Unsupported camera families and captured fixtures |
 | Dummy/retired sensors | `sensors/alti_simulator.py`, `sensors/dummy_alti.py`, `sensors/dummy_cam.py`, `sensors/trusense_altimeter.py`, `sensors/altitude_switch.py`, `sensors/camera_logger.py`, `sensors/cam_manager.py.save.1` | Simulators, unsupported hardware and backup copies |
+| Retired Sony pipeline support | `sensors/base_setting.py` | Unused settings abstraction removed with the save-thread, preview and tmpfs pipeline |
 | IMU | `serial_comms/berryIMU.py`, `serial_comms/IMU.py`, `serial_comms/LIS3MDL.py`, `serial_comms/LSM6DSL.py`, `serial_comms/LSM9DS0.py`, `serial_comms/LSM9DS1.py` | IMU is no longer fitted or consumed |
 | Protobuf | `tricap.proto`, `protobuf/**`, `serial_comms/out/**` | Generated protocol layer had no remaining producer or consumer |
 | Image geotagging | `support/gps_geotag.py` | Geotagging was too slow and is no longer performed |
@@ -223,6 +238,7 @@ Directory globs mean every previously tracked file beneath that directory.
 | AssistNow (A-GPS) | `serial_comms/ubloxAgps.py` | GPS is only needed in AP mode, where there is no uplink; the receiver acquires its own fix |
 | Session logger | `support/session_logger.py` | Only ever started by the GPIO switch; wrote altimeter lines and log copies to `/home/radxa/temp`, which nothing reads. Altitude is already logged to `altitudeData.csv` for the flight log |
 | SMS/phone/Bluetooth-era support | `support/sms_sender.py`, `support/phone_gps.py`, `support/talkbox.py`, `support/connection_monitor.py` | Retired communication paths |
+| Replaced clock and path helpers | `support/phone_time.py`, `local_paths.py` | Clock coordination moved to `support/system_clock.py`; deployment paths moved to `config.py` |
 | Old image/log models | `support/camera_data.py`, `support/camera_image.py`, `support/log_list.py` | Used only by the retired Flask pages |
 | Old Flask UI | `app/forms.py`, `app/views/camera.py`, `app/views/home.py`, `app/views/settings.py`, `app/views/showlog.py`, `app/templates/base.html`, `app/templates/camera/**`, `app/templates/home/**`, `app/templates/settings/**`, `app/templates/showlog/**`, `app/templates/js/**` | Replaced by the two direct Flask operator pages |
 | Old browser stack | `app/static/js/**`, old Bootstrap/Bootswatch/Font Awesome/Lato assets under `app/static/css/**` and `app/static/fonts/**`, `app/static/img/default.jpg`, `app/static/img/placeholder.png`, `app/static/img/Power-Shutdown.png` | jQuery and handwritten JavaScript UI replaced by strict TypeScript and one stylesheet |
@@ -232,14 +248,18 @@ Directory globs mean every previously tracked file beneath that directory.
 | Old launch/deploy files | `tricap.service`, `tricap.ini`, `wsgi.py`, `tricap_launcher.sh`, `tricap_launch_tester.py`, `tricap_loop.py`, `main_serial.py`, `python_setup.sh`, `setup.py`, `wifi_setup.sh`, `get_time_from_camera.sh`, `local_paths_example.py` | Duplicate, obsolete or replaced entry/deployment paths |
 | Root artifacts | `.coveragerc`, `defaultend.jpg` | Unused coverage and image residue |
 | Root test harnesses | `test_app.py`, `test_behaviour.py`, `test_live_server.py`, `test_sensors.py`, `test_unit.py` | Duplicate and hardware-stale test entry points |
+| Replaced clock test | `tests/test_phone_time.py` | Replaced by `tests/test_system_clock.py`, which covers coordinated phone and authoritative GPS time |
 | Obsolete tests | `tests/test_alti_simulator.py`, `tests/test_altitude_switch.py`, `tests/test_ap_monitor.py`, `tests/test_ap_watchdog.py`, `tests/test_basic.py`, `tests/test_camera_logger.py`, `tests/test_canon6d_cam.py`, `tests/test_captive_portal.py`, `tests/test_connection_monitor.py`, `tests/test_dummy_alti.py`, `tests/test_dummy_cam.py`, `tests/test_log_list.py`, `tests/test_page_camera_live_server.py`, `tests/test_page_home.py`, `tests/test_page_home_live_server.py`, `tests/test_session_logger.py`, `tests/test_settings.py`, `tests/test_sms_sender.py`, `tests/test_system_monitor.py`, `tests/test_talkbox.py`, `tests/test_trusense_altimeter.py`, `tests/tricap_flask_live_server_test_case.py`, `tests/tricap_flask_test_case.py`, `tests/tricap_tempfile_test_case.py` | Covered retired components, duplicate layers or brittle live-server scaffolding |
 
 The cleanup also removed dead Web and SMS sections, the unused
-`session_description` option and the retired Trusense altimeter options
-(`measurement_timeout`, `num_frames_to_avg`) from `default.cfg`, prunes them
-when an older `initial.cfg` is next saved, removed unused runtime
-constants/imports, and deleted a captured AssistNow binary payload that had
-been committed as a comment.
+`session_description` option, and the retired Trusense altimeter options
+(`measurement_timeout`, `num_frames_to_avg`) from `default.cfg`; older
+`initial.cfg` files are pruned when next saved. It removed the retired `/api`,
+`/api/do_preview`, `/api/image`, `/api/stream`, `/api/copy_eta`,
+`/api/test_capture`, `/api/lensNumber`, `/api/download_gps_logs`, and
+`/api/netbird_key` endpoints, along with the OpenCV, NumPy, Pillow and pytz
+dependencies. It also removed unused runtime constants/imports and a captured
+AssistNow binary payload that had been committed as a comment.
 
 Ignored local directories such as `.venv/`, `node_modules/`, `__pycache__/`,
 coverage output and logs are development products, not tracked repository
@@ -257,7 +277,8 @@ configuration, service, lock and documentation files each have a defined build
 or deployment consumer.
 
 The only automatic recovery action is a bounded restart of failed hostapd or
-dnsmasq after three failed health checks and a ten-minute cooldown. A hidden
-camera-error reboot path found during this audit was removed. Reboot remains an
-explicit operator action in the setup UI; no monitor, capture callback or timer
-can invoke it.
+dnsmasq after three failed health checks, with ten minutes between restarts.
+Recovery is deferred while `/run/skyseeker-capture-active` exists and is paused
+after three restarts without a healthy check. A hidden camera-error reboot path
+found during this audit was removed. Reboot remains an explicit operator action
+in the setup UI; no monitor, capture callback or timer can invoke it.

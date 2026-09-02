@@ -9,7 +9,9 @@ Supported hardware:
 - GRF-500 laser altimeter
 - u-blox GPS on `/dev/gps`
 - TP-Link USB Wi-Fi adapter for the access point
+- Onboard Broadcom Wi-Fi for normal and rescue uplinks
 - Direct Ethernet maintenance connection
+- Internal NVMe capture storage and a removable USB SSD backup volume
 
 ## Runtime
 
@@ -59,6 +61,10 @@ Install the locked Python environment:
 ```sh
 uv sync --locked
 ```
+
+The only direct Python runtime dependencies are Flask, pyserial and pyubx2.
+Note that the rig's service runs the system interpreter, so these must be
+installed for `/usr/bin/python3` on the device (see `services/README.md`).
 
 Install and check the TypeScript frontend:
 

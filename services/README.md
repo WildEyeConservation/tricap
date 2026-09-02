@@ -29,10 +29,12 @@ working rig or written by hand:
 | NetworkManager profile `skyseeker-rescue` | `usr-local/sbin/skyseeker-recovery-scan` | Must be a provisioned Wi-Fi connection for the rescue hotspot, whose default SSID is also `skyseeker-rescue`, and must be activatable on the onboard Broadcom interface. Contents are not tracked; copy from a working rig or create by hand. |
 
 Flask owns the operator UI and API and listens directly on port 80 through
-`tricap.service`. Its request boundary accepts loopback, the
-`192.168.50.0/24` access-point subnet, the `192.168.51.0/24` wired maintenance
-subnet, and the `100.64.0.0/10` NetBird overlay. It rejects requests from the
-internet-uplink Wi-Fi path.
+`tricap.service`. Its request boundary accepts any private-network client:
+loopback, the `192.168.50.0/24` access point, the `192.168.51.0/24` wired
+maintenance link, whatever subnet the rescue hotspot hands out, and the
+`100.64.0.0/10` NetBird overlay. Only public internet addresses are rejected.
+Which NetBird peers can reach the rig is decided by the NetBird access policy,
+not by this check.
 
 After pulling a change that touches anything in this directory, re-install and
 reload:

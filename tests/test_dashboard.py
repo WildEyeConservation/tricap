@@ -24,20 +24,21 @@ class WebAccessTests(unittest.TestCase):
             "192.168.51.42",
             "100.64.0.1",
             "100.127.255.254",
+            "172.20.10.3",
+            "192.168.43.20",
+            "10.0.0.20",
         ):
             with self.subTest(address=address):
                 self.assertTrue(web_client_allowed(address))
 
-    def test_upstream_and_invalid_clients_are_rejected(self):
+    def test_public_and_invalid_clients_are_rejected(self):
         for address in (
             None,
             "",
             "not-an-address",
-            "10.0.0.20",
-            "172.16.0.20",
-            "192.168.1.20",
-            "192.168.43.20",
-            "203.0.113.20",
+            "8.8.8.8",
+            "142.250.72.46",
+            "2001:4860:4860::8888",
         ):
             with self.subTest(address=address):
                 self.assertFalse(web_client_allowed(address))

@@ -133,7 +133,7 @@ The following is the complete tracked tree, grouped by purpose.
 │   ├── component_health.py           camera/GPS/altimeter health summary
 │   ├── configure.py                  layered default.cfg/initial.cfg reader/writer
 │   ├── git_info.py                   deployed revision reporting
-│   ├── local_network.py              Flask source-network allow-list
+│   ├── local_network.py              Flask private-network-only request guard
 │   ├── rsync_progress.py             live rsync progress-output parser
 │   ├── ssd_volume.py                 external USB volume discovery and stable identity
 │   └── system_clock.py               phone/GPS clock authority and system-time updates

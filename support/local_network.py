@@ -1,21 +1,20 @@
-"""Restrict the web interface to SkySeeker-managed networks."""
+"""Restrict the web interface to private networks the rig is attached to."""
 
 from __future__ import annotations
 
 import ipaddress
 
 
-AP_NETWORK = ipaddress.ip_network("192.168.50.0/24")
-WIRED_MAINTENANCE_NETWORK = ipaddress.ip_network("192.168.51.0/24")
-NETBIRD_NETWORK = ipaddress.ip_network("100.64.0.0/10")
-ALLOWED_CLIENT_NETWORKS = (
-    AP_NETWORK,
-    WIRED_MAINTENANCE_NETWORK,
-    NETBIRD_NETWORK,
-)
-
-
 def web_client_allowed(client_ip: str | None) -> bool:
+    """Accept clients on any private network; reject public internet addresses.
+
+    The rig is reached over its own access point, a direct Ethernet cable, a
+    phone hotspot it has joined for internet, or the NetBird overlay. All of
+    those hand out private or carrier-grade NAT addresses, and which subnet a
+    hotspot uses is not ours to choose, so the rule is simply "not globally
+    routable". Public addresses cannot reach the rig anyway because it always
+    sits behind NAT; rejecting them here is belt and braces.
+    """
     if not client_ip:
         return False
 
@@ -26,6 +25,6 @@ def web_client_allowed(client_ip: str | None) -> bool:
 
     if address.is_loopback:
         return True
-    return address.version == 4 and any(
-        address in network for network in ALLOWED_CLIENT_NETWORKS
-    )
+    if address.version == 6:
+        return address.is_link_local or address.is_private
+    return not address.is_global

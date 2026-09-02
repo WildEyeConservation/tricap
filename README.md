@@ -17,10 +17,10 @@ Supported hardware:
 
 `tricap.service` starts `tricap.py`, which serves the Flask operator UI and API
 directly on HTTP port 80. There is no proxy, separate web server, or captive
-portal process. Requests are accepted only from loopback, the SkySeeker AP
-subnet (`192.168.50.0/24`), the wired maintenance subnet
-(`192.168.51.0/24`), and the NetBird overlay (`100.64.0.0/10`); clients on an
-internet-uplink Wi-Fi receive HTTP 403. The AP,
+portal process. Requests are accepted from any private network the rig is
+attached to: the SkySeeker AP (`192.168.50.0/24`), the wired maintenance link
+(`192.168.51.0/24`), a hotspot the rig has joined for internet, and the NetBird
+overlay (`100.64.0.0/10`). Public internet addresses receive HTTP 403. The AP,
 rescue-network scan, diagnostics, and recovery services are stored under `services/`; see
 [`services/README.md`](services/README.md) for installation and operation.
 

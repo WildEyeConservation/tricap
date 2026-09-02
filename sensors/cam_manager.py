@@ -15,7 +15,6 @@ from datetime import datetime
 from config import (
     CAM_MANAGER_STATES,
     MOUNT_POINT,
-    SONY_TEMPFS_MOUNT_POINT,
     MOUNT_POINT_SSD,
     SONY_IMAGE_FORMAT_CAMERA_SETTING,
     SONY_IMAGE_FORMAT_CHOICES,
@@ -24,7 +23,6 @@ from config import (
 
 from support.ssd_volume import find_volume
 
-from .base_setting import BaseSetting, SettingSpec
 from .sony_discovery import discover_sony_cameras
 from .sonySDK_cam import sonySDKcam as SonyCamera
 
@@ -43,29 +41,6 @@ def create_sony_sdk():
     return sonyCamera()
 
 
-class CameraSettings:
-    def __init__(self, manager):
-        object.__setattr__(self, "_manager", manager)
-
-    def __setattr__(self, key, value):
-        if key == SONY_IMAGE_FORMAT_CONFIG_KEY:
-            self._manager.set_sony_image_format(value)
-        else:
-            self._manager._cam_settings[key] = value
-
-    def __getattr__(self, key):
-        if key == SONY_IMAGE_FORMAT_CONFIG_KEY:
-            return BaseSetting(SettingSpec(
-                choices=SONY_IMAGE_FORMAT_CHOICES,
-                get_value=self._manager.get_sony_image_format,
-                set_value=self._manager.set_sony_image_format,
-            ))
-        return self._manager._cam_settings.get(key)
-
-    __setitem__ = __setattr__
-    __getitem__ = __getattr__
-
-
 class TriCapCamsManager:
     """TriCapCamsManager manages TriCap camera objects"""
 
@@ -76,20 +51,16 @@ class TriCapCamsManager:
         self.state = CAM_MANAGER_STATES.STOPPED
 
         self._copy_start_time = None
-        self._save_threads = list()
         self._capture_threads = list()
-        self._preview_threads = list()
         # Keep this list object for the lifetime of the manager. Other startup
         # components retain a reference to it.
         self._cameras = []
         self.camera_startup_error = ''
         self._stop_capture = None
-        self._save_done = list() # sync finish time between capture and save threads
         self._capture_threads_done = list() # sync finish time between capture threads
         self._cam_settings = cam_settings
         self._man_settings = man_settings
-        self._capture_and_copy_lock = list()
-        self._save_and_preview_lock = list()
+        self._camera_count_locks = list()
         self._storage_lock = storage_lock or threading.Lock()
         # Free space on the external SSD only changes during a copy, so measure it
         # once per volume and serve the cached figures while unmounted.
@@ -119,20 +90,8 @@ class TriCapCamsManager:
 
         self._image_capture_interval = float(self._man_settings['image_capture_interval'])
 
-    def is_cam_image_fresh(self, cam_num):
-        return self._cameras[cam_num].is_cam_image_fresh()
-
-    def get_data(self, cam_num):
-        return self._cameras[cam_num].data
-
-    def get_cam_image_fp(self, cam_num):
-        return self._cameras[cam_num].get_cam_image_fp()
-
     def get_cameras_as_list(self):  # Sort this list
         return self._cameras
-
-    def get_state(self):
-        return self.state
 
     def _find_cameras(self, discovery_attempts=15):
         self._sonySDKInstance, camera_count = discover_sony_cameras(
@@ -146,7 +105,6 @@ class TriCapCamsManager:
         for camera_id in range(1, camera_count + 1):
             try:
                 camera = SonyCamera(
-                    SONY_TEMPFS_MOUNT_POINT,
                     self._sonySDKInstance,
                     camera_id,
                     self._sonySDKCamCaptureLock,
@@ -173,24 +131,11 @@ class TriCapCamsManager:
         """Start the capturing threads of all connected cams."""
         self._logger.debug(f"Cam manager - current state {self.state}")
 
-        if self.state == CAM_MANAGER_STATES.STARTED and (
-                not self.is_capture_thread_alive()
-                or not self.is_save_thread_alive()):
-            self._logger.debug('Cam manager - waiting for threads to end')
-            while self.is_capture_thread_alive() or self.is_save_thread_alive():
-                time.sleep(50e-3)
-            self.copy_disk_monitor()
-
         if not self._cameras:
             self.state = CAM_MANAGER_STATES.ERROR_NO_CAMS
             self._logger.debug(
                 'Tried to start capture threads with no Sony cameras connected.'
             )
-            return
-
-        if self.state == CAM_MANAGER_STATES.STARTED:
-            self._stop_capture.clear()
-            self._logger.debug('Cam manager - continue capturing thread')
             return
 
         if self.state != CAM_MANAGER_STATES.STOPPED:
@@ -203,34 +148,29 @@ class TriCapCamsManager:
             self._logger.warning('Cam manager - altimeter start failed: %s', exc)
 
         for camera in self._cameras:
-            camera._image_count = 0
+            camera.reset_session_counters()
 
         self._logger.debug('Cam manager - start capturing threads')
         self._stop_capture = threading.Event()
 
-        if not self._capture_and_copy_lock:
+        if not self._camera_count_locks:
             self._logger.debug('Cam manager - create thread interlocks')
             self._thread_sync_lock = threading.Lock()
             for _camera in self._cameras:
-                self._capture_and_copy_lock.append(threading.Lock())
-                self._save_and_preview_lock.append(threading.Lock())
+                self._camera_count_locks.append(threading.Lock())
                 self._capture_threads_done.append(threading.Event())
-                self._save_done.append(threading.Event())
 
         if not self.mount_disk():
             self._logger.warning(
                 'Internal storage is not mounted; Sony capture will continue'
             )
 
-        global_start_time = time.time() + 0.5
+        global_start_time = time.monotonic() + 0.5
         self._copy_start_time = datetime.now()
-        existing_files = self.list_exisiting_files(MOUNT_POINT)
         self._capture_threads.clear()
-        self._save_threads.clear()
 
         for index, camera in enumerate(self._cameras):
             self._capture_threads_done[index].clear()
-            self._save_done[index].clear()
             self._capture_threads.append(threading.Thread(
                 target=camera.capture_and_copy,
                 daemon=True,
@@ -241,38 +181,23 @@ class TriCapCamsManager:
                     self._copy_start_time,
                     str(camera.serial_num),
                     self._stop_capture,
-                    self._capture_and_copy_lock[index],
+                    self._camera_count_locks[index],
                     index,
                     self._capture_threads_done,
-                    self._save_done[index],
                     self._thread_sync_lock,
                 ),
             ))
-            self._save_threads.append(threading.Thread(
-                target=camera.save_to_ssd,
-                daemon=True,
-                args=(
-                    MOUNT_POINT,
-                    existing_files,
-                    str(camera.serial_num),
-                    self._capture_and_copy_lock[index],
-                    self._save_and_preview_lock[index],
-                    self._capture_threads_done,
-                    self._save_done[index],
-                    self._thread_sync_lock,
-                ),
-            ))
-
-        for thread in self._capture_threads + self._save_threads:
-            thread.start()
 
         self.state = CAM_MANAGER_STATES.STARTED
+        for thread in self._capture_threads:
+            thread.start()
+
         self._logger.debug('Cam manager - capture threads started.')
 
         threading.Thread(
-            target=self._finalise_when_saved,
+            target=self._finalise_when_capture_threads_exit,
             daemon=True,
-            args=(list(self._save_threads),),
+            args=(list(self._capture_threads),),
         ).start()
 
     def stop_capturing(self):
@@ -291,34 +216,6 @@ class TriCapCamsManager:
             if t.is_alive():
                 return True
         return False
-
-    def is_save_thread_alive(self):
-        """ Return true if any cam thread is alive """
-        for t in self._save_threads:
-            if t.is_alive():
-                return True
-        return False
-
-    def is_preview_thread_alive(self):
-        """ Return true if any cam thread is alive """
-        for t in self._preview_threads:
-            if t.is_alive():
-                return True
-        return False
-
-    def list_exisiting_files(self, dir):
-        result = []
-        for root, dirs, files in os.walk(os.path.expanduser(dir)):
-            for name in files:
-                if '.thumbs' in dirs:
-                    dirs.remove('.thumbs')
-                if name in ('.directory',):
-                    continue
-                ext = os.path.splitext(name)[1].lower()
-                if ext in ('.db',):
-                    continue
-                result.append(os.path.join(root, name))
-        return result
 
     def mount_disk(self):
         if not os.path.ismount(MOUNT_POINT):
@@ -434,27 +331,19 @@ class TriCapCamsManager:
                 self._logger.info('Disk not mounted')
         return True
 
-    def _finalise_when_saved(self, save_threads):
-        """Return to STOPPED once every save thread of this capture has exited.
-
-        Nothing else transitions the manager out of STARTED: stop_capturing
-        only requests the threads to stop, and the save threads may keep
-        copying for a while after that.
-        """
-        for thread in save_threads:
+    def _finalise_when_capture_threads_exit(self, capture_threads):
+        """Return to STOPPED once every capture thread has exited."""
+        for thread in capture_threads:
             thread.join()
-        self.copy_disk_monitor()
+        self._reset_after_capture()
 
-    def copy_disk_monitor(self):
-        """Reset manager and camera state once the save threads have finished."""
-
-        if not self.is_save_thread_alive() and self.state == CAM_MANAGER_STATES.STARTED:
-            self._logger.debug("Save completed - unmount disk")
+    def _reset_after_capture(self):
+        """Reset manager and successful cameras after capture completes."""
+        if (not self.is_capture_thread_alive()
+                and self.state == CAM_MANAGER_STATES.STARTED):
+            self._logger.debug("Capture completed")
             self.state = CAM_MANAGER_STATES.STOPPED
 
-            # A successful trigger leaves each camera in CAPTURING. Once all
-            # capture/save threads have finished, return successful cameras to
-            # their ready state without masking a genuine error state.
             for cam in self._cameras:
                 if cam.state.name == 'CAPTURING':
                     cam.state = type(cam.state).INITIALISED
@@ -468,19 +357,6 @@ class TriCapCamsManager:
 
     def get_num_cams(self):
         return len(self._cameras)
-
-    def get_cam_ids(self):
-        cam_ids = []
-        for cam in self._cameras:
-            if cam.serial_num is not None:
-                cam_ids.append(cam.serial_num)
-            else:
-                cam_ids.append('Unknown')
-        return cam_ids
-
-    @property
-    def config(self):
-        return CameraSettings(self)
 
     def get_sony_image_format(self):
         """Return the configured Sony image-format behavior."""
@@ -502,34 +378,8 @@ class TriCapCamsManager:
             camera.set_image_format(image_format)
         self._cam_settings[SONY_IMAGE_FORMAT_CONFIG_KEY] = image_format
 
-    def copy_eta(self):
-        return ""
-
     def sync_time(self, time_str):
         subprocess.run(["timedatectl", "set-time", time_str], check=True)
 
         for cam in self._cameras:
             cam.sync_time()
-
-    def start_preview(self):
-        if len(self._save_and_preview_lock) == 0:
-            return False
-
-        if not self.is_preview_thread_alive():
-            self._logger.debug('Cam manager - start preview thread')
-            self._preview_threads.clear()
-            for index, cam in enumerate(self._cameras):
-                x = threading.Thread(target=cam.load_preview_images, daemon=True, args=(self._save_and_preview_lock[index], ))
-                self._preview_threads.append(x)
-
-            for t in self._preview_threads:
-                t.start()
-            
-            return True
-
-        return False
-
-
-    @property
-    def mount_point(self):
-        return MOUNT_POINT

@@ -52,18 +52,6 @@ class SonyImageFormatTests(unittest.TestCase):
 
         self.assertIn("not writable", "\n".join(captured.output))
 
-    @patch("sensors.sonySDK_cam.subprocess.run")
-    @patch("sensors.sonySDK_cam.os.path.ismount")
-    @patch("sensors.sonySDK_cam.os.makedirs")
-    def test_existing_transfer_tmpfs_is_not_mounted_again(
-            self, makedirs_mock, ismount_mock, run_mock):
-        ismount_mock.return_value = True
-
-        self.camera._ensure_memory_fs("/transfer")
-
-        makedirs_mock.assert_called_once_with("/transfer", exist_ok=True)
-        run_mock.assert_not_called()
-
     @patch("sensors.sonySDK_cam.sleep")
     def test_camera_connection_retries_are_bounded(self, sleep_mock):
         self.camera.CONNECT_ATTEMPTS = 2

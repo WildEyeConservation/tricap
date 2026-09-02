@@ -6,7 +6,7 @@ from threading import Lock
 from unittest.mock import ANY, Mock, call, patch
 
 from sensors.cam_manager import TriCapCamsManager
-from config import CAM_MANAGER_STATES, CAMERA_STATES, SONY_TEMPFS_MOUNT_POINT
+from config import CAM_MANAGER_STATES, CAMERA_STATES
 
 
 class SonyCameraManagerTests(unittest.TestCase):
@@ -29,24 +29,23 @@ class SonyCameraManagerTests(unittest.TestCase):
 
         self.assertEqual(manager.get_num_cams(), 2)
         self.assertEqual(
-            [item.args[2] for item in camera_mock.call_args_list],
+            [item.args[1] for item in camera_mock.call_args_list],
             [1, 2],
         )
         self.assertEqual(
             camera_mock.call_args_list,
             [
-                call(SONY_TEMPFS_MOUNT_POINT, sdk, 1, ANY, "Default"),
-                call(SONY_TEMPFS_MOUNT_POINT, sdk, 2, ANY, "Default"),
+                call(sdk, 1, ANY, "Default"),
+                call(sdk, 2, ANY, "Default"),
             ],
         )
 
-    @patch.object(TriCapCamsManager, "list_exisiting_files", return_value=[])
     @patch.object(TriCapCamsManager, "mount_disk", return_value=True)
     @patch("sensors.cam_manager.subprocess.run")
     @patch("sensors.cam_manager.SonyCamera")
     @patch("sensors.cam_manager.discover_sony_cameras")
-    def test_returns_to_stopped_once_save_threads_finish(
-            self, discover_mock, camera_mock, _run_mock, _mount_mock, _list_mock):
+    def test_returns_to_stopped_once_capture_threads_finish(
+            self, discover_mock, camera_mock, _run_mock, _mount_mock):
         discover_mock.return_value = (Mock(), 1)
         camera = Mock(serial_num="one", state=CAMERA_STATES.CAPTURING)
         camera_mock.return_value = camera
@@ -57,8 +56,8 @@ class SonyCameraManagerTests(unittest.TestCase):
             Lock(),
         )
 
-        # The mocked capture and save targets return immediately, so the
-        # manager must reset itself without any external periodic caller.
+        # The mocked capture target returns immediately, so the manager must
+        # reset itself without any external periodic caller.
         manager.start_capturing()
 
         deadline = time.monotonic() + 2
@@ -67,7 +66,8 @@ class SonyCameraManagerTests(unittest.TestCase):
 
         self.assertEqual(manager.state, CAM_MANAGER_STATES.STOPPED)
         self.assertEqual(camera.state, CAMERA_STATES.INITIALISED)
-        self.assertTrue(camera.save_to_ssd.called)
+        camera.reset_session_counters.assert_called_once_with()
+        camera.capture_and_copy.assert_called_once()
 
 
 if __name__ == "__main__":

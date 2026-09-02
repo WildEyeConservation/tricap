@@ -2,14 +2,12 @@ from __future__ import annotations
 
 from flask import Blueprint, Response, request, jsonify, abort, send_file
 from app import tricap_manager, gps_ser, altimeter
-import base64, logging, cv2
-import numpy as np
+import logging
 from datetime import datetime
 from config import (
   CAM_MANAGER_STATES,
   CAMERA_STATES,
   CAPTURE_INTERVAL_MIN_SEC,
-  FALLBACK_TELEMETRY_DIR,
   SERVER_LOG_DIR,
   MOUNT_POINT,
   MOUNT_POINT_SSD,
@@ -18,7 +16,7 @@ from config import (
 )
 import os
 from support.configure import TricapConfig
-import subprocess, csv
+import subprocess
 from pathlib import Path
 from support.backup import RsyncManager
 from support.component_health import component_health
@@ -28,7 +26,7 @@ from support.phone_time import (
   validate_phone_time,
 )
 from .dashboard import ap_wifi_signal
-import time, shutil, threading, re, io
+import time, shutil, threading, re
 
 api_bp = Blueprint('api', __name__)
 _logger = logging.getLogger(__name__)
@@ -62,10 +60,6 @@ backupManager = RsyncManager(
     release_storage=tricap_manager.release_external_storage,
 )
 
-@api_bp.route('/api')
-def api():
-  return "API working"
-
 @api_bp.route('/api/status')
 def status():
   cams = tricap_manager.get_cameras_as_list()
@@ -78,9 +72,6 @@ def status():
     ret['camError'] = True
   else: 
     ret['camError'] = False
-  progress = tricap_manager.copy_eta()
-  if progress != "":
-    ret['progress'] = progress
   gps["fix"] = gps_ser.hasGps()
   gps['satellites'] = gps_ser.total_visible
   gps['pdop'] = gps_ser.pdop if gps_ser.pdop is not None else 0
@@ -174,16 +165,6 @@ def images_captured():
 
   return ret
 
-@api_bp.route('/api/do_preview')
-def do_preview():
-  if tricap_manager.state == CAM_MANAGER_STATES.STARTED or tricap_manager.state == CAM_MANAGER_STATES.COPYING:
-    return jsonify({'msg': 'Not allowed in started or copying state'}), 400
-
-  ret = {}
-  ret['success'] = tricap_manager.start_preview()
-
-  return ret  
-
 @api_bp.route('/api/statistics')
 def statistics():
   _logger.debug('statistics called')
@@ -199,91 +180,6 @@ def statistics():
     return stats
   except Exception as ex:
     return "", 420
-
-def _mjpeg_placeholder_frame():
-  """Single grey JPEG frame for 'no signal' when no preview is available."""
-  img = np.zeros((80, 80, 3), dtype=np.uint8)
-  img[:] = (48, 48, 48)
-  _, jpeg = cv2.imencode('.jpg', img)
-  return jpeg.tobytes()
-
-
-STREAM_PREVIEW_TIMEOUT_SEC = 300  # Stop live stream after 5 minutes
-
-
-def _stream_preview_frames(cam_idx: int):
-  """Generate Sony SDK live-view frames for up to five minutes."""
-  boundary = b'frame'
-  if cam_idx >= len(tricap_manager._cameras):
-    return
-
-  cam = tricap_manager._cameras[cam_idx]
-  placeholder = _mjpeg_placeholder_frame()
-  stream_start = time.monotonic()
-
-  _logger.debug('stream_preview_frames called')
-  while True:
-    # Stop after 2 minutes
-    if time.monotonic() - stream_start >= STREAM_PREVIEW_TIMEOUT_SEC:
-      _logger.debug('stream_preview_frames ended (5 min timeout)')
-      break
-    # Stop streaming while system is capturing or copying
-    if tricap_manager.state in (CAM_MANAGER_STATES.STARTED, CAM_MANAGER_STATES.COPYING):
-      break
-
-    try:
-      frame_bytes = cam.get_live_view_frame()
-      frame = frame_bytes if frame_bytes else placeholder
-    except Exception as e:
-      _logger.debug('stream frame error: %s', e)
-      frame = placeholder
-
-    part = (
-      b'--' + boundary +
-      b'\r\nContent-Type: image/jpeg\r\nContent-Length: %d\r\n\r\n' % len(frame) +
-      frame + b'\r\n'
-    )
-    yield part
-    time.sleep(0.1)
-  _logger.debug('stream_preview_frames ended')
-
-
-@api_bp.route('/api/stream/<int:cam_idx>')
-def stream_preview(cam_idx):
-  """Stream live preview as MJPEG for the given camera index.
-
-  Not available while capturing or copying.
-  """
-  if cam_idx < 0 or cam_idx >= len(tricap_manager._cameras):
-    return jsonify({'msg': 'Invalid camera index'}), 400
-  if tricap_manager.state in (CAM_MANAGER_STATES.STARTED, CAM_MANAGER_STATES.COPYING):
-    return jsonify({'msg': 'Stream not available while capturing or copying'}), 503
-
-  return Response(
-    _stream_preview_frames(cam_idx),
-    mimetype='multipart/x-mixed-replace; boundary=frame',
-    headers={
-      'Cache-Control': 'no-store, no-cache, must-revalidate',
-      'Pragma': 'no-cache',
-    },
-  )
-
-
-@api_bp.route('/api/image/<cam_idx>/<im_idx>')
-def get_image(cam_idx, im_idx):
-  camIdx = int(cam_idx)
-  imIdx = int(im_idx)
-  if camIdx >= len(tricap_manager._cameras):
-    return jsonify({'msg': 'Invalid camera index'}), 400
-
-  im = {}
-  cam = tricap_manager._cameras[camIdx]
-  im['serialNumber'] = str(cam.serial_num)
-  im['image'] = cam.get_preview_image(imIdx)
-  im['aspectRatio'] = cam.get_aspect_ratio()
-
-  _logger.debug(len(im['image']))
-  return im
 
 NAME_RE = re.compile(
     r"^(?P<cam>\d+)_(?P<dd>\d{2})_(?P<mm>\d{2})_(?P<yyyy>\d{4})_(?P<hh>\d{2})_(?P<mi>\d{2})_(?P<ss>\d{2})_(?P<frame>\d+)\.[A-Za-z0-9]+$",
@@ -341,13 +237,6 @@ def get_images(cam_idx):
   response.headers['X-SkySeeker-Filename'] = path.name
   return response
 
-@api_bp.route('/api/lensNumber')
-def lens_number():
-  ret = {}
-  ret['lens'] = ''
-
-  return ret
-
 @api_bp.route('/api/restart')
 def restart():
   _logger.debug('restart called')
@@ -367,14 +256,6 @@ def reboot():
   subprocess.run(['systemctl', 'reboot'], check=True)
   _logger.debug('reboot')
   return {'success': True}
-
-@api_bp.route('/api/copy_eta')
-def copy_eta():
-  info = tricap_manager.copy_eta()
-  if info == "":
-    return jsonify({'msg': 'No copy information'}), 400
-
-  return info  
 
 @api_bp.route('/api/start_capture')
 def start():
@@ -401,29 +282,6 @@ def stop():
   ret = {}
   ret['success'] = True
   return ret  
-
-
-@api_bp.route('/api/test_capture', methods=['POST'])
-def test_capture():
-  if tricap_manager.state in (CAM_MANAGER_STATES.STARTED, CAM_MANAGER_STATES.COPYING):
-    return jsonify({'msg': 'Not allowed in started or copying state'}), 400
-
-  data = request.get_json()
-  if data is None or 'cam' not in data:
-    return jsonify({'msg': 'Missing cam index'}), 400
-
-  cam_idx = int(data['cam'])
-  if cam_idx >= len(tricap_manager._cameras):
-    return jsonify({'msg': 'Invalid camera index'}), 400
-
-  try:
-    img_bytes, filename = tricap_manager._cameras[cam_idx].test_capture()
-  except Exception as e:
-    _logger.error(f"test_capture failed for cam {cam_idx}: {e}")
-    return jsonify({'msg': f'Capture failed: {e}'}), 500
-
-  return send_file(io.BytesIO(img_bytes), mimetype='application/octet-stream',
-                   download_name=filename, as_attachment=True)
 
 
 @api_bp.route('/api/capture_interval', methods = ['POST'])
@@ -626,61 +484,6 @@ def backup_status():
       "throughput_mib_s": float(st.get("throughput_mib_s") or 0),
   }
 
-@api_bp.route('/api/netbird_key', methods=['POST'])
-def set_netbird_key():
-    _logger.debug("set_netbird_key {}".format(tricap_manager.state))
-    if tricap_manager.state in (CAM_MANAGER_STATES.STARTED, CAM_MANAGER_STATES.COPYING):
-      return jsonify({'msg': 'Not allowed in started or copying state'}), 400
-
-    data = request.get_json()
-    if not data or 'key' not in data:
-        return jsonify({'msg': 'Invalid request', 'success': False}), 400
-    
-    key = data.get('key', '').strip()
-    if not key:
-        return jsonify({'msg': 'Key cannot be empty', 'success': False}), 400
-    
-    try:
-        # Execute: sudo netbird up --setup-key <key>
-        cmd = ['sudo', 'netbird', 'up', '--setup-key', key, '--disable-auto-connect=false']
-        _logger.info("Executing: {}".format(' '.join(cmd)))
-        
-        result = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            timeout=30  # 30 second timeout
-        )
-        
-        if result.returncode != 0:
-            error_msg = result.stderr or result.stdout or 'Unknown error'
-            _logger.error("netbird up --setup-key failed: {}".format(error_msg))
-            return jsonify({
-                'msg': 'Failed to set netbird key: {}'.format(error_msg),
-                'success': False
-            }), 500
-        
-        _logger.info(f"netbird up --setup-key succeeded, return code {result.returncode}")
-        ret = {
-            'success': True,
-            'msg': 'Netbird key set successfully'
-        }
-        return jsonify(ret), 200
-        
-    except subprocess.TimeoutExpired:
-        _logger.error("netbird command timed out")
-        return jsonify({
-            'msg': 'Command timed out',
-            'success': False
-        }), 500
-    except Exception as e:
-        _logger.error("Error setting netbird key: {}".format(str(e)))
-        return jsonify({
-            'msg': 'Error: {}'.format(str(e)),
-            'success': False
-        }), 500
-
-
 @api_bp.route('/api/netbird_connect', methods=['POST'])
 def netbird_connect():
     """Connect to netbird (without setup key)"""
@@ -865,58 +668,6 @@ def download_log():
 
   log_path_file = Path(os.path.join(SERVER_LOG_DIR, 'tricap_master.log'))
   
-  if not log_path_file.exists():
-    abort(404)
-
-  file_size = log_path_file.stat().st_size
-  range_header = request.headers.get("Range", None)
-
-  headers = {
-    "Accept-Ranges": "bytes",
-    "Content-Disposition": f'attachment; filename="{log_path_file.name}"',
-    "Content-Type": "text/plain",
-    "Cache-Control": "no-store",
-  }
-
-  if range_header:
-    try:
-      _, rng = range_header.split("=")
-      start_s, end_s = rng.split("-")
-      start = int(start_s) if start_s else 0
-      end = int(end_s) if end_s else file_size - 1
-      if start < 0 or end >= file_size or start > end:
-        raise ValueError
-    except Exception:
-      abort(416) # invalid Range
-
-    length = end - start + 1
-    headers.update({
-      "Content-Range": f"bytes {start}-{end}/{file_size}",
-      "Content-Length": str(length),
-    })
-    return Response(
-      file_iterator(log_path_file, start, end),
-      status=206,
-      headers=headers,
-    )
-
-  # Full download
-  headers["Content-Length"] = str(file_size)
-  return Response(file_iterator(log_path_file), headers=headers)
-
-@api_bp.route('/api/download_gps_logs', methods = ['GET'])
-def download_gps_log():
-  if tricap_manager.state in (CAM_MANAGER_STATES.STARTED, CAM_MANAGER_STATES.COPYING):
-    return jsonify({'msg': 'Not allowed in started or copying state'}), 400
-
-  log_path = ''
-  if os.path.ismount(MOUNT_POINT):
-      log_path = os.path.join(MOUNT_POINT, datetime.now().strftime('%Y_%m_%d'))
-  else:
-      print("SSD not mounted, reading GPS data from built-in storage")
-      log_path = os.path.join(FALLBACK_TELEMETRY_DIR, datetime.now().strftime('%Y_%m_%d'))
-  log_path_file = Path(os.path.join(log_path, 'gpsData.csv'))
-
   if not log_path_file.exists():
     abort(404)
 

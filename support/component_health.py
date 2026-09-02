@@ -29,6 +29,8 @@ def component_health(camera_manager, gps, altimeter, storage_mounted):
         pass
 
     altimeter_connected = bool(getattr(altimeter, 'available', False))
+    altimeter_state = getattr(altimeter, 'state', None)
+    altimeter_error = getattr(altimeter_state, 'name', None) == 'ERROR'
     return {
         'cameras': _entry(
             camera_count > 0,
@@ -51,7 +53,11 @@ def component_health(camera_manager, gps, altimeter, storage_mounted):
         'altimeter': _entry(
             altimeter_connected,
             'GRF-500 altimeter connected.' if altimeter_connected
-            else 'GRF-500 altimeter is not connected. Capture can continue without altitude data.'),
+            else (
+                'GRF-500 altimeter lost communication. Reconnect it; it is retried when capture starts.'
+                if altimeter_error
+                else 'GRF-500 altimeter is not connected. Capture can continue without altitude data.'
+            )),
         'storage': _entry(
             storage_mounted,
             'Internal storage mounted.' if storage_mounted

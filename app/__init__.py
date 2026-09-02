@@ -146,8 +146,6 @@ rootlogger.debug('Cameras have been configured.')
 try:
     rootlogger.debug('Connecting to the GRF-500 altimeter.')
     altimeter = Grf500Altimeter()
-    altimeter.available = True
-    altimeter.configured_type = 'grf500'
 except Exception as exc:
     rootlogger.warning(
         'GRF-500 altimeter is unavailable; continuing without altitude data: %s',

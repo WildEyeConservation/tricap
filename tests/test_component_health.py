@@ -1,6 +1,7 @@
 """Tests for operator-facing optional-component health messages."""
 
 import unittest
+from types import SimpleNamespace
 from unittest.mock import Mock
 
 from support.component_health import component_health
@@ -33,6 +34,27 @@ class ComponentHealthTests(unittest.TestCase):
         self.assertEqual(
             set(health),
             {'cameras', 'gps', 'altimeter', 'storage'},
+        )
+
+    def test_altimeter_error_reports_lost_communication(self):
+        manager = Mock()
+        manager.get_cameras_as_list.return_value = []
+        gps = Mock(isConnected=False)
+        gps.hasGps.return_value = False
+        altimeter = SimpleNamespace(
+            available=False,
+            state=SimpleNamespace(name='ERROR'),
+        )
+
+        health = component_health(
+            manager, gps, altimeter, storage_mounted=True
+        )
+
+        self.assertFalse(health['altimeter']['connected'])
+        self.assertEqual(
+            health['altimeter']['message'],
+            'GRF-500 altimeter lost communication. '
+            'Reconnect it; it is retried when capture starts.',
         )
 
 

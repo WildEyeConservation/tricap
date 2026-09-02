@@ -52,10 +52,12 @@ class Grf500Altimeter(Subject):
     """Handles LWNX communication with the LightWare GRF-500 laser rangefinder."""
 
     _logger = logging.getLogger(__name__)
+    configured_type = 'grf500'
 
     def __init__(self, supported_devices=GRF500_USB_IDS):
         super().__init__()
 
+        self._supported_devices = supported_devices
         self.state = ALTIMETER_STATE.NOT_CONNECTED
         self._kill_pill = None
         self._read_thread = None
@@ -77,18 +79,29 @@ class Grf500Altimeter(Subject):
         self.alti_code = 2 * [""]
 
         self._ser = None
-        self._ser = serial.Serial(port=self._get_correct_port_name(supported_devices),
-                                  baudrate=115200, timeout=0.2, write_timeout=1.0)
-        self._logger.info('GRF-500 serial port opened.')
-        self.state = ALTIMETER_STATE.CONNECTED
-        self._configure()
+        self._open_port()
 
     # --- properties ---------------------------------------------------------
     @property
     def measurement(self):
         return self._measurement
 
+    @property
+    def available(self):
+        return self.state not in (
+            ALTIMETER_STATE.ERROR,
+            ALTIMETER_STATE.NOT_CONNECTED,
+        )
+
     # --- port discovery -----------------------------------------------------
+    def _open_port(self):
+        """Open the USB-CDC port, configure the sensor and mark it CONNECTED."""
+        self._ser = serial.Serial(port=self._get_correct_port_name(self._supported_devices),
+                                  baudrate=115200, timeout=0.2, write_timeout=1.0)
+        self._logger.info('GRF-500 serial port opened.')
+        self.state = ALTIMETER_STATE.CONNECTED
+        self._configure()
+
     @staticmethod
     def _get_correct_port_name(supported_devices):
         for port in serial.tools.list_ports.comports():
@@ -227,47 +240,74 @@ class Grf500Altimeter(Subject):
         return round(raw * _DIST_TO_M, 1)
 
     def _read(self, stop_event):
-        period = 1.0 / max(self._update_rate_hz(), 1.0)
-        consecutive_fails = 0
-        while not stop_event.is_set():
-            payload, ok = self._txn(_CMD_DISTANCE_DATA)
-            if ok and payload and len(payload) >= 16:
-                consecutive_fails = 0
-                (first_raw, self.first_strength,
-                 last_raw, self.last_strength) = struct.unpack_from('<iiii', payload)
-                self.first_return = self._distance_metres(first_raw)
-                self.last_return = self._distance_metres(last_raw)
+        try:
+            period = 1.0 / max(self._update_rate_hz(), 1.0)
+            consecutive_fails = 0
+            while not stop_event.is_set():
+                payload, ok = self._txn(_CMD_DISTANCE_DATA)
+                if ok and payload and len(payload) >= 16:
+                    consecutive_fails = 0
+                    (first_raw, self.first_strength,
+                     last_raw, self.last_strength) = struct.unpack_from('<iiii', payload)
+                    self.first_return = self._distance_metres(first_raw)
+                    self.last_return = self._distance_metres(last_raw)
 
-                # The dashboard and legacy altitude consumers intentionally use
-                # the last reflection, while observers can log both returns.
-                self._measurement = self.last_return
-                self.value = self.last_return
-                self.strength = self.last_strength
-                if self.last_return is None:
-                    self.set_error('No target')
+                    # The dashboard and legacy altitude consumers intentionally use
+                    # the last reflection, while observers can log both returns.
+                    self._measurement = self.last_return
+                    self.value = self.last_return
+                    self.strength = self.last_strength
+                    if self.last_return is None:
+                        self.set_error('No target')
+                    else:
+                        self.set_error('')
+                    self.notify()
                 else:
-                    self.set_error("")
-                self.notify()
-            else:
-                consecutive_fails += 1
-            if consecutive_fails >= 5:
-                self.state = ALTIMETER_STATE.ERROR
-                self._logger.error('GRF-500 Error: too many read failures, comms lost.')
-                raise GrfError('Communications with GRF-500 lost (5 consecutive failures).')
-            stop_event.wait(period)
+                    consecutive_fails += 1
+                if consecutive_fails >= 5:
+                    raise GrfError(
+                        'Communications with GRF-500 lost '
+                        '(5 consecutive failures).'
+                    )
+                stop_event.wait(period)
+        except (serial.SerialException, OSError, GrfError, struct.error) as exc:
+            self.state = ALTIMETER_STATE.ERROR
+            self.set_error(str(exc))
+            self._measurement = None
+            self.first_return = None
+            self.last_return = None
+            self._logger.error('GRF-500 communication lost: %s', exc)
+            return
         self.state = ALTIMETER_STATE.CONNECTED
 
     def start_measuring(self):
         """Start the measuring thread."""
         if self._read_thread is not None and self._read_thread.is_alive():
-            return
+            return True
+        if self.state == ALTIMETER_STATE.ERROR:
+            # The port is dead after a comms loss; one reopen per capture start.
+            try:
+                if self._ser is not None:
+                    try:
+                        self._ser.close()
+                    except Exception:
+                        pass
+                self._open_port()
+            except Exception as exc:
+                self.state = ALTIMETER_STATE.ERROR
+                self._logger.warning(
+                    'GRF-500 reconnect failed; measurement was not started: %s',
+                    exc,
+                )
+                return False
         self._set_laser(True)
         self._kill_pill = threading.Event()
         self._read_thread = threading.Thread(target=self._read,
                                               args=(self._kill_pill,), daemon=True)
-        self._read_thread.start()
         self.state = ALTIMETER_STATE.MEASURING
+        self._read_thread.start()
         self._logger.debug("GRF-500 - started measuring.")
+        return True
 
     def stop_measuring(self):
         if self._read_thread and self._read_thread.is_alive():
@@ -275,4 +315,5 @@ class Grf500Altimeter(Subject):
             self._read_thread.join()
             self._logger.debug("GRF-500 - stopped measuring.")
         self._set_laser(False)
-        self.state = ALTIMETER_STATE.CONNECTED
+        if self.state != ALTIMETER_STATE.ERROR:
+            self.state = ALTIMETER_STATE.CONNECTED

@@ -162,6 +162,20 @@ tricap_manager.altimeter = altimeter
 rootlogger.info("Git version: " + code_inf.code_id())
 
 
+def shutdown():
+    """Safely stop rig hardware and release mounted storage."""
+    rootlogger.info('Shutting down TriCap app.')
+    tricap_manager.shutdown()
+    try:
+        altimeter.stop_measuring()
+    except Exception as exc:
+        rootlogger.warning('Altimeter shutdown failed: %s', exc, exc_info=True)
+    try:
+        tricap_manager.unmount_disk()
+    except Exception as exc:
+        rootlogger.warning('SSD unmount during shutdown failed: %s', exc, exc_info=True)
+
+
 # Configure the Flask Blueprints
 from .views.dashboard import dashboard_bp
 from .views.api import api_bp

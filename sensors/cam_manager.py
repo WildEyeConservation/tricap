@@ -210,6 +210,17 @@ class TriCapCamsManager:
             self._stop_capture.set()
             self._logger.debug('Cam manager - capture threads stop requested.')
 
+    def shutdown(self):
+        """Stop capture and release every camera within a bounded interval."""
+        self.stop_capturing()
+        deadline = time.monotonic() + 25
+        while self.is_capture_thread_alive() and time.monotonic() < deadline:
+            time.sleep(0.1)
+        if self.is_capture_thread_alive():
+            self._logger.warning('Capture threads did not stop before shutdown timeout')
+        for camera in self._cameras:
+            camera.release()
+
     def is_capture_thread_alive(self):
         """ Return true if any cam thread is alive """
         for t in self._capture_threads:

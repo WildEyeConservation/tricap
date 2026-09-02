@@ -108,7 +108,6 @@ The following is the complete tracked tree, grouped by purpose.
 │   └── setup.ts                      typed setup and maintenance client
 ├── sensors/
 │   ├── __init__.py                   Python package marker
-│   ├── base_setting.py               shared validated hardware setting model
 │   ├── cam_manager.py                Sony discovery, capture and storage owner
 │   ├── sony_discovery.py             bounded Sony SDK discovery retries
 │   ├── sonySDK_cam.py                Sony SDK camera adapter
@@ -163,7 +162,6 @@ The following is the complete tracked tree, grouped by purpose.
 │   ├── test_sony_image_format.py     Sony connection and transfer settings
 │   └── test_ublox_gps.py             GPS satellite and quality parsing
 ├── config.py                         runtime constants and state enums
-├── local_paths.py                    deployed log and config paths
 ├── default.cfg                       every supported option: Sony format, capture interval, UI poll rates
 ├── pyproject.toml                    locked Python dependency declaration
 ├── uv.lock                           exact Python dependency graph

@@ -2,8 +2,6 @@
 
 import logging
 import os
-import signal
-import sys
 import threading
 import time
 from datetime import datetime
@@ -49,13 +47,6 @@ class sonySDKcam:
             "Received an error callback from Sony camera SDK: %s", message
         )
 
-    def exitGracefully(self, *args):
-        self._logger.info("Exiting gracefully")
-        self._sonyCamera.setOnErrorCallBack(None, self._cameraID)
-        del self._sonyCamera
-        self._sonyCamera = None
-        sys.exit(143)
-
     def __init__(
             self,
             sonySDKInstance,
@@ -72,10 +63,6 @@ class sonySDKcam:
         self._count_lock = threading.Lock()
         self.last_error = None
 
-        # Background rediscovery runs outside Python's main thread, where
-        # signal.signal() is not permitted.
-        if threading.current_thread() is threading.main_thread():
-            signal.signal(signal.SIGTERM, self.exitGracefully)
         self._sonyCamera = sonySDKInstance
         self._cameraID = cameraID
 
@@ -103,6 +90,20 @@ class sonySDKcam:
         # Prevent the first capture from being missed while the camera settles.
         sleep(3)
         self.state = CAMERA_STATES.INITIALISED
+
+    def release(self):
+        """Detach SDK callbacks without allowing cleanup errors to escape."""
+        for callback_name in (
+                "setOnErrorCallBack", "setOnDownloadCompleteCallback"):
+            try:
+                callback = getattr(self._sonyCamera, callback_name)
+                callback(None, self._cameraID)
+            except Exception as exc:
+                self._logger.debug(
+                    "Failed to release Sony camera %s callback: %s",
+                    self._cameraID,
+                    exc,
+                )
 
     def _connect_camera(self):
         """Connect with bounded retries instead of waiting forever."""

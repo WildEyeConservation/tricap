@@ -1,13 +1,12 @@
-"""Configuration variables and classes for tricap.py.
-
-Imports all paths from the local_paths.py file.
-"""
+"""Shared configuration paths, constants, and states for SkySeeker."""
 # coding=utf-8
 
 import os
 from enum import Enum
 
-from local_paths import CONFIG_FP, SERVER_LOG_DIR
+# Deployment paths on the rig.
+SERVER_LOG_DIR = '/home/radxa/tricap/logs'
+CONFIG_FP = '/home/radxa/tricap/initial.cfg'
 
 # Shipped defaults for every supported option; initial.cfg only holds overrides.
 DEFAULT_CONFIG_FP = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'default.cfg')
@@ -42,7 +41,6 @@ SONY_PC_IMAGE_FORMAT_FILE_TYPES = {
 MOUNT_POINT = "/mnt/ext_cam_storage"
 MOUNT_POINT_SSD = "/mnt/ssd_cam_storage"
 FALLBACK_TELEMETRY_DIR = "/home/radxa/SkySeeker_Data"
-SONY_TEMPFS_MOUNT_POINT = "/home/radxa/SonySDKWrapper/memoryFs"
 
 CAMERA_STATES = Enum("CamState", ["UNINITIALISED", "INITIALISED", "CAPTURING", 
                                   "ERROR_CONFIG", "ERROR_CAPTURE"])

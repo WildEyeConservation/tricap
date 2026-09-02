@@ -25,6 +25,7 @@ let verifyTimer;
 let verifyAnnounce = false;
 let deleteMode = "verify";
 let statusFailures = 0;
+let jobTick = 0;
 // Controls stay locked until every poller has answered at least once.
 const known = { status: false, backup: false, verify: false };
 function setControlsEnabled() {
@@ -88,7 +89,35 @@ async function loadSensors() {
             void pollBackup();
         if (!known.verify)
             void pollVerify();
+        // A copy or delete can be started from another phone or tab while this
+        // page sits idle, so the job endpoints are re-checked every third tick.
+        else if (known.backup && !capturing && !backupRunning && !verifyRunning && ++jobTick % 3 === 0) {
+            void checkRemoteJobs();
+        }
         setControlsEnabled();
+    });
+}
+// Only a running job is rendered: an idle answer must not overwrite the
+// completion message the other poller left on the backup line.
+async function checkRemoteJobs() {
+    await singleFlight("job-check", async () => {
+        try {
+            const [backup, verify, force] = await Promise.all([
+                getJson("/api/backup_status"),
+                getJson("/api/verify_and_delete_status"),
+                getJson("/api/force_delete_status"),
+            ]);
+            if (force.running || verify.running) {
+                deleteMode = force.running ? "force" : "verify";
+                renderVerify(force.running ? force : verify);
+            }
+            else if (backup.running) {
+                renderBackup(backup);
+            }
+        }
+        catch {
+            // Status polling reports outages; a missed re-check is harmless.
+        }
     });
 }
 async function loadStats() {

@@ -14,6 +14,19 @@ import {
   uiConfig,
 } from "./common.js";
 
+// nmcli may wait up to 40 seconds before the server returns.
+const UPLINK_CONNECT_TIMEOUT_MS = 60000;
+// Uplink teardown can block while the server disconnects the interface.
+const UPLINK_DISCONNECT_TIMEOUT_MS = 30000;
+// NetBird connect and disconnect commands have a 30-second server timeout.
+const NETBIRD_ACTION_TIMEOUT_MS = 40000;
+// NetBird status checks can take up to 10 seconds on the server.
+const NETBIRD_STATUS_TIMEOUT_MS = 15000;
+// Storage operations may need to mount the backup device first.
+const STORAGE_ACTION_TIMEOUT_MS = 30000;
+// Restart and reboot requests need time for the server command to begin.
+const SYSTEM_ACTION_TIMEOUT_MS = 15000;
+
 interface GpsStatus {
   avg?: number;
   lastUpdate?: number;
@@ -394,7 +407,7 @@ async function startBackup(control: HTMLButtonElement): Promise<void> {
   const finish = beginAction(control, "Starting backup...");
   if (!finish) return;
   try {
-    const result = await getJson<ActionResponse>("/api/backup_start");
+    const result = await getJson<ActionResponse>("/api/backup_start", {}, STORAGE_ACTION_TIMEOUT_MS);
     if (result.success === false) toast(result.msg || "Backup failed to start");
     else {
       backupRunning = true;
@@ -414,7 +427,7 @@ async function moveBackup(control: HTMLButtonElement): Promise<void> {
   if (!finish) return;
   byId("moveConfirmModal").classList.remove("open");
   try {
-    const result = await getJson<ActionResponse>("/api/backup_move");
+    const result = await getJson<ActionResponse>("/api/backup_move", {}, STORAGE_ACTION_TIMEOUT_MS);
     if (result.success === false) toast(result.msg || "Copy & delete failed to start");
     else {
       backupRunning = true;
@@ -458,7 +471,7 @@ async function verifyDeleteMatched(control: HTMLButtonElement): Promise<void> {
   byId("deleteDecisionModal").classList.remove("open");
   try {
     deleteMode = "verify";
-    const result = await getJson<ActionResponse>("/api/verify_and_delete");
+    const result = await getJson<ActionResponse>("/api/verify_and_delete", {}, STORAGE_ACTION_TIMEOUT_MS);
     if (result.success) {
       verifyRunning = true;
       verifyAnnounce = true;
@@ -510,7 +523,7 @@ async function forceDeleteAll(control: HTMLButtonElement): Promise<void> {
 
 async function netbirdStatus(announce: boolean): Promise<void> {
   try {
-    const result = await getJson<NetbirdStatus>("/api/netbird_status");
+    const result = await getJson<NetbirdStatus>("/api/netbird_status", {}, NETBIRD_STATUS_TIMEOUT_MS);
     byId("nbDot").className = `dot ${result.connected ? "good" : "off"}`;
     byId("nbState").textContent = result.connected ? "Available" : "Off";
     if (announce) toast(result.connected ? "Remote support is available" : "Remote support is off");
@@ -548,7 +561,7 @@ async function restartCaptureService(control: HTMLButtonElement): Promise<void> 
   const finish = beginAction(control, "Restarting tricap...");
   if (!finish) return;
   try {
-    await getJson<unknown>("/api/restart");
+    await getJson<unknown>("/api/restart", {}, SYSTEM_ACTION_TIMEOUT_MS);
     toast("tricap restart requested");
   } catch (error) {
     toast(errorMessage(error));
@@ -563,7 +576,7 @@ async function rebootDevice(control: HTMLButtonElement): Promise<void> {
   const finish = beginAction(control, "Requesting reboot...");
   if (!finish) return;
   try {
-    await getJson<unknown>("/api/reboot");
+    await getJson<unknown>("/api/reboot", {}, SYSTEM_ACTION_TIMEOUT_MS);
     toast("Reboot requested - rejoin skyseeker when it returns");
   } catch (error) {
     toast(errorMessage(error));
@@ -607,7 +620,11 @@ async function connectUplink(custom: boolean): Promise<void> {
       body.ssid = ssid;
       if (psk) body.psk = psk;
     }
-    const result = await postJson<ActionResponse, UplinkRequest>("/api/uplink_connect", body);
+    const result = await postJson<ActionResponse, UplinkRequest>(
+      "/api/uplink_connect",
+      body,
+      UPLINK_CONNECT_TIMEOUT_MS,
+    );
     toast(result.msg || "Internet connected");
     void uplinkStatus();
   } catch (error) {
@@ -622,7 +639,11 @@ async function disconnectUplink(control: HTMLButtonElement): Promise<void> {
   const finish = beginAction(control, "Disconnecting internet...");
   if (!finish) return;
   try {
-    const result = await postJson<ActionResponse>("/api/uplink_disconnect");
+    const result = await postJson<ActionResponse>(
+      "/api/uplink_disconnect",
+      undefined,
+      UPLINK_DISCONNECT_TIMEOUT_MS,
+    );
     toast(result.msg || "Internet disconnected");
     void uplinkStatus();
   } catch (error) {
@@ -726,7 +747,7 @@ button("nbConnect").addEventListener("click", async () => {
   const finish = beginAction(control, "Connecting remote support...");
   if (!finish) return;
   try {
-    await postJson<unknown>("/api/netbird_connect");
+    await postJson<unknown>("/api/netbird_connect", undefined, NETBIRD_ACTION_TIMEOUT_MS);
     await netbirdStatus(true);
   } catch (error) {
     toast(errorMessage(error));
@@ -740,7 +761,7 @@ button("nbDisconnect").addEventListener("click", async () => {
   const finish = beginAction(control, "Turning off remote support...");
   if (!finish) return;
   try {
-    await postJson<unknown>("/api/netbird_disconnect");
+    await postJson<unknown>("/api/netbird_disconnect", undefined, NETBIRD_ACTION_TIMEOUT_MS);
     await netbirdStatus(true);
   } catch (error) {
     toast(errorMessage(error));

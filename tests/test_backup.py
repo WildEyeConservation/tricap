@@ -95,6 +95,16 @@ class BackupTests(unittest.TestCase):
         RsyncManager(refresh_usage=explode)._refresh_storage_usage()
         self.assertTrue(RsyncManager()._unmount_storage())
 
+    def test_prune_keeps_root_and_lost_and_found(self):
+        (self.source / "lost+found").mkdir()
+        (self.source / "2026_09_01" / "cam").mkdir(parents=True)
+
+        self.manager.delete_matched_files(str(self.source), [])
+
+        self.assertTrue((self.source / "lost+found").is_dir())
+        self.assertTrue(self.source.is_dir())
+        self.assertFalse((self.source / "2026_09_01").exists())
+
     @patch("support.backup.os.path.ismount", return_value=False)
     def test_start_refuses_unmounted_destination(self, _ismount):
         self.destination.rmdir()

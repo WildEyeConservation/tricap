@@ -590,10 +590,13 @@ class RsyncManager:
         if prune_empty_dirs and not dry_run:
             for dirpath, _, _ in os.walk(src_p, topdown=False):
                 p = Path(dirpath)
+                # The mount root and ext4's lost+found are not flight data.
+                if p == src_p or p.name == "lost+found":
+                    continue
                 try:
                     if not any(p.iterdir()):
                         p.rmdir()
-                except Exception:
+                except OSError:
                     pass
 
         return {

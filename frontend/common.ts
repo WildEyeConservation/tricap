@@ -98,39 +98,62 @@ export function beginAction(
 export async function getJson<T>(
   path: string,
   options: RequestInit = {},
+  timeoutMs = 8000,
 ): Promise<T> {
-  const response = await fetch(path, {
-    cache: "no-store",
-    ...options,
-    headers: {
-      Accept: "application/json",
-      ...options.headers,
-    },
-  });
-
-  if (!response.ok) {
-    const data: ApiErrorData = await response.json().catch(() => ({
-      msg: `${response.status} ${response.statusText}`,
-    }));
-    throw new ApiError(
-      data.msg || `${response.status} ${response.statusText}`,
-      response.status,
-      data,
-    );
+  const controller = new AbortController();
+  const abort = (): void => controller.abort();
+  const callerSignal = options.signal;
+  if (callerSignal?.aborted) {
+    abort();
+  } else {
+    callerSignal?.addEventListener("abort", abort, { once: true });
   }
+  const timer = window.setTimeout(abort, timeoutMs);
 
-  return response.json();
+  try {
+    const response = await fetch(path, {
+      cache: "no-store",
+      ...options,
+      headers: {
+        Accept: "application/json",
+        ...options.headers,
+      },
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      const data: ApiErrorData = await response.json().catch(() => ({
+        msg: `${response.status} ${response.statusText}`,
+      }));
+      throw new ApiError(
+        data.msg || `${response.status} ${response.statusText}`,
+        response.status,
+        data,
+      );
+    }
+
+    return await response.json();
+  } catch (error) {
+    if (controller.signal.aborted) {
+      throw new ApiError("Request timed out", 0, { msg: "Request timed out" });
+    }
+    throw error;
+  } finally {
+    window.clearTimeout(timer);
+    callerSignal?.removeEventListener("abort", abort);
+  }
 }
 
 export function postJson<TResponse, TBody extends object = Record<string, never>>(
   path: string,
   body?: TBody,
+  timeoutMs = 8000,
 ): Promise<TResponse> {
   return getJson<TResponse>(path, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body ?? {}),
-  });
+  }, timeoutMs);
 }
 
 const inflightRequests = new Set<string>();

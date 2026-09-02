@@ -339,10 +339,18 @@ async function toggleCapture(control) {
     byId("captureButton").disabled = true;
     byId("flightStop").disabled = true;
     try {
-        if (!capturing)
-            await syncPhoneClock();
+        let clockNote = "";
+        if (!capturing) {
+            // The rig's clock is convenience metadata; a failed sync must not block capture.
+            try {
+                await syncPhoneClock();
+            }
+            catch {
+                clockNote = " (clock sync failed)";
+            }
+        }
         await getJson(capturing ? "/api/stop_capture" : "/api/start_capture");
-        toast(capturing ? "Capture stopped" : "Capture started");
+        toast(capturing ? "Capture stopped" : `Capture started${clockNote}`);
     }
     catch (error) {
         toast(errorMessage(error));

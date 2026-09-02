@@ -73,29 +73,52 @@ export function beginAction(control, message) {
         }
     };
 }
-export async function getJson(path, options = {}) {
-    const response = await fetch(path, {
-        cache: "no-store",
-        ...options,
-        headers: {
-            Accept: "application/json",
-            ...options.headers,
-        },
-    });
-    if (!response.ok) {
-        const data = await response.json().catch(() => ({
-            msg: `${response.status} ${response.statusText}`,
-        }));
-        throw new ApiError(data.msg || `${response.status} ${response.statusText}`, response.status, data);
+export async function getJson(path, options = {}, timeoutMs = 8000) {
+    const controller = new AbortController();
+    const abort = () => controller.abort();
+    const callerSignal = options.signal;
+    if (callerSignal?.aborted) {
+        abort();
     }
-    return response.json();
+    else {
+        callerSignal?.addEventListener("abort", abort, { once: true });
+    }
+    const timer = window.setTimeout(abort, timeoutMs);
+    try {
+        const response = await fetch(path, {
+            cache: "no-store",
+            ...options,
+            headers: {
+                Accept: "application/json",
+                ...options.headers,
+            },
+            signal: controller.signal,
+        });
+        if (!response.ok) {
+            const data = await response.json().catch(() => ({
+                msg: `${response.status} ${response.statusText}`,
+            }));
+            throw new ApiError(data.msg || `${response.status} ${response.statusText}`, response.status, data);
+        }
+        return await response.json();
+    }
+    catch (error) {
+        if (controller.signal.aborted) {
+            throw new ApiError("Request timed out", 0, { msg: "Request timed out" });
+        }
+        throw error;
+    }
+    finally {
+        window.clearTimeout(timer);
+        callerSignal?.removeEventListener("abort", abort);
+    }
 }
-export function postJson(path, body) {
+export function postJson(path, body, timeoutMs = 8000) {
     return getJson(path, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body ?? {}),
-    });
+    }, timeoutMs);
 }
 const inflightRequests = new Set();
 export async function singleFlight(key, work) {

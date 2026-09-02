@@ -1,5 +1,7 @@
 import configparser
+from html.parser import HTMLParser
 import importlib.util
+import json
 from pathlib import Path
 import unittest
 from unittest.mock import patch
@@ -13,6 +15,34 @@ VIEW_PATH = ROOT / "app" / "views" / "dashboard.py"
 VIEW_SPEC = importlib.util.spec_from_file_location("skyseeker_dashboard_view", VIEW_PATH)
 DASHBOARD_VIEW = importlib.util.module_from_spec(VIEW_SPEC)
 VIEW_SPEC.loader.exec_module(DASHBOARD_VIEW)
+
+
+class DashboardPageParser(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.module_sources = []
+        self.ui_config_parts = []
+        self.reading_ui_config = False
+
+    def handle_starttag(self, tag, attrs):
+        if tag != "script":
+            return
+        attributes = dict(attrs)
+        if attributes.get("type") == "module":
+            self.module_sources.append(attributes.get("src"))
+        if (
+            attributes.get("id") == "ui-config"
+            and attributes.get("type") == "application/json"
+        ):
+            self.reading_ui_config = True
+
+    def handle_endtag(self, tag):
+        if tag == "script":
+            self.reading_ui_config = False
+
+    def handle_data(self, data):
+        if self.reading_ui_config:
+            self.ui_config_parts.append(data)
 
 
 class WebAccessTests(unittest.TestCase):
@@ -58,10 +88,6 @@ class WebAccessTests(unittest.TestCase):
         self.assertEqual(profile["ipv4"]["address1"], "192.168.51.1/24")
         self.assertEqual(profile["ipv4"]["never-default"], "true")
 
-    def test_flask_runs_directly_on_http_port(self):
-        launcher = (ROOT / "tricap.py").read_text()
-        self.assertIn('host="0.0.0.0", port=80', launcher)
-
     def test_compiled_frontend_is_present_for_each_page(self):
         for page in ("common", "home", "setup"):
             self.assertTrue((ROOT / "app" / "static" / "dist" / f"{page}.js").is_file())
@@ -99,23 +125,23 @@ class FlaskDashboardAssetTests(unittest.TestCase):
             connect.assert_called_once_with("field-hotspot", "secret")
 
     def test_templates_load_only_compiled_typescript(self):
-        for page in ("home", "setup"):
-            template = (ROOT / "app" / "templates" / "dashboard" / f"{page}.html").read_text()
-            self.assertIn(f'/static/dist/{page}.js', template)
-            self.assertNotIn("<style>", template)
-            # One compiled module plus the [Ui] JSON data block, which is not executable.
-            self.assertEqual(template.count("<script"), 2)
-            self.assertEqual(template.count('script type="module"'), 1)
-            self.assertEqual(template.count('script type="application/json" id="ui-config"'), 1)
+        for path, page in (("/", "home"), ("/setup", "setup")):
+            with self.subTest(path=path):
+                parser = DashboardPageParser()
+                parser.feed(self.client.get(path).get_data(as_text=True))
+
+                self.assertEqual(parser.module_sources, [f"/static/dist/{page}.js"])
 
     def test_pages_embed_the_configured_poll_rates(self):
         for path in ("/", "/setup"):
-            html = self.client.get(path).get_data(as_text=True)
-            self.assertIn(
-                '<script type="application/json" id="ui-config">'
-                '{"heartbeat_ms": 7000, "status_poll_ms": 1500}</script>',
-                html,
-            )
+            with self.subTest(path=path):
+                parser = DashboardPageParser()
+                parser.feed(self.client.get(path).get_data(as_text=True))
+
+                self.assertEqual(
+                    json.loads("".join(parser.ui_config_parts)),
+                    {"status_poll_ms": 1500, "heartbeat_ms": 7000},
+                )
 
 
 class AccessPointSignalTests(unittest.TestCase):

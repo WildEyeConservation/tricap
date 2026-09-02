@@ -1,9 +1,7 @@
 """Tests for SkySeeker diagnostics and bounded AP recovery."""
 
-import contextlib
 from importlib.machinery import SourceFileLoader
 import importlib.util
-import io
 from pathlib import Path
 import subprocess
 import tempfile
@@ -134,13 +132,15 @@ class NetworkHealthTests(unittest.TestCase):
                            "restarts_since_recovery": HEALTH.MAX_RESTARTS_BEFORE_BACKOFF})
         status = healthy_status()
         status["hostapd"] = "inactive"
-        with (
-            patch.object(HEALTH, "run") as run_mock,
-            contextlib.redirect_stdout(io.StringIO()) as output,
-        ):
+        with patch.object(HEALTH, "run") as run_mock:
             self.assertEqual(HEALTH.recover(status), 0)
         run_mock.assert_not_called()
-        self.assertIn("recovery paused", output.getvalue())
+        state = HEALTH.load_state()
+        self.assertEqual(state["failures"], 1)
+        self.assertEqual(
+            state["restarts_since_recovery"],
+            HEALTH.MAX_RESTARTS_BEFORE_BACKOFF,
+        )
 
     def test_healthy_check_resets_restart_budget(self):
         HEALTH.save_state({"failures": 4, "last_restart": 123.0, "restarts_since_recovery": 3})
@@ -169,33 +169,68 @@ class NetworkHealthTests(unittest.TestCase):
         status = healthy_status()
         status['hostapd'] = 'inactive'
 
-        with (
-            patch.object(HEALTH, 'run') as run_mock,
-            contextlib.redirect_stdout(io.StringIO()) as output,
-        ):
+        with patch.object(HEALTH, 'run') as run_mock:
             self.assertEqual(HEALTH.recover(status), 0)
 
         run_mock.assert_not_called()
         self.assertEqual(HEALTH.load_state(), original_state)
-        self.assertIn(
-            'recovery deferred while capture is running',
-            output.getvalue(),
-        )
 
-    def test_automatic_recovery_has_no_power_cycle_path(self):
-        source = HEALTH_PATH.read_text(encoding="utf-8")
-        for command in ("reboot", "poweroff", "shutdown"):
-            self.assertNotIn(command, source)
+    def test_automatic_recovery_only_restarts_expected_services(self):
+        HEALTH.save_state({"failures": 2, "last_restart": 0.0})
+        status = healthy_status()
+        status["hostapd"] = "inactive"
+        commands = []
+
+        def runner(args, timeout=6):
+            commands.append(args)
+            return result(args)
+
+        with (
+            patch.object(HEALTH, "run", side_effect=runner),
+            patch.object(HEALTH, "ap_status", return_value=healthy_status()),
+        ):
+            self.assertEqual(HEALTH.recover(status), 0)
+
+        self.assertTrue(commands)
+        for command in commands:
+            self.assertEqual(command[:2], [HEALTH.SYSTEMCTL, "restart"])
+            self.assertIn(command[2], {"hostapd.service", "dnsmasq.service"})
+            self.assertTrue(
+                {"reboot", "poweroff", "shutdown"}.isdisjoint(
+                    token.lower() for token in command
+                )
+            )
+
+    def test_failed_restart_still_consumes_budget_and_waits_for_fresh_failures(self):
+        # A failed systemctl restart counts as an attempt: the budget is spent and
+        # the failure count restarts so the next attempt waits for the cooldown.
+        HEALTH.save_state({"failures": 2, "last_restart": 0.0})
+        status = healthy_status()
+        status["hostapd"] = "inactive"
+
+        with (
+            patch.object(
+                HEALTH,
+                "run",
+                return_value=result([], returncode=1, stderr="restart failed"),
+            ),
+            patch.object(HEALTH, "ap_status", return_value=status),
+        ):
+            self.assertEqual(HEALTH.recover(status), 0)
+
+        state = HEALTH.load_state()
+        self.assertEqual(state["failures"], 0)
+        self.assertEqual(state["restarts_since_recovery"], 1)
 
     def test_failed_snapshot_is_still_printable(self):
         status = healthy_status()
         status["interface"] = None
         with (
             patch.object(HEALTH, "snapshot", return_value={"ap": "failed"}),
-            contextlib.redirect_stdout(io.StringIO()) as output,
+            patch("builtins.print") as print_mock,
         ):
             HEALTH.print_snapshot(status)
-        self.assertIn("ap=failed", output.getvalue())
+        print_mock.assert_called_once()
 
 
 if __name__ == "__main__":

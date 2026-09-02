@@ -73,11 +73,51 @@ class RecoveryScanTests(unittest.TestCase):
             calls,
         )
 
-    def test_scan_does_not_manage_netbird(self):
-        source = SCAN_PATH.read_text(encoding="utf-8").lower()
-        self.assertNotIn("netbird up", source)
-        self.assertNotIn("netbird down", source)
-        self.assertNotIn("systemctl restart netbird", source)
+    def test_joining_rescue_profile_does_not_manage_netbird(self):
+        calls = []
+
+        def commands(args, timeout=15):
+            calls.append(args)
+            if "--active" in args:
+                return result(args)
+            if args[-2:] == ["connection", "show"]:
+                return result(args, stdout=f"{SCAN.PROFILE}\n")
+            if "list" in args:
+                return result(args, stdout=f"{SCAN.SSID}\n")
+            return result(args)
+
+        with (
+            patch.object(SCAN, "onboard_interface", return_value="wlan0"),
+            patch.object(SCAN, "run", side_effect=commands),
+        ):
+            self.assertEqual(SCAN.main(), 0)
+
+        self.assertIn("up", calls[-1])
+        self.assertIn(SCAN.PROFILE, calls[-1])
+        self.assertTrue(
+            all("netbird" not in " ".join(command).lower() for command in calls)
+        )
+
+    def test_failed_connect_logs_and_performs_no_followup_command(self):
+        calls = []
+
+        def commands(args, timeout=15):
+            calls.append(args)
+            return result(args, returncode=10, stderr="connection failed")
+
+        with (
+            patch.object(SCAN, "onboard_interface", return_value="wlan0"),
+            patch.object(SCAN, "active_connection", return_value=None),
+            patch.object(SCAN, "profile_exists", return_value=True),
+            patch.object(SCAN, "rescue_visible", return_value=True),
+            patch.object(SCAN, "run", side_effect=commands),
+            patch.object(SCAN, "log") as log,
+        ):
+            self.assertEqual(SCAN.main(), 0)
+
+        self.assertTrue(log.called)
+        self.assertEqual(len(calls), 1)
+        self.assertIn("up", calls[0])
 
 
 if __name__ == "__main__":

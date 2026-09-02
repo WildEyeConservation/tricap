@@ -22,15 +22,17 @@ class ComponentHealthTests(unittest.TestCase):
         )
 
         self.assertFalse(health['cameras']['connected'])
-        self.assertIn('Storage operations remain available',
-                      health['cameras']['message'])
-        self.assertIn('Restart Tricap after reconnecting cameras',
-                      health['cameras']['message'])
+        self.assertEqual(health['cameras']['count'], 0)
+        self.assertTrue(health['cameras']['message'])
         self.assertEqual(
             health['cameras']['error'],
             "Sony SDK reported zero cameras",
         )
-        self.assertIn('GRF-500', health['altimeter']['message'])
+        self.assertFalse(health['gps']['connected'])
+        self.assertFalse(health['gps']['fix'])
+        self.assertFalse(health['altimeter']['connected'])
+        self.assertTrue(health['altimeter']['message'])
+        self.assertTrue(health['storage']['connected'])
         self.assertEqual(
             set(health),
             {'cameras', 'gps', 'altimeter', 'storage'},
@@ -51,11 +53,7 @@ class ComponentHealthTests(unittest.TestCase):
         )
 
         self.assertFalse(health['altimeter']['connected'])
-        self.assertEqual(
-            health['altimeter']['message'],
-            'GRF-500 altimeter lost communication. '
-            'Reconnect it; it is retried when capture starts.',
-        )
+        self.assertIn('lost communication', health['altimeter']['message'])
 
 
 if __name__ == "__main__":

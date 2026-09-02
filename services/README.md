@@ -9,6 +9,25 @@ These mirror files that live outside the repo on the device:
 - `udev-rules.d/` -> `/etc/udev/rules.d/`
 - `usr-local/sbin/` -> `/usr/local/sbin/`
 
+## Files and setup not tracked here
+
+The tracked tree is not sufficient on its own to provision a new unit. The
+following files and setup are not in this repository and must be copied from a
+working rig or written by hand:
+
+| Path or item | Tracked file that needs it | Required contents or setup |
+| --- | --- | --- |
+| `/etc/default/skyseeker-standalone` | `usr-local/sbin/skyseeker-ap-autodetect.sh` and `systemd/skyseeker-standalone-net.service` | Must define `AP_IFACE=` with the AP interface name and `SUBNET_IP=` with the address to assign to that interface as a `/24`. |
+| `/etc/hostapd/hostapd-skyseeker.conf` | `usr-local/sbin/skyseeker-ap-autodetect.sh` | Contents are not tracked; copy from a working rig. The script updates a pinned AP interface name and adds `ctrl_interface=/run/hostapd` if no control interface is configured. |
+| `/etc/dnsmasq.d/skyseeker.conf` | `usr-local/sbin/skyseeker-ap-autodetect.sh` | Contents are not tracked; copy from a working rig. The script updates a pinned AP interface name. |
+| `/etc/NetworkManager/conf.d/90-skyseeker-standalone.conf` | `usr-local/sbin/skyseeker-ap-autodetect.sh` | Contents are not tracked; copy from a working rig. The script updates a pinned AP interface name. |
+| `/home/radxa/tricap` and the `/usr/bin/python3` environment | `systemd/tricap.service` | The repository must be present at `/home/radxa/tricap`, and the dependencies in `pyproject.toml` must be installed for the system Python interpreter used by the service. `uv.lock` governs only the development virtual environment. |
+| `/dev/gps` | `app/__init__.py` and `serial_comms/SerialInterface.py` | A udev rule not tracked here must provide this symlink for the u-blox receiver; the application opens it at 921600 baud. Copy the rule from a working rig or write it by hand. |
+| `/dev/nvme0n1p1` and `/mnt/ext_cam_storage` | `sensors/cam_manager.py` | The NVMe partition must exist and the mount-point directory must be available so the camera manager can mount the internal capture drive there (the path name is historical; this is the internal NVMe). |
+| `/home/radxa/SonySDKWrapper` | `sensors/cam_manager.py` | Must provide the Sony SDK Python wrapper import `sonySDKWrapper.sonyCamera`. Contents are not tracked; copy from a working rig. |
+| `netbird` CLI | `app/views/api.py` | Must be installed and available on the service command path so the API can run `netbird up`, `netbird down`, and `netbird status`. |
+| NetworkManager profile `skyseeker-rescue` | `usr-local/sbin/skyseeker-recovery-scan` | Must be a provisioned Wi-Fi connection for the rescue hotspot, whose default SSID is also `skyseeker-rescue`, and must be activatable on the onboard Broadcom interface. Contents are not tracked; copy from a working rig or create by hand. |
+
 Flask owns the operator UI and API and listens directly on port 80 through
 `tricap.service`. Its request boundary accepts loopback, the
 `192.168.50.0/24` access-point subnet, the `192.168.51.0/24` wired maintenance

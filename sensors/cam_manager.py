@@ -65,6 +65,7 @@ class TriCapCamsManager:
         self._man_settings = man_settings
         self._camera_count_locks = list()
         self._storage_lock = storage_lock or threading.Lock()
+        self._sonySDKCamCaptureLock = threading.Lock()
         # Free space on the external SSD only changes during a copy, so measure it
         # once per volume and serve the cached figures while unmounted.
         self._ssd_usage_lock = threading.Lock()
@@ -74,7 +75,6 @@ class TriCapCamsManager:
         self._external_jobs_lock = threading.Lock()
         self._external_storage_jobs = set()
         self._thread_sync_lock = None
-        subprocess.run(["timedatectl", "set-ntp", "false"], check=True)
         # A marker left by a crash mid-capture would otherwise defer AP recovery until reboot.
         self._clear_capture_marker()
         self._initialise()
@@ -104,7 +104,6 @@ class TriCapCamsManager:
             attempts=discovery_attempts,
             logger=self._logger,
         )
-        self._sonySDKCamCaptureLock = threading.Lock()
         discovered_cameras = []
 
         for camera_id in range(1, camera_count + 1):
@@ -415,8 +414,20 @@ class TriCapCamsManager:
             camera.set_image_format(image_format)
         self._cam_settings[SONY_IMAGE_FORMAT_CONFIG_KEY] = image_format
 
-    def sync_time(self, time_str):
-        subprocess.run(["timedatectl", "set-time", time_str], check=True)
-
-        for cam in self._cameras:
-            cam.sync_time()
+    def sync_camera_clocks(self):
+        """Synchronize Sony clocks under the same lock used for shutter commands."""
+        synced_count = 0
+        errors = []
+        with self._sonySDKCamCaptureLock:
+            for cam in self._cameras:
+                try:
+                    cam.sync_time()
+                    synced_count += 1
+                except Exception as exc:
+                    errors.append(str(exc) or type(exc).__name__)
+                    self._logger.warning(
+                        'Could not sync camera %s time: %s',
+                        getattr(cam, 'serial_num', '?'),
+                        exc,
+                    )
+        return synced_count, errors

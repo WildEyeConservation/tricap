@@ -48,9 +48,9 @@ sudo systemctl restart tricap
 
 Everything else (driver timeouts, storage paths, network subnets) is a named
 constant in code, because it is tied to the hardware image rather than to a
-deployment. The clock and timezone are not configured at all: each dashboard
-client that connects sets the rig's clock and, for whole-hour offsets, its
-system timezone from the phone.
+deployment. GPS time is authoritative once the rig has seen a fix; before that,
+the connecting phone sets the clock. The phone always sets the system timezone
+when its UTC offset is a whole number of hours.
 
 ## Development
 

@@ -17,6 +17,7 @@ from sensors.grf500_altimeter import Grf500Altimeter
 from sensors.unavailable_altimeter import UnavailableAltimeter
 from support.configure import TricapConfig
 from support.git_info import GitData
+from support import system_clock
 
 from config import FALLBACK_TELEMETRY_DIR, MOUNT_POINT, SERVER_LOG_DIR
 
@@ -98,7 +99,7 @@ def set_http_headers(response):
     response.headers['Permissions-Policy'] = 'geolocation=()'
     response.headers['X-Content-Type-Options'] = 'nosniff'
     response.headers['Content-Security-Policy'] = (
-        "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; "
+        "default-src 'self'; script-src 'self'; style-src 'self'; "
         "img-src 'self' blob:; connect-src 'self'; frame-ancestors 'none'"
     )
     if request.path.startswith('/api/'):
@@ -130,12 +131,15 @@ storage_lock = Lock()
 
 tricap_manager = TriCapCamsManager(misc_settings, cam_settings, storage_lock)
 tricap_cameras = tricap_manager.get_cameras_as_list()
+system_clock.disable_ntp()
+clock = system_clock.ClockSync(
+    on_synced=lambda source: tricap_manager.sync_camera_clocks())
 
 gps_ser = SerialInterface(
     '/dev/gps',
     921600,
     capturing_lock=storage_lock,
-    cam_manager=tricap_manager,
+    on_first_fix=clock.sync_from_gps,
 )
 
 rootlogger.debug('Cameras have been configured.')

@@ -12,7 +12,7 @@ from pathlib import Path
 
 from flask import Blueprint, abort, jsonify, request, send_file
 
-from app import altimeter, gps_ser, tricap_manager
+from app import altimeter, clock, gps_ser, tricap_manager
 from config import (
     CAM_MANAGER_STATES,
     CAMERA_STATES,
@@ -26,16 +26,11 @@ from config import (
 from support.backup import RsyncManager
 from support.component_health import component_health
 from support.configure import TricapConfig
-from support.phone_time import (
-    set_system_time_from_phone,
-    set_system_timezone_from_phone,
-    validate_phone_time,
-)
+from support.system_clock import validate_phone_time
 from .dashboard import ap_wifi_signal
 
 api_bp = Blueprint('api', __name__)
 _logger = logging.getLogger(__name__)
-_phone_time_lock = threading.Lock()
 _FORCE_DELETE_CONFIRMATION = 'delete-unbacked-internal-data'
 _force_delete_lock = threading.Lock()
 _force_delete_status = {
@@ -135,7 +130,7 @@ def status():
 
 @api_bp.route('/api/sync_phone_time', methods=['POST'])
 def sync_phone_time():
-    """Set the rig and connected cameras from the dashboard device's clock."""
+    """Apply the dashboard device's timezone and, until GPS syncs, its clock."""
     if tricap_manager.state in (
         CAM_MANAGER_STATES.STARTED, CAM_MANAGER_STATES.COPYING):
         return jsonify({
@@ -149,35 +144,20 @@ def sync_phone_time():
         return jsonify({'msg': str(exc)}), 400
 
     try:
-        with _phone_time_lock:
-            timezone = set_system_timezone_from_phone(timezone_offset)
-            result = set_system_time_from_phone(epoch_ms)
-            cameras_synced = 0
-            camera_errors = []
-            for cam in tricap_manager.get_cameras_as_list():
-                try:
-                    cam.sync_time()
-                    cameras_synced += 1
-                except Exception as exc:
-                    camera_errors.append(str(exc) or type(exc).__name__)
-                    _logger.warning('Could not sync camera %s time: %s',
-                                    getattr(cam, 'serial_num', '?'), exc)
+        result = clock.sync_from_phone(epoch_ms, timezone_offset)
     except (OSError, subprocess.SubprocessError) as exc:
         _logger.exception('Could not set system clock from dashboard client')
         return jsonify({'msg': 'Could not set the device clock: {}'.format(exc)}), 500
 
     client_ip = request.remote_addr or 'unknown'
+    timezone = result['timezone']
+    cameras_synced = result['camerasSynced']
     _logger.info(
         'Clock synchronized from dashboard client %s; adjustment=%sms, '
         'timezone_offset=%s, timezone=%s, rtc_synced=%s, cameras_synced=%s',
         client_ip, result['adjustmentMs'], timezone_offset, timezone,
         result['rtcSynced'], cameras_synced)
-    result.update({
-        'success': True,
-        'timezone': timezone,
-        'camerasSynced': cameras_synced,
-        'cameraErrors': camera_errors,
-    })
+    result['success'] = True
     return jsonify(result)
 
 @api_bp.route('/api/images_captured')

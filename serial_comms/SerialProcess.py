@@ -17,14 +17,15 @@ from config import FALLBACK_TELEMETRY_DIR, MOUNT_POINT
 logger = logging.getLogger(__name__)
 
 class SerialProcess():
-    def __init__(self, cam_manager = None):
+    def __init__(self, on_first_fix=None):
         super().__init__()
         # append valid reponses
         self._requests = []
         self._hasGps = False
         self._firstGps = False
+        self._clock_set_from_gps = False
         self._gpsTimestamp = 0
-        self._cam_manager = cam_manager
+        self._on_first_fix = on_first_fix
 
         self._lock = Lock()
         # Public "latest" values you can read at any time
@@ -112,13 +113,19 @@ class SerialProcess():
             self._hasGps = False
 
     def saveRmc(self, msg):
-        if msg.date != None and msg.time != None and msg.lat != '' and msg.lon != '' and not self._firstGps and self._cam_manager != None:
+        if msg.date != None and msg.time != None and msg.lat != '' and msg.lon != '' and not self._clock_set_from_gps:
             self._firstGps = True
-            # timedatectl set-time reads wall-clock time in the system zone, so
-            # express the GPS UTC fix in whatever zone the rig currently has.
-            gps_time = datetime.combine(msg.date, msg.time.replace(tzinfo=None),
-                                        tzinfo=timezone.utc).astimezone()
-            self._cam_manager.sync_time(gps_time.strftime('%Y-%m-%d %H:%M:%S.%f'))
+            gps_time = datetime.combine(
+                msg.date, msg.time.replace(tzinfo=None), tzinfo=timezone.utc)
+            # Retried on the next RMC if setting the clock fails, so a transient
+            # error does not leave the rig on phone time for the whole flight.
+            self._clock_set_from_gps = True
+            if self._on_first_fix is not None:
+                try:
+                    self._on_first_fix(gps_time)
+                except Exception as exc:
+                    self._clock_set_from_gps = False
+                    logger.warning('First GPS fix callback failed: %s', exc)
 
     def process_gsv(self, msg):
         """

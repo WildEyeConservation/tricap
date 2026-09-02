@@ -5,7 +5,7 @@ import tempfile
 import unittest
 from datetime import datetime, time, timezone
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from serial_comms.SerialProcess import SerialProcess
 
@@ -34,6 +34,34 @@ class UbloxGpsTests(unittest.TestCase):
         just_before_midnight = datetime(2026, 9, 1, 23, 59, 58, tzinfo=timezone.utc)
         fix_after_midnight = SerialProcess.gps_datetime(time(0, 0, 5), just_before_midnight)
         self.assertEqual(fix_after_midnight.date().isoformat(), "2026-09-02")
+
+    def test_save_rmc_calls_first_fix_with_aware_utc_datetime(self):
+        on_first_fix = Mock()
+        gps = SerialProcess(on_first_fix=on_first_fix)
+        msg = SimpleNamespace(
+            date=datetime(2026, 9, 2).date(),
+            time=time(12, 30, 15, 500000),
+            lat='1234.5678',
+            lon='01234.5678',
+        )
+
+        gps.saveRmc(msg)
+
+        on_first_fix.assert_called_once_with(
+            datetime(2026, 9, 2, 12, 30, 15, 500000, tzinfo=timezone.utc))
+        self.assertTrue(gps._firstGps)
+
+    def test_save_rmc_marks_first_fix_without_callback(self):
+        msg = SimpleNamespace(
+            date=datetime(2026, 9, 2).date(),
+            time=time(12, 30, 15),
+            lat='1234.5678',
+            lon='01234.5678',
+        )
+
+        self.gps.saveRmc(msg)
+
+        self.assertTrue(self.gps._firstGps)
 
     def test_completed_gsv_cycle_updates_satellite_and_snr_status(self):
         self.gps.process_gsv(SimpleNamespace(

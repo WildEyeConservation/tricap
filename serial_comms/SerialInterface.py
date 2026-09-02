@@ -8,8 +8,8 @@ from .SerialProcess import SerialProcess
 logger = logging.getLogger(__name__)
 
 class SerialInterface(SerialProcess):
-  def __init__(self, port, baud, capturing_lock=None, cam_manager=None):
-    super().__init__(cam_manager)
+  def __init__(self, port, baud, capturing_lock=None, on_first_fix=None):
+    super().__init__(on_first_fix)
     self.port = port
     self.isConnected = False
     self.killThread = False

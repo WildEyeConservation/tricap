@@ -48,6 +48,10 @@ check and reports that manual attention is needed. A healthy check resets this
 restart budget. Create `/run/skyseeker-health.disabled` to disable recovery
 actions during maintenance; diagnostics continue and the marker clears at reboot.
 
+Recovery is deferred while a flight capture is running, preventing hostapd
+restarts from disconnecting Wi-Fi clients. It resumes after capture stops and
+the capture-active marker is cleared.
+
 There is no automatic reboot path and no systemd hardware watchdog. Warm resets
 on this Rockchip/NVMe platform can leave PCIe in a failed state, so a persistent
 kernel, PCIe, or NVMe failure requires a deliberate full power cycle.

@@ -23,6 +23,7 @@ STATE_PATH = Path("/run/skyseeker-health.state")
 DISABLE_PATH = Path("/run/skyseeker-health.disabled")
 SYS_CLASS_NET = Path("/sys/class/net")
 INTERNAL_STORAGE = "/mnt/ext_cam_storage"
+CAPTURE_ACTIVE_PATH = Path('/run/skyseeker-capture-active')
 FAILURES_BEFORE_RESTART = 3
 RESTART_COOLDOWN_SECONDS = 600
 MAX_RESTARTS_BEFORE_BACKOFF = 3
@@ -165,6 +166,7 @@ def pcie_error_count():
 def snapshot(status):
     healthy, _, _ = ap_health(status)
     return {
+        'capture': 'active' if CAPTURE_ACTIVE_PATH.exists() else 'idle',
         "ap": "ok" if healthy else "failed",
         "interface": status["interface"] or "none",
         "driver": status["driver"],
@@ -220,6 +222,13 @@ def save_state(state):
 def recover(status):
     if DISABLE_PATH.exists():
         print(f"skyseeker-health: recovery disabled by {DISABLE_PATH}", flush=True)
+        return 0
+
+    if CAPTURE_ACTIVE_PATH.exists():
+        print(
+            'skyseeker-health: recovery deferred while capture is running',
+            flush=True,
+        )
         return 0
 
     healthy, detail, services = ap_health(status)

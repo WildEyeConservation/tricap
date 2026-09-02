@@ -42,6 +42,7 @@ class NetworkHealthTests(unittest.TestCase):
         self.tempdir = tempfile.TemporaryDirectory()
         root = Path(self.tempdir.name)
         patches = [
+            patch.object(HEALTH, 'CAPTURE_ACTIVE_PATH', root / 'capture-active'),
             patch.object(HEALTH, "STATE_PATH", root / "state"),
             patch.object(HEALTH, "DISABLE_PATH", root / "disabled"),
             patch.object(HEALTH, "RESTART_SETTLE_SECONDS", 0),
@@ -156,6 +157,30 @@ class NetworkHealthTests(unittest.TestCase):
         with patch.object(HEALTH, "run") as run_mock:
             self.assertEqual(HEALTH.recover(healthy_status()), 0)
         run_mock.assert_not_called()
+
+    def test_capture_marker_defers_recovery_without_changing_state(self):
+        original_state = {
+            'failures': 2,
+            'last_restart': 123.0,
+            'restarts_since_recovery': 1,
+        }
+        HEALTH.save_state(original_state)
+        HEALTH.CAPTURE_ACTIVE_PATH.touch()
+        status = healthy_status()
+        status['hostapd'] = 'inactive'
+
+        with (
+            patch.object(HEALTH, 'run') as run_mock,
+            contextlib.redirect_stdout(io.StringIO()) as output,
+        ):
+            self.assertEqual(HEALTH.recover(status), 0)
+
+        run_mock.assert_not_called()
+        self.assertEqual(HEALTH.load_state(), original_state)
+        self.assertIn(
+            'recovery deferred while capture is running',
+            output.getvalue(),
+        )
 
     def test_automatic_recovery_has_no_power_cycle_path(self):
         source = HEALTH_PATH.read_text(encoding="utf-8")

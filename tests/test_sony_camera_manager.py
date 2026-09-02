@@ -11,6 +11,14 @@ from config import CAM_MANAGER_STATES, CAMERA_STATES
 
 class SonyCameraManagerTests(unittest.TestCase):
 
+    def setUp(self):
+        mark_patch = patch.object(TriCapCamsManager, '_mark_capture_active')
+        clear_patch = patch.object(TriCapCamsManager, '_clear_capture_marker')
+        self.mark_capture_active = mark_patch.start()
+        self.clear_capture_marker = clear_patch.start()
+        self.addCleanup(mark_patch.stop)
+        self.addCleanup(clear_patch.stop)
+
     @patch.object(TriCapCamsManager, "mount_disk", return_value=True)
     @patch("sensors.cam_manager.subprocess.run")
     @patch("sensors.cam_manager.SonyCamera")
@@ -68,6 +76,8 @@ class SonyCameraManagerTests(unittest.TestCase):
         self.assertEqual(camera.state, CAMERA_STATES.INITIALISED)
         camera.reset_session_counters.assert_called_once_with()
         camera.capture_and_copy.assert_called_once()
+        self.mark_capture_active.assert_called_once_with()
+        self.clear_capture_marker.assert_called_once_with()
 
 
 if __name__ == "__main__":

@@ -27,6 +27,9 @@ from .sony_discovery import discover_sony_cameras
 from .sonySDK_cam import sonySDKcam as SonyCamera
 
 
+CAPTURE_ACTIVE_MARKER = '/run/skyseeker-capture-active'
+
+
 def _disk_usage_gb(path):
     total, used, free = shutil.disk_usage(path)
     gb = 1073741824
@@ -189,6 +192,7 @@ class TriCapCamsManager:
             ))
 
         self.state = CAM_MANAGER_STATES.STARTED
+        self._mark_capture_active()
         for thread in self._capture_threads:
             thread.start()
 
@@ -218,8 +222,27 @@ class TriCapCamsManager:
             time.sleep(0.1)
         if self.is_capture_thread_alive():
             self._logger.warning('Capture threads did not stop before shutdown timeout')
+        else:
+            self._clear_capture_marker()
         for camera in self._cameras:
             camera.release()
+
+    def _mark_capture_active(self):
+        '''Create the advisory marker used to defer AP recovery.'''
+        try:
+            with open(CAPTURE_ACTIVE_MARKER, 'w', encoding='utf-8') as marker:
+                marker.write(self._copy_start_time.isoformat())
+        except OSError as exc:
+            self._logger.warning('Could not create capture-active marker: %s', exc)
+
+    def _clear_capture_marker(self):
+        '''Remove the advisory capture marker when capture has stopped.'''
+        try:
+            os.remove(CAPTURE_ACTIVE_MARKER)
+        except FileNotFoundError:
+            pass
+        except OSError as exc:
+            self._logger.warning('Could not remove capture-active marker: %s', exc)
 
     def is_capture_thread_alive(self):
         """ Return true if any cam thread is alive """
@@ -354,6 +377,7 @@ class TriCapCamsManager:
                 and self.state == CAM_MANAGER_STATES.STARTED):
             self._logger.debug("Capture completed")
             self.state = CAM_MANAGER_STATES.STOPPED
+            self._clear_capture_marker()
 
             for cam in self._cameras:
                 if cam.state.name == 'CAPTURING':

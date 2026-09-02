@@ -77,7 +77,8 @@ class SonyCameraManagerTests(unittest.TestCase):
         camera.reset_session_counters.assert_called_once_with()
         camera.capture_and_copy.assert_called_once()
         self.mark_capture_active.assert_called_once_with()
-        self.clear_capture_marker.assert_called_once_with()
+        # Cleared once at construction (stale marker) and once when capture ends.
+        self.assertEqual(self.clear_capture_marker.call_count, 2)
 
 
 if __name__ == "__main__":

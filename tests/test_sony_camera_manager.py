@@ -80,6 +80,29 @@ class SonyCameraManagerTests(unittest.TestCase):
         # Cleared once at construction (stale marker) and once when capture ends.
         self.assertEqual(self.clear_capture_marker.call_count, 2)
 
+    @patch.object(TriCapCamsManager, "mount_disk", return_value=False)
+    @patch("sensors.cam_manager.subprocess.run")
+    @patch("sensors.cam_manager.SonyCamera")
+    @patch("sensors.cam_manager.discover_sony_cameras")
+    def test_refuses_to_capture_when_internal_storage_does_not_mount(
+            self, discover_mock, camera_mock, _run_mock, _mount_mock):
+        discover_mock.return_value = (Mock(), 1)
+        camera = Mock(serial_num="one")
+        camera_mock.return_value = camera
+        manager = TriCapCamsManager(
+            {"image_capture_interval": "3"},
+            {"sony_image_format": "Default"},
+            Lock(),
+        )
+        manager.altimeter = Mock()
+
+        self.assertFalse(manager.start_capturing())
+
+        self.assertEqual(manager.state, CAM_MANAGER_STATES.STOPPED)
+        camera.capture_and_copy.assert_not_called()
+        manager.altimeter.start_measuring.assert_not_called()
+        self.mark_capture_active.assert_not_called()
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -279,10 +279,11 @@ def start():
             'msg': 'No cameras connected. Connect at least one camera to start capture.'
         }), 409
 
-    tricap_manager.start_capturing()
-    ret = {}
-    ret['success'] = True
-    return ret
+    if not tricap_manager.start_capturing():
+        return jsonify({
+            'msg': 'Internal storage failed to mount. Capture not started.'
+        }), 409
+    return {'success': True}
 
 @api_bp.route('/api/stop_capture', methods=['POST'])
 def stop():

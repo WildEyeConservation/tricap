@@ -132,7 +132,12 @@ class TriCapCamsManager:
         self.camera_startup_error = ''
 
     def start_capturing(self):
-        """Start the capturing threads of all connected cams."""
+        """Start the capturing threads of all connected cams.
+
+        Returns True when capture threads were started. Capture is refused,
+        and the manager stays STOPPED, when the internal NVMe cannot be
+        mounted: images must never land on the root filesystem.
+        """
         self._logger.debug(f"Cam manager - current state {self.state}")
 
         if not self._cameras:
@@ -140,10 +145,18 @@ class TriCapCamsManager:
             self._logger.debug(
                 'Tried to start capture threads with no Sony cameras connected.'
             )
-            return
+            return False
 
         if self.state != CAM_MANAGER_STATES.STOPPED:
-            return
+            return False
+
+        # Checked before the laser is switched on so a refused start leaves
+        # every peripheral as it was.
+        if not self.mount_disk():
+            self._logger.error(
+                'Internal storage is not mounted; capture refused'
+            )
+            return False
 
         try:
             if getattr(self, 'altimeter', None) is not None:
@@ -163,11 +176,6 @@ class TriCapCamsManager:
             for _camera in self._cameras:
                 self._camera_count_locks.append(threading.Lock())
                 self._capture_threads_done.append(threading.Event())
-
-        if not self.mount_disk():
-            self._logger.warning(
-                'Internal storage is not mounted; Sony capture will continue'
-            )
 
         global_start_time = time.monotonic() + 0.5
         self._copy_start_time = datetime.now()
@@ -204,6 +212,7 @@ class TriCapCamsManager:
             daemon=True,
             args=(list(self._capture_threads),),
         ).start()
+        return True
 
     def stop_capturing(self):
         try:

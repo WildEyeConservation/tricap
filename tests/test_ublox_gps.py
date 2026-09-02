@@ -1,5 +1,6 @@
 """Focused tests for u-blox GPS status processing."""
 
+import csv
 import os
 import tempfile
 import unittest
@@ -8,6 +9,7 @@ from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
 from serial_comms.SerialProcess import SerialProcess
+from support import flight_log
 
 
 class UbloxGpsTests(unittest.TestCase):
@@ -111,12 +113,16 @@ class UbloxGpsTests(unittest.TestCase):
             gps_file = os.path.join(fallback_dir, '2026_09_02', 'gpsData.csv')
             with open(gps_file, 'rt') as f:
                 lines = f.readlines()
+            with open(os.path.join(fallback_dir, '2026_09_02', 'flightData.csv'), newline='') as f:
+                rows = list(csv.reader(f))
 
         gps_epoch = datetime(2026, 9, 2, 12, 30, 15, tzinfo=timezone.utc).timestamp()
         pi_epoch = datetime(2026, 9, 2, 12, 0, 0).timestamp()
         self.assertEqual(lines, [
             f'1,{gps_epoch},{pi_epoch},1234.5678,S,01234.5678,E,100.0,0.9,30.0\n'
         ])
+        self.assertEqual(rows[0], list(flight_log.FLIGHT_LOG_HEADER))
+        self.assertEqual(rows[1][5:7], ['-1234.5678000', '1234.5678000'])
 
 
 if __name__ == "__main__":

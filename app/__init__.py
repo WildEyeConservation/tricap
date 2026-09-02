@@ -22,6 +22,7 @@ from support import system_clock
 from config import FALLBACK_TELEMETRY_DIR, MOUNT_POINT, SERVER_LOG_DIR
 
 from serial_comms.SerialInterface import SerialInterface
+from support import flight_log
 from support.local_network import web_client_allowed
 
 class AltitudeLogObserver():
@@ -33,6 +34,9 @@ class AltitudeLogObserver():
         last_return = alti.last_return
         first_strength = alti.first_strength
         last_strength = alti.last_strength
+        # Published even when None so a lost target clears the flight-log value
+        # rather than leaving a stale reading on later GPS rows.
+        flight_log.record_laser_altitude(last_return)
         if first_return is None and last_return is None:
             return
         try:

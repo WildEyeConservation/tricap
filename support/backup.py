@@ -37,7 +37,7 @@ RSYNC_VERIFY_TIMEOUT_SEC = 1800   # verify passes may checksum the whole tree
 UNMOUNT_ATTEMPTS = 5
 UNMOUNT_RETRY_SEC = 2.0
 
-LIVE_TELEMETRY_NAMES = {"gpsData.csv", "altitudeData.csv"}
+LIVE_TELEMETRY_NAMES = {"gpsData.csv", "altitudeData.csv", "flightData.csv"}
 BACKUP_BENCHMARK_LOG = Path(
     os.environ.get("SKYSEEKER_BACKUP_BENCHMARK_LOG", "/home/radxa/tricap/logs/backup_benchmark.csv")
 )

@@ -132,6 +132,7 @@ The following is the complete tracked tree, grouped by purpose.
 │   ├── basic.py                      observer primitive
 │   ├── component_health.py           camera/GPS/altimeter health summary
 │   ├── configure.py                  layered default.cfg/initial.cfg reader/writer
+│   ├── flight_log.py                 live user-friendly flightData.csv writer
 │   ├── git_info.py                   deployed revision reporting
 │   ├── local_network.py              Flask private-network-only request guard
 │   ├── rsync_progress.py             live rsync progress-output parser
@@ -164,6 +165,7 @@ The following is the complete tracked tree, grouped by purpose.
 │   ├── test_component_health.py      hardware failure reporting
 │   ├── test_configure.py             supported/retired config behavior
 │   ├── test_dashboard.py             Flask ownership, access and UI assets
+│   ├── test_flight_log.py            flight log rows and laser join
 │   ├── test_git_info.py              safe deployed-revision reporting
 │   ├── test_grf500_altimeter.py      GRF-500 serial setup and frames
 │   ├── test_network_health.py        bounded AP diagnostics and recovery

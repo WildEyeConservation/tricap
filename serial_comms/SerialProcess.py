@@ -13,6 +13,7 @@ from datetime import datetime, timedelta, timezone
 from threading import Lock
 
 from config import FALLBACK_TELEMETRY_DIR, MOUNT_POINT
+from support import flight_log
 
 logger = logging.getLogger(__name__)
 
@@ -108,6 +109,13 @@ class SerialProcess():
                     f.write(line)
             except Exception as e:
                 logger.warning('GPS line not saved: %s', e)
+            # Friendly flight log with the laser's latest last return joined on,
+            # written live so it is complete however the folder is copied.
+            try:
+                flight_log.append_fix(complete_dir, msg.quality, gps_datetime, pi_time,
+                                      msg.lat, msg.NS, msg.lon, msg.EW, alt, msg.HDOP)
+            except Exception as e:
+                logger.warning('Flight log line not saved: %s', e)
                 
         else:
             self._hasGps = False

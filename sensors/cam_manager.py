@@ -95,6 +95,10 @@ class TriCapCamsManager:
         # once per volume and serve the cached figures while unmounted.
         self._ssd_usage_lock = threading.Lock()
         self._ssd_usage = {"id": None, "info": {}, "at": 0.0}
+        # Names of backup/verify jobs currently using the external SSD. While
+        # any is present the SSD must not be unmounted or mount-cycled.
+        self._external_jobs_lock = threading.Lock()
+        self._external_storage_jobs = set()
         self._thread_sync_lock = None
         subprocess.run(["timedatectl", "set-ntp", "false"], check=True)
         self._initialise()
@@ -355,6 +359,14 @@ class TriCapCamsManager:
             return False
         return True
 
+    def claim_external_storage(self, job):
+        with self._external_jobs_lock:
+            self._external_storage_jobs.add(job)
+
+    def release_external_storage(self, job):
+        with self._external_jobs_lock:
+            self._external_storage_jobs.discard(job)
+
     def external_ssd_device(self):
         """Path of the external SSD's data partition, or None."""
         vol = find_volume()
@@ -364,6 +376,11 @@ class TriCapCamsManager:
 
     def ssd_usage(self):
         """Capacity/used/free of the external SSD in GB; {} when none is connected."""
+        with self._external_jobs_lock:
+            in_use = bool(self._external_storage_jobs)
+        if in_use:
+            with self._ssd_usage_lock:
+                return dict(self._ssd_usage["info"])
         if os.path.ismount(MOUNT_POINT_SSD):
             return self.refresh_ssd_usage()
         vol = find_volume()
@@ -399,15 +416,22 @@ class TriCapCamsManager:
         return dict(info)
 
     def unmount_disk(self):
-        if os.path.ismount(MOUNT_POINT_SSD):
-            try:
-                mount_status = subprocess.run(["umount", MOUNT_POINT_SSD], check=True)
-                self._logger.debug(mount_status)
-            except:
-                self._logger.warning('Failed to umount')
+        with self._external_jobs_lock:
+            if self._external_storage_jobs:
+                self._logger.warning(
+                    "Refusing to unmount external storage while in use by %s",
+                    sorted(self._external_storage_jobs),
+                )
                 return False
-        else:
-            self._logger.info('Disk not mounted')
+            if os.path.ismount(MOUNT_POINT_SSD):
+                try:
+                    mount_status = subprocess.run(["umount", MOUNT_POINT_SSD], check=True)
+                    self._logger.debug(mount_status)
+                except (OSError, subprocess.SubprocessError) as exc:
+                    self._logger.warning("Failed to umount: %s", exc)
+                    return False
+            else:
+                self._logger.info('Disk not mounted')
         return True
 
     def _finalise_when_saved(self, save_threads):

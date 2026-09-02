@@ -34,6 +34,8 @@ EXFAT_MTIME_RESOLUTION_NS = 10_000_000  # 10 ms
 # forever.
 RSYNC_SCAN_TIMEOUT_SEC = 300      # dry-run inspection passes
 RSYNC_VERIFY_TIMEOUT_SEC = 1800   # verify passes may checksum the whole tree
+UNMOUNT_ATTEMPTS = 5
+UNMOUNT_RETRY_SEC = 2.0
 
 LIVE_TELEMETRY_NAMES = {"gpsData.csv", "altitudeData.csv"}
 BACKUP_BENCHMARK_LOG = Path(
@@ -108,6 +110,8 @@ class RsyncManager:
         self,
         unmount: Callable[[], bool] | None = None,
         refresh_usage: Callable[[], Any] | None = None,
+        claim_storage: Callable[[str], Any] | None = None,
+        release_storage: Callable[[str], Any] | None = None,
     ) -> None:
         self._logger = logging.getLogger(__name__)
         self._lock = threading.Lock()
@@ -118,6 +122,8 @@ class RsyncManager:
         self._proc: subprocess.Popen[str] | subprocess.Popen[bytes] | None = None
         self._unmount = unmount
         self._refresh_usage = refresh_usage
+        self._claim_storage = claim_storage or (lambda _job: True)
+        self._release_storage = release_storage or (lambda _job: None)
 
         # job config
         self._src: Path | None = None
@@ -126,6 +132,7 @@ class RsyncManager:
         self._verify: bool = False
         self._delete: bool = False
         self._remove_source: bool = False
+        self._partial: bool = False   # set when free space forced a files-from subset
 
         # Progress parts: files already on the destination at start, then
         # bytes/files reported by the live rsync.
@@ -142,6 +149,12 @@ class RsyncManager:
 
     def start_verify_and_delete(self, src: str, dst: str) -> dict[str, Any]:
         """Start verification/deletion without holding an HTTP request open."""
+        if not os.path.ismount(dst):
+            return {
+                "success": False,
+                "code": "destination_not_mounted",
+                "msg": "Destination is not mounted",
+            }
         with self._lock:
             if self._status.running:
                 return {"success": False, "msg": "Backup is running"}
@@ -158,7 +171,8 @@ class RsyncManager:
                 args=(src, dst),
                 daemon=True,
             )
-            self._verify_thread.start()
+        self._claim_storage("verify")
+        self._verify_thread.start()
         return {"success": True, "started": True}
 
     def _set_verify_progress(self, phase: str, completed: int, total: int) -> None:
@@ -171,6 +185,8 @@ class RsyncManager:
 
     def _run_verify_and_delete(self, src: str, dst: str) -> None:
         try:
+            if not os.path.ismount(dst):
+                raise RuntimeError("Destination is not mounted")
             result = self.verify_and_delete_matched_sampled(
                 src,
                 dst,
@@ -182,7 +198,6 @@ class RsyncManager:
             success = bool(result.get("success"))
             errors = list(result.get("errors") or []) + list(delete_result.get("errors") or [])
             with self._lock:
-                self._verify_status.running = False
                 self._verify_status.phase = "finished" if success else "error"
                 self._verify_status.success = success
                 self._verify_status.matched = matched
@@ -198,14 +213,24 @@ class RsyncManager:
         except Exception as exc:
             self._logger.exception("Verify and delete failed")
             with self._lock:
-                self._verify_status.running = False
                 self._verify_status.phase = "error"
                 self._verify_status.success = False
                 self._verify_status.message = f"Verification failed: {exc}"
                 self._verify_status.errors = [str(exc)]
                 self._verify_status.finished_at = time.time()
         finally:
-            self._unmount_storage()
+            self._release_storage_claim("verify")
+            unmounted = self._unmount_storage_with_retries()
+            with self._lock:
+                self._verify_status.running = False
+                self._verify_status.finished_at = time.time()
+                if not unmounted:
+                    self._verify_status.phase = "error"
+                    self._verify_status.success = False
+                    self._verify_status.message = (
+                        "Verification completed, but the SSD could not be unmounted; "
+                        "remove it only after a restart."
+                    )
 
     def start(
         self,
@@ -221,7 +246,12 @@ class RsyncManager:
 
         if not src_p.exists() or not src_p.is_dir():
             return {"success": False}
-        dst_p.mkdir(parents=True, exist_ok=True)
+        if not os.path.ismount(dst):
+            return {
+                "success": False,
+                "code": "destination_not_mounted",
+                "msg": "Destination is not mounted",
+            }
 
         with self._lock:
             if self._status.running:
@@ -234,58 +264,19 @@ class RsyncManager:
             self._verify = bool(verify)
             self._delete = bool(delete)
             self._remove_source = bool(remove_source)
-
-            # compute totals once
-            total_bytes, total_files = self._scan_totals(self._src, self._files_from)
-            # --- free-space preflight ---
-            try:
-                free_bytes = self._disk_free_bytes(self._dst)
-
-                # Estimate only the *remaining* bytes that would be sent.
-                remaining_bytes, remaining_files = self._estimate_delta_bytes(
-                    self._src,
-                    self._dst,
-                    self._files_from,
-                    total_bytes,
-                    total_files,
-                )
-
-                need_with_margin = remaining_bytes + 256*1024*1024 # 256MB margin
-                if free_bytes < need_with_margin and remaining_bytes > 0:
-                    # Mark status and refuse to start
-                    self._status.running = False
-                    self._status.phase = "error"
-                    self._status.message = "Insufficient space"
-                    return {
-                        "success": False,
-                        "msg": "Insufficient space",
-                    }
-            except Exception as e:
-                # If the preflight itself fails, be conservative and refuse to start
-                self._status.running = False
-                self._status.phase = "error"
-                self._status.message = f"Space check failed: {e}"
-                return {"success": False, "msg": f"space_check_failed: {e}"}
-            # --- end free-space preflight ---
-
             self._status = BackupStatus(
                 running=True,
                 phase="indexing",
                 message="Indexing backup...",
                 started_at=time.time(),
-                total_files=total_files,
-                total_bytes=total_bytes,
-                planned_bytes=remaining_bytes,
-                planned_files=remaining_files,
             )
-            self._base_bytes = max(0, total_bytes - remaining_bytes)
-            self._base_files = max(0, total_files - remaining_files)
+            self._base_bytes = self._base_files = 0
             self._rsync_bytes = self._rsync_files = 0
-            self._set_progress()
 
             self._thread = threading.Thread(target=self._run_rsync, daemon=True)
-            self._thread.start()
-            return {"success": True, "msg": "Complete backup" if self._files_from is None else "Partial backup"}
+        self._claim_storage("backup")
+        self._thread.start()
+        return {"success": True, "msg": "Backup started"}
 
     def stop(self) -> dict[str, Any]:
         with self._lock:
@@ -697,8 +688,12 @@ class RsyncManager:
 
         if not src_p.is_dir():
             return {"success": False, "msg": "src_not_dir"}
-        if not dst_p.exists():
-            dst_p.mkdir(parents=True, exist_ok=True)
+        if not os.path.ismount(dst_root):
+            return {
+                "success": False,
+                "code": "destination_not_mounted",
+                "msg": "Destination is not mounted",
+            }
 
         free_bytes = self._disk_free_bytes(dst_p)
         budget = max(0, free_bytes - int(margin_bytes))
@@ -784,6 +779,75 @@ class RsyncManager:
     # ---------------- Internals ----------------
 
     def _run_rsync(self) -> None:
+        try:
+            if not self._prepare_backup():
+                return
+            self._run_rsync_job()
+        except Exception as exc:
+            with self._lock:
+                self._status.phase = "error"
+                self._status.message = f"Error: {exc}"
+        finally:
+            self._refresh_storage_usage()
+            self._release_storage_claim("backup")
+            unmounted = self._unmount_storage_with_retries()
+            with self._lock:
+                if not unmounted:
+                    self._status.phase = "error"
+                    self._status.message = (
+                        "The SSD could not be unmounted; remove it only after a restart."
+                    )
+                self._status.running = False
+                self._status.finished_at = time.time()
+            self._proc = None
+            self._finalize_benchmark()
+
+    def _prepare_backup(self) -> bool:
+        assert self._src is not None and self._dst is not None
+        total_bytes, total_files = self._scan_totals(self._src, self._files_from)
+        free_bytes = self._disk_free_bytes(self._dst)
+        remaining_bytes, remaining_files = self._estimate_delta_bytes(
+            self._src,
+            self._dst,
+            self._files_from,
+            total_bytes,
+            total_files,
+        )
+        partial = False
+        if remaining_bytes > 0 and free_bytes < remaining_bytes + 256 * 1024 * 1024:
+            plan = self.generate_partial_files_from(
+                str(self._src),
+                str(self._dst),
+                margin_bytes=256 * 1024 * 1024,
+            )
+            if not plan.get("success") or not plan.get("planned_files"):
+                with self._lock:
+                    self._status.phase = "error"
+                    self._status.message = "Insufficient space"
+                    self._status.total_bytes = total_bytes
+                    self._status.total_files = total_files
+                    self._status.planned_bytes = int(plan.get("planned_bytes") or 0)
+                    self._status.planned_files = int(plan.get("planned_files") or 0)
+                return False
+            self._files_from = Path(plan["files_from"]).resolve()
+            total_bytes, total_files = self._scan_totals(self._src, self._files_from)
+            remaining_bytes = int(plan["planned_bytes"])
+            remaining_files = int(plan["planned_files"])
+            partial = True
+
+        with self._lock:
+            self._status.total_bytes = total_bytes
+            self._status.total_files = total_files
+            self._status.planned_bytes = remaining_bytes
+            self._status.planned_files = remaining_files
+            self._status.message = "Backup indexed"
+            self._partial = partial
+            self._base_bytes = max(0, total_bytes - remaining_bytes)
+            self._base_files = max(0, total_files - remaining_files)
+            self._set_progress()
+        return True
+
+    def _run_rsync_job(self) -> None:
         assert self._src is not None and self._dst is not None
 
         cmd: list[str] = [
@@ -823,10 +887,11 @@ class RsyncManager:
             copy_started = time.monotonic()
             with self._lock:
                 self._status.phase = "copying"
-                if self._remove_source:
-                    self._status.message = "Moving files..."
-                else:
-                    self._status.message = "Copying files..."
+                action = "Moving" if self._remove_source else "Copying"
+                scope = "files that fit" if self._partial else "files"
+                self._status.message = f"{action} {scope}..."
+            if not os.path.ismount(self._dst):
+                raise RuntimeError("Destination is not mounted")
             self._proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, cwd=cwd,
                                           env={**os.environ, "LC_ALL": "C"})
             rsync_error = ""
@@ -853,6 +918,8 @@ class RsyncManager:
                 with self._lock:
                     stopping = self._status.phase == "stopping"
                 if not stopping:
+                    if not os.path.ismount(self._dst):
+                        raise RuntimeError("Destination is not mounted")
                     self._copy_live_telemetry()
                     with self._lock:
                         self._status.phase = "cleaning"
@@ -873,17 +940,7 @@ class RsyncManager:
                         selected_files = self._status.total_files
                     _, remaining_files = self._scan_totals(self._src, self._files_from)
                     cleanup_deleted = max(0, selected_files - remaining_files)
-            # Cache the SSD's free space while it is still mounted, so the UI does
-            # not keep serving the pre-copy figure after unmount.
-            self._refresh_storage_usage()
-            while True:
-                if not self._unmount_storage():
-                    time.sleep(2.0)
-                else:
-                    break
             with self._lock:
-                self._status.running = False
-                self._status.finished_at = time.time()
                 if self._status.phase == "stopping":
                     # treat as user-stopped regardless of rc
                     self._status.phase = "finished"
@@ -902,13 +959,8 @@ class RsyncManager:
                     self._status.message = rsync_error or f"exited with code {rc}"
         except Exception as e:
             with self._lock:
-                self._status.running = False
-                self._status.finished_at = time.time()
                 self._status.phase = "error"
                 self._status.message = f"Error: {e}"
-        finally:
-            self._proc = None
-            self._finalize_benchmark()
 
     def _copy_live_telemetry(self) -> None:
         """Copy today's continuously-updated telemetry files.
@@ -988,6 +1040,23 @@ class RsyncManager:
 
     def _unmount_storage(self) -> bool:
         return True if self._unmount is None else bool(self._unmount())
+
+    def _unmount_storage_with_retries(self) -> bool:
+        for attempt in range(UNMOUNT_ATTEMPTS):
+            try:
+                if self._unmount_storage():
+                    return True
+            except Exception as exc:
+                self._logger.warning("Could not unmount external storage: %s", exc)
+            if attempt + 1 < UNMOUNT_ATTEMPTS:
+                time.sleep(UNMOUNT_RETRY_SEC)
+        return False
+
+    def _release_storage_claim(self, job: str) -> None:
+        try:
+            self._release_storage(job)
+        except Exception as exc:
+            self._logger.warning("Could not release external storage claim: %s", exc)
 
     def _refresh_storage_usage(self) -> None:
         if self._refresh_usage is not None:

@@ -58,6 +58,8 @@ def _storage_busy_reason():
 backupManager = RsyncManager(
     unmount=tricap_manager.unmount_disk,
     refresh_usage=tricap_manager.refresh_ssd_usage,
+    claim_storage=tricap_manager.claim_external_storage,
+    release_storage=tricap_manager.release_external_storage,
 )
 
 @api_bp.route('/api')
@@ -563,20 +565,10 @@ def backup_start():
     src = MOUNT_POINT
     dst = MOUNT_POINT_SSD
     res = backupManager.start(src, dst)
-
-    plan = {}
-    if (not res.get("success")) and res.get("msg") and res.get("msg") == "Insufficient space" :
-        _logger.debug("Not enough free space. Starting partial backup")
-        plan = backupManager.generate_partial_files_from(
-            src_root=src,
-            dst_root=dst,
-            margin_bytes=256 * 1024 * 1024
-        )
-
-        res = backupManager.start(src, dst, files_from=plan["files_from"])
-        return jsonify(res)
-    else:
-      return jsonify(res)
+    if not res.get("success"):
+      tricap_manager.unmount_disk()
+      return jsonify(res), 400
+    return jsonify(res), 202
   else:
     return jsonify({'msg': 'Failed to mount external disk'}), 400
 
@@ -590,23 +582,10 @@ def backup_move():
     src = MOUNT_POINT
     dst = MOUNT_POINT_SSD
     res = backupManager.start(src, dst, remove_source=True)
-
-    if (not res.get("success")) and res.get("msg") == "Insufficient space":
-        _logger.debug("Not enough free space. Starting partial copy & delete")
-        plan = backupManager.generate_partial_files_from(
-            src_root=src,
-            dst_root=dst,
-            margin_bytes=256 * 1024 * 1024
-        )
-        if not plan.get("success"):
-          return jsonify(res)
-        res = backupManager.start(
-          src,
-          dst,
-          files_from=plan["files_from"],
-          remove_source=True,
-        )
-    return jsonify(res)
+    if not res.get("success"):
+      tricap_manager.unmount_disk()
+      return jsonify(res), 400
+    return jsonify(res), 202
   else:
     return jsonify({'msg': 'Failed to mount external disk'}), 400
 

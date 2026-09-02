@@ -2,9 +2,12 @@
 
 import os
 import tempfile
+import threading
 import unittest
 from pathlib import Path
+from unittest.mock import Mock, patch
 
+from sensors.cam_manager import TriCapCamsManager
 from support.backup import BackupStatus, RsyncManager
 
 
@@ -91,6 +94,38 @@ class BackupTests(unittest.TestCase):
             raise OSError("drive gone")
         RsyncManager(refresh_usage=explode)._refresh_storage_usage()
         self.assertTrue(RsyncManager()._unmount_storage())
+
+    @patch("support.backup.os.path.ismount", return_value=False)
+    def test_start_refuses_unmounted_destination(self, _ismount):
+        self.destination.rmdir()
+        result = self.manager.start(str(self.source), str(self.destination))
+        self.assertEqual(result["code"], "destination_not_mounted")
+        self.assertFalse(result["success"])
+        self.assertFalse(self.destination.exists())
+
+    @patch("sensors.cam_manager.subprocess.run")
+    @patch("sensors.cam_manager.os.path.ismount", return_value=True)
+    def test_unmount_refuses_while_external_storage_is_claimed(
+        self, _ismount, run
+    ):
+        manager = TriCapCamsManager.__new__(TriCapCamsManager)
+        manager._external_jobs_lock = threading.Lock()
+        manager._external_storage_jobs = set()
+        manager.claim_external_storage("backup")
+        self.assertFalse(manager.unmount_disk())
+        run.assert_not_called()
+
+        manager.release_external_storage("backup")
+        self.assertTrue(manager.unmount_disk())
+        run.assert_called_once()
+
+    @patch("support.backup.time.sleep")
+    def test_unmount_retries_are_bounded(self, sleep):
+        unmount = Mock(return_value=False)
+        manager = RsyncManager(unmount=unmount)
+        self.assertFalse(manager._unmount_storage_with_retries())
+        self.assertEqual(unmount.call_count, 5)
+        self.assertEqual(sleep.call_count, 4)
 
 
 if __name__ == "__main__":

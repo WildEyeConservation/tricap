@@ -13,7 +13,6 @@ from support import flight_log
 
 
 class UbloxGpsTests(unittest.TestCase):
-
     def setUp(self):
         self.gps = SerialProcess()
 
@@ -43,22 +42,21 @@ class UbloxGpsTests(unittest.TestCase):
         msg = SimpleNamespace(
             date=datetime(2026, 9, 2).date(),
             time=time(12, 30, 15, 500000),
-            lat='1234.5678',
-            lon='01234.5678',
+            lat="1234.5678",
+            lon="01234.5678",
         )
 
         gps.saveRmc(msg)
 
-        on_first_fix.assert_called_once_with(
-            datetime(2026, 9, 2, 12, 30, 15, 500000, tzinfo=timezone.utc))
+        on_first_fix.assert_called_once_with(datetime(2026, 9, 2, 12, 30, 15, 500000, tzinfo=timezone.utc))
         self.assertTrue(gps._firstGps)
 
     def test_save_rmc_marks_first_fix_without_callback(self):
         msg = SimpleNamespace(
             date=datetime(2026, 9, 2).date(),
             time=time(12, 30, 15),
-            lat='1234.5678',
-            lon='01234.5678',
+            lat="1234.5678",
+            lon="01234.5678",
         )
 
         self.gps.saveRmc(msg)
@@ -66,17 +64,19 @@ class UbloxGpsTests(unittest.TestCase):
         self.assertTrue(self.gps._firstGps)
 
     def test_completed_gsv_cycle_updates_satellite_and_snr_status(self):
-        self.gps.process_gsv(SimpleNamespace(
-            talker="GP",
-            numMsg="1",
-            msgNum="1",
-            numSV="3",
-            signalID="0",
-            cno_01="10",
-            cno_02="20",
-            cno_03="30",
-            cno_04="",
-        ))
+        self.gps.process_gsv(
+            SimpleNamespace(
+                talker="GP",
+                numMsg="1",
+                msgNum="1",
+                numSV="3",
+                signalID="0",
+                cno_01="10",
+                cno_02="20",
+                cno_03="30",
+                cno_04="",
+            )
+        )
 
         self.assertEqual(self.gps.total_visible, 3)
         self.assertEqual(self.gps.visible_by_talker, {"GP": 3})
@@ -93,36 +93,36 @@ class UbloxGpsTests(unittest.TestCase):
 
         msg = SimpleNamespace(
             time=time(12, 30, 15),
-            lat='1234.5678',
-            NS='S',
-            lon='01234.5678',
-            EW='E',
+            lat="1234.5678",
+            NS="S",
+            lon="01234.5678",
+            EW="E",
             alt=100.0,
-            HDOP='0.9',
-            sep='30.0',
+            HDOP="0.9",
+            sep="30.0",
             quality=1,
         )
         self.gps._firstGps = True
 
-        with tempfile.TemporaryDirectory() as fallback_dir, \
-                patch('serial_comms.SerialProcess.os.path.ismount', return_value=False), \
-                patch('serial_comms.SerialProcess.FALLBACK_TELEMETRY_DIR', fallback_dir), \
-                patch('serial_comms.SerialProcess.datetime', FixedDateTime):
+        with (
+            tempfile.TemporaryDirectory() as fallback_dir,
+            patch("serial_comms.SerialProcess.os.path.ismount", return_value=False),
+            patch("serial_comms.SerialProcess.FALLBACK_TELEMETRY_DIR", fallback_dir),
+            patch("serial_comms.SerialProcess.datetime", FixedDateTime),
+        ):
             self.gps.saveGga(msg)
 
-            gps_file = os.path.join(fallback_dir, '2026_09_02', 'gpsData.csv')
-            with open(gps_file, 'rt') as f:
+            gps_file = os.path.join(fallback_dir, "2026_09_02", "gpsData.csv")
+            with open(gps_file) as f:
                 lines = f.readlines()
-            with open(os.path.join(fallback_dir, '2026_09_02', 'flightData.csv'), newline='') as f:
+            with open(os.path.join(fallback_dir, "2026_09_02", "flightData.csv"), newline="") as f:
                 rows = list(csv.reader(f))
 
         gps_epoch = datetime(2026, 9, 2, 12, 30, 15, tzinfo=timezone.utc).timestamp()
         pi_epoch = datetime(2026, 9, 2, 12, 0, 0).timestamp()
-        self.assertEqual(lines, [
-            f'1,{gps_epoch},{pi_epoch},1234.5678,S,01234.5678,E,100.0,0.9,30.0\n'
-        ])
+        self.assertEqual(lines, [f"1,{gps_epoch},{pi_epoch},1234.5678,S,01234.5678,E,100.0,0.9,30.0\n"])
         self.assertEqual(rows[0], list(flight_log.FLIGHT_LOG_HEADER))
-        self.assertEqual(rows[1][5:7], ['-1234.5678000', '1234.5678000'])
+        self.assertEqual(rows[1][5:7], ["-1234.5678000", "1234.5678000"])
 
 
 if __name__ == "__main__":

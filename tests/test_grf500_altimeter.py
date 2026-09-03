@@ -11,12 +11,10 @@ from sensors.grf500_altimeter import Grf500Altimeter
 
 
 class Grf500AltimeterTests(unittest.TestCase):
-
     @patch.object(Grf500Altimeter, "_configure")
     @patch.object(Grf500Altimeter, "_get_correct_port_name", return_value="/dev/grf500")
     @patch("sensors.grf500_altimeter.serial.Serial")
-    def test_opens_port_with_lwnx_serial_settings(
-            self, serial_mock, _port_mock, _configure_mock):
+    def test_opens_port_with_lwnx_serial_settings(self, serial_mock, _port_mock, _configure_mock):
         altimeter = Grf500Altimeter()
 
         self.assertFalse(hasattr(altimeter, "config"))
@@ -45,8 +43,7 @@ class Grf500AltimeterTests(unittest.TestCase):
     @patch.object(Grf500Altimeter, "_configure")
     @patch.object(Grf500Altimeter, "_get_correct_port_name", return_value="/dev/grf500")
     @patch("sensors.grf500_altimeter.serial.Serial")
-    def test_serial_exception_ends_read_with_error_and_unavailable(
-            self, _serial_mock, _port_mock, _configure_mock):
+    def test_serial_exception_ends_read_with_error_and_unavailable(self, _serial_mock, _port_mock, _configure_mock):
         altimeter = Grf500Altimeter()
         altimeter.state = ALTIMETER_STATE.MEASURING
         altimeter._measurement = 12.3

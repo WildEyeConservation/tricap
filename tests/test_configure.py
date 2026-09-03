@@ -12,7 +12,6 @@ from config import (
 )
 from support.configure import TricapConfig, TricapConfigError
 
-
 DEFAULTS_TEXT = """\
 [Camera]
 sony_image_format = Default   ; Default | RAW | JPEG
@@ -54,7 +53,6 @@ timeout = 1
 
 
 class ConfigureTests(unittest.TestCase):
-
     def setUp(self):
         self.temp_dir = tempfile.TemporaryDirectory()
         root = Path(self.temp_dir.name)
@@ -96,9 +94,7 @@ class ConfigureTests(unittest.TestCase):
         self.assertTrue(config.is_ready())
         config.save_to_file()
 
-        self.assertEqual(
-            dict(self.saved().items("Misc")), {"image_capture_interval": "3"}
-        )
+        self.assertEqual(dict(self.saved().items("Misc")), {"image_capture_interval": "3"})
 
     def test_retires_legacy_settings_from_overrides(self):
         self.config_path.write_text(LEGACY_OVERRIDES_TEXT, encoding="utf-8")
@@ -162,7 +158,7 @@ class ConfigureTests(unittest.TestCase):
         config = TricapConfig(str(self.config_path), DEFAULT_CONFIG_FP)
 
         self.assertEqual(config.get(SONY_IMAGE_FORMAT_CONFIG_KEY, "Camera"), "Default")
-        self.assertGreaterEqual(config.get("image_capture_interval", "Misc", "float"), 0.5)
+        self.assertGreaterEqual(float(config.get("image_capture_interval", "Misc", "float")), 0.5)
         self.assertEqual(
             config.ui_settings(),
             {

@@ -1,8 +1,10 @@
 """Parse the live output of an rsync run for progress reporting."""
+
 from __future__ import annotations
 
 import re
-from typing import IO, Any, Iterator
+from collections.abc import Iterator
+from typing import Any, Protocol
 
 # %b makes rsync print the per-file line when the transfer finishes, not when it starts.
 RSYNC_PROGRESS_ARGS = ["--info=progress2", "--out-format=%i|%b|%n"]
@@ -11,7 +13,13 @@ RSYNC_PROGRESS_ARGS = ["--info=progress2", "--out-format=%i|%b|%n"]
 _PROGRESS = re.compile(r"^\s*([\d,]+)\s+\d+%")
 
 
-def iter_lines(stream: IO[bytes]) -> Iterator[str]:
+class SupportsRead1(Protocol):
+    """A binary stream that returns whatever is available without blocking for a full buffer."""
+
+    def read1(self, size: int = ..., /) -> bytes: ...
+
+
+def iter_lines(stream: SupportsRead1) -> Iterator[str]:
     """Yield output lines. progress2 ends lines with \r, everything else with \n."""
     buf = b""
     while chunk := stream.read1(8192):

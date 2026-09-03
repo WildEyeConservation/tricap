@@ -3,8 +3,7 @@
 import time
 
 
-def discover_sony_cameras(camera_factory, attempts=15, interval=2.0,
-                          stable_results=3, logger=None):
+def discover_sony_cameras(camera_factory, attempts=15, interval=2.0, stable_results=3, logger=None):
     """Return ``(sdk, count)`` after retrying transient empty/error results.
 
     USB cameras can finish enumerating after the application service starts.
@@ -33,11 +32,7 @@ def discover_sony_cameras(camera_factory, attempts=15, interval=2.0,
                     stable_count = 1
                 if stable_count >= stable_results:
                     return sdk, camera_count
-                last_error = RuntimeError(
-                    "Sony SDK camera count {} is not stable yet".format(
-                        camera_count
-                    )
-                )
+                last_error = RuntimeError(f"Sony SDK camera count {camera_count} is not stable yet")
             else:
                 last_count = 0
                 stable_count = 0
@@ -63,8 +58,4 @@ def discover_sony_cameras(camera_factory, attempts=15, interval=2.0,
         if attempt < attempts:
             time.sleep(interval)
 
-    raise RuntimeError(
-        "No Sony cameras became available after {} discovery attempts".format(
-            attempts
-        )
-    ) from last_error
+    raise RuntimeError(f"No Sony cameras became available after {attempts} discovery attempts") from last_error

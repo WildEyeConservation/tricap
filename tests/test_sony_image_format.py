@@ -25,15 +25,12 @@ class FormatCamera:
 
 
 class SonyImageFormatTests(unittest.TestCase):
-
     @classmethod
     def setUpClass(cls):
         cls.module = sonySDK_cam
 
     def setUp(self):
-        self.camera = self.module.sonySDKcam.__new__(
-            self.module.sonySDKcam
-        )
+        self.camera = self.module.sonySDKcam.__new__(self.module.sonySDKcam)
         self.camera._cameraID = 2
         self.sdk = FormatCamera()
         self.camera._sonyCamera = self.sdk

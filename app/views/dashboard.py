@@ -49,9 +49,7 @@ def _scan_ap_stations():
                 elif line.startswith("type ") and cur and line.split()[1] == "AP":
                     ap = cur
             if ap:
-                dump = subprocess.check_output(
-                    [IW, "dev", ap, "station", "dump"], text=True, timeout=4
-                )
+                dump = subprocess.check_output([IW, "dev", ap, "station", "dump"], text=True, timeout=4)
                 mac = None
                 for raw in dump.splitlines():
                     line = raw.strip()
@@ -75,11 +73,7 @@ def _ip_to_mac(ip):
     with _wifi_lock:
         now = time.monotonic()
         clients = _wifi_cache["clients"]
-        expired = [
-            cached_ip
-            for cached_ip, (ts, _) in clients.items()
-            if now - ts >= _WIFI_TTL
-        ]
+        expired = [cached_ip for cached_ip, (ts, _) in clients.items() if now - ts >= _WIFI_TTL]
         for cached_ip in expired:
             del clients[cached_ip]
         if ip in clients:
@@ -87,9 +81,7 @@ def _ip_to_mac(ip):
 
         mac = None
         try:
-            out = subprocess.check_output(
-                ["ip", "neigh", "show", ip], text=True, timeout=3
-            )
+            out = subprocess.check_output(["ip", "neigh", "show", ip], text=True, timeout=3)
             for raw in out.splitlines():
                 parts = raw.split()
                 if "lladdr" in parts:
@@ -118,8 +110,8 @@ def ap_wifi_signal(client_ip=None):
 #  Recovery uplink (the onboard Wi-Fi periodically joins the phone hotspot;   #
 #  the USB high-gain adapter continues serving the local control AP).          #
 # --------------------------------------------------------------------------- #
-SUPPORT_CON = "skyseeker-rescue"    # pre-provisioned phone recovery profile
-CUSTOM_CON = "skyseeker-uplink"     # profile created for an operator-entered SSID
+SUPPORT_CON = "skyseeker-rescue"  # pre-provisioned phone recovery profile
+CUSTOM_CON = "skyseeker-uplink"  # profile created for an operator-entered SSID
 NMCLI = "/usr/bin/nmcli"
 
 
@@ -138,9 +130,7 @@ def uplink_iface():
         r = _nmcli(["-t", "-f", "DEVICE,TYPE,STATE", "device", "status"])
         for line in r.stdout.splitlines():
             parts = line.split(":")
-            if (len(parts) >= 3 and parts[1] == "wifi"
-                    and parts[2] != "unmanaged"
-                    and not parts[0].startswith("p2p-")):
+            if len(parts) >= 3 and parts[1] == "wifi" and parts[2] != "unmanaged" and not parts[0].startswith("p2p-"):
                 return parts[0]
     except (OSError, subprocess.TimeoutExpired):
         pass
@@ -160,8 +150,13 @@ def uplink_status():
         parts = line.split(":")
         if parts[0] == iface and len(parts) >= 3:
             state, con = parts[1], parts[2]
-    info = {"available": True, "iface": iface, "state": state,
-            "connection": con, "connected": state.startswith("connected")}
+    info = {
+        "available": True,
+        "iface": iface,
+        "state": state,
+        "connection": con,
+        "connected": state.startswith("connected"),
+    }
     if info["connected"]:
         try:
             show = _nmcli(["-t", "-f", "IP4.ADDRESS", "device", "show", iface])
@@ -193,10 +188,24 @@ def uplink_connect(ssid=None, psk=None):
         if ssid:
             name = CUSTOM_CON
             _nmcli(["connection", "delete", name])  # replace any previous custom profile
-            args = ["connection", "add", "type", "wifi", "ifname", uplink_iface(),
-                    "con-name", name, "ssid", ssid,
-                    "connection.autoconnect", "no", "ipv6.method", "ignore",
-                    "ipv4.route-metric", "100"]
+            args = [
+                "connection",
+                "add",
+                "type",
+                "wifi",
+                "ifname",
+                uplink_iface(),
+                "con-name",
+                name,
+                "ssid",
+                ssid,
+                "connection.autoconnect",
+                "no",
+                "ipv6.method",
+                "ignore",
+                "ipv4.route-metric",
+                "100",
+            ]
             if psk:
                 args += ["wifi-sec.key-mgmt", "wpa-psk", "wifi-sec.psk", psk]
             r = _nmcli(args)
@@ -227,11 +236,13 @@ def uplink_disconnect():
 # --------------------------------------------------------------------------- #
 DATA_MOUNT = MOUNT_POINT
 DATA_FALLBACK = FALLBACK_TELEMETRY_DIR
-FLIGHT_LOG_HEADER = ("quality,gps_timestamp,pi_timestamp,latitude,ns,longitude,ew,"
-                     "gps_altitude_m,hdop,geoid_sep,"
-                     "laser_altitude_agl_m,laser_strength_db,"
-                     "laser_first_return_m,laser_last_return_m,"
-                     "laser_first_strength_db,laser_last_strength_db\n")
+FLIGHT_LOG_HEADER = (
+    "quality,gps_timestamp,pi_timestamp,latitude,ns,longitude,ew,"
+    "gps_altitude_m,hdop,geoid_sep,"
+    "laser_altitude_agl_m,laser_strength_db,"
+    "laser_first_return_m,laser_last_return_m,"
+    "laser_first_strength_db,laser_last_strength_db\n"
+)
 ALT_MATCH_TOLERANCE_SEC = 2.0
 
 
@@ -239,7 +250,7 @@ def _load_altitude_samples(path):
     """Load new dual-return rows while retaining legacy log compatibility."""
     rows = []
     try:
-        with open(path, "r", encoding="utf-8", errors="replace") as f:
+        with open(path, encoding="utf-8", errors="replace") as f:
             for line in f:
                 parts = line.strip().split(",")
                 try:
@@ -289,11 +300,10 @@ def merged_flight_log():
 
     # altitudeData.csv contains legacy last-return aliases plus explicit
     # first/last distances and strengths.
-    alt_keys, alt_rows = _load_altitude_samples(
-        os.path.join(base, day, "altitudeData.csv"))
+    alt_keys, alt_rows = _load_altitude_samples(os.path.join(base, day, "altitudeData.csv"))
 
     out = [FLIGHT_LOG_HEADER]
-    with open(gps_path, "r", encoding="utf-8", errors="replace") as f:
+    with open(gps_path, encoding="utf-8", errors="replace") as f:
         for line in f:
             row = line.strip()
             if not row:
@@ -349,9 +359,7 @@ def storage_image_sample():
             for entry in entries:
                 if entry.is_dir(follow_symlinks=False):
                     try:
-                        candidates.append(
-                            (entry.stat(follow_symlinks=False).st_mtime, entry.path)
-                        )
+                        candidates.append((entry.stat(follow_symlinks=False).st_mtime, entry.path))
                     except OSError:
                         continue
         candidates.sort(reverse=True)
@@ -386,6 +394,7 @@ def storage_image_sample():
     with _storage_sample_lock:
         _storage_sample_cache.update(ts=now, payload=payload)
     return payload
+
 
 dashboard_bp = Blueprint("dashboard", __name__)
 
@@ -425,8 +434,7 @@ def get_storage_estimate():
 @dashboard_bp.post("/api/uplink_connect")
 def connect_uplink():
     payload = request.get_json(silent=True) or {}
-    ok, message = uplink_connect(payload.get("ssid") or None,
-                                 payload.get("psk") or None)
+    ok, message = uplink_connect(payload.get("ssid") or None, payload.get("psk") or None)
     return jsonify({"success": ok, "msg": message}), 200 if ok else 500
 
 
@@ -444,8 +452,5 @@ def download_flight_log():
     return Response(
         payload,
         content_type="text/csv; charset=utf-8",
-        headers={
-            "Content-Disposition":
-                f'attachment; filename="flightData_{day}.csv"'
-        },
+        headers={"Content-Disposition": f'attachment; filename="flightData_{day}.csv"'},
     )

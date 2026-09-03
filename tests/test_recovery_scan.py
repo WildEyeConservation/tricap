@@ -1,17 +1,17 @@
 """Tests for the onboard-radio rescue hotspot scan."""
 
-from importlib.machinery import SourceFileLoader
 import importlib.util
-from pathlib import Path
 import subprocess
 import unittest
+from importlib.machinery import SourceFileLoader
+from pathlib import Path
 from unittest.mock import patch
-
 
 ROOT = Path(__file__).resolve().parents[1]
 SCAN_PATH = ROOT / "services" / "usr-local" / "sbin" / "skyseeker-recovery-scan"
 LOADER = SourceFileLoader("skyseeker_recovery_scan", str(SCAN_PATH))
 SPEC = importlib.util.spec_from_loader(LOADER.name, LOADER)
+assert SPEC is not None
 SCAN = importlib.util.module_from_spec(SPEC)
 LOADER.exec_module(SCAN)
 
@@ -34,8 +34,7 @@ class RecoveryScanTests(unittest.TestCase):
             self.assertTrue(SCAN.rescue_visible("wlan0"))
         self.assertEqual(
             calls[0],
-            [SCAN.NMCLI, "device", "wifi", "rescan", "ifname", "wlan0",
-             "ssid", SCAN.SSID],
+            [SCAN.NMCLI, "device", "wifi", "rescan", "ifname", "wlan0", "ssid", SCAN.SSID],
         )
 
     def test_active_uplink_is_never_interrupted(self):
@@ -68,8 +67,7 @@ class RecoveryScanTests(unittest.TestCase):
             self.assertEqual(SCAN.main(), 0)
 
         self.assertIn(
-            [SCAN.NMCLI, "--wait", "30", "connection", "up", SCAN.PROFILE,
-             "ifname", "wlan0"],
+            [SCAN.NMCLI, "--wait", "30", "connection", "up", SCAN.PROFILE, "ifname", "wlan0"],
             calls,
         )
 
@@ -94,9 +92,7 @@ class RecoveryScanTests(unittest.TestCase):
 
         self.assertIn("up", calls[-1])
         self.assertIn(SCAN.PROFILE, calls[-1])
-        self.assertTrue(
-            all("netbird" not in " ".join(command).lower() for command in calls)
-        )
+        self.assertTrue(all("netbird" not in " ".join(command).lower() for command in calls))
 
     def test_failed_connect_logs_and_performs_no_followup_command(self):
         calls = []

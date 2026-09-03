@@ -16,55 +16,55 @@ from support.system_clock import (
 
 
 class SystemClockTests(unittest.TestCase):
-
     def test_validates_epoch_and_timezone_offset(self):
-        epoch_ms, timezone_offset = validate_phone_time({
-            "epochMs": 1785484800123,
-            "timezoneOffsetMinutes": -120,
-        })
+        epoch_ms, timezone_offset = validate_phone_time(
+            {
+                "epochMs": 1785484800123,
+                "timezoneOffsetMinutes": -120,
+            }
+        )
 
         self.assertEqual(epoch_ms, 1785484800123)
         self.assertEqual(timezone_offset, -120)
 
     def test_rejects_missing_or_implausible_epoch(self):
-        for payload in ({}, {"epochMs": "1785484800123"},
-                        {"epochMs": 0}, {"epochMs": float("nan")}):
+        for payload in ({}, {"epochMs": "1785484800123"}, {"epochMs": 0}, {"epochMs": float("nan")}):
             with self.subTest(payload=payload):
                 with self.assertRaises(ValueError):
                     validate_phone_time(payload)
 
-    @patch("support.system_clock.time.time",
-           side_effect=[1785484799.0, 1785484800.125])
+    @patch("support.system_clock.time.time", side_effect=[1785484799.0, 1785484800.125])
     @patch("support.system_clock.subprocess.run")
     def test_sets_system_clock_and_rtc(self, run_mock, _time_mock):
         result = set_system_time(1785484800.123)
 
-        self.assertEqual(run_mock.call_args_list, [
-            call(
-                ["date", "--set", "@1785484800.123"],
-                check=True,
-                capture_output=True,
-                text=True,
-                timeout=5,
-            ),
-            call(
-                ["hwclock", "--systohc", "--utc"],
-                check=True,
-                capture_output=True,
-                text=True,
-                timeout=5,
-            ),
-        ])
+        self.assertEqual(
+            run_mock.call_args_list,
+            [
+                call(
+                    ["date", "--set", "@1785484800.123"],
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                    timeout=5,
+                ),
+                call(
+                    ["hwclock", "--systohc", "--utc"],
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                    timeout=5,
+                ),
+            ],
+        )
         self.assertEqual(result["previousEpochMs"], 1785484799000)
         self.assertEqual(result["deviceEpochMs"], 1785484800125)
         self.assertEqual(result["adjustmentMs"], 1123)
         self.assertTrue(result["rtcSynced"])
 
-    @patch("support.system_clock.time.time",
-           side_effect=[1785484799.0, 1785484800.125])
+    @patch("support.system_clock.time.time", side_effect=[1785484799.0, 1785484800.125])
     @patch("support.system_clock.subprocess.run")
-    def test_rtc_failure_does_not_fail_system_sync(
-            self, run_mock, _time_mock):
+    def test_rtc_failure_does_not_fail_system_sync(self, run_mock, _time_mock):
         run_mock.side_effect = [
             None,
             subprocess.CalledProcessError(1, ["hwclock"]),
@@ -75,10 +75,10 @@ class SystemClockTests(unittest.TestCase):
         self.assertFalse(result["rtcSynced"])
 
     def test_browser_offsets_map_to_posix_etc_zones(self):
-        self.assertEqual(timezone_name_for_offset(-120), "Etc/GMT-2")   # UTC+2
-        self.assertEqual(timezone_name_for_offset(300), "Etc/GMT+5")    # UTC-5
+        self.assertEqual(timezone_name_for_offset(-120), "Etc/GMT-2")  # UTC+2
+        self.assertEqual(timezone_name_for_offset(300), "Etc/GMT+5")  # UTC-5
         self.assertEqual(timezone_name_for_offset(0), "Etc/UTC")
-        self.assertIsNone(timezone_name_for_offset(-330))               # UTC+5:30
+        self.assertIsNone(timezone_name_for_offset(-330))  # UTC+5:30
         self.assertIsNone(timezone_name_for_offset(None))
 
     @patch("support.system_clock.subprocess.run")
@@ -103,8 +103,7 @@ class SystemClockTests(unittest.TestCase):
 
     @patch("support.system_clock.subprocess.run")
     def test_disable_ntp_failure_is_nonfatal(self, run_mock):
-        run_mock.side_effect = subprocess.CalledProcessError(
-            1, ["timedatectl", "set-ntp", "false"])
+        run_mock.side_effect = subprocess.CalledProcessError(1, ["timedatectl", "set-ntp", "false"])
 
         self.assertFalse(disable_ntp())
 
@@ -116,11 +115,9 @@ class SystemClockTests(unittest.TestCase):
             timeout=5,
         )
 
-    @patch("support.system_clock.set_system_timezone",
-           return_value="Etc/GMT-2")
+    @patch("support.system_clock.set_system_timezone", return_value="Etc/GMT-2")
     @patch("support.system_clock.set_system_time")
-    def test_phone_after_gps_only_sets_timezone(
-            self, set_time_mock, set_timezone_mock):
+    def test_phone_after_gps_only_sets_timezone(self, set_time_mock, set_timezone_mock):
         set_time_mock.return_value = {
             "previousEpochMs": 1,
             "deviceEpochMs": 2,
@@ -150,8 +147,7 @@ class SystemClockTests(unittest.TestCase):
         }
         on_synced = Mock(return_value=(2, ["camera three failed"]))
         clock = ClockSync(on_synced=on_synced)
-        gps_time = datetime(
-            2026, 9, 2, 12, 30, 15, 500000, tzinfo=timezone.utc)
+        gps_time = datetime(2026, 9, 2, 12, 30, 15, 500000, tzinfo=timezone.utc)
 
         result = clock.sync_from_gps(gps_time)
 

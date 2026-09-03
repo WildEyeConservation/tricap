@@ -17,53 +17,53 @@ class TricapConfigError(Exception):
 
 
 class TricapConfig:
-    """ TricapConfig: Object that reads and writes settings from/to a config file, handling the
-        translation from machine code to human readable format, and back again. Uses the
-        configparser to do most of the heavy lifting.
-        - Options are layered: default.cfg (shipped with the code) lists every supported option,
-          and initial.cfg (on the device) overrides any of them. Reads see the merged view.
-        - Saving writes only the options the UI manages back to initial.cfg, so a rig's own
-          overrides are kept and default.cfg keeps its comments.
-        - Note that keys in sections are case-insensitive and stored in lowercase, and that all keys
-          in sections are accessible in a case-insensitive manner.
-        - The TricapConfig is treated as a flight critical component, and therefore any exceptions
-          raised should be raised, i.e. the system should halt and catch fire. A missing
-          initial.cfg is the one exception: the defaults are complete, so it is simply created on
-          the first save.
-         """
+    """TricapConfig: Object that reads and writes settings from/to a config file, handling the
+    translation from machine code to human readable format, and back again. Uses the
+    configparser to do most of the heavy lifting.
+    - Options are layered: default.cfg (shipped with the code) lists every supported option,
+      and initial.cfg (on the device) overrides any of them. Reads see the merged view.
+    - Saving writes only the options the UI manages back to initial.cfg, so a rig's own
+      overrides are kept and default.cfg keeps its comments.
+    - Note that keys in sections are case-insensitive and stored in lowercase, and that all keys
+      in sections are accessible in a case-insensitive manner.
+    - The TricapConfig is treated as a flight critical component, and therefore any exceptions
+      raised should be raised, i.e. the system should halt and catch fire. A missing
+      initial.cfg is the one exception: the defaults are complete, so it is simply created on
+      the first save.
+    """
 
     _logger = logging.getLogger(__name__)
 
-    CAMERA_SECTION_HEADER = 'Camera'
-    MISC_SECTION_HEADER = 'Misc'
-    UI_SECTION_HEADER = 'Ui'
+    CAMERA_SECTION_HEADER = "Camera"
+    MISC_SECTION_HEADER = "Misc"
+    UI_SECTION_HEADER = "Ui"
 
     # Options the UI changes at runtime; the only ones written back to initial.cfg.
     PERSISTED_OPTIONS = {
         CAMERA_SECTION_HEADER: (SONY_IMAGE_FORMAT_CONFIG_KEY,),
-        MISC_SECTION_HEADER: ('image_capture_interval',),
+        MISC_SECTION_HEADER: ("image_capture_interval",),
     }
 
     # Sections and options that older initial.cfg files may still carry but nothing reads.
-    RETIRED_SECTIONS = ('Web', 'SMS', 'Altimeter')
-    RETIRED_MISC_OPTIONS = ('session_description',)
+    RETIRED_SECTIONS = ("Web", "SMS", "Altimeter")
+    RETIRED_MISC_OPTIONS = ("session_description",)
 
     # Lowest accepted value per [Ui] option; anything faster hammers the rig over Wi-Fi.
     UI_MINIMUMS_MS = {
-        'status_poll_ms': 250,
-        'sensors_poll_ms': 250,
-        'sensors_poll_capturing_ms': 250,
-        'background_poll_ms': 1000,
-        'uplink_poll_ms': 1000,
-        'netbird_poll_ms': 1000,
-        'backup_poll_ms': 250,
-        'verify_poll_ms': 250,
-        'heartbeat_ms': 1000,
+        "status_poll_ms": 250,
+        "sensors_poll_ms": 250,
+        "sensors_poll_capturing_ms": 250,
+        "background_poll_ms": 1000,
+        "uplink_poll_ms": 1000,
+        "netbird_poll_ms": 1000,
+        "backup_poll_ms": 250,
+        "verify_poll_ms": 250,
+        "heartbeat_ms": 1000,
     }
 
-    TYPE_STRING = 'string'
-    TYPE_INT = 'int'
-    TYPE_FLOAT = 'float'
+    TYPE_STRING = "string"
+    TYPE_INT = "int"
+    TYPE_FLOAT = "float"
 
     def __init__(self, config_fp_to_read=CONFIG_FP, defaults_fp=DEFAULT_CONFIG_FP):
         self._parser = self._new_parser()
@@ -75,13 +75,13 @@ class TricapConfig:
 
         try:
             # read_file (rather than read) makes the parser raise on a problem with the file
-            with open(self._defaults_fp, 'r') as defaults_file:
+            with open(self._defaults_fp) as defaults_file:
                 self._parser.read_file(defaults_file)
             if os.path.exists(self._config_fp):
-                with open(self._config_fp, 'r') as config_file:
+                with open(self._config_fp) as config_file:
                     self._overrides.read_file(config_file)
             else:
-                self._logger.info('No %s yet; running on default.cfg alone', self._config_fp)
+                self._logger.info("No %s yet; running on default.cfg alone", self._config_fp)
             self._retire_legacy_options(self._overrides)
             for section in self._overrides.sections():
                 if not self._parser.has_section(section):
@@ -89,16 +89,15 @@ class TricapConfig:
                 for key, value in self._overrides.items(section, raw=True):
                     self._parser.set(section, key, value)
             self._ready_flag = True
-        except (configparser.Error, IOError, OSError) as ex:
-            self._logger.error('Error reading config files %s and %s',
-                               self._defaults_fp, self._config_fp)
-            self._logger.error('configparser exception: %s', ex.args)
+        except (configparser.Error, OSError) as ex:
+            self._logger.error("Error reading config files %s and %s", self._defaults_fp, self._config_fp)
+            self._logger.error("configparser exception: %s", ex.args)
             # If there is an error reading from the config file, the system should fall over
             raise
 
     @staticmethod
     def _new_parser():
-        return configparser.ConfigParser(inline_comment_prefixes=(';',))
+        return configparser.ConfigParser(inline_comment_prefixes=(";",))
 
     def _retire_legacy_options(self, parser):
         """Drop options from an older initial.cfg that nothing reads any more."""
@@ -112,16 +111,14 @@ class TricapConfig:
                 if option != SONY_IMAGE_FORMAT_CONFIG_KEY:
                     parser.remove_option(self.CAMERA_SECTION_HEADER, option)
             # The pre-SDK name for leaving the camera body's own format alone.
-            if parser.get(self.CAMERA_SECTION_HEADER, SONY_IMAGE_FORMAT_CONFIG_KEY,
-                          fallback=None) == 'Camera setting':
-                parser.set(self.CAMERA_SECTION_HEADER, SONY_IMAGE_FORMAT_CONFIG_KEY,
-                           SONY_IMAGE_FORMAT_CAMERA_SETTING)
+            if parser.get(self.CAMERA_SECTION_HEADER, SONY_IMAGE_FORMAT_CONFIG_KEY, fallback=None) == "Camera setting":
+                parser.set(self.CAMERA_SECTION_HEADER, SONY_IMAGE_FORMAT_CONFIG_KEY, SONY_IMAGE_FORMAT_CAMERA_SETTING)
 
     def is_ready(self):
         return self._ready_flag
 
     def get_section_dict(self, section_header):
-        """ Get all the parameters for a particular section """
+        """Get all the parameters for a particular section"""
 
         assert self._ready_flag
 
@@ -133,14 +130,14 @@ class TricapConfig:
 
         return dict(items)
 
-    def get(self, id_str, section_header, type_str='string'):
+    def get(self, id_str, section_header, type_str="string"):
 
         assert self._ready_flag
 
         try:
             val_str = self._parser[section_header][id_str]
-        except (configparser.Error, IOError, KeyError) as ex:
-            self._logger.error('Error reading from config file %s', self._config_fp)
+        except (OSError, configparser.Error, KeyError) as ex:
+            self._logger.error("Error reading from config file %s", self._config_fp)
             self._logger.error(ex)
             raise
 
@@ -151,7 +148,7 @@ class TricapConfig:
             elif type_str == TricapConfig.TYPE_FLOAT:
                 ret_val = float(val_str)
         except ValueError:
-            self._logger.error('Error converting string %s to %s', val_str, type_str)
+            self._logger.error("Error converting string %s to %s", val_str, type_str)
             raise
 
         return ret_val
@@ -163,12 +160,10 @@ class TricapConfig:
 
         settings = {}
         for key, minimum in self.UI_MINIMUMS_MS.items():
-            value = self.get(key, self.UI_SECTION_HEADER, self.TYPE_INT)
+            value = int(self.get(key, self.UI_SECTION_HEADER, self.TYPE_INT))
             if value < minimum:
-                self._logger.error('[Ui] %s = %s is below the minimum of %s ms',
-                                   key, value, minimum)
-                raise TricapConfigError(
-                    '[Ui] {} must be at least {} ms, got {}'.format(key, minimum, value))
+                self._logger.error("[Ui] %s = %s is below the minimum of %s ms", key, value, minimum)
+                raise TricapConfigError(f"[Ui] {key} must be at least {minimum} ms, got {value}")
             settings[key] = value
         return settings
 
@@ -180,21 +175,21 @@ class TricapConfig:
         # Using an assert, because this should really not happen
         assert self._ready_flag
 
+        key = None
         try:
             for key in section_dict.keys():
                 if key not in self._parser[section_header]:
-                    self._logger.warning('Not setting %s, which was not in the original cfg', key)
+                    self._logger.warning("Not setting %s, which was not in the original cfg", key)
                     raise TricapConfigError
                 else:
                     self._parser.set(section_header, key, str(section_dict[key]))
         except (configparser.Error, KeyError) as ex:
-            self._logger.error('Error setting %s as %s in section %s', key, str(section_dict[key]),
-                               section_header)
-            self._logger.error('configparser exception: %s', ex.args)
+            self._logger.error("Error setting %s as %s in section %s", key, section_dict.get(key), section_header)
+            self._logger.error("configparser exception: %s", ex.args)
             raise
 
     def save_to_file(self, config_fp=None):
-        """ Write the UI-managed options to initial.cfg, keeping the rig's other overrides. """
+        """Write the UI-managed options to initial.cfg, keeping the rig's other overrides."""
 
         assert self._ready_flag
 
@@ -208,9 +203,9 @@ class TricapConfig:
                 self._overrides.set(section, option, self._parser.get(section, option, raw=True))
 
         try:
-            with open(config_fp, 'w') as config_file:
+            with open(config_fp, "w") as config_file:
                 self._overrides.write(config_file)
-        except (configparser.Error, IOError) as ex:
-            self._logger.error('Error writing configs to file %s', config_fp)
+        except (OSError, configparser.Error) as ex:
+            self._logger.error("Error writing configs to file %s", config_fp)
             self._logger.error(ex)
             raise

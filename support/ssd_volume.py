@@ -1,4 +1,5 @@
 """Locate the external USB volume and give it a stable identity."""
+
 from __future__ import annotations
 
 import json
@@ -6,15 +7,21 @@ import logging
 import subprocess
 from dataclasses import dataclass
 
-LSBLK_CMD = ["lsblk", "--json", "--paths", "--bytes", "--output",
-             "NAME,PATH,TYPE,FSTYPE,TRAN,SIZE,UUID,PARTUUID,SERIAL"]
+LSBLK_CMD = [
+    "lsblk",
+    "--json",
+    "--paths",
+    "--bytes",
+    "--output",
+    "NAME,PATH,TYPE,FSTYPE,TRAN,SIZE,UUID,PARTUUID,SERIAL",
+]
 _logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
 class Volume:
     path: str  # what mount(8) needs, e.g. /dev/sda1
-    id: str    # filesystem UUID; falls back to PARTUUID, disk serial, then path
+    id: str  # filesystem UUID; falls back to PARTUUID, disk serial, then path
 
 
 def pick_volume(blockdevices: list[dict]) -> Volume | None:

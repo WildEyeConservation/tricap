@@ -1,15 +1,14 @@
 """Tests for the USB AP adapter auto-detect script, run against a fake root."""
 
-from pathlib import Path
 import shutil
 import subprocess
 import tempfile
 import unittest
-
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "services" / "usr-local" / "sbin" / "skyseeker-ap-autodetect.sh"
-BASH = shutil.which("bash")
+BASH = shutil.which("bash") or ""
 
 
 @unittest.skipUnless(BASH, "bash is required to run the autodetect script")
@@ -36,7 +35,10 @@ class ApAutodetectTests(unittest.TestCase):
     def run_script(self):
         return subprocess.run(
             [BASH, str(SCRIPT), str(self.root)],
-            capture_output=True, text=True, timeout=30, check=False,
+            capture_output=True,
+            text=True,
+            timeout=30,
+            check=False,
         )
 
     def test_dongle_from_any_driver_is_chosen_over_the_onboard_radio(self):

@@ -10,7 +10,6 @@ from support.backup import RsyncManager
 
 
 class BackupTests(unittest.TestCase):
-
     def setUp(self):
         self.temp_dir = tempfile.TemporaryDirectory()
         self.root = Path(self.temp_dir.name)
@@ -71,9 +70,7 @@ class BackupTests(unittest.TestCase):
             destination_file.write(b"corrupt")
         os.utime(destination_path, ns=(timestamp_ns, timestamp_ns))
 
-        result = self.manager.list_matched_files_sampled(
-            str(self.source), str(self.destination), blocks=4, workers=1
-        )
+        result = self.manager.list_matched_files_sampled(str(self.source), str(self.destination), blocks=4, workers=1)
 
         self.assertTrue(result["success"])
         self.assertEqual(result["matched"], [])
@@ -94,9 +91,7 @@ class BackupTests(unittest.TestCase):
                     destination_file.write(b"corrupt")
                 os.utime(destination_path, ns=(timestamp_ns, timestamp_ns))
 
-        result = self.manager.list_matched_files_sampled(
-            str(self.source), str(self.destination), workers=1
-        )
+        result = self.manager.list_matched_files_sampled(str(self.source), str(self.destination), workers=1)
 
         self.assertTrue(result["success"])
         self.assertEqual(result["matched"], [])
@@ -109,9 +104,7 @@ class BackupTests(unittest.TestCase):
         different_mtime_ns = source_mtime_ns - 20_000_000
         os.utime(destination_path, ns=(different_mtime_ns, different_mtime_ns))
 
-        result = self.manager.list_matched_files_sampled(
-            str(self.source), str(self.destination), workers=1
-        )
+        result = self.manager.list_matched_files_sampled(str(self.source), str(self.destination), workers=1)
 
         self.assertTrue(result["success"])
         self.assertEqual(result["matched"], [])
@@ -124,9 +117,7 @@ class BackupTests(unittest.TestCase):
         source_path.parent.mkdir(parents=True)
         source_path.write_bytes(b"camera raw data")
 
-        result = self.manager.list_matched_files_sampled(
-            str(self.source), str(self.destination), workers=1
-        )
+        result = self.manager.list_matched_files_sampled(str(self.source), str(self.destination), workers=1)
 
         self.assertTrue(result["success"])
         self.assertEqual(result["matched"], [])
@@ -155,9 +146,7 @@ class BackupTests(unittest.TestCase):
 
     @patch("support.backup.time.sleep")
     @patch("support.backup.os.path.ismount", return_value=True)
-    def test_backup_worker_failure_releases_claim_and_retries_unmount(
-        self, _ismount, _sleep
-    ):
+    def test_backup_worker_failure_releases_claim_and_retries_unmount(self, _ismount, _sleep):
         source_file = self.source / "capture.ARW"
         source_file.write_bytes(b"camera raw data")
         claim_storage = Mock()
@@ -171,15 +160,17 @@ class BackupTests(unittest.TestCase):
             unmount=unmount,
         )
 
-        with patch.object(manager, "_prepare_backup", return_value=True), patch.object(
-            manager, "_run_rsync_job", side_effect=RuntimeError("copy failed")
-        ), patch(
-            "support.backup.BACKUP_BENCHMARK_LOG", self.root / "benchmark.csv"
+        with (
+            patch.object(manager, "_prepare_backup", return_value=True),
+            patch.object(manager, "_run_rsync_job", side_effect=RuntimeError("copy failed")),
+            patch("support.backup.BACKUP_BENCHMARK_LOG", self.root / "benchmark.csv"),
         ):
             result = manager.start(str(self.source), str(self.destination))
             self.assertTrue(result["success"])
-            manager._thread.join(timeout=5)
-            self.assertFalse(manager._thread.is_alive())
+            thread = manager._thread
+            assert thread is not None
+            thread.join(timeout=5)
+            self.assertFalse(thread.is_alive())
 
         claim_storage.assert_called_once_with("backup")
         release_storage.assert_called_once_with("backup")
@@ -190,9 +181,7 @@ class BackupTests(unittest.TestCase):
 
     @patch("support.backup.time.sleep")
     @patch("support.backup.os.path.ismount", return_value=True)
-    def test_unmount_callback_failure_still_releases_claim_and_stops_worker(
-        self, _ismount, _sleep
-    ):
+    def test_unmount_callback_failure_still_releases_claim_and_stops_worker(self, _ismount, _sleep):
         source_file = self.source / "capture.ARW"
         source_file.write_bytes(b"camera raw data")
         claim_storage = Mock()
@@ -206,15 +195,17 @@ class BackupTests(unittest.TestCase):
             unmount=unmount,
         )
 
-        with patch.object(manager, "_prepare_backup", return_value=True), patch.object(
-            manager, "_run_rsync_job"
-        ), patch(
-            "support.backup.BACKUP_BENCHMARK_LOG", self.root / "benchmark.csv"
+        with (
+            patch.object(manager, "_prepare_backup", return_value=True),
+            patch.object(manager, "_run_rsync_job"),
+            patch("support.backup.BACKUP_BENCHMARK_LOG", self.root / "benchmark.csv"),
         ):
             result = manager.start(str(self.source), str(self.destination))
             self.assertTrue(result["success"])
-            manager._thread.join(timeout=5)
-            self.assertFalse(manager._thread.is_alive())
+            thread = manager._thread
+            assert thread is not None
+            thread.join(timeout=5)
+            self.assertFalse(thread.is_alive())
 
         claim_storage.assert_called_once_with("backup")
         release_storage.assert_called_once_with("backup")
@@ -225,31 +216,23 @@ class BackupTests(unittest.TestCase):
 
     @patch("support.backup.os.path.ismount", return_value=False)
     def test_start_verify_and_delete_refuses_unmounted_destination(self, _ismount):
-        result = self.manager.start_verify_and_delete(
-            str(self.source), str(self.destination)
-        )
+        result = self.manager.start_verify_and_delete(str(self.source), str(self.destination))
 
         self.assertFalse(result["success"])
         self.assertEqual(result["code"], "destination_not_mounted")
 
     @patch("support.backup.os.path.ismount", return_value=True)
-    def test_start_verify_and_delete_refuses_when_a_job_is_already_running(
-        self, _ismount
-    ):
+    def test_start_verify_and_delete_refuses_when_a_job_is_already_running(self, _ismount):
         self.manager._status.running = True
 
-        result = self.manager.start_verify_and_delete(
-            str(self.source), str(self.destination)
-        )
+        result = self.manager.start_verify_and_delete(str(self.source), str(self.destination))
 
         self.assertFalse(result["success"])
         self.assertEqual(result["msg"], "Backup is running")
 
         self.manager._status.running = False
         self.manager._verify_status.running = True
-        result = self.manager.start_verify_and_delete(
-            str(self.source), str(self.destination)
-        )
+        result = self.manager.start_verify_and_delete(str(self.source), str(self.destination))
 
         self.assertFalse(result["success"])
         self.assertEqual(result["msg"], "Verification is already running")

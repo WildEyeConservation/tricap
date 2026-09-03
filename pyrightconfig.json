@@ -1,0 +1,8 @@
+{
+  "include": ["app", "sensors", "serial_comms", "support", "tests", "config.py", "tricap.py"],
+  "exclude": ["**/node_modules", "**/__pycache__", ".venv"],
+  "venvPath": ".",
+  "venv": ".venv",
+  "pythonVersion": "3.10",
+  "pythonPlatform": "Linux"
+}

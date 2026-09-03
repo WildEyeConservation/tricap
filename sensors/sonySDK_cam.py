@@ -20,39 +20,24 @@ class sonySDKcam:
     """Handle communication with one Sony SDK camera."""
 
     _logger = logging.getLogger(__name__)
-    CONNECT_ATTEMPTS = 10
-    CONNECT_POLLS_PER_ATTEMPT = 50
+    CONNECT_ATTEMPTS: int = 10
+    CONNECT_POLLS_PER_ATTEMPT: int = 50
     CONNECT_POLL_INTERVAL_SEC = 0.1
 
     def imageDownloadCompleteCallback(self, filename):
-        name = (
-            filename.decode("utf-8", errors="replace")
-            if isinstance(filename, bytes)
-            else str(filename)
-        )
+        name = filename.decode("utf-8", errors="replace") if isinstance(filename, bytes) else str(filename)
         self._logger.debug("Sony camera transfer callback called with %s", name)
         with self._count_lock:
             self._downLoadedCount += 1
             self._num_images_copied += 1
 
     def cameraErrorCallback(self, message):
-        message = (
-            message.decode("utf-8", errors="replace")
-            if isinstance(message, bytes)
-            else str(message)
-        )
+        message = message.decode("utf-8", errors="replace") if isinstance(message, bytes) else str(message)
         self.last_error = message
         self.state = CAMERA_STATES.ERROR_CAPTURE
-        self._logger.error(
-            "Received an error callback from Sony camera SDK: %s", message
-        )
+        self._logger.error("Received an error callback from Sony camera SDK: %s", message)
 
-    def __init__(
-            self,
-            sonySDKInstance,
-            cameraID,
-            capture_lock,
-            image_format=SONY_IMAGE_FORMAT_CAMERA_SETTING):
+    def __init__(self, sonySDKInstance, cameraID, capture_lock, image_format=SONY_IMAGE_FORMAT_CAMERA_SETTING):
         self._image_count = 0
         self._serial_num = "Default_serial_num"
         self._num_images_copied = 0
@@ -77,15 +62,9 @@ class sonySDKcam:
         self.set_image_format(image_format)
 
         self._logger.debug("Setting Sony download callback")
-        self._sonyCamera.setOnDownloadCompleteCallback(
-            self.imageDownloadCompleteCallback, self._cameraID
-        )
-        self._sonyCamera.setOnErrorCallBack(
-            self.cameraErrorCallback, self._cameraID
-        )
-        self._serial_num = self._sonyCamera.getModel(self._cameraID).replace(
-            "-", "_"
-        )
+        self._sonyCamera.setOnDownloadCompleteCallback(self.imageDownloadCompleteCallback, self._cameraID)
+        self._sonyCamera.setOnErrorCallBack(self.cameraErrorCallback, self._cameraID)
+        self._serial_num = self._sonyCamera.getModel(self._cameraID).replace("-", "_")
 
         # Prevent the first capture from being missed while the camera settles.
         sleep(3)
@@ -93,8 +72,7 @@ class sonySDKcam:
 
     def release(self):
         """Detach SDK callbacks without allowing cleanup errors to escape."""
-        for callback_name in (
-                "setOnErrorCallBack", "setOnDownloadCompleteCallback"):
+        for callback_name in ("setOnErrorCallBack", "setOnDownloadCompleteCallback"):
             try:
                 callback = getattr(self._sonyCamera, callback_name)
                 callback(None, self._cameraID)
@@ -124,49 +102,34 @@ class sonySDKcam:
             )
             self._sonyCamera.disconnect(self._cameraID)
 
-        raise RuntimeError(
-            "Sony camera {} connection timed out after {} attempts".format(
-                self._cameraID, self.CONNECT_ATTEMPTS
-            )
-        )
+        raise RuntimeError(f"Sony camera {self._cameraID} connection timed out after {self.CONNECT_ATTEMPTS} attempts")
 
     def set_image_format(self, image_format):
         """Set the camera format and its corresponding PC transfer format."""
         if image_format not in SONY_IMAGE_FORMAT_CHOICES:
             raise ValueError(
-                "Unsupported Sony image format {!r}; expected one of {}".format(
-                    image_format, SONY_IMAGE_FORMAT_CHOICES
-                )
+                f"Unsupported Sony image format {image_format!r}; expected one of {SONY_IMAGE_FORMAT_CHOICES}"
             )
 
         if image_format != SONY_IMAGE_FORMAT_CAMERA_SETTING:
             file_type = SONY_IMAGE_FORMAT_FILE_TYPES[image_format]
-            if not self._sonyCamera.setCameraFileSaveType(
-                    file_type, self._cameraID):
-                raise RuntimeError(
-                    "Failed to set camera {} image format to {}".format(
-                        self._cameraID, image_format
-                    )
-                )
+            if not self._sonyCamera.setCameraFileSaveType(file_type, self._cameraID):
+                raise RuntimeError(f"Failed to set camera {self._cameraID} image format to {image_format}")
             self._logger.info(
                 "Camera %s image format set to %s",
                 self._cameraID,
                 image_format,
             )
         else:
-            self._logger.info(
-                "Camera %s image format left unchanged", self._cameraID
-            )
+            self._logger.info("Camera %s image format left unchanged", self._cameraID)
 
         # Sony exposes host transfer selection separately from FileType.
         pc_file_type = SONY_PC_IMAGE_FORMAT_FILE_TYPES[image_format]
-        if not self._sonyCamera.setPCFileSaveType(
-                pc_file_type, self._cameraID):
+        if not self._sonyCamera.setPCFileSaveType(pc_file_type, self._cameraID):
             # ILX-LR1 commonly exposes this property as read-only while still
             # transferring the explicitly selected format correctly.
             self._logger.warning(
-                "Camera %s PC transfer format is not writable; retaining "
-                "the camera's existing transfer selection",
+                "Camera %s PC transfer format is not writable; retaining the camera's existing transfer selection",
                 self._cameraID,
             )
         else:
@@ -179,39 +142,30 @@ class sonySDKcam:
     def _trigger_capture(self):
         """Trigger the shutter without waiting for the image transfer."""
         with self._capture_lock:
-            shutter_down = (
-                self._sonyCamera.isConnected(self._cameraID)
-                and self._sonyCamera.shutterDown(self._cameraID)
-            )
+            shutter_down = self._sonyCamera.isConnected(self._cameraID) and self._sonyCamera.shutterDown(self._cameraID)
         if not shutter_down:
-            self._logger.warning(
-                "Trigger Camera(shutter down) %s failed", self._cameraID
-            )
+            self._logger.warning("Trigger Camera(shutter down) %s failed", self._cameraID)
 
         sleep(0.035)
         with self._capture_lock:
-            shutter_up = (
-                self._sonyCamera.isConnected(self._cameraID)
-                and self._sonyCamera.shutterUp(self._cameraID)
-            )
+            shutter_up = self._sonyCamera.isConnected(self._cameraID) and self._sonyCamera.shutterUp(self._cameraID)
         if not shutter_up:
-            self._logger.warning(
-                "Trigger Camera(shutter up) %s failed", self._cameraID
-            )
+            self._logger.warning("Trigger Camera(shutter up) %s failed", self._cameraID)
         return bool(shutter_down and shutter_up)
 
     def capture_and_copy(
-            self,
-            mount_point,
-            interval,
-            init_start,
-            session_start_date,
-            serial_number,
-            stop_capture,
-            count_lock,
-            index,
-            capture_done,
-            sync_lock):
+        self,
+        mount_point,
+        interval,
+        init_start,
+        session_start_date,
+        serial_number,
+        stop_capture,
+        count_lock,
+        index,
+        capture_done,
+        sync_lock,
+    ):
         self._count_lock = count_lock
         self._logger.debug("capture_and_copy %s", init_start)
         self._session_start_date = session_start_date
@@ -225,29 +179,24 @@ class sonySDKcam:
         self._num_images_failed = 0
         self._image_count = 0
 
-        self._dest_dir = self.get_im_target_dir(
-            self._session_start_date, mount_point, serial_number
-        )
+        self._dest_dir = self.get_im_target_dir(self._session_start_date, mount_point, serial_number)
         os.makedirs(self._dest_dir, exist_ok=True)
 
-        self._logger.info(
-            "Set save info CAM%s to %s", self._cameraID, self._dest_dir
-        )
+        self._logger.info("Set save info CAM%s to %s", self._cameraID, self._dest_dir)
         if not self._sonyCamera.setSaveInfo(
-                self._dest_dir,
-                "{}_{}_".format(
-                    self._cameraID,
-                    session_start_date.strftime("%d_%m_%Y_%H_%M_%S"),
-                ),
-                1,
-                self._cameraID):
+            self._dest_dir,
+            "{}_{}_".format(
+                self._cameraID,
+                session_start_date.strftime("%d_%m_%Y_%H_%M_%S"),
+            ),
+            1,
+            self._cameraID,
+        ):
             with sync_lock:
                 capture_done[index].set()
             raise RuntimeError(
                 "Failed to set the save location. Make sure that the following "
-                "path exists and has appropriate permissions: {}".format(
-                    self._dest_dir
-                )
+                f"path exists and has appropriate permissions: {self._dest_dir}"
             )
 
         sleep(1)
@@ -255,8 +204,8 @@ class sonySDKcam:
 
         try:
             self._capture_loop(
-                interval, start, serial_number, stop_capture, index,
-                capture_done, sync_lock, download_wait_attempts)
+                interval, start, serial_number, stop_capture, index, capture_done, sync_lock, download_wait_attempts
+            )
         except Exception as exc:
             # An SDK call that raises must not leave the camera looking healthy
             # or the session waiting on a thread that is already gone.
@@ -266,8 +215,9 @@ class sonySDKcam:
                 capture_done[index].set()
             raise
 
-    def _capture_loop(self, interval, start, serial_number, stop_capture,
-                      index, capture_done, sync_lock, download_wait_attempts):
+    def _capture_loop(
+        self, interval, start, serial_number, stop_capture, index, capture_done, sync_lock, download_wait_attempts
+    ):
         stop_trigger_initiated = False
         while True:
             if stop_capture.is_set() and not stop_trigger_initiated:
@@ -288,18 +238,12 @@ class sonySDKcam:
                         waiting,
                     )
                 else:
-                    self._logger.warning(
-                        "Could not successfully trigger a capture."
-                    )
+                    self._logger.warning("Could not successfully trigger a capture.")
                     self.state = CAMERA_STATES.ERROR_CAPTURE
                     if not self._sonyCamera.isConnected(self._cameraID):
                         with sync_lock:
                             capture_done[index].set()
-                        raise RuntimeError(
-                            "Camera {} is not connected!".format(
-                                self._cameraID
-                            )
-                        )
+                        raise RuntimeError(f"Camera {self._cameraID} is not connected!")
 
                 start += interval
                 skipped_slots = 0
@@ -315,16 +259,11 @@ class sonySDKcam:
 
             if stop_capture.is_set() and stop_trigger_initiated:
                 with self._count_lock:
-                    downloads_complete = (
-                        self._downLoadedCount + self._num_images_failed
-                        >= self._triggers
-                    )
+                    downloads_complete = self._downLoadedCount + self._num_images_failed >= self._triggers
                 if downloads_complete or download_wait_attempts <= 0:
                     if download_wait_attempts <= 0:
                         with self._count_lock:
-                            self._num_images_failed = max(
-                                0, self._triggers - self._downLoadedCount
-                            )
+                            self._num_images_failed = max(0, self._triggers - self._downLoadedCount)
                         self._logger.warning(
                             "%s: failed to download %s images from the camera",
                             serial_number,
@@ -347,15 +286,11 @@ class sonySDKcam:
         return self.state.name
 
     def get_im_target_dir(self, timestamp, mount_point, serial_num):
-        session_dir = "{}/{}".format(
-            timestamp.strftime("%Y_%m_%d"), self._session_id
-        )
+        session_dir = "{}/{}".format(timestamp.strftime("%Y_%m_%d"), self._session_id)
         return os.path.join(mount_point, session_dir, str(serial_num))
 
     def sync_time(self):
-        self._sonyCamera.setDateTime(
-            round(datetime.now().timestamp()), self._cameraID
-        )
+        self._sonyCamera.setDateTime(round(datetime.now().timestamp()), self._cameraID)
 
     @property
     def serial_num(self):

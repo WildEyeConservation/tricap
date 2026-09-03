@@ -12,9 +12,7 @@ class TestGitData(unittest.TestCase):
     def test_reads_latest_commit_metadata(self, run):
         commit_hash = "0123456789abcdef0123456789abcdef01234567"
         commit_date = "2026-09-02T10:20:30+02:00"
-        run.return_value = CompletedProcess(
-            args=[], returncode=0, stdout=f"{commit_hash}\n{commit_date}\n", stderr=""
-        )
+        run.return_value = CompletedProcess(args=[], returncode=0, stdout=f"{commit_hash}\n{commit_date}\n", stderr="")
 
         git_data = GitData()
 
@@ -29,9 +27,7 @@ class TestGitData(unittest.TestCase):
     @patch("support.git_info.LOGGER.warning")
     @patch("support.git_info.subprocess.run")
     def test_command_failure_returns_unknown_and_warns_once(self, run, warning):
-        run.return_value = CompletedProcess(
-            args=[], returncode=128, stdout="", stderr="fatal: not a git repository"
-        )
+        run.return_value = CompletedProcess(args=[], returncode=128, stdout="", stderr="fatal: not a git repository")
 
         git_data = GitData()
 

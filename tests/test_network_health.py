@@ -1,19 +1,19 @@
 """Tests for SkySeeker diagnostics and bounded AP recovery."""
 
-from importlib.machinery import SourceFileLoader
 import importlib.util
-from pathlib import Path
 import subprocess
 import tempfile
 import time
 import unittest
+from importlib.machinery import SourceFileLoader
+from pathlib import Path
 from unittest.mock import patch
-
 
 ROOT = Path(__file__).resolve().parents[1]
 HEALTH_PATH = ROOT / "services" / "usr-local" / "sbin" / "skyseeker-health"
 LOADER = SourceFileLoader("skyseeker_health", str(HEALTH_PATH))
 SPEC = importlib.util.spec_from_loader(LOADER.name, LOADER)
+assert SPEC is not None
 HEALTH = importlib.util.module_from_spec(SPEC)
 LOADER.exec_module(HEALTH)
 
@@ -40,7 +40,7 @@ class NetworkHealthTests(unittest.TestCase):
         self.tempdir = tempfile.TemporaryDirectory()
         root = Path(self.tempdir.name)
         patches = [
-            patch.object(HEALTH, 'CAPTURE_ACTIVE_PATH', root / 'capture-active'),
+            patch.object(HEALTH, "CAPTURE_ACTIVE_PATH", root / "capture-active"),
             patch.object(HEALTH, "STATE_PATH", root / "state"),
             patch.object(HEALTH, "DISABLE_PATH", root / "disabled"),
             patch.object(HEALTH, "RESTART_SETTLE_SECONDS", 0),
@@ -53,9 +53,7 @@ class NetworkHealthTests(unittest.TestCase):
     def test_finds_only_an_ap_interface(self):
         output = "Interface wlan0\n\ttype managed\nInterface wlx0\n\ttype AP\n"
         self.assertEqual(HEALTH.find_ap_interface(output), "wlx0")
-        self.assertIsNone(
-            HEALTH.find_ap_interface("Interface wlan0\n\ttype managed\n")
-        )
+        self.assertIsNone(HEALTH.find_ap_interface("Interface wlan0\n\ttype managed\n"))
 
     def test_station_stats_reports_count_and_weakest_signal(self):
         dump = (
@@ -128,8 +126,9 @@ class NetworkHealthTests(unittest.TestCase):
         run_mock.assert_not_called()
 
     def test_restart_budget_suppresses_further_restarts(self):
-        HEALTH.save_state({"failures": 0, "last_restart": 0.0,
-                           "restarts_since_recovery": HEALTH.MAX_RESTARTS_BEFORE_BACKOFF})
+        HEALTH.save_state(
+            {"failures": 0, "last_restart": 0.0, "restarts_since_recovery": HEALTH.MAX_RESTARTS_BEFORE_BACKOFF}
+        )
         status = healthy_status()
         status["hostapd"] = "inactive"
         with patch.object(HEALTH, "run") as run_mock:
@@ -160,16 +159,16 @@ class NetworkHealthTests(unittest.TestCase):
 
     def test_capture_marker_defers_recovery_without_changing_state(self):
         original_state = {
-            'failures': 2,
-            'last_restart': 123.0,
-            'restarts_since_recovery': 1,
+            "failures": 2,
+            "last_restart": 123.0,
+            "restarts_since_recovery": 1,
         }
         HEALTH.save_state(original_state)
         HEALTH.CAPTURE_ACTIVE_PATH.touch()
         status = healthy_status()
-        status['hostapd'] = 'inactive'
+        status["hostapd"] = "inactive"
 
-        with patch.object(HEALTH, 'run') as run_mock:
+        with patch.object(HEALTH, "run") as run_mock:
             self.assertEqual(HEALTH.recover(status), 0)
 
         run_mock.assert_not_called()
@@ -195,11 +194,7 @@ class NetworkHealthTests(unittest.TestCase):
         for command in commands:
             self.assertEqual(command[:2], [HEALTH.SYSTEMCTL, "restart"])
             self.assertIn(command[2], {"hostapd.service", "dnsmasq.service"})
-            self.assertTrue(
-                {"reboot", "poweroff", "shutdown"}.isdisjoint(
-                    token.lower() for token in command
-                )
-            )
+            self.assertTrue({"reboot", "poweroff", "shutdown"}.isdisjoint(token.lower() for token in command))
 
     def test_failed_restart_still_consumes_budget_and_waits_for_fresh_failures(self):
         # A failed systemctl restart counts as an attempt: the budget is spent and

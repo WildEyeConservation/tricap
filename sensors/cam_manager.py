@@ -11,6 +11,7 @@ import sys
 import threading
 import time
 from datetime import datetime
+from typing import Any
 
 from config import (
     CAM_MANAGER_STATES,
@@ -20,14 +21,12 @@ from config import (
     SONY_IMAGE_FORMAT_CHOICES,
     SONY_IMAGE_FORMAT_CONFIG_KEY,
 )
-
 from support.ssd_volume import find_volume
 
 from .sony_discovery import discover_sony_cameras
 from .sonySDK_cam import sonySDKcam as SonyCamera
 
-
-CAPTURE_ACTIVE_MARKER = '/run/skyseeker-capture-active'
+CAPTURE_ACTIVE_MARKER = "/run/skyseeker-capture-active"
 
 
 def _disk_usage_gb(path):
@@ -40,7 +39,8 @@ def create_sony_sdk():
     wrapper_path = os.path.abspath("/home/radxa/SonySDKWrapper")
     if wrapper_path not in sys.path:
         sys.path.append(wrapper_path)
-    from sonySDKWrapper import sonyCamera
+    from sonySDKWrapper import sonyCamera  # pyright: ignore[reportMissingImports]
+
     return sonyCamera()
 
 
@@ -53,14 +53,16 @@ class TriCapCamsManager:
         """Construct."""
         self.state = CAM_MANAGER_STATES.STOPPED
 
-        self._copy_start_time = None
+        self._copy_start_time: datetime | None = None
+        # Assigned by the app once the altimeter has been constructed.
+        self.altimeter: Any = None
         self._capture_threads = list()
         # Keep this list object for the lifetime of the manager. Other startup
         # components retain a reference to it.
         self._cameras = []
-        self.camera_startup_error = ''
-        self._stop_capture = None
-        self._capture_threads_done = list() # sync finish time between capture threads
+        self.camera_startup_error = ""
+        self._stop_capture = threading.Event()
+        self._capture_threads_done = list()  # sync finish time between capture threads
         self._cam_settings = cam_settings
         self._man_settings = man_settings
         self._camera_count_locks = list()
@@ -86,14 +88,14 @@ class TriCapCamsManager:
         except Exception as exc:
             self.camera_startup_error = str(exc)
             self._logger.error(
-                'Camera startup failed; dashboard will remain available and '
-                'storage operations can continue. Restart Tricap after '
-                'reconnecting cameras: %s',
+                "Camera startup failed; dashboard will remain available and "
+                "storage operations can continue. Restart Tricap after "
+                "reconnecting cameras: %s",
                 exc,
                 exc_info=True,
             )
 
-        self._image_capture_interval = float(self._man_settings['image_capture_interval'])
+        self._image_capture_interval = float(self._man_settings["image_capture_interval"])
 
     def get_cameras_as_list(self):  # Sort this list
         return self._cameras
@@ -117,19 +119,17 @@ class TriCapCamsManager:
                 discovered_cameras.append(camera)
             except Exception as exc:
                 self._logger.warning(
-                    'Sony camera %s could not be initialised: %s',
+                    "Sony camera %s could not be initialised: %s",
                     camera_id,
                     exc,
                     exc_info=True,
                 )
 
         if not discovered_cameras:
-            raise RuntimeError(
-                'Sony cameras were detected, but none could be initialised'
-            )
+            raise RuntimeError("Sony cameras were detected, but none could be initialised")
 
         self._cameras.extend(discovered_cameras)
-        self.camera_startup_error = ''
+        self.camera_startup_error = ""
 
     def start_capturing(self):
         """Start the capturing threads of all connected cams.
@@ -142,9 +142,7 @@ class TriCapCamsManager:
 
         if not self._cameras:
             self.state = CAM_MANAGER_STATES.ERROR_NO_CAMS
-            self._logger.debug(
-                'Tried to start capture threads with no Sony cameras connected.'
-            )
+            self._logger.debug("Tried to start capture threads with no Sony cameras connected.")
             return False
 
         if self.state != CAM_MANAGER_STATES.STOPPED:
@@ -153,25 +151,23 @@ class TriCapCamsManager:
         # Checked before the laser is switched on so a refused start leaves
         # every peripheral as it was.
         if not self.mount_disk():
-            self._logger.error(
-                'Internal storage is not mounted; capture refused'
-            )
+            self._logger.error("Internal storage is not mounted; capture refused")
             return False
 
         try:
-            if getattr(self, 'altimeter', None) is not None:
+            if self.altimeter is not None:
                 self.altimeter.start_measuring()
         except Exception as exc:
-            self._logger.warning('Cam manager - altimeter start failed: %s', exc)
+            self._logger.warning("Cam manager - altimeter start failed: %s", exc)
 
         for camera in self._cameras:
             camera.reset_session_counters()
 
-        self._logger.debug('Cam manager - start capturing threads')
+        self._logger.debug("Cam manager - start capturing threads")
         self._stop_capture = threading.Event()
 
         if not self._camera_count_locks:
-            self._logger.debug('Cam manager - create thread interlocks')
+            self._logger.debug("Cam manager - create thread interlocks")
             self._thread_sync_lock = threading.Lock()
             for _camera in self._cameras:
                 self._camera_count_locks.append(threading.Lock())
@@ -183,29 +179,31 @@ class TriCapCamsManager:
 
         for index, camera in enumerate(self._cameras):
             self._capture_threads_done[index].clear()
-            self._capture_threads.append(threading.Thread(
-                target=camera.capture_and_copy,
-                daemon=True,
-                args=(
-                    MOUNT_POINT,
-                    self._image_capture_interval,
-                    global_start_time,
-                    self._copy_start_time,
-                    str(camera.serial_num),
-                    self._stop_capture,
-                    self._camera_count_locks[index],
-                    index,
-                    self._capture_threads_done,
-                    self._thread_sync_lock,
-                ),
-            ))
+            self._capture_threads.append(
+                threading.Thread(
+                    target=camera.capture_and_copy,
+                    daemon=True,
+                    args=(
+                        MOUNT_POINT,
+                        self._image_capture_interval,
+                        global_start_time,
+                        self._copy_start_time,
+                        str(camera.serial_num),
+                        self._stop_capture,
+                        self._camera_count_locks[index],
+                        index,
+                        self._capture_threads_done,
+                        self._thread_sync_lock,
+                    ),
+                )
+            )
 
         self.state = CAM_MANAGER_STATES.STARTED
         self._mark_capture_active()
         for thread in self._capture_threads:
             thread.start()
 
-        self._logger.debug('Cam manager - capture threads started.')
+        self._logger.debug("Cam manager - capture threads started.")
 
         threading.Thread(
             target=self._finalise_when_capture_threads_exit,
@@ -216,13 +214,13 @@ class TriCapCamsManager:
 
     def stop_capturing(self):
         try:
-            if getattr(self, 'altimeter', None) is not None:
+            if self.altimeter is not None:
                 self.altimeter.stop_measuring()
         except Exception as e:
             self._logger.warning(f"Cam manager - altimeter stop failed: {e}")
         if self.state == CAM_MANAGER_STATES.STARTED:
             self._stop_capture.set()
-            self._logger.debug('Cam manager - capture threads stop requested.')
+            self._logger.debug("Cam manager - capture threads stop requested.")
 
     def shutdown(self):
         """Stop capture and release every camera within a bounded interval."""
@@ -231,31 +229,31 @@ class TriCapCamsManager:
         while self.is_capture_thread_alive() and time.monotonic() < deadline:
             time.sleep(0.1)
         if self.is_capture_thread_alive():
-            self._logger.warning('Capture threads did not stop before shutdown timeout')
+            self._logger.warning("Capture threads did not stop before shutdown timeout")
         # The process is exiting either way, so capture cannot still be running.
         self._clear_capture_marker()
         for camera in self._cameras:
             camera.release()
 
     def _mark_capture_active(self):
-        '''Create the advisory marker used to defer AP recovery.'''
+        """Create the advisory marker used to defer AP recovery."""
         try:
-            with open(CAPTURE_ACTIVE_MARKER, 'w', encoding='utf-8') as marker:
-                marker.write(self._copy_start_time.isoformat())
+            with open(CAPTURE_ACTIVE_MARKER, "w", encoding="utf-8") as marker:
+                marker.write((self._copy_start_time or datetime.now()).isoformat())
         except OSError as exc:
-            self._logger.warning('Could not create capture-active marker: %s', exc)
+            self._logger.warning("Could not create capture-active marker: %s", exc)
 
     def _clear_capture_marker(self):
-        '''Remove the advisory capture marker when capture has stopped.'''
+        """Remove the advisory capture marker when capture has stopped."""
         try:
             os.remove(CAPTURE_ACTIVE_MARKER)
         except FileNotFoundError:
             pass
         except OSError as exc:
-            self._logger.warning('Could not remove capture-active marker: %s', exc)
+            self._logger.warning("Could not remove capture-active marker: %s", exc)
 
     def is_capture_thread_alive(self):
-        """ Return true if any cam thread is alive """
+        """Return true if any cam thread is alive"""
         for t in self._capture_threads:
             if t.is_alive():
                 return True
@@ -267,36 +265,35 @@ class TriCapCamsManager:
                 with self._storage_lock:
                     mount_status = subprocess.run(["mount", "/dev/nvme0n1p1", MOUNT_POINT], check=True)
                     self._logger.debug(mount_status)
-            except:
-                self._logger.warning('Failed to mount')
+            except (OSError, subprocess.SubprocessError):
+                self._logger.warning("Failed to mount")
                 return False
         else:
-            self._logger.info('Disk already mounted')
+            self._logger.info("Disk already mounted")
         return True
 
     def mount_ssd(self):
         if not os.path.ismount(MOUNT_POINT_SSD):
             device = self.external_ssd_device()
             if device is None:
-                self._logger.warning('SSD not connected')
+                self._logger.warning("SSD not connected")
                 return False
             try:
                 os.makedirs(MOUNT_POINT_SSD, exist_ok=True)
-                mount_status = subprocess.run(
-                    ["mount", device, MOUNT_POINT_SSD], check=True)
+                mount_status = subprocess.run(["mount", device, MOUNT_POINT_SSD], check=True)
                 self._logger.debug(mount_status)
             except (OSError, subprocess.SubprocessError) as exc:
-                self._logger.warning('Failed to mount %s: %s', device, exc)
+                self._logger.warning("Failed to mount %s: %s", device, exc)
                 return False
         else:
-            self._logger.info('Disk already mounted')
+            self._logger.info("Disk already mounted")
 
         try:
             if os.statvfs(MOUNT_POINT_SSD).f_flag & os.ST_RDONLY:
-                self._logger.warning('External SSD is mounted read-only')
+                self._logger.warning("External SSD is mounted read-only")
                 return False
         except OSError as exc:
-            self._logger.warning('Failed to inspect external SSD mount: %s', exc)
+            self._logger.warning("Failed to inspect external SSD mount: %s", exc)
             return False
         return True
 
@@ -372,7 +369,7 @@ class TriCapCamsManager:
                     self._logger.warning("Failed to umount: %s", exc)
                     return False
             else:
-                self._logger.info('Disk not mounted')
+                self._logger.info("Disk not mounted")
         return True
 
     def _finalise_when_capture_threads_exit(self, capture_threads):
@@ -383,21 +380,20 @@ class TriCapCamsManager:
 
     def _reset_after_capture(self):
         """Reset manager and successful cameras after capture completes."""
-        if (not self.is_capture_thread_alive()
-                and self.state == CAM_MANAGER_STATES.STARTED):
+        if not self.is_capture_thread_alive() and self.state == CAM_MANAGER_STATES.STARTED:
             self._logger.debug("Capture completed")
             self.state = CAM_MANAGER_STATES.STOPPED
             self._clear_capture_marker()
 
             for cam in self._cameras:
-                if cam.state.name == 'CAPTURING':
+                if cam.state.name == "CAPTURING":
                     cam.state = type(cam.state).INITIALISED
 
     def get_image_capture_interval(self):
-        return self._man_settings['image_capture_interval']
+        return self._man_settings["image_capture_interval"]
 
     def set_image_capture_interval(self, value):
-        self._man_settings['image_capture_interval'] = value
+        self._man_settings["image_capture_interval"] = value
         self._image_capture_interval = value
 
     def get_num_cams(self):
@@ -414,9 +410,7 @@ class TriCapCamsManager:
         """Store the value and apply explicit overrides to Sony cameras."""
         if image_format not in SONY_IMAGE_FORMAT_CHOICES:
             raise ValueError(
-                "Unsupported Sony image format {!r}; expected one of {}".format(
-                    image_format, SONY_IMAGE_FORMAT_CHOICES
-                )
+                f"Unsupported Sony image format {image_format!r}; expected one of {SONY_IMAGE_FORMAT_CHOICES}"
             )
 
         for camera in self._cameras:
@@ -435,8 +429,8 @@ class TriCapCamsManager:
                 except Exception as exc:
                     errors.append(str(exc) or type(exc).__name__)
                     self._logger.warning(
-                        'Could not sync camera %s time: %s',
-                        getattr(cam, 'serial_num', '?'),
+                        "Could not sync camera %s time: %s",
+                        getattr(cam, "serial_num", "?"),
                         exc,
                     )
         return synced_count, errors

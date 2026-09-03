@@ -19,10 +19,8 @@ ROOT = Path(__file__).resolve().parents[1]
 if "app" not in sys.modules:
     stub_app = types.ModuleType("app")
     stub_app.__path__ = [str(ROOT / "app")]
-    stub_app.altimeter = Mock()
-    stub_app.clock = Mock()
-    stub_app.gps_ser = Mock()
-    stub_app.tricap_manager = Mock()
+    for name in ("altimeter", "clock", "gps_ser", "tricap_manager"):
+        setattr(stub_app, name, Mock())
     sys.modules["app"] = stub_app
 
 from app.views import api as API  # noqa: E402
@@ -33,7 +31,6 @@ RUNNING = {"running": True}
 
 
 class ApiInterlockTests(unittest.TestCase):
-
     def setUp(self):
         app = Flask(__name__)
         app.register_blueprint(API.api_bp)
@@ -131,8 +128,7 @@ class ApiInterlockTests(unittest.TestCase):
     def test_restart_and_reboot_schedule_the_system_action_when_idle(self):
         response = self.client.post("/api/restart")
         self.assertEqual(response.status_code, 200)
-        self.schedule.assert_called_once_with(
-            ["systemctl", "--no-block", "restart", "tricap.service"])
+        self.schedule.assert_called_once_with(["systemctl", "--no-block", "restart", "tricap.service"])
 
         self.schedule.reset_mock()
         response = self.client.post("/api/reboot")
@@ -144,8 +140,8 @@ class ApiInterlockTests(unittest.TestCase):
     def test_sync_phone_time_refuses_during_capture(self):
         self._busy(CAM_MANAGER_STATES.COPYING)
         response = self.client.post(
-            "/api/sync_phone_time",
-            json={"epochMs": 1_700_000_000_000, "timezoneOffsetMinutes": -120})
+            "/api/sync_phone_time", json={"epochMs": 1_700_000_000_000, "timezoneOffsetMinutes": -120}
+        )
         self.assertEqual(response.status_code, 409)
         self.clock.sync_from_phone.assert_not_called()
 
@@ -156,15 +152,18 @@ class ApiInterlockTests(unittest.TestCase):
 
     def test_sync_phone_time_applies_valid_payload(self):
         self.clock.sync_from_phone.return_value = {
-            "source": "phone", "timeApplied": True, "timezone": "Etc/GMT-2",
-            "adjustmentMs": 5, "rtcSynced": True, "camerasSynced": 1,
+            "source": "phone",
+            "timeApplied": True,
+            "timezone": "Etc/GMT-2",
+            "adjustmentMs": 5,
+            "rtcSynced": True,
+            "camerasSynced": 1,
             "cameraErrors": [],
         }
-        with patch.object(API, "validate_phone_time",
-                          return_value=(1_700_000_000_000, -120)):
+        with patch.object(API, "validate_phone_time", return_value=(1_700_000_000_000, -120)):
             response = self.client.post(
-                "/api/sync_phone_time",
-                json={"epochMs": 1_700_000_000_000, "timezoneOffsetMinutes": -120})
+                "/api/sync_phone_time", json={"epochMs": 1_700_000_000_000, "timezoneOffsetMinutes": -120}
+            )
         self.assertEqual(response.status_code, 200)
         self.assertTrue(response.get_json()["success"])
         self.clock.sync_from_phone.assert_called_once_with(1_700_000_000_000, -120)
@@ -173,8 +172,7 @@ class ApiInterlockTests(unittest.TestCase):
 
     def test_backup_endpoints_refuse_during_capture_and_copy(self):
         for state in BUSY_STATES:
-            for path in ("/api/backup_start", "/api/backup_move",
-                         "/api/backup_stop", "/api/verify_and_delete"):
+            for path in ("/api/backup_start", "/api/backup_move", "/api/backup_stop", "/api/verify_and_delete"):
                 with self.subTest(state=state.name, path=path):
                     self._busy(state)
                     self.assertEqual(self.client.post(path).status_code, 400)
@@ -190,8 +188,7 @@ class ApiInterlockTests(unittest.TestCase):
         self.backup.start.reset_mock()
         response = self.client.post("/api/backup_move")
         self.assertEqual(response.status_code, 202)
-        self.backup.start.assert_called_once_with(
-            MOUNT_POINT, MOUNT_POINT_SSD, remove_source=True)
+        self.backup.start.assert_called_once_with(MOUNT_POINT, MOUNT_POINT_SSD, remove_source=True)
 
     def test_backup_refusal_by_manager_unmounts_the_ssd_again(self):
         self.backup.start.return_value = {"success": False, "msg": "Backup is running"}
@@ -215,11 +212,9 @@ class ApiInterlockTests(unittest.TestCase):
     def test_verify_and_delete_starts_and_unmounts_on_refusal(self):
         response = self.client.post("/api/verify_and_delete")
         self.assertEqual(response.status_code, 202)
-        self.backup.start_verify_and_delete.assert_called_once_with(
-            MOUNT_POINT, MOUNT_POINT_SSD)
+        self.backup.start_verify_and_delete.assert_called_once_with(MOUNT_POINT, MOUNT_POINT_SSD)
 
-        self.backup.start_verify_and_delete.return_value = {
-            "success": False, "code": "destination_not_mounted"}
+        self.backup.start_verify_and_delete.return_value = {"success": False, "code": "destination_not_mounted"}
         response = self.client.post("/api/verify_and_delete")
         self.assertEqual(response.status_code, 409)
         self.manager.unmount_disk.assert_called_once_with()
@@ -262,13 +257,11 @@ class ApiInterlockTests(unittest.TestCase):
         thread.assert_not_called()
 
     def test_force_delete_targets_only_the_internal_mount_point(self):
-        with patch.object(API.threading, "Thread") as thread, \
-                patch.object(API.os.path, "ismount", return_value=True):
+        with patch.object(API.threading, "Thread") as thread, patch.object(API.os.path, "ismount", return_value=True):
             response = self._force_delete()
         self.assertEqual(response.status_code, 202)
         thread.assert_called_once()
-        self.assertEqual(
-            thread.call_args.kwargs["args"], (Path(MOUNT_POINT).resolve(),))
+        self.assertEqual(thread.call_args.kwargs["args"], (Path(MOUNT_POINT).resolve(),))
         self.assertTrue(API._force_delete_status["running"])
 
     # -- read-only endpoints ----------------------------------------------
@@ -285,9 +278,10 @@ class ApiInterlockTests(unittest.TestCase):
         self.assertEqual(unmounted["internalStorage"], {})
 
         gib = 1073741824
-        with patch.object(API.os.path, "ismount", return_value=True), \
-                patch.object(API.shutil, "disk_usage",
-                             return_value=(4 * gib, 1 * gib, 3 * gib)):
+        with (
+            patch.object(API.os.path, "ismount", return_value=True),
+            patch.object(API.shutil, "disk_usage", return_value=(4 * gib, 1 * gib, 3 * gib)),
+        ):
             mounted = self.client.get("/api/statistics").get_json()
         self.assertEqual(mounted["internalStorage"]["capacityGB"], 4.0)
         self.assertEqual(mounted["internalStorage"]["freeGB"], 3.0)
@@ -297,8 +291,7 @@ class ApiInterlockTests(unittest.TestCase):
         self.assertEqual(self.client.get("/api/download_logs").status_code, 400)
 
         self._busy(CAM_MANAGER_STATES.STOPPED)
-        with tempfile.TemporaryDirectory() as empty_dir, \
-                patch.object(API, "SERVER_LOG_DIR", empty_dir):
+        with tempfile.TemporaryDirectory() as empty_dir, patch.object(API, "SERVER_LOG_DIR", empty_dir):
             self.assertEqual(self.client.get("/api/download_logs").status_code, 404)
 
 

@@ -1,11 +1,10 @@
 """The basics of basic classes. Should be so abstract as to do nothing."""
 
 import logging
-
 from abc import ABCMeta
 
 
-class Subject(object):
+class Subject:
     """Abstract base class for observable objects (implementing the observer design pattern)."""
 
     __metaclass__ = ABCMeta
@@ -24,8 +23,7 @@ class Subject(object):
         try:
             self._observers.remove(observer)
         except ValueError:
-            logging.getLogger('root').warning('Subject asked to detach non-existent observer : %s',
-                                              str(observer))
+            logging.getLogger("root").warning("Subject asked to detach non-existent observer : %s", str(observer))
             pass
 
     def notify(self, modifier=None):

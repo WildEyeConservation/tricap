@@ -2,21 +2,23 @@
 # Minimal rsync-backed backup engine. Progress is read from rsync's own output.
 from __future__ import annotations
 
+import concurrent.futures
+import csv
+import hashlib
+import io
+import logging
 import os
+import shutil
 import signal
 import subprocess
+import tempfile
 import threading
 import time
-import shutil
-import tempfile
-import hashlib
-import concurrent.futures
-import logging
-import csv
+from collections.abc import Callable
+from dataclasses import asdict, dataclass
 from datetime import datetime
-from dataclasses import dataclass, asdict
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, cast
 
 from support.rsync_progress import RSYNC_PROGRESS_ARGS, iter_lines, parse_line
 
@@ -32,8 +34,8 @@ EXFAT_MTIME_RESOLUTION_NS = 10_000_000  # 10 ms
 # not performance controls: a healthy scan takes seconds, so they sit far above
 # any legitimate duration. Without them a hung drive blocks the calling thread
 # forever.
-RSYNC_SCAN_TIMEOUT_SEC = 300      # dry-run inspection passes
-RSYNC_VERIFY_TIMEOUT_SEC = 1800   # verify passes may checksum the whole tree
+RSYNC_SCAN_TIMEOUT_SEC = 300  # dry-run inspection passes
+RSYNC_VERIFY_TIMEOUT_SEC = 1800  # verify passes may checksum the whole tree
 UNMOUNT_ATTEMPTS = 5
 UNMOUNT_RETRY_SEC = 2.0
 
@@ -46,7 +48,7 @@ BACKUP_BENCHMARK_LOG = Path(
 @dataclass
 class BackupStatus:
     running: bool = False
-    phase: str = "idle"                # idle | copying | stopping | finished | error
+    phase: str = "idle"  # idle | copying | stopping | finished | error
     message: str = ""
     started_at: float | None = None
     finished_at: float | None = None
@@ -61,7 +63,7 @@ class BackupStatus:
     current_file: str = ""
 
     # Verification / deletion helpers
-    verify_mode: str = "none"           # none | checksum | sha256
+    verify_mode: str = "none"  # none | checksum | sha256
     verified: bool = False
     verify_missing: int = 0
     verify_changed: int = 0
@@ -85,7 +87,7 @@ class BackupStatus:
 @dataclass
 class VerifyDeleteStatus:
     running: bool = False
-    phase: str = "idle"              # idle | verifying | deleting | finished | error
+    phase: str = "idle"  # idle | verifying | deleting | finished | error
     message: str = ""
     completed: int = 0
     total: int = 0
@@ -106,6 +108,7 @@ class RsyncManager:
     Runs rsync in a background thread and reads progress from its output, so
     status() is a plain read and costs the drives nothing.
     """
+
     def __init__(
         self,
         unmount: Callable[[], bool] | None = None,
@@ -132,7 +135,7 @@ class RsyncManager:
         self._verify: bool = False
         self._delete: bool = False
         self._remove_source: bool = False
-        self._partial: bool = False   # set when free space forced a files-from subset
+        self._partial: bool = False  # set when free space forced a files-from subset
 
         # Progress parts: files already on the destination at start, then
         # bytes/files reported by the live rsync.
@@ -228,8 +231,7 @@ class RsyncManager:
                     self._verify_status.phase = "error"
                     self._verify_status.success = False
                     self._verify_status.message = (
-                        "Verification completed, but the SSD could not be unmounted; "
-                        "remove it only after a restart."
+                        "Verification completed, but the SSD could not be unmounted; remove it only after a restart."
                     )
 
     def start(
@@ -308,7 +310,6 @@ class RsyncManager:
         st.bytes_copied = min(st.total_bytes, self._base_bytes + self._rsync_bytes)
         st.files_done = min(st.total_files, self._base_files + self._rsync_files)
 
-
     def verify_now(
         self,
         src: str,
@@ -321,7 +322,7 @@ class RsyncManager:
         Run verification immediately (synchronous). Returns the verify result dict
         and updates the status fields.
         """
-        checksum = (mode == "checksum")
+        checksum = mode == "checksum"
         res = self._verify_pass(
             Path(src),
             Path(dst),
@@ -344,7 +345,6 @@ class RsyncManager:
         out = {"success": True}
         out.update(res)
         return out
-
 
     def _sample_fingerprint(
         self,
@@ -482,7 +482,9 @@ class RsyncManager:
 
                 # Sampled fingerprints (limited reads)
                 source_fingerprint = self._sample_fingerprint(source_path, block_size=block_size, blocks=blocks)
-                destination_fingerprint = self._sample_fingerprint(destination_path, block_size=block_size, blocks=blocks)
+                destination_fingerprint = self._sample_fingerprint(
+                    destination_path, block_size=block_size, blocks=blocks
+                )
 
                 if source_fingerprint == destination_fingerprint:
                     return ("matched", rel)
@@ -562,11 +564,7 @@ class RsyncManager:
                 if progress_callback is not None:
                     progress_callback("deleting", index, total_paths)
                 continue
-            if (
-                len(parts) == 2
-                and parts[0] == time.strftime("%Y_%m_%d")
-                and parts[1] in LIVE_TELEMETRY_NAMES
-            ):
+            if len(parts) == 2 and parts[0] == time.strftime("%Y_%m_%d") and parts[1] in LIVE_TELEMETRY_NAMES:
                 if progress_callback is not None:
                     progress_callback("deleting", index, total_paths)
                 continue
@@ -607,7 +605,6 @@ class RsyncManager:
             "dry_run": dry_run,
         }
 
-
     def verify_and_delete_matched_sampled(
         self,
         src_root: str,
@@ -647,7 +644,7 @@ class RsyncManager:
         out.update(res)
         out.update({"delete": delres})
         return out
-    
+
     def generate_partial_files_from(
         self,
         src_root: str,
@@ -729,8 +726,9 @@ class RsyncManager:
         cmd += [src_arg, str(dst_p)]
 
         try:
-            out = subprocess.check_output(cmd, text=True, stderr=subprocess.STDOUT, env=env,
-                                          timeout=RSYNC_SCAN_TIMEOUT_SEC)
+            out = subprocess.check_output(
+                cmd, text=True, stderr=subprocess.STDOUT, env=env, timeout=RSYNC_SCAN_TIMEOUT_SEC
+            )
         except Exception as e:
             return {"success": False, "msg": f"rsync_dry_run_failed: {e}"}
 
@@ -778,7 +776,6 @@ class RsyncManager:
             "remaining_files": remaining_files,
         }
 
-
     # ---------------- Internals ----------------
 
     def _run_rsync(self) -> None:
@@ -797,9 +794,7 @@ class RsyncManager:
             with self._lock:
                 if not unmounted:
                     self._status.phase = "error"
-                    self._status.message = (
-                        "The SSD could not be unmounted; remove it only after a restart."
-                    )
+                    self._status.message = "The SSD could not be unmounted; remove it only after a restart."
                 self._status.running = False
                 self._status.finished_at = time.time()
             self._proc = None
@@ -855,12 +850,12 @@ class RsyncManager:
 
         cmd: list[str] = [
             "rsync",
-            "-aH",                # archive + preserve hardlinks
+            "-aH",  # archive + preserve hardlinks
             "--partial",
-            "--append-verify",    # safe resume
+            "--append-verify",  # safe resume
         ]
         if self._verify:
-            cmd.append("--checksum")    # slower; content-verify
+            cmd.append("--checksum")  # slower; content-verify
         if self._delete:
             cmd.append("--delete-after")
         if self._remove_source:
@@ -895,10 +890,13 @@ class RsyncManager:
                 self._status.message = f"{action} {scope}..."
             if not os.path.ismount(self._dst):
                 raise RuntimeError("Destination is not mounted")
-            self._proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, cwd=cwd,
-                                          env={**os.environ, "LC_ALL": "C"})
+            self._proc = subprocess.Popen(
+                cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, cwd=cwd, env={**os.environ, "LC_ALL": "C"}
+            )
             rsync_error = ""
-            for line in iter_lines(self._proc.stdout):
+            # Popen types stdout as IO[bytes]; the pipe is really a BufferedReader with read1.
+            stdout = cast(io.BufferedReader, self._proc.stdout)
+            for line in iter_lines(stdout):
                 parsed = parse_line(line)
                 if not parsed:
                     continue
@@ -952,7 +950,9 @@ class RsyncManager:
                     self._status.phase = "finished"
                     if self._remove_source and cleanup_failed:
                         self._status.phase = "error"
-                        self._status.message = "Copy completed but some source files could not be verified; they were retained."
+                        self._status.message = (
+                            "Copy completed but some source files could not be verified; they were retained."
+                        )
                     elif self._remove_source:
                         self._status.message = f"Completed. Deleted {cleanup_deleted} source files."
                     else:
@@ -996,34 +996,37 @@ class RsyncManager:
                 return
             if self._status.finished_at is None:
                 self._status.finished_at = time.time()
-            self._status.elapsed_seconds = max(
-                0.0, self._status.finished_at - self._status.started_at
-            )
+            self._status.elapsed_seconds = max(0.0, self._status.finished_at - self._status.started_at)
             if self._status.phase == "finished" and self._status.message == "Completed.":
                 self._status.bytes_copied = self._status.total_bytes
                 self._status.files_done = self._status.total_files
             if self._status.elapsed_seconds > 0 and self._status.planned_bytes > 0:
-                self._status.throughput_mib_s = (
-                    self._status.planned_bytes / 1024 / 1024 / self._status.elapsed_seconds
-                )
+                self._status.throughput_mib_s = self._status.planned_bytes / 1024 / 1024 / self._status.elapsed_seconds
             status = asdict(self._status)
 
         columns = [
-            "started_at", "finished_at", "result", "elapsed_seconds",
-            "copy_seconds", "planned_bytes", "planned_files", "total_bytes",
-            "total_files", "throughput_mib_s",
+            "started_at",
+            "finished_at",
+            "result",
+            "elapsed_seconds",
+            "copy_seconds",
+            "planned_bytes",
+            "planned_files",
+            "total_bytes",
+            "total_files",
+            "throughput_mib_s",
         ]
         row = {
             "started_at": datetime.fromtimestamp(status["started_at"]).astimezone().isoformat(),
             "finished_at": datetime.fromtimestamp(status["finished_at"]).astimezone().isoformat(),
             "result": status["message"],
-            "elapsed_seconds": f'{status["elapsed_seconds"]:.3f}',
-            "copy_seconds": f'{status["copy_seconds"]:.3f}',
+            "elapsed_seconds": f"{status['elapsed_seconds']:.3f}",
+            "copy_seconds": f"{status['copy_seconds']:.3f}",
             "planned_bytes": status["planned_bytes"],
             "planned_files": status["planned_files"],
             "total_bytes": status["total_bytes"],
             "total_files": status["total_files"],
-            "throughput_mib_s": f'{status["throughput_mib_s"]:.3f}',
+            "throughput_mib_s": f"{status['throughput_mib_s']:.3f}",
         }
         try:
             BACKUP_BENCHMARK_LOG.parent.mkdir(parents=True, exist_ok=True)
@@ -1037,7 +1040,6 @@ class RsyncManager:
                 os.fsync(handle.fileno())
         except Exception as exc:
             self._logger.warning("Could not write backup benchmark log: %s", exc)
-
 
     # ---------- helpers ----------
 
@@ -1214,8 +1216,17 @@ class RsyncManager:
         dst_arg = str(dst)
 
         # 1) src -> dst: missing/changed
-        cmd1 = ["rsync", "-rltH", "--size-only", "--dry-run", "--itemize-changes", "--out-format=%i|%n",
-                 "--no-perms", "--no-owner", "--no-group"]
+        cmd1 = [
+            "rsync",
+            "-rltH",
+            "--size-only",
+            "--dry-run",
+            "--itemize-changes",
+            "--out-format=%i|%n",
+            "--no-perms",
+            "--no-owner",
+            "--no-group",
+        ]
         if checksum:
             cmd1.append("--checksum")
         for pat in effective_excludes:
@@ -1226,8 +1237,9 @@ class RsyncManager:
         missing = 0
         samples: list[str] = []
         try:
-            out1 = subprocess.check_output(cmd1, text=True, stderr=subprocess.STDOUT, env=env,
-                                           timeout=RSYNC_VERIFY_TIMEOUT_SEC)
+            out1 = subprocess.check_output(
+                cmd1, text=True, stderr=subprocess.STDOUT, env=env, timeout=RSYNC_VERIFY_TIMEOUT_SEC
+            )
             for line in out1.splitlines():
                 # Expect: "<itemize>|<path>"
                 try:
@@ -1236,7 +1248,7 @@ class RsyncManager:
                     continue
                 if len(item) >= 2 and item[0] == ">" and item[1] in ("f", "L", "D"):
                     # New vs changed: new files usually show as >f+++++++++
-                    is_missing = ("+++++++++" in item)
+                    is_missing = "+++++++++" in item
                     if is_missing:
                         missing += 1
                     else:
@@ -1263,13 +1275,14 @@ class RsyncManager:
 
         extra = 0
         try:
-            out2 = subprocess.check_output(cmd2, text=True, stderr=subprocess.STDOUT, env=env,
-                                           timeout=RSYNC_VERIFY_TIMEOUT_SEC)
+            out2 = subprocess.check_output(
+                cmd2, text=True, stderr=subprocess.STDOUT, env=env, timeout=RSYNC_VERIFY_TIMEOUT_SEC
+            )
             for line in out2.splitlines():
                 if line.startswith("deleting "):
                     extra += 1
                     if len(samples) < sample_limit:
-                        samples.append(f"EXTRA: {line[len('deleting '):]}")
+                        samples.append(f"EXTRA: {line[len('deleting ') :]}")
         except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as e:
             return {
                 "ok": False,
@@ -1284,7 +1297,7 @@ class RsyncManager:
         # 3) quick dst totals
         dst_bytes, dst_files = self._scan_totals(dst, None)
 
-        ok = (missing == 0 and changed == 0 and extra == 0)
+        ok = missing == 0 and changed == 0 and extra == 0
         return {
             "ok": ok,
             "missing": missing,
@@ -1294,5 +1307,6 @@ class RsyncManager:
             "dst_files": dst_files,
             "dst_bytes": dst_bytes,
         }
+
 
 __all__ = ["BackupStatus", "RsyncManager"]

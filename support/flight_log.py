@@ -45,8 +45,7 @@ def record_laser_altitude(last_return: float | None, at: float | None = None) ->
         _laser_at = time.monotonic() if at is None else at
 
 
-def latest_laser_altitude(now: float | None = None,
-                          fresh_seconds: float = LASER_FRESH_SECONDS) -> float | None:
+def latest_laser_altitude(now: float | None = None, fresh_seconds: float = LASER_FRESH_SECONDS) -> float | None:
     """Return the latest last-return distance if it is recent enough, else None."""
     with _laser_lock:
         value, at = _laser_value, _laser_at
@@ -84,9 +83,18 @@ def _timestamp(value: datetime) -> str:
     return str(value.timestamp())
 
 
-def format_row(quality, gps_time: datetime, system_time: datetime,
-               latitude, ns, longitude, ew, gps_altitude, hdop,
-               laser_altitude: float | None) -> list[str]:
+def format_row(
+    quality,
+    gps_time: datetime,
+    system_time: datetime,
+    latitude,
+    ns,
+    longitude,
+    ew,
+    gps_altitude,
+    hdop,
+    laser_altitude: float | None,
+) -> list[str]:
     """Build one flight-log row in the order of FLIGHT_LOG_HEADER."""
     return [
         "" if quality is None else str(quality),
@@ -102,10 +110,20 @@ def format_row(quality, gps_time: datetime, system_time: datetime,
     ]
 
 
-def append_fix(directory: str, quality, gps_time: datetime, system_time: datetime,
-               latitude, ns, longitude, ew, gps_altitude, hdop,
-               laser_altitude: float | None = None,
-               use_latest_laser: bool = True) -> str:
+def append_fix(
+    directory: str,
+    quality,
+    gps_time: datetime,
+    system_time: datetime,
+    latitude,
+    ns,
+    longitude,
+    ew,
+    gps_altitude,
+    hdop,
+    laser_altitude: float | None = None,
+    use_latest_laser: bool = True,
+) -> str:
     """Append one GPS fix to ``flightData.csv`` in *directory*, creating it with
     a header when needed. Returns the path written.
 
@@ -114,8 +132,7 @@ def append_fix(directory: str, quality, gps_time: datetime, system_time: datetim
     """
     if use_latest_laser:
         laser_altitude = latest_laser_altitude()
-    row = format_row(quality, gps_time, system_time, latitude, ns, longitude, ew,
-                     gps_altitude, hdop, laser_altitude)
+    row = format_row(quality, gps_time, system_time, latitude, ns, longitude, ew, gps_altitude, hdop, laser_altitude)
     os.makedirs(directory, exist_ok=True)
     path = os.path.join(directory, FLIGHT_LOG_FILENAME)
     new_file = not os.path.exists(path) or os.path.getsize(path) == 0

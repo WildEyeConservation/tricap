@@ -1,18 +1,19 @@
 import configparser
-from html.parser import HTMLParser
 import importlib.util
 import json
-from pathlib import Path
 import unittest
+from html.parser import HTMLParser
+from pathlib import Path
 from unittest.mock import patch
 
 from flask import Flask
-from support.local_network import web_client_allowed
 
+from support.local_network import web_client_allowed
 
 ROOT = Path(__file__).resolve().parents[1]
 VIEW_PATH = ROOT / "app" / "views" / "dashboard.py"
 VIEW_SPEC = importlib.util.spec_from_file_location("skyseeker_dashboard_view", VIEW_PATH)
+assert VIEW_SPEC is not None and VIEW_SPEC.loader is not None
 DASHBOARD_VIEW = importlib.util.module_from_spec(VIEW_SPEC)
 VIEW_SPEC.loader.exec_module(DASHBOARD_VIEW)
 
@@ -33,10 +34,7 @@ class DashboardPageParser(HTMLParser):
             return
         if attributes.get("type") == "module":
             self.module_sources.append(attributes.get("src"))
-        if (
-            attributes.get("id") == "ui-config"
-            and attributes.get("type") == "application/json"
-        ):
+        if attributes.get("id") == "ui-config" and attributes.get("type") == "application/json":
             self.reading_ui_config = True
 
     def handle_endtag(self, tag):
@@ -79,11 +77,7 @@ class WebAccessTests(unittest.TestCase):
     def test_wired_maintenance_profile_provides_laptop_addressing(self):
         profile = configparser.ConfigParser()
         profile.read(
-            ROOT
-            / "services"
-            / "NetworkManager"
-            / "system-connections"
-            / "skyseeker-wired-access.nmconnection"
+            ROOT / "services" / "NetworkManager" / "system-connections" / "skyseeker-wired-access.nmconnection"
         )
 
         self.assertEqual(profile["connection"]["type"], "ethernet")
@@ -162,9 +156,7 @@ class FlaskDashboardAssetTests(unittest.TestCase):
 class AccessPointSignalTests(unittest.TestCase):
     def setUp(self):
         with DASHBOARD_VIEW._wifi_lock:
-            DASHBOARD_VIEW._wifi_cache.update(
-                ts=0.0, ap=None, stations={}, clients={}
-            )
+            DASHBOARD_VIEW._wifi_cache.update(ts=0.0, ap=None, stations={}, clients={})
 
     def test_requesting_client_station_is_preferred(self):
         stations = {"aa:aa:aa:aa:aa:aa": -68, "bb:bb:bb:bb:bb:bb": -42}
@@ -197,14 +189,12 @@ class AccessPointSignalTests(unittest.TestCase):
             self.assertEqual(DASHBOARD_VIEW.ap_wifi_signal("192.168.50.20"), -68)
             self.assertEqual(DASHBOARD_VIEW.ap_wifi_signal("192.168.50.20"), -68)
 
-        check_output.assert_called_once_with(
-            ["ip", "neigh", "show", "192.168.50.20"], text=True, timeout=3
-        )
+        check_output.assert_called_once_with(["ip", "neigh", "show", "192.168.50.20"], text=True, timeout=3)
 
 
 class StorageImageSampleTests(unittest.TestCase):
     def test_unmounted_internal_storage_is_unavailable(self):
-        DASHBOARD_VIEW._storage_sample_cache = {"ts": 0.0, "payload": None}
+        setattr(DASHBOARD_VIEW, "_storage_sample_cache", {"ts": 0.0, "payload": None})
         with patch.object(DASHBOARD_VIEW.os.path, "ismount", return_value=False):
             payload = DASHBOARD_VIEW.storage_image_sample()
 

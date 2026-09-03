@@ -3,9 +3,9 @@
 
 def _entry(connected, message, **extra):
     value = {
-        'connected': bool(connected),
-        'state': 'connected' if connected else 'not_connected',
-        'message': message,
+        "connected": bool(connected),
+        "state": "connected" if connected else "not_connected",
+        "message": message,
     }
     value.update(extra)
     return value
@@ -17,49 +17,54 @@ def component_health(camera_manager, gps, altimeter, storage_mounted):
         camera_count = len(camera_manager.get_cameras_as_list() or [])
     except Exception:
         camera_count = 0
-    camera_startup_error = str(
-        getattr(camera_manager, 'camera_startup_error', '') or ''
-    )
+    camera_startup_error = str(getattr(camera_manager, "camera_startup_error", "") or "")
 
-    gps_connected = bool(getattr(gps, 'isConnected', False))
+    gps_connected = bool(getattr(gps, "isConnected", False))
     gps_fix = False
     try:
         gps_fix = bool(gps.hasGps())
     except Exception:
         pass
 
-    altimeter_connected = bool(getattr(altimeter, 'available', False))
-    altimeter_state = getattr(altimeter, 'state', None)
-    altimeter_error = getattr(altimeter_state, 'name', None) == 'ERROR'
+    altimeter_connected = bool(getattr(altimeter, "available", False))
+    altimeter_state = getattr(altimeter, "state", None)
+    altimeter_error = getattr(altimeter_state, "name", None) == "ERROR"
     return {
-        'cameras': _entry(
+        "cameras": _entry(
             camera_count > 0,
-            (f'{camera_count} camera' + ('' if camera_count == 1 else 's') + ' connected.')
+            (f"{camera_count} camera" + ("" if camera_count == 1 else "s") + " connected.")
             if camera_count
             else (
-                'Cameras are not connected. Storage operations remain '
-                'available. Restart Tricap after reconnecting cameras. '
-                f'Last error: {camera_startup_error}'
+                "Cameras are not connected. Storage operations remain "
+                "available. Restart Tricap after reconnecting cameras. "
+                f"Last error: {camera_startup_error}"
                 if camera_startup_error
-                else 'No cameras connected. Capture is unavailable.'
+                else "No cameras connected. Capture is unavailable."
             ),
             count=camera_count,
-            error=camera_startup_error),
-        'gps': _entry(
+            error=camera_startup_error,
+        ),
+        "gps": _entry(
             gps_connected,
-            ('GPS connected with a position fix.' if gps_fix else 'GPS connected; waiting for a position fix.')
-            if gps_connected else 'GPS is not connected. Capture can continue without location data.',
-            fix=gps_fix),
-        'altimeter': _entry(
+            ("GPS connected with a position fix." if gps_fix else "GPS connected; waiting for a position fix.")
+            if gps_connected
+            else "GPS is not connected. Capture can continue without location data.",
+            fix=gps_fix,
+        ),
+        "altimeter": _entry(
             altimeter_connected,
-            'GRF-500 altimeter connected.' if altimeter_connected
+            "GRF-500 altimeter connected."
+            if altimeter_connected
             else (
-                'GRF-500 altimeter lost communication. Reconnect it; it is retried when capture starts.'
+                "GRF-500 altimeter lost communication. Reconnect it; it is retried when capture starts."
                 if altimeter_error
-                else 'GRF-500 altimeter is not connected. Capture can continue without altitude data.'
-            )),
-        'storage': _entry(
+                else "GRF-500 altimeter is not connected. Capture can continue without altitude data."
+            ),
+        ),
+        "storage": _entry(
             storage_mounted,
-            'Internal storage mounted.' if storage_mounted
-            else 'Internal storage is not mounted. Check storage before capturing.'),
+            "Internal storage mounted."
+            if storage_mounted
+            else "Internal storage is not mounted. Check storage before capturing.",
+        ),
     }

@@ -12,7 +12,6 @@ from sensors.sonySDK_cam import sonySDKcam
 
 
 class FakeClock:
-
     def __init__(self, values):
         self._values = iter(values)
         self.current = None
@@ -27,7 +26,6 @@ class FakeClock:
 
 
 class SonyCaptureTests(unittest.TestCase):
-
     def setUp(self):
         self.temp_dir = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp_dir.cleanup)
@@ -68,14 +66,11 @@ class SonyCaptureTests(unittest.TestCase):
 
         def target():
             try:
-                self.camera.capture_and_copy(
-                    *self._capture_args(stop_capture, capture_done)
-                )
+                self.camera.capture_and_copy(*self._capture_args(stop_capture, capture_done))
             except Exception as exc:
                 errors.append(exc)
 
-        with patch("sensors.sonySDK_cam.time.monotonic", clock.monotonic), \
-                patch("sensors.sonySDK_cam.sleep"):
+        with patch("sensors.sonySDK_cam.time.monotonic", clock.monotonic), patch("sensors.sonySDK_cam.sleep"):
             thread = threading.Thread(target=target)
             thread.start()
             thread.join(timeout=1)
@@ -88,15 +83,17 @@ class SonyCaptureTests(unittest.TestCase):
 
     def test_triggers_on_each_scheduled_slot_and_updates_counters(self):
         boundary = math.nextafter(10.0, math.inf)
-        clock = FakeClock([
-            10.0,
-            boundary,
-            boundary,
-            12.0 + (boundary - 10.0),
-            12.0 + (boundary - 10.0),
-            14.0 + (boundary - 10.0),
-            14.0 + (boundary - 10.0),
-        ])
+        clock = FakeClock(
+            [
+                10.0,
+                boundary,
+                boundary,
+                12.0 + (boundary - 10.0),
+                12.0 + (boundary - 10.0),
+                14.0 + (boundary - 10.0),
+                14.0 + (boundary - 10.0),
+            ]
+        )
         stop_capture = threading.Event()
         capture_done = [threading.Event()]
         trigger_times = []
@@ -133,16 +130,18 @@ class SonyCaptureTests(unittest.TestCase):
     def test_clock_jump_warns_once_and_resumes_at_next_slot(self):
         boundary = math.nextafter(10.0, math.inf)
         next_boundary = math.nextafter(18.0, math.inf)
-        clock = FakeClock([
-            boundary,
-            boundary,
-            17.2,
-            17.2,
-            17.2,
-            17.2,
-            next_boundary,
-            next_boundary,
-        ])
+        clock = FakeClock(
+            [
+                boundary,
+                boundary,
+                17.2,
+                17.2,
+                17.2,
+                17.2,
+                next_boundary,
+                next_boundary,
+            ]
+        )
         stop_capture = threading.Event()
         capture_done = [threading.Event()]
         trigger_times = []

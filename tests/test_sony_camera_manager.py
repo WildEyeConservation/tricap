@@ -12,14 +12,11 @@ from sensors.cam_manager import TriCapCamsManager
 
 
 class SonyCameraManagerTests(unittest.TestCase):
-
     def setUp(self):
         self.temp_dir = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp_dir.cleanup)
         self.marker = Path(self.temp_dir.name) / "capture-active"
-        marker_patch = patch(
-            "sensors.cam_manager.CAPTURE_ACTIVE_MARKER", str(self.marker)
-        )
+        marker_patch = patch("sensors.cam_manager.CAPTURE_ACTIVE_MARKER", str(self.marker))
         marker_patch.start()
         self.addCleanup(marker_patch.stop)
         self.real_thread = threading.Thread
@@ -39,8 +36,7 @@ class SonyCameraManagerTests(unittest.TestCase):
     @patch("sensors.cam_manager.subprocess.run")
     @patch("sensors.cam_manager.SonyCamera")
     @patch("sensors.cam_manager.discover_sony_cameras")
-    def test_initialises_every_discovered_sony_camera(
-            self, discover_mock, camera_mock, _run_mock, _mount_mock):
+    def test_initialises_every_discovered_sony_camera(self, discover_mock, camera_mock, _run_mock, _mount_mock):
         sdk = Mock()
         discover_mock.return_value = (sdk, 2)
         camera_mock.side_effect = [Mock(serial_num="one"), Mock(serial_num="two")]
@@ -68,8 +64,7 @@ class SonyCameraManagerTests(unittest.TestCase):
     @patch("sensors.cam_manager.subprocess.run")
     @patch("sensors.cam_manager.SonyCamera")
     @patch("sensors.cam_manager.discover_sony_cameras")
-    def test_returns_to_stopped_once_capture_threads_finish(
-            self, discover_mock, camera_mock, _run_mock, _mount_mock):
+    def test_returns_to_stopped_once_capture_threads_finish(self, discover_mock, camera_mock, _run_mock, _mount_mock):
         discover_mock.return_value = (Mock(), 1)
         capture_started = threading.Event()
         release_capture = threading.Event()
@@ -87,9 +82,7 @@ class SonyCameraManagerTests(unittest.TestCase):
             Lock(),
         )
 
-        with patch(
-                "sensors.cam_manager.threading.Thread",
-                side_effect=self._record_thread):
+        with patch("sensors.cam_manager.threading.Thread", side_effect=self._record_thread):
             capture_started_ok = manager.start_capturing()
             capture_target_started = capture_started.wait(timeout=1)
             state_while_capturing = manager.state
@@ -112,7 +105,8 @@ class SonyCameraManagerTests(unittest.TestCase):
     @patch("sensors.cam_manager.SonyCamera")
     @patch("sensors.cam_manager.discover_sony_cameras")
     def test_refuses_to_capture_when_internal_storage_does_not_mount(
-            self, discover_mock, camera_mock, _run_mock, _mount_mock):
+        self, discover_mock, camera_mock, _run_mock, _mount_mock
+    ):
         discover_mock.return_value = (Mock(), 1)
         camera = Mock(serial_num="one")
         camera_mock.return_value = camera
@@ -135,23 +129,25 @@ class SonyCameraManagerTests(unittest.TestCase):
     @patch("sensors.cam_manager.SonyCamera")
     @patch("sensors.cam_manager.discover_sony_cameras")
     def test_stop_capturing_signals_threads_and_manager_resets_when_they_exit(
-            self, discover_mock, camera_mock, _run_mock, _mount_mock):
+        self, discover_mock, camera_mock, _run_mock, _mount_mock
+    ):
         discover_mock.return_value = (Mock(), 1)
         capture_started = threading.Event()
         stop_seen = threading.Event()
         release_capture = threading.Event()
 
         def capture_target(
-                _mount_point,
-                _interval,
-                _init_start,
-                _session_start,
-                _serial_number,
-                stop_capture,
-                _count_lock,
-                _index,
-                _capture_done,
-                _sync_lock):
+            _mount_point,
+            _interval,
+            _init_start,
+            _session_start,
+            _serial_number,
+            stop_capture,
+            _count_lock,
+            _index,
+            _capture_done,
+            _sync_lock,
+        ):
             capture_started.set()
             stop_capture.wait()
             stop_seen.set()
@@ -166,9 +162,7 @@ class SonyCameraManagerTests(unittest.TestCase):
             Lock(),
         )
 
-        with patch(
-                "sensors.cam_manager.threading.Thread",
-                side_effect=self._record_thread):
+        with patch("sensors.cam_manager.threading.Thread", side_effect=self._record_thread):
             capture_started_ok = manager.start_capturing()
             capture_target_started = capture_started.wait(timeout=1)
             # stop_capturing only signals; the finaliser thread resets the
@@ -194,7 +188,8 @@ class SonyCameraManagerTests(unittest.TestCase):
     @patch("sensors.cam_manager.SonyCamera")
     @patch("sensors.cam_manager.discover_sony_cameras")
     def test_shutdown_during_capture_is_bounded_and_releases_resources(
-            self, discover_mock, camera_mock, _run_mock, _mount_mock):
+        self, discover_mock, camera_mock, _run_mock, _mount_mock
+    ):
         discover_mock.return_value = (Mock(), 1)
         capture_started = threading.Event()
         release_capture = threading.Event()
@@ -213,15 +208,11 @@ class SonyCameraManagerTests(unittest.TestCase):
         )
         manager.altimeter = Mock()
 
-        with patch(
-                "sensors.cam_manager.threading.Thread",
-                side_effect=self._record_thread):
+        with patch("sensors.cam_manager.threading.Thread", side_effect=self._record_thread):
             capture_started_ok = manager.start_capturing()
             capture_target_started = capture_started.wait(timeout=1)
             marker_while_capturing = self.marker.exists()
-            with patch(
-                    "sensors.cam_manager.time.monotonic",
-                    side_effect=[100.0, 126.0]):
+            with patch("sensors.cam_manager.time.monotonic", side_effect=[100.0, 126.0]):
                 shutdown_thread = self.real_thread(target=manager.shutdown)
                 shutdown_thread.start()
                 shutdown_thread.join(timeout=1)
@@ -248,7 +239,8 @@ class SonyCameraManagerTests(unittest.TestCase):
     @patch("sensors.cam_manager.SonyCamera")
     @patch("sensors.cam_manager.discover_sony_cameras")
     def test_shutdown_when_idle_clears_stale_marker_and_releases_cameras(
-            self, discover_mock, camera_mock, _run_mock, _mount_mock):
+        self, discover_mock, camera_mock, _run_mock, _mount_mock
+    ):
         discover_mock.return_value = (Mock(), 2)
         cameras = [
             Mock(serial_num="one", state=CAMERA_STATES.INITIALISED),
@@ -271,8 +263,7 @@ class SonyCameraManagerTests(unittest.TestCase):
 
     @patch("sensors.cam_manager.subprocess.run")
     @patch("sensors.cam_manager.os.path.ismount", return_value=True)
-    def test_unmount_refuses_while_external_storage_is_claimed(
-            self, _ismount, run):
+    def test_unmount_refuses_while_external_storage_is_claimed(self, _ismount, run):
         manager = TriCapCamsManager.__new__(TriCapCamsManager)
         manager._external_jobs_lock = threading.Lock()
         manager._external_storage_jobs = set()

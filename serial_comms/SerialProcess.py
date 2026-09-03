@@ -1,23 +1,25 @@
+import logging
 import math
 import os
-import serial
-import logging
-from statistics import mean
+from datetime import datetime, timedelta, timezone
 from io import BytesIO
+from statistics import mean
+from threading import Lock
+
+import serial
 from pyubx2 import (
     NMEA_PROTOCOL,
     UBX_PROTOCOL,
     UBXReader,
 )
-from datetime import datetime, timedelta, timezone
-from threading import Lock
 
 from config import FALLBACK_TELEMETRY_DIR, MOUNT_POINT
 from support import flight_log
 
 logger = logging.getLogger(__name__)
 
-class SerialProcess():
+
+class SerialProcess:
     def __init__(self, on_first_fix=None):
         super().__init__()
         # append valid reponses
@@ -31,11 +33,11 @@ class SerialProcess():
         self._lock = Lock()
         # Public "latest" values you can read at any time
         self.total_visible = 0
-        self.visible_by_talker = {}    # {'GP': 17, 'GL': 9, ...}
-        self.snr_min = None            # dB-Hz
+        self.visible_by_talker = {}  # {'GP': 17, 'GL': 9, ...}
+        self.snr_min = None  # dB-Hz
         self.snr_avg = None
         self.snr_max = None
-        self.pdop = None               # from GSA (best/latest valid)
+        self.pdop = None  # from GSA (best/latest valid)
         self.pdopLastUpdate = None
 
         # Internal state to assemble multipart GSVs per talker (constellation)
@@ -54,6 +56,7 @@ class SerialProcess():
     """
     Rx and Tx functions
     """
+
     def processGpsResponse(self, packet):
         try:
             bio = BytesIO(packet)
@@ -63,10 +66,10 @@ class SerialProcess():
             if parsed:
                 self._requests.append(parsed)
         except serial.SerialException as e:
-            logger.warning('Device error: %s', e)
+            logger.warning("Device error: %s", e)
             return False
         except Exception as e:
-            logger.warning('Parse error: %s', e)
+            logger.warning("Parse error: %s", e)
             return False
         return True
 
@@ -78,8 +81,7 @@ class SerialProcess():
         result is nudged by a day when the two straddle midnight UTC.
         """
         now = now or datetime.now(timezone.utc)
-        candidate = datetime.combine(now.date(), gps_time.replace(tzinfo=None),
-                                     tzinfo=timezone.utc)
+        candidate = datetime.combine(now.date(), gps_time.replace(tzinfo=None), tzinfo=timezone.utc)
         if candidate - now > timedelta(hours=12):
             candidate -= timedelta(days=1)
         elif now - candidate > timedelta(hours=12):
@@ -88,43 +90,49 @@ class SerialProcess():
 
     def saveGga(self, msg):
         pi_time = datetime.now()
-        if msg.time != None and msg.lat != '' and msg.lon != '' and self._firstGps:
+        if msg.time is not None and msg.lat != "" and msg.lon != "" and self._firstGps:
             self._hasGps = True
             # Epoch seconds, so the stored timestamp does not depend on the rig's zone.
             gps_datetime = self.gps_datetime(msg.time)
             mounted = os.path.ismount(MOUNT_POINT)
             storage_dir = MOUNT_POINT if mounted else FALLBACK_TELEMETRY_DIR
-            complete_dir = os.path.join(storage_dir, datetime.now().strftime('%Y_%m_%d'))
-            dest = os.path.join(complete_dir, 'gpsData.csv')
+            complete_dir = os.path.join(storage_dir, datetime.now().strftime("%Y_%m_%d"))
+            dest = os.path.join(complete_dir, "gpsData.csv")
+            alt = 0.0
             try:
                 if not os.path.isdir(complete_dir):
                     if not mounted:
-                        logger.warning('Internal storage not mounted; saving GPS data to %s', complete_dir)
+                        logger.warning("Internal storage not mounted; saving GPS data to %s", complete_dir)
                     os.makedirs(complete_dir, exist_ok=True)
-                alt = 0.0
-                if msg.alt != None:
+                if msg.alt is not None:
                     alt = msg.alt
-                line=(f"{str(msg.quality)},{str(gps_datetime.timestamp())},{str(pi_time.timestamp())},{str(msg.lat)},{msg.NS},{str(msg.lon)},{msg.EW},{str(alt)},{str(msg.HDOP)},{str(msg.sep)}\n")
-                with open(dest, 'ta') as f:
+                line = f"{str(msg.quality)},{str(gps_datetime.timestamp())},{str(pi_time.timestamp())},{str(msg.lat)},{msg.NS},{str(msg.lon)},{msg.EW},{str(alt)},{str(msg.HDOP)},{str(msg.sep)}\n"
+                with open(dest, "a") as f:
                     f.write(line)
             except Exception as e:
-                logger.warning('GPS line not saved: %s', e)
+                logger.warning("GPS line not saved: %s", e)
             # Friendly flight log with the laser's latest last return joined on,
             # written live so it is complete however the folder is copied.
             try:
-                flight_log.append_fix(complete_dir, msg.quality, gps_datetime, pi_time,
-                                      msg.lat, msg.NS, msg.lon, msg.EW, alt, msg.HDOP)
+                flight_log.append_fix(
+                    complete_dir, msg.quality, gps_datetime, pi_time, msg.lat, msg.NS, msg.lon, msg.EW, alt, msg.HDOP
+                )
             except Exception as e:
-                logger.warning('Flight log line not saved: %s', e)
-                
+                logger.warning("Flight log line not saved: %s", e)
+
         else:
             self._hasGps = False
 
     def saveRmc(self, msg):
-        if msg.date != None and msg.time != None and msg.lat != '' and msg.lon != '' and not self._clock_set_from_gps:
+        if (
+            msg.date is not None
+            and msg.time is not None
+            and msg.lat != ""
+            and msg.lon != ""
+            and not self._clock_set_from_gps
+        ):
             self._firstGps = True
-            gps_time = datetime.combine(
-                msg.date, msg.time.replace(tzinfo=None), tzinfo=timezone.utc)
+            gps_time = datetime.combine(msg.date, msg.time.replace(tzinfo=None), tzinfo=timezone.utc)
             # Retried on the next RMC if setting the clock fails, so a transient
             # error does not leave the rig on phone time for the whole flight.
             self._clock_set_from_gps = True
@@ -133,33 +141,33 @@ class SerialProcess():
                     self._on_first_fix(gps_time)
                 except Exception as exc:
                     self._clock_set_from_gps = False
-                    logger.warning('First GPS fix callback failed: %s', exc)
+                    logger.warning("First GPS fix callback failed: %s", exc)
 
     def process_gsv(self, msg):
         """
         Handle a single GSV sentence (multi-part). When the cycle for this talker completes,
         updates the public latest values (totals and SNR stats).
         """
-        talker = getattr(msg, 'talker', None)
+        talker = getattr(msg, "talker", None)
         if not talker:
             return
 
         # Parts/cycle info
         try:
-            total_msgs = int(getattr(msg, 'numMsg', 0))
-            this_part  = int(getattr(msg, 'msgNum', 0))
+            total_msgs = int(getattr(msg, "numMsg", 0))
+            this_part = int(getattr(msg, "msgNum", 0))
         except (TypeError, ValueError):
             return
 
         # Satellites in view for this constellation (reported on each part)
-        num_in_view = self._safe_int(getattr(msg, 'numSV', None))
+        num_in_view = self._safe_int(getattr(msg, "numSV", None))
 
         # Extract up to 4 SNR fields from this sentence
-        signal_id = getattr(msg, 'signalID', None)
+        signal_id = getattr(msg, "signalID", None)
         snrs = []
         for i in range(1, 5):
             s = getattr(msg, f"cno_0{i}", None)
-            if s in (None, ''):
+            if s in (None, ""):
                 continue
             try:
                 snrs.append(int(s))
@@ -167,40 +175,43 @@ class SerialProcess():
                 pass  # ignore non-integer SNRs
 
         with self._lock:
-            st = self._gsv_state.setdefault(talker, {
-                'expected': total_msgs or 0,
-                'received_parts': set(),
-                'snrs': [],
-                'num_in_view': num_in_view if num_in_view is not None else 0
-            })
+            st = self._gsv_state.setdefault(
+                talker,
+                {
+                    "expected": total_msgs or 0,
+                    "received_parts": set(),
+                    "snrs": [],
+                    "num_in_view": num_in_view if num_in_view is not None else 0,
+                },
+            )
 
             # If expected suddenly changes (new cycle), reset the state
-            if st['expected'] and total_msgs and total_msgs != st['expected'] and this_part == 1:
-                st['received_parts'].clear()
-                st['snrs'].clear()
+            if st["expected"] and total_msgs and total_msgs != st["expected"] and this_part == 1:
+                st["received_parts"].clear()
+                st["snrs"].clear()
 
             if total_msgs:
-                st['expected'] = total_msgs
+                st["expected"] = total_msgs
             if num_in_view is not None:
-                st['num_in_view'] = num_in_view
+                st["num_in_view"] = num_in_view
 
             if this_part >= 1:
-                st['received_parts'].add(this_part)
+                st["received_parts"].add(this_part)
             if snrs:
-                st['snrs'].extend(snrs)
+                st["snrs"].extend(snrs)
 
             # Check completion of the cycle for this talker
-            if st['expected'] and len(st['received_parts']) >= st['expected']:
+            if st["expected"] and len(st["received_parts"]) >= st["expected"]:
                 # Save a completed snapshot for this constellation
                 self._gsv_complete[talker] = {
-                    'snrs': list(st['snrs']),
-                    'num_in_view': st['num_in_view'] if st['num_in_view'] is not None else 0
+                    "snrs": list(st["snrs"]),
+                    "num_in_view": st["num_in_view"] if st["num_in_view"] is not None else 0,
                 }
                 # Reset for the next cycle
-                st['received_parts'].clear()
-                if signal_id is None or signal_id == '0':
+                st["received_parts"].clear()
+                if signal_id is None or signal_id == "0":
                     # only clear here for next cycle
-                    st['snrs'].clear()
+                    st["snrs"].clear()
 
                 # Recompute combined "latest" view across all talkers
                 self._recompute_latest_from_completed_locked()
@@ -209,7 +220,7 @@ class SerialProcess():
         """
         Handle a single GSA sentence. Updates `pdop` when it’s valid (ignores 0 and 99.99 etc.).
         """
-        pdop = getattr(msg, 'PDOP', None)
+        pdop = getattr(msg, "PDOP", None)
         v = self._valid_pdop(pdop)
         if v is None:
             return
@@ -229,10 +240,10 @@ class SerialProcess():
         all_snrs = []
 
         for talker, snap in self._gsv_complete.items():
-            n = snap.get('num_in_view') or 0
+            n = snap.get("num_in_view") or 0
             total_visible += n
             visible_by_talker[talker] = n
-            snrs = snap.get('snrs') or []
+            snrs = snap.get("snrs") or []
             all_snrs.extend(s for s in snrs if isinstance(s, int))
 
         self.total_visible = total_visible

@@ -4,7 +4,6 @@ import re
 import subprocess
 from datetime import datetime
 
-
 LOGGER = logging.getLogger(__name__)
 UNKNOWN = "unknown"
 

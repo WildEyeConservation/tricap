@@ -2,13 +2,12 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
 import logging
 import math
 import subprocess
 import threading
 import time
-
+from datetime import datetime, timezone
 
 logger = logging.getLogger(__name__)
 
@@ -33,9 +32,11 @@ def validate_phone_time(payload):
 
     timezone_offset = payload.get("timezoneOffsetMinutes")
     if timezone_offset is not None:
-        if (isinstance(timezone_offset, bool) or
-                not isinstance(timezone_offset, (int, float)) or
-                not math.isfinite(float(timezone_offset))):
+        if (
+            isinstance(timezone_offset, bool)
+            or not isinstance(timezone_offset, (int, float))
+            or not math.isfinite(float(timezone_offset))
+        ):
             raise ValueError("timezoneOffsetMinutes must be a number")
         timezone_offset = int(timezone_offset)
         if not -14 * 60 <= timezone_offset <= 14 * 60:
@@ -95,7 +96,7 @@ def set_system_time(epoch_seconds: float) -> dict:
     previous_seconds = time.time()
 
     subprocess.run(
-        ["date", "--set", "@{:.3f}".format(target_seconds)],
+        ["date", "--set", f"@{target_seconds:.3f}"],
         check=True,
         capture_output=True,
         text=True,
@@ -117,8 +118,7 @@ def set_system_time(epoch_seconds: float) -> dict:
     return {
         "previousEpochMs": round(previous_seconds * 1000),
         "deviceEpochMs": round(time.time() * 1000),
-        "adjustmentMs": round(target_seconds * 1000 -
-                              previous_seconds * 1000),
+        "adjustmentMs": round(target_seconds * 1000 - previous_seconds * 1000),
         "rtcSynced": rtc_synced,
     }
 
@@ -182,11 +182,13 @@ class ClockSync:
 
             result = set_system_time(epoch_ms / 1000.0)
             self.source = "phone"
-            result.update({
-                "source": self.source,
-                "timeApplied": True,
-                "timezone": timezone_name,
-            })
+            result.update(
+                {
+                    "source": self.source,
+                    "timeApplied": True,
+                    "timezone": timezone_name,
+                }
+            )
             result.update(self._camera_result(self.source))
             return result
 
@@ -194,9 +196,11 @@ class ClockSync:
         with self._lock:
             result = set_system_time(utc_datetime.timestamp())
             self.source = "gps"
-            result.update({
-                "source": self.source,
-                "timeApplied": True,
-            })
+            result.update(
+                {
+                    "source": self.source,
+                    "timeApplied": True,
+                }
+            )
             result.update(self._camera_result(self.source))
             return result

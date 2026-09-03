@@ -85,7 +85,31 @@ class PortalPollingTests(unittest.TestCase):
         for tag in lockable:
             self.assertIn(" disabled", tag, tag)
         self.assertIn("const unknown=!(known.status&&known.backup&&known.verify)", PORTAL.SETUP_JS)
-        self.assertIn("const lock=unknown||capturing||backupRunning||verifyRunning", PORTAL.SETUP_JS)
+        self.assertIn("const jobLock=unknown||capturing||backupRunning||verifyRunning", PORTAL.SETUP_JS)
+
+    def test_any_inflight_action_locks_every_action_button(self):
+        # The moment one action button is pressed, every other action button
+        # locks too; nothing waits for the next status poll to disable.
+        self.assertIn("actionBusyCount++;if(onActionStateChange)onActionStateChange()", PORTAL.COMMON_JS)
+        self.assertIn("actionBusyCount--;if(onActionStateChange)onActionStateChange()", PORTAL.COMMON_JS)
+        self.assertIn("onActionStateChange=setControlsEnabled", PORTAL.SETUP_JS)
+        self.assertIn("const lock=jobLock||actionBusyCount>0", PORTAL.SETUP_JS)
+
+    def test_stop_backup_replaces_backup_buttons_while_running(self):
+        # While a copy runs the start/verify/move buttons are hidden and a
+        # single Stop backup button (with its own confirmation modal) shows;
+        # the swap reverses once the job is no longer running.
+        self.assertIn('el("backupActions").hidden=backupRunning', PORTAL.SETUP_JS)
+        self.assertIn('el("backupStop").hidden=!backupRunning', PORTAL.SETUP_JS)
+        self.assertIn('el("backupStop").disabled=backupStopping||actionBusyCount>0', PORTAL.SETUP_JS)
+        # Stop confirms via its own modal and calls the stop API.
+        self.assertIn('id="stopBackupModal"', PORTAL.SETUP_HTML)
+        self.assertIn('fetchJson("/api/backup_stop")', PORTAL.SETUP_JS)
+        # The button starts hidden and is not part of the data-locks group, so
+        # it stays usable while the running job locks everything else.
+        stop_tag = re.search(r'<button[^>]*id="backupStop"[^>]*>', PORTAL.SETUP_HTML).group(0)
+        self.assertIn(" hidden", stop_tag)
+        self.assertNotIn("data-locks", stop_tag)
 
     def test_setup_page_notices_jobs_started_elsewhere(self):
         # An already-open page re-checks the job endpoints every third status

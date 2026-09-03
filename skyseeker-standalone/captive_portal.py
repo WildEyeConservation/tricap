@@ -546,16 +546,22 @@ const nf=v=>Number(v||0).toLocaleString();
 function toast(m){const t=el("toast");t.textContent=m;t.classList.remove("loading");t.classList.add("show");clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove("show"),2800)}
 function loadingToast(m){const t=el("toast"),s=document.createElement("span"),label=document.createElement("span");s.className="toast-spinner";s.setAttribute("aria-hidden","true");label.textContent=m;t.textContent="";t.append(s,label);t.classList.add("show","loading");clearTimeout(t._t)}
 function hideLoadingToast(){const t=el("toast");if(t.classList.contains("loading")){t.classList.remove("show","loading")}}
+// Pages that lock groups of controls assign a callback here; it fires the
+// moment any action starts or finishes so every action button locks together
+// instead of waiting for the next status poll.
+let actionBusyCount=0,onActionStateChange=null;
 function beginAction(control,message){
   if(!control||control.disabled||control.dataset.actionBusy==="true")return null;
   control.dataset.actionBusy="true";control.classList.add("action-busy");control.setAttribute("aria-busy","true");
   if("disabled" in control)control.disabled=true;else control.setAttribute("aria-disabled","true");
+  actionBusyCount++;if(onActionStateChange)onActionStateChange();
   loadingToast(message);
   let finished=false;
   return keepLoading=>{
     if(finished)return;finished=true;
     delete control.dataset.actionBusy;control.classList.remove("action-busy");control.removeAttribute("aria-busy");control.removeAttribute("aria-disabled");
     if("disabled" in control)control.disabled=false;
+    actionBusyCount--;if(onActionStateChange)onActionStateChange();
     if(!keepLoading)hideLoadingToast();
   };
 }
@@ -833,17 +839,29 @@ runPeriodic(()=>latest&&latest.mode==="STARTED"?null:pollStorage(),15000);
 '''
 
 SETUP_JS = COMMON_JS + r'''
-let currentInterval=null,currentImageFormat=null,capturing=false,backupRunning=false,backupTimer=null,camCount=-1,externalConnected=false;
+let currentInterval=null,currentImageFormat=null,capturing=false,backupRunning=false,backupStopping=false,backupTimer=null,camCount=-1,externalConnected=false;
 let verifyRunning=false,verifyTimer=null,verifyAnnounce=false;
 let deleteMode="verify",statusFailures=0,jobTick=0;
 // Controls stay locked until every poller has answered at least once.
 const known={status:false,backup:false,verify:false};
 function setControlsEnabled(){
   const unknown=!(known.status&&known.backup&&known.verify);
-  const lock=unknown||capturing||backupRunning||verifyRunning;
+  const jobLock=unknown||capturing||backupRunning||verifyRunning;
+  // Any in-flight action locks every action button immediately, so a second
+  // control cannot be pressed while the first request is still being answered.
+  const lock=jobLock||actionBusyCount>0;
   document.querySelectorAll("[data-locks]").forEach(b=>{b.disabled=lock||b.dataset.actionBusy==="true"});
-  el("lockNote").textContent=unknown?"Checking device status...":lock?"Some controls are disabled while capture or copy is running.":"";
+  el("lockNote").textContent=unknown?"Checking device status...":jobLock?"Some controls are disabled while capture or copy is running.":"";
+  updateBackupButtons();
 }
+// While a copy runs the start/verify/move buttons are swapped for a single
+// Stop button; it is not data-locks because it must stay usable during the job.
+function updateBackupButtons(){
+  el("backupActions").hidden=backupRunning;
+  el("backupStop").hidden=!backupRunning;
+  el("backupStop").disabled=backupStopping||actionBusyCount>0;
+}
+onActionStateChange=setControlsEnabled;
 function renderImageButtons(n){
   if(n===camCount)return;camCount=n;
   const c=el("imageButtons");c.innerHTML="";
@@ -922,14 +940,18 @@ async function setIntervalValue(delta,control){
 }
 function renderBackup(st){
   const wasRunning=backupRunning,running=!!st.running,pct=Number(st.percent||0);
-  backupRunning=running;setControlsEnabled();
+  backupRunning=running;
+  // The stopping phase also arrives from stops requested on another device.
+  backupStopping=running&&st.phase==="stopping";
+  if(!running)el("stopBackupModal").classList.remove("open");
+  setControlsEnabled();
   if(verifyRunning)return;
   el("backupFill").style.width=Math.max(0,Math.min(100,pct))+"%";
   let line=st.phase||"Idle";
   if(running){line=`${st.phase||"copying"} - ${pct.toFixed(1)}%`;
     if(st.files_total)line+=` (${st.files_done}/${st.files_total} files)`;
     if(st.eta_seconds>0)line+=` - ETA ${formatDuration(st.eta_seconds)}`;
-    loadingToast(`Copying to SSD... ${pct.toFixed(0)}%`);}
+    loadingToast(backupStopping?"Stopping backup...":`Copying to SSD... ${pct.toFixed(0)}%`);}
   else if(st.message)line=st.message;
   el("backupState").textContent=line;
   if(!running&&st.elapsed_seconds>0){
@@ -948,7 +970,7 @@ async function pollBackup(){return singleFlight("backup-status",async()=>{
     if(backupTimer){clearInterval(backupTimer);backupTimer=null}
     // 400 means the backend refused because capture is running, so no backup can be.
     known.backup=e.status===400;
-    if(known.backup)backupRunning=false;
+    if(known.backup){backupRunning=false;backupStopping=false}
     setControlsEnabled();
   }
 })}
@@ -1018,6 +1040,19 @@ async function moveBackup(control){
   }
   catch(e){toast(e.message)}
   finally{finish(backupRunning);setControlsEnabled()}
+}
+async function stopBackup(control){
+  const finish=beginAction(control,"Stopping backup...");
+  if(!finish)return;
+  el("stopBackupModal").classList.remove("open");
+  try{
+    const r=await fetchJson("/api/backup_stop");
+    if(r&&r.success===false)toast(r.msg||"The backup could not be stopped");
+    else{backupStopping=true;loadingToast("Stopping backup...")}
+    pollBackup();
+  }
+  catch(e){toast(e.message)}
+  finally{finish(backupStopping);setControlsEnabled()}
 }
 function openDeleteDialog(){
   el("deleteDecisionTitle").textContent=externalConnected?"Clear internal storage?":"External SSD not connected";
@@ -1093,6 +1128,9 @@ el("backupStart").addEventListener("click",event=>startBackup(event.currentTarge
 el("backupMove").addEventListener("click",()=>el("moveConfirmModal").classList.add("open"));
 el("moveConfirmContinue").addEventListener("click",event=>moveBackup(event.currentTarget));
 el("moveConfirmCancel").addEventListener("click",()=>el("moveConfirmModal").classList.remove("open"));
+el("backupStop").addEventListener("click",()=>el("stopBackupModal").classList.add("open"));
+el("stopBackupContinue").addEventListener("click",event=>stopBackup(event.currentTarget));
+el("stopBackupCancel").addEventListener("click",()=>el("stopBackupModal").classList.remove("open"));
 el("backupDelete").addEventListener("click",event=>deleteBackup(event.currentTarget));
 el("deleteDecisionCancel").addEventListener("click",()=>el("deleteDecisionModal").classList.remove("open"));
 el("deleteDecisionVerify").addEventListener("click",event=>verifyDeleteMatched(event.currentTarget));
@@ -1348,11 +1386,14 @@ SETUP_HTML = f'''{_HEAD}<title>SkySeeker Setup</title><style>{STYLE}</style></he
 <section class="card pad">
   <div class="card-h mb">Backup to SSD</div>
   <p class="muted small" style="margin:0 0 12px">Copies images together with GPS and altitude CSV logs.</p>
-  <div class="grid2">
-    <button class="go-btn" id="backupStart" type="button" data-locks disabled>Start backup</button>
-    <button class="danger-btn" id="backupDelete" type="button" data-locks disabled>Verify &amp; delete</button>
+  <div id="backupActions">
+    <div class="grid2">
+      <button class="go-btn" id="backupStart" type="button" data-locks disabled>Start backup</button>
+      <button class="danger-btn" id="backupDelete" type="button" data-locks disabled>Verify &amp; delete</button>
+    </div>
+    <button class="danger-btn mt" id="backupMove" type="button" data-locks disabled style="width:100%">Copy &amp; delete</button>
   </div>
-  <button class="danger-btn mt" id="backupMove" type="button" data-locks disabled style="width:100%">Copy &amp; delete</button>
+  <button class="danger-btn" id="backupStop" type="button" hidden style="width:100%">Stop backup</button>
   <div class="progress-track mt"><div class="progress-fill" id="backupFill"></div></div>
   <p class="muted small" id="backupState" style="margin-top:8px">Idle</p>
   <p class="benchmark-line mono" id="backupBenchmark">No benchmark recorded this session.</p>
@@ -1422,6 +1463,16 @@ SETUP_HTML = f'''{_HEAD}<title>SkySeeker Setup</title><style>{STYLE}</style></he
     <div style="display:flex;flex-direction:column;gap:10px">
       <button class="danger-btn" id="moveConfirmContinue" type="button">Copy &amp; delete</button>
       <button class="consent-cancel" id="moveConfirmCancel" type="button">Cancel</button>
+    </div>
+  </div>
+</div>
+<div class="consent-modal" id="stopBackupModal" role="dialog" aria-modal="true" aria-labelledby="stopBackupTitle">
+  <div class="consent-card">
+    <div class="consent-title" id="stopBackupTitle">Stop the backup?</div>
+    <p class="consent-text">The copy stops safely after the current file. Files already on the SSD are kept and nothing is deleted from internal storage that has not been verified. Starting a backup again later continues where this one stopped.</p>
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <button class="danger-btn" id="stopBackupContinue" type="button">Stop backup</button>
+      <button class="consent-cancel" id="stopBackupCancel" type="button">Keep copying</button>
     </div>
   </div>
 </div>

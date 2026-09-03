@@ -8,7 +8,7 @@ Supported hardware:
 - Sony cameras through the Sony Camera Remote SDK
 - GRF-500 laser altimeter
 - u-blox GPS on `/dev/gps`
-- TP-Link USB Wi-Fi adapter for the access point
+- USB Wi-Fi adapter for the access point (any AP-capable dongle; detected automatically)
 - Onboard Broadcom Wi-Fi for normal and rescue uplinks
 - Direct Ethernet maintenance connection
 - Internal NVMe capture storage and a removable USB SSD backup volume

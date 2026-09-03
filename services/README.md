@@ -78,10 +78,18 @@ was already connected while installing it, activate it immediately with:
 sudo nmcli connection up skyseeker-wired-access
 ```
 
-The modprobe options for the `8192eu` driver take effect when the module next
-loads (reboot, or a manual module reload with hostapd stopped). The udev rule
-and the `power_save off` assert in `skyseeker-ap-autodetect.sh` apply from the
-next boot on their own.
+`skyseeker-ap-autodetect.sh` treats any wireless interface that is not the
+onboard Broadcom radio (driver `brcmfmac`) as the AP dongle, so the dongle
+model is not fixed. If several are plugged in, the name already pinned in
+`/etc/default/skyseeker-standalone` wins, then the first by name. The script
+warns in the journal when the chosen radio does not advertise AP mode.
+
+The modprobe options for the `8192eu` driver only apply to the original TP-Link
+RTL8192EU dongle and take effect when that module next loads (reboot, or a
+manual module reload with hostapd stopped). The udev rule pins USB autosuspend
+off for that dongle by vendor and product ID; `skyseeker-ap-autodetect.sh`
+also asserts `power_save off` and USB `power/control=on` for whichever dongle
+it detects, from the next boot on its own.
 
 `skyseeker-health.timer` records AP, service, storage, PCIe, temperature, load,
 and memory state every 15 seconds. Three consecutive AP failures restart only

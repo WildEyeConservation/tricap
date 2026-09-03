@@ -12,7 +12,7 @@ The deployed hardware boundary is:
 - Sony cameras through the Sony Camera Remote SDK;
 - GRF-500 laser altimeter;
 - u-blox GPS on `/dev/gps`;
-- TP-Link RTL8192EU USB adapter dedicated to the access point;
+- a USB Wi-Fi adapter (any driver; TP-Link RTL8192EU on the original rig) dedicated to the access point;
 - onboard Broadcom Wi-Fi for normal and rescue uplinks;
 - direct Ethernet maintenance at `192.168.51.1`;
 - internal capture storage and a removable USB backup volume.
@@ -143,7 +143,7 @@ The following is the complete tracked tree, grouped by purpose.
 │   ├── systemd/
 │   │   ├── tricap.service            Flask/capture process supervision
 │   │   ├── skyseeker-standalone-net.service  AP interface address
-│   │   ├── skyseeker-ap-autodetect.service   TP-Link interface discovery
+│   │   ├── skyseeker-ap-autodetect.service   USB AP interface discovery
 │   │   ├── skyseeker-firstboot.service       unique host identity generation
 │   │   ├── skyseeker-health.service          one health/recovery execution
 │   │   ├── skyseeker-health.timer            periodic bounded AP recovery
@@ -152,12 +152,12 @@ The following is the complete tracked tree, grouped by purpose.
 │   ├── NetworkManager/system-connections/
 │   │   └── skyseeker-wired-access.nmconnection  direct Ethernet DHCP profile
 │   ├── usr-local/sbin/
-│   │   ├── skyseeker-ap-autodetect.sh        detect and pin RTL8192EU AP radio
+│   │   ├── skyseeker-ap-autodetect.sh        detect and pin the non-onboard AP radio
 │   │   ├── skyseeker-firstboot.sh            regenerate cloned identities
 │   │   ├── skyseeker-health                  diagnostics and service recovery
 │   │   └── skyseeker-recovery-scan           non-disruptive rescue joiner
 │   ├── journald.conf.d/skyseeker-journald.conf  bounded persistent journal
-│   ├── modprobe.d/skyseeker-8192eu.conf       disable AP driver power saving
+│   ├── modprobe.d/skyseeker-8192eu.conf       disable 8192eu driver power saving
 │   └── udev-rules.d/99-skyseeker-ap-dongle.rules  disable USB autosuspend
 ├── tests/
 │   ├── __init__.py                   test package marker

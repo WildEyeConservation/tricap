@@ -7,7 +7,7 @@ service, but it never reboots or power-cycles the device automatically.
 
 | Component | Role |
 |---|---|
-| TP-Link RTL8192EU USB adapter | Runs the `skyseeker` access point through hostapd |
+| USB Wi-Fi adapter (any AP-capable dongle; detected as the non-onboard radio) | Runs the `skyseeker` access point through hostapd |
 | dnsmasq | Assigns addresses on `192.168.50.0/24` |
 | Onboard Broadcom Wi-Fi | Joins an internet uplink or the `skyseeker-rescue` hotspot |
 | Ethernet | Direct laptop maintenance on `192.168.51.0/24` |

@@ -3,20 +3,24 @@
 #
 # Why: the rescue AP belongs on the USB high-gain radio, while the onboard
 # Broadcom radio searches for the phone recovery hotspot. Interface names may
-# change on cloned units, so detect the AP radio by driver and rewrite stale
-# pins.
+# change on cloned units and the USB dongle model may change between rigs, so
+# detect the AP radio by elimination and rewrite stale pins.
 #
-# Detection: a wireless interface driven by rtl8192eu/8192eu (the USB radio).
+# Detection: any wireless interface that is not the onboard Broadcom radio
+# (driver brcmfmac). If several qualify, the one already pinned in
+# /etc/default/skyseeker-standalone wins, then the first by name.
 #
 # Testing: pass a directory as $1 to treat it as the filesystem root
 # (e.g. skyseeker-ap-autodetect.sh /tmp/fakeroot). Service reloads
-# (NetworkManager) are skipped in that mode.
+# (NetworkManager) and iw calls are skipped in that mode.
 set -u
 
 ROOT="${1:-}"
 LOG_TAG="skyseeker-ap-autodetect"
+ONBOARD_DRIVER="brcmfmac"
+ENV_FILE="$ROOT/etc/default/skyseeker-standalone"
 PIN_FILES=(
-    "$ROOT/etc/default/skyseeker-standalone"
+    "$ENV_FILE"
     "$ROOT/etc/hostapd/hostapd-skyseeker.conf"
     "$ROOT/etc/dnsmasq.d/skyseeker.conf"
     "$ROOT/etc/NetworkManager/conf.d/90-skyseeker-standalone.conf"
@@ -39,17 +43,54 @@ ensure_hostapd_control() {
     fi
 }
 
-detect_ap_iface() {
-    local i name driver
+interface_driver() {
+    # sysfs reports the bound driver twice: as DRIVER= in device/uevent and
+    # as the device/driver symlink. Prefer the plain file; fall back to the
+    # symlink for the rare bus that leaves DRIVER= out of uevent.
+    local dev="$ROOT/sys/class/net/$1/device" driver=""
+    [ -r "$dev/uevent" ] && driver=$(sed -n 's/^DRIVER=//p' "$dev/uevent" | head -1)
+    [ -n "$driver" ] || driver=$(basename "$(readlink -f "$dev/driver" 2>/dev/null)" 2>/dev/null)
+    echo "$driver"
+}
+
+pinned_iface() {
+    [ -f "$ENV_FILE" ] || return 0
+    sed -n 's/^AP_IFACE=//p' "$ENV_FILE" | head -1
+}
+
+# Print every wireless interface that is not the onboard radio, one per line.
+candidate_ifaces() {
+    local i name
     for i in "$ROOT"/sys/class/net/*; do
         name=$(basename "$i")
         [ -d "$i/wireless" ] || continue
-        driver=$(basename "$(readlink -f "$i/device/driver" 2>/dev/null)" 2>/dev/null)
-        case "$driver" in
-            rtl8192eu|8192eu) echo "$name"; return 0 ;;
-        esac
+        [ "$(interface_driver "$name")" = "$ONBOARD_DRIVER" ] && continue
+        echo "$name"
     done
-    return 1
+}
+
+detect_ap_iface() {
+    local candidates pinned
+    candidates=$(candidate_ifaces)
+    [ -n "$candidates" ] || return 1
+    pinned=$(pinned_iface)
+    if [ -n "$pinned" ] && grep -qx -- "$pinned" <<< "$candidates"; then
+        echo "$pinned"
+        return 0
+    fi
+    head -n 1 <<< "$candidates"
+}
+
+supports_ap_mode() {
+    # Ask the kernel whether the radio behind the interface can run an AP.
+    # Only advisory: a dongle that cannot will fail inside hostapd, so warn
+    # early and loudly rather than silently leaving the rig without an AP.
+    local phy
+    phy=$(basename "$(readlink -f "/sys/class/net/$1/phy80211" 2>/dev/null)" 2>/dev/null)
+    [ -n "$phy" ] || return 0
+    iw phy "$phy" info 2>/dev/null \
+        | sed -n '/Supported interface modes/,/^\t[^\t]/p' \
+        | grep -q '^\t\t \* AP$'
 }
 
 # USB enumeration can lag boot: wait up to 30 s for the AP interface. A
@@ -62,32 +103,42 @@ for _ in $(seq 1 "$attempts"); do
     sleep 1
 done
 if [ -z "$iface" ]; then
-    log "no USB RTL8192EU AP adapter found after 30s; leaving configs untouched"
+    log "no USB AP adapter found after 30s (only the onboard $ONBOARD_DRIVER radio is present); leaving configs untouched"
     exit 0
 fi
 
+driver=$(interface_driver "$iface")
+extra=$(candidate_ifaces | grep -vx -- "$iface" | tr '\n' ' ')
+[ -z "$extra" ] || log "several USB radios present (${extra% }); using $iface"
+log "AP adapter is $iface (driver ${driver:-unknown})"
+
 if [ -z "$ROOT" ]; then
+    if ! supports_ap_mode "$iface"; then
+        log "WARNING: $iface (driver ${driver:-unknown}) does not advertise AP mode; hostapd is likely to fail"
+    fi
     # Belt-and-braces: assert no runtime power saving on the AP radio every
-    # boot. The driver-level knobs are pinned in /etc/modprobe.d and the USB
-    # autosuspend policy in /etc/udev/rules.d; this covers the interface flag.
+    # boot. The 8192eu driver-level knobs are pinned in /etc/modprobe.d and
+    # the TP-Link USB autosuspend policy in /etc/udev/rules.d; these two lines
+    # cover the interface flag and USB autosuspend for whatever dongle is
+    # actually plugged in.
     iw dev "$iface" set power_save off 2>/dev/null || true
+    echo on > "/sys/class/net/$iface/device/power/control" 2>/dev/null || true
 fi
 
 ensure_hostapd_control
 
-env_file="$ROOT/etc/default/skyseeker-standalone"
-if [ ! -f "$env_file" ]; then
-    log "$env_file missing; is this a standalone unit? nothing to do"
+if [ ! -f "$ENV_FILE" ]; then
+    log "$ENV_FILE missing; is this a standalone unit? nothing to do"
     exit 0
 fi
-pinned=$(sed -n 's/^AP_IFACE=//p' "$env_file" | head -1)
+pinned=$(pinned_iface)
 if [ -z "$pinned" ]; then
-    log "no AP_IFACE in $env_file; nothing to do"
+    log "no AP_IFACE in $ENV_FILE; nothing to do"
     exit 0
 fi
 
 if [ "$iface" = "$pinned" ]; then
-    exit 0  # names match — the common case on the original unit
+    exit 0  # names match: the common case on the original unit
 fi
 
 log "adapter is $iface but configs pin $pinned; rewriting"

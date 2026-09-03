@@ -1,5 +1,6 @@
 import {
   ApiError,
+  actionBusyCount,
   beginAction,
   byId,
   downloadBlob,
@@ -9,6 +10,7 @@ import {
   loadingToast,
   postJson,
   runPeriodic,
+  setActionStateListener,
   singleFlight,
   toast,
   uiConfig,
@@ -115,6 +117,7 @@ let currentInterval: number | undefined;
 let currentImageFormat: ImageFormat | undefined;
 let capturing = false;
 let backupRunning = false;
+let backupStopping = false;
 let backupTimer: number | undefined;
 let cameraCount = -1;
 let externalConnected = false;
@@ -129,16 +132,26 @@ const known = { status: false, backup: false, verify: false };
 
 function setControlsEnabled(): void {
   const unknown = !(known.status && known.backup && known.verify);
-  const locked = unknown || capturing || backupRunning || verifyRunning;
+  const jobLocked = unknown || capturing || backupRunning || verifyRunning;
+  const locked = jobLocked || actionBusyCount > 0;
   document.querySelectorAll<HTMLButtonElement>("[data-locks]").forEach((control) => {
     control.disabled = locked || control.dataset.actionBusy === "true";
   });
   byId("lockNote").textContent = unknown
     ? "Checking device status..."
-    : locked
+    : jobLocked
       ? "Some controls are disabled while capture or copy is running."
       : "";
+  updateBackupButtons();
 }
+
+function updateBackupButtons(): void {
+  byId("backupActions").hidden = backupRunning;
+  button("backupStop").hidden = !backupRunning;
+  button("backupStop").disabled = backupStopping || actionBusyCount > 0;
+}
+
+setActionStateListener(setControlsEnabled);
 
 function renderImageButtons(count: number): void {
   if (count === cameraCount) return;
@@ -315,6 +328,8 @@ function formatDuration(seconds: number): string {
 function renderBackup(status: BackupStatus): void {
   const wasRunning = backupRunning;
   backupRunning = status.running;
+  backupStopping = status.running && status.phase === "stopping";
+  if (!status.running) byId("stopBackupModal").classList.remove("open");
   setControlsEnabled();
   if (verifyRunning) return;
 
@@ -325,7 +340,7 @@ function renderBackup(status: BackupStatus): void {
     line = `${status.phase || "copying"} - ${percent.toFixed(1)}%`;
     if (status.files_total) line += ` (${status.files_done}/${status.files_total} files)`;
     if (Number(status.eta_seconds) > 0) line += ` - ETA ${formatDuration(Number(status.eta_seconds))}`;
-    loadingToast(`Copying to SSD... ${percent.toFixed(0)}%`);
+    loadingToast(backupStopping ? "Stopping backup..." : `Copying to SSD... ${percent.toFixed(0)}%`);
   } else if (status.message) {
     line = status.message;
   }
@@ -360,7 +375,10 @@ async function pollBackup(): Promise<void> {
       }
       // 400 means the backend refused because capture is running, so no backup can be.
       known.backup = error instanceof ApiError && error.status === 400;
-      if (known.backup) backupRunning = false;
+      if (known.backup) {
+        backupRunning = false;
+        backupStopping = false;
+      }
       setControlsEnabled();
     }
   });
@@ -458,6 +476,26 @@ async function moveBackup(control: HTMLButtonElement): Promise<void> {
     toast(errorMessage(error));
   } finally {
     finish(backupRunning);
+    setControlsEnabled();
+  }
+}
+
+async function stopBackup(control: HTMLButtonElement): Promise<void> {
+  const finish = beginAction(control, "Stopping backup...");
+  if (!finish) return;
+  byId("stopBackupModal").classList.remove("open");
+  try {
+    const result = await postJson<ActionResponse>("/api/backup_stop");
+    if (result.success === false) toast(result.msg || "The backup could not be stopped");
+    else {
+      backupStopping = true;
+      loadingToast("Stopping backup...");
+    }
+    void pollBackup();
+  } catch (error) {
+    toast(errorMessage(error));
+  } finally {
+    finish(backupStopping);
     setControlsEnabled();
   }
 }
@@ -758,6 +796,9 @@ button("backupStart").addEventListener("click", () => void startBackup(button("b
 button("backupMove").addEventListener("click", () => byId("moveConfirmModal").classList.add("open"));
 button("moveConfirmContinue").addEventListener("click", () => void moveBackup(button("moveConfirmContinue")));
 button("moveConfirmCancel").addEventListener("click", () => byId("moveConfirmModal").classList.remove("open"));
+button("backupStop").addEventListener("click", () => byId("stopBackupModal").classList.add("open"));
+button("stopBackupContinue").addEventListener("click", () => void stopBackup(button("stopBackupContinue")));
+button("stopBackupCancel").addEventListener("click", () => byId("stopBackupModal").classList.remove("open"));
 button("backupDelete").addEventListener("click", () => void deleteBackup(button("backupDelete")));
 button("deleteDecisionCancel").addEventListener("click", () => byId("deleteDecisionModal").classList.remove("open"));
 button("deleteDecisionVerify").addEventListener("click", () => void verifyDeleteMatched(button("deleteDecisionVerify")));

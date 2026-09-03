@@ -20,14 +20,17 @@ VIEW_SPEC.loader.exec_module(DASHBOARD_VIEW)
 class DashboardPageParser(HTMLParser):
     def __init__(self):
         super().__init__()
+        self.elements = {}
         self.module_sources = []
         self.ui_config_parts = []
         self.reading_ui_config = False
 
     def handle_starttag(self, tag, attrs):
+        attributes = dict(attrs)
+        if attributes.get("id"):
+            self.elements[attributes["id"]] = (tag, attributes)
         if tag != "script":
             return
-        attributes = dict(attrs)
         if attributes.get("type") == "module":
             self.module_sources.append(attributes.get("src"))
         if (
@@ -142,6 +145,18 @@ class FlaskDashboardAssetTests(unittest.TestCase):
                     json.loads("".join(parser.ui_config_parts)),
                     {"status_poll_ms": 1500, "heartbeat_ms": 7000},
                 )
+
+    def test_setup_has_a_confirmed_stop_backup_control(self):
+        parser = DashboardPageParser()
+        parser.feed(self.client.get("/setup").get_data(as_text=True))
+
+        stop_tag, stop_attributes = parser.elements["backupStop"]
+        self.assertEqual(stop_tag, "button")
+        self.assertIn("hidden", stop_attributes)
+        self.assertNotIn("data-locks", stop_attributes)
+        self.assertEqual(parser.elements["stopBackupModal"][0], "div")
+        self.assertEqual(parser.elements["stopBackupContinue"][0], "button")
+        self.assertEqual(parser.elements["stopBackupCancel"][0], "button")
 
 
 class AccessPointSignalTests(unittest.TestCase):

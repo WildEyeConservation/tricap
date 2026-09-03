@@ -17,6 +17,13 @@ export class ApiError extends Error {
 export type ActionControl = HTMLButtonElement;
 export type FinishAction = (keepLoading?: boolean) => void;
 
+export let actionBusyCount = 0;
+let actionStateListener: (() => void) | undefined;
+
+export function setActionStateListener(listener: () => void): void {
+  actionStateListener = listener;
+}
+
 export function byId<T extends HTMLElement = HTMLElement>(id: string): T {
   const element = document.querySelector<T>(`#${CSS.escape(id)}`);
   if (!element) {
@@ -77,6 +84,8 @@ export function beginAction(
   control.classList.add("action-busy");
   control.setAttribute("aria-busy", "true");
   control.disabled = true;
+  actionBusyCount += 1;
+  actionStateListener?.();
   loadingToast(message);
 
   let finished = false;
@@ -89,6 +98,8 @@ export function beginAction(
     control.classList.remove("action-busy");
     control.removeAttribute("aria-busy");
     control.disabled = false;
+    actionBusyCount -= 1;
+    actionStateListener?.();
     if (!keepLoading) {
       hideLoadingToast();
     }

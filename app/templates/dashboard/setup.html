@@ -31,11 +31,14 @@
 <section class="card pad">
   <div class="card-h mb">Backup to SSD</div>
   <p class="muted small mb12">Copies images together with GPS and altitude CSV logs.</p>
-  <div class="grid2">
-    <button class="go-btn" id="backupStart" type="button" data-locks disabled>Start backup</button>
-    <button class="danger-btn" id="backupDelete" type="button" data-locks disabled>Verify &amp; delete</button>
+  <div id="backupActions">
+    <div class="grid2">
+      <button class="go-btn" id="backupStart" type="button" data-locks disabled>Start backup</button>
+      <button class="danger-btn" id="backupDelete" type="button" data-locks disabled>Verify &amp; delete</button>
+    </div>
+    <button class="danger-btn mt full-width" id="backupMove" type="button" data-locks disabled>Copy &amp; delete</button>
   </div>
-  <button class="danger-btn mt full-width" id="backupMove" type="button" data-locks disabled>Copy &amp; delete</button>
+  <button class="danger-btn full-width" id="backupStop" type="button" hidden>Stop backup</button>
   <div class="progress-track mt"><div class="progress-fill" id="backupFill"></div></div>
   <p class="muted small mt8" id="backupState">Idle</p>
   <p class="benchmark-line mono" id="backupBenchmark">No benchmark recorded this session.</p>
@@ -103,6 +106,16 @@
     <div class="stack-gap">
       <button class="danger-btn" id="moveConfirmContinue" type="button">Copy &amp; delete</button>
       <button class="consent-cancel" id="moveConfirmCancel" type="button">Cancel</button>
+    </div>
+  </div>
+</div>
+<div class="consent-modal" id="stopBackupModal" role="dialog" aria-modal="true" aria-labelledby="stopBackupTitle">
+  <div class="consent-card">
+    <div class="consent-title" id="stopBackupTitle">Stop the backup?</div>
+    <p class="consent-text">The copy stops safely after the current file. Files already on the SSD are kept and nothing is deleted from internal storage that has not been verified. Starting a backup again later continues where this one stopped.</p>
+    <div class="stack-gap">
+      <button class="danger-btn" id="stopBackupContinue" type="button">Stop backup</button>
+      <button class="consent-cancel" id="stopBackupCancel" type="button">Keep copying</button>
     </div>
   </div>
 </div>

@@ -8,6 +8,11 @@ export class ApiError extends Error {
         this.name = "ApiError";
     }
 }
+export let actionBusyCount = 0;
+let actionStateListener;
+export function setActionStateListener(listener) {
+    actionStateListener = listener;
+}
 export function byId(id) {
     const element = document.querySelector(`#${CSS.escape(id)}`);
     if (!element) {
@@ -57,6 +62,8 @@ export function beginAction(control, message) {
     control.classList.add("action-busy");
     control.setAttribute("aria-busy", "true");
     control.disabled = true;
+    actionBusyCount += 1;
+    actionStateListener?.();
     loadingToast(message);
     let finished = false;
     return (keepLoading = false) => {
@@ -68,6 +75,8 @@ export function beginAction(control, message) {
         control.classList.remove("action-busy");
         control.removeAttribute("aria-busy");
         control.disabled = false;
+        actionBusyCount -= 1;
+        actionStateListener?.();
         if (!keepLoading) {
             hideLoadingToast();
         }
